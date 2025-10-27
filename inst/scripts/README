@@ -1,0 +1,18 @@
+List of reproducible scripts
+
+
+benchmark_Seu_miloR.R:  benchmark tinydenseR, Seurat and miloR on COVID dataset
+
+head_to_head_Seu.R:     head to head comparison bewteen Seurat and tinydenseR on COVID dataset
+
+peak_mem_profvis.R:     utility used in benchmark
+
+sim_flow_DA_diffcyt.R:  simulated differential abundance dataset and analysis with diffcyt
+
+sim_flow_DA.R:          simulated differential abundance dataset and analysis with tinydenseR
+
+sim_flow_DE_diffcyt.R:  simulated differential expression dataset and analysis with diffcyt
+
+sim_flow_DE.R:          simulated differential expression dataset and analysis with tinydenseR
+
+sim_scRNAseq_traj.R:    simulated trajectory dataset and analysis with tinydenseR
