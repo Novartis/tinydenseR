@@ -1,5 +1,5 @@
 
-# tinydenseR <a href="artwork/tinydenseR_hex_piano_behind.png"><img src="artwork/tinydenseR_hex_piano_behind.png" style="float:right" height="138" /></a>
+# tinydenseR <a href="artwork/tinydenseR_hex_piano_behind.png"><img src="artwork/tinydenseR_hex_piano_behind.png" align="right" height="138" /></a>
 
 <!-- badges: start -->
 
