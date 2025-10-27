@@ -12,9 +12,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-# tinydenseR
-
-<a href="artwork/tinydenseR_hex_piano_behind.png"><img src="artwork/tinydenseR_hex_piano_behind.png" align="right" height="250" /></a>
+# tinydenseR <a href="artwork/tinydenseR_hex_piano_behind.png"><img src="artwork/tinydenseR_hex_piano_behind.png" style="float:right" height="138" /></a>
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/Novartis/tinydenseR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Novartis/tinydenseR/actions/workflows/R-CMD-check.yaml)

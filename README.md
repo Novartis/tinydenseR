@@ -1,7 +1,5 @@
 
-# tinydenseR
-
-<a href="artwork/tinydenseR_hex_piano_behind.png"><img src="artwork/tinydenseR_hex_piano_behind.png" align="right" height="250" /></a>
+# tinydenseR <a href="artwork/tinydenseR_hex_piano_behind.png"><img src="artwork/tinydenseR_hex_piano_behind.png" style="float:right" height="138" /></a>
 
 <!-- badges: start -->
 
@@ -318,10 +316,10 @@ library(tinydenseR)
 library(tidyverse)
 #> ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
 #> ✔ dplyr     1.1.4     ✔ readr     2.1.5
-#> ✔ forcats   1.0.0     ✔ stringr   1.5.1
-#> ✔ ggplot2   3.5.2     ✔ tibble    3.3.0
+#> ✔ forcats   1.0.1     ✔ stringr   1.5.2
+#> ✔ ggplot2   4.0.0     ✔ tibble    3.3.0
 #> ✔ lubridate 1.9.4     ✔ tidyr     1.3.1
-#> ✔ purrr     1.0.4     
+#> ✔ purrr     1.1.0     
 #> ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
 #> ✖ dplyr::filter() masks stats::filter()
 #> ✖ dplyr::lag()    masks stats::lag()
@@ -356,7 +354,128 @@ if (curl::has_internet()) {
 
 }
 #> Downloading trajectory data from miloR repository...
-#> Loading required namespace: SingleCellExperiment
+#> Loading required package: SingleCellExperiment
+#> Loading required package: SummarizedExperiment
+#> Loading required package: MatrixGenerics
+#> Loading required package: matrixStats
+#> 
+#> Attaching package: 'matrixStats'
+#> 
+#> The following object is masked from 'package:dplyr':
+#> 
+#>     count
+#> 
+#> 
+#> Attaching package: 'MatrixGenerics'
+#> 
+#> The following objects are masked from 'package:matrixStats':
+#> 
+#>     colAlls, colAnyNAs, colAnys, colAvgsPerRowSet, colCollapse,
+#>     colCounts, colCummaxs, colCummins, colCumprods, colCumsums,
+#>     colDiffs, colIQRDiffs, colIQRs, colLogSumExps, colMadDiffs,
+#>     colMads, colMaxs, colMeans2, colMedians, colMins, colOrderStats,
+#>     colProds, colQuantiles, colRanges, colRanks, colSdDiffs, colSds,
+#>     colSums2, colTabulates, colVarDiffs, colVars, colWeightedMads,
+#>     colWeightedMeans, colWeightedMedians, colWeightedSds,
+#>     colWeightedVars, rowAlls, rowAnyNAs, rowAnys, rowAvgsPerColSet,
+#>     rowCollapse, rowCounts, rowCummaxs, rowCummins, rowCumprods,
+#>     rowCumsums, rowDiffs, rowIQRDiffs, rowIQRs, rowLogSumExps,
+#>     rowMadDiffs, rowMads, rowMaxs, rowMeans2, rowMedians, rowMins,
+#>     rowOrderStats, rowProds, rowQuantiles, rowRanges, rowRanks,
+#>     rowSdDiffs, rowSds, rowSums2, rowTabulates, rowVarDiffs, rowVars,
+#>     rowWeightedMads, rowWeightedMeans, rowWeightedMedians,
+#>     rowWeightedSds, rowWeightedVars
+#> 
+#> Loading required package: GenomicRanges
+#> Loading required package: stats4
+#> Loading required package: BiocGenerics
+#> 
+#> Attaching package: 'BiocGenerics'
+#> 
+#> The following objects are masked from 'package:lubridate':
+#> 
+#>     intersect, setdiff, union
+#> 
+#> The following objects are masked from 'package:dplyr':
+#> 
+#>     combine, intersect, setdiff, union
+#> 
+#> The following object is masked from 'package:tinydenseR':
+#> 
+#>     plotPCA
+#> 
+#> The following objects are masked from 'package:stats':
+#> 
+#>     IQR, mad, sd, var, xtabs
+#> 
+#> The following objects are masked from 'package:base':
+#> 
+#>     anyDuplicated, aperm, append, as.data.frame, basename, cbind,
+#>     colnames, dirname, do.call, duplicated, eval, evalq, Filter, Find,
+#>     get, grep, grepl, intersect, is.unsorted, lapply, Map, mapply,
+#>     match, mget, order, paste, pmax, pmax.int, pmin, pmin.int,
+#>     Position, rank, rbind, Reduce, rownames, sapply, saveRDS, setdiff,
+#>     table, tapply, union, unique, unsplit, which.max, which.min
+#> 
+#> Loading required package: S4Vectors
+#> 
+#> Attaching package: 'S4Vectors'
+#> 
+#> The following objects are masked from 'package:lubridate':
+#> 
+#>     second, second<-
+#> 
+#> The following objects are masked from 'package:dplyr':
+#> 
+#>     first, rename
+#> 
+#> The following object is masked from 'package:tidyr':
+#> 
+#>     expand
+#> 
+#> The following object is masked from 'package:utils':
+#> 
+#>     findMatches
+#> 
+#> The following objects are masked from 'package:base':
+#> 
+#>     expand.grid, I, unname
+#> 
+#> Loading required package: IRanges
+#> 
+#> Attaching package: 'IRanges'
+#> 
+#> The following object is masked from 'package:lubridate':
+#> 
+#>     %within%
+#> 
+#> The following objects are masked from 'package:dplyr':
+#> 
+#>     collapse, desc, slice
+#> 
+#> The following object is masked from 'package:purrr':
+#> 
+#>     reduce
+#> 
+#> Loading required package: GenomeInfoDb
+#> Loading required package: Biobase
+#> Welcome to Bioconductor
+#> 
+#>     Vignettes contain introductory material; view with
+#>     'browseVignettes()'. To cite Bioconductor, see
+#>     'citation("Biobase")', and for packages 'citation("pkgname")'.
+#> 
+#> 
+#> Attaching package: 'Biobase'
+#> 
+#> The following object is masked from 'package:MatrixGenerics':
+#> 
+#>     rowMedians
+#> 
+#> The following objects are masked from 'package:matrixStats':
+#> 
+#>     anyMissing, rowMedians
+#> 
 #> Successfully fetched trajectory data with 500 cells and 500 features
 ```
 
