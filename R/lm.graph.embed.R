@@ -29,13 +29,17 @@ leiden.cluster <-
   function(.lm.obj = NULL,
            .sim.matrix,
            .resolution.parameter,
-           .small.size = floor(x = nrow(x = .sim.matrix) / 200),
+           .small.size = floor(nrow(.sim.matrix) / 200),
            .verbose = TRUE,
            .seed = 123) {
     
     .init.embed <- 
       if(!is.null(x = .lm.obj)){
-        .lm.obj$graph$uwot$embedding
+        if(is.na(x = .lm.obj$graph$LE$embed[1,1])) {
+          .lm.obj$pca$embed[,1:min(3, ncol(x = .lm.obj$pca$embed)), drop = FALSE]
+        } else {
+          .lm.obj$graph$LE$embed
+        }
       } else {
         irlba::irlba(A = .sim.matrix,
                      nv = 3,
@@ -260,10 +264,6 @@ get.graph <-
            .cl.resolution.parameter = 0.8,
            .small.size = floor(x = nrow(x = .lm.obj$lm) / 200)){
     
-    .cl.method <-
-      match.arg(arg = .cl.method,
-                choices = c("fgraph","snn"))
-    
     set.seed(seed = .seed)
     .lm.obj$graph$uwot <-
       uwot::umap(X = if(!is.null(x = .lm.obj$harmony.obj) || .lm.obj$assay.type == "RNA") .lm.obj$pca$embed else .lm.obj$lm,
@@ -289,18 +289,21 @@ get.graph <-
     .lm.obj$graph$adj.matrix <-
       get.adj.matrix(.nn.idx = .lm.obj$graph$uwot$nn$euclidean$idx)
     
-    if(isTRUE(x = .verbose)){
-      message("getting snn")
+    if(.cl.method == "snn"){
+      if(isTRUE(x = .verbose)){
+        message("getting snn")
+      }
+      
+      .lm.obj$graph$snn <-
+        fast.jaccard.r(.adj.matrix = .lm.obj$graph$adj.matrix,
+                       .prune = 1/15) |>
+        (\(x)
+         `dimnames<-`(x = x,
+                      value = list(rownames(x = .lm.obj$lm),
+                                   rownames(x = .lm.obj$lm)))
+        )()
+      
     }
-    
-    .lm.obj$graph$snn <-
-      fast.jaccard.r(.adj.matrix = .lm.obj$graph$adj.matrix,
-                     .prune = 1/15) |>
-      (\(x)
-       `dimnames<-`(x = x,
-                    value = list(rownames(x = .lm.obj$lm),
-                                 rownames(x = .lm.obj$lm)))
-      )()
     
     if(isTRUE(x = .verbose)){
       message("getting Laplacian Eigenmap")
