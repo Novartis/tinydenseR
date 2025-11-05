@@ -264,6 +264,10 @@ get.graph <-
            .cl.resolution.parameter = 0.8,
            .small.size = floor(x = nrow(x = .lm.obj$lm) / 200)){
     
+    .cl.method <-
+      match.arg(arg = .cl.method,
+                choices = c("fgraph","snn"))
+    
     set.seed(seed = .seed)
     .lm.obj$graph$uwot <-
       uwot::umap(X = if(!is.null(x = .lm.obj$harmony.obj) || .lm.obj$assay.type == "RNA") .lm.obj$pca$embed else .lm.obj$lm,
@@ -289,21 +293,15 @@ get.graph <-
     .lm.obj$graph$adj.matrix <-
       get.adj.matrix(.nn.idx = .lm.obj$graph$uwot$nn$euclidean$idx)
     
-    if(.cl.method == "snn"){
-      if(isTRUE(x = .verbose)){
-        message("getting snn")
-      }
-      
-      .lm.obj$graph$snn <-
-        fast.jaccard.r(.adj.matrix = .lm.obj$graph$adj.matrix,
-                       .prune = 1/15) |>
-        (\(x)
-         `dimnames<-`(x = x,
-                      value = list(rownames(x = .lm.obj$lm),
-                                   rownames(x = .lm.obj$lm)))
-        )()
-      
-    }
+    .lm.obj$graph$snn <-
+      fast.jaccard.r(.adj.matrix = .lm.obj$graph$adj.matrix,
+                     .prune = 1/15) |>
+      (\(x)
+       `dimnames<-`(x = x,
+                    value = list(rownames(x = .lm.obj$lm),
+                                 rownames(x = .lm.obj$lm)))
+      )()
+    
     
     if(isTRUE(x = .verbose)){
       message("getting Laplacian Eigenmap")
