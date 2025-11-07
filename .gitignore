@@ -48,3 +48,6 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 tinydenseR.Rproj
+
+# macOS
+.DS_Store

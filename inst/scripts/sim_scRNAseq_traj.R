@@ -56,7 +56,7 @@ lm.cells <-
   tinydenseR::get.landmarks(.nHVG = 500,
                             .nPC = 3) |>
   tinydenseR::get.graph(.cl.resolution.parameter = 2e2, 
-                           .k = 10)
+                        .k = 10)
 
 lm.cells <-
   tinydenseR::get.map(.lm.obj = lm.cells)
@@ -209,7 +209,7 @@ tinydenseR::plotPCA(.lm.obj = lm.cells,
                       "not sig.",
                       "abundance up")),
   .plot.title = "hypothesis testing",
-  .color.label = "Group B vs A\nFDR < 10%",
+  .color.label = "Group B vs A\nq < 0.1",
   .cat.feature.color = Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2) +

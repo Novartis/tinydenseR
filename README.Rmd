@@ -12,7 +12,9 @@ knitr::opts_chunk$set(
 )
 ```
 
-# tinydenseR <a href="artwork/tinydenseR_hex_piano_behind.png"><img src="artwork/tinydenseR_hex_piano_behind.png" align="right" height="138" /></a>
+# tinydenseR
+
+<a href="artwork/tinydenseR_hex_piano_behind.png"><img src="artwork/tinydenseR_hex_piano_behind.png" align="right" height="250" /></a>
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/Novartis/tinydenseR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Novartis/tinydenseR/actions/workflows/R-CMD-check.yaml)
@@ -414,11 +416,11 @@ tinydenseR::plotPCA(
         yes = "less abundant",
         no = "more abundant") |>
         ifelse(
-            test = condition.stats$fit$pca.weighted.q.fdr[,"ConditionB"] < 0.1,
+            test = condition.stats$fit$pca.weighted.q[,"ConditionB"] < 0.1,
             no = "not sig.") |>
         factor(levels = c("less abundant", "not sig.", "more abundant")),
     .cat.feature.color = Color.Palette[1,c(1,6,2)],
-    .color.label = "FDR < 10%",
+    .color.label = "q < 0.1",
     .point.size = 1,
     .panel.size = 1.5
 )

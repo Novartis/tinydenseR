@@ -373,7 +373,7 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DA.0.5,
                       "not sig.",
                       "more abundant")),
   .plot.title = "Depletion vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -387,13 +387,13 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DA.0.5,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.0.5$fit$pca.weighted.q.fdr[,"Depletion"] < 0.1,
+      test = Treatment.stats.0.5$fit$pca.weighted.q[,"Depletion"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
                       "more abundant")),
   .plot.title = "Depletion vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -419,8 +419,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-    .lm.obj = lm.cells.DA.0.5,
-    .stats.obj = Treatment.stats.0.5)
+  .lm.obj = lm.cells.DA.0.5,
+  .stats.obj = Treatment.stats.0.5)
 
 stat.test.percentages.DA.0.5 <-
   lm.cells.DA.0.5$map$clustering$cell.perc |>
@@ -720,7 +720,7 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DA.5,
                       "not sig.",
                       "more abundant")),
   .plot.title = "Depletion vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -734,13 +734,13 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DA.5,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.5$fit$pca.weighted.q.fdr[,"Depletion"] < 0.1,
+      test = Treatment.stats.5$fit$pca.weighted.q[,"Depletion"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
                       "more abundant")),
   .plot.title = "Depletion vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -766,8 +766,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-    .lm.obj = lm.cells.DA.5,
-    .stats.obj = Treatment.stats.5)
+  .lm.obj = lm.cells.DA.5,
+  .stats.obj = Treatment.stats.5)
 
 stat.test.percentages.DA.5 <-
   lm.cells.DA.5$map$clustering$cell.perc |>
@@ -808,12 +808,12 @@ stat.test.percentages.DA.5 <-
     ggplot2::labs(title = "within-cluster abundance"))
 
 tinydenseR::plotBeeswarm(
-    .lm.obj = lm.cells.DA.5,
-    .stats.obj = Treatment.stats.5,
-    .coefs = "Depletion",
-    .swarm.title = "Depletion vs Baseline",
-    .row.space.scaler = 0.5,
-    .perc.plot = FALSE) +
+  .lm.obj = lm.cells.DA.5,
+  .stats.obj = Treatment.stats.5,
+  .coefs = "Depletion",
+  .swarm.title = "Depletion vs Baseline",
+  .row.space.scaler = 0.5,
+  .perc.plot = FALSE) +
   ggplot2::geom_vline(xintercept = -1,
                       color = "red",
                       linetype = "dashed")
@@ -1069,7 +1069,7 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DA.50,
                       "not sig.",
                       "more abundant")),
   .plot.title = "Depletion vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -1083,13 +1083,13 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DA.50,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.50$fit$pca.weighted.q.fdr[,"Depletion"] < 0.1,
+      test = Treatment.stats.50$fit$pca.weighted.q[,"Depletion"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
                       "more abundant")),
   .plot.title = "Depletion vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -1115,8 +1115,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-    .lm.obj = lm.cells.DA.50,
-    .stats.obj = Treatment.stats.50)
+  .lm.obj = lm.cells.DA.50,
+  .stats.obj = Treatment.stats.50)
 
 stat.test.percentages.DA.50 <-
   lm.cells.DA.50$map$clustering$cell.perc |>
@@ -1157,12 +1157,12 @@ stat.test.percentages.DA.50 <-
     ggplot2::labs(title = "within-cluster abundance"))
 
 tinydenseR::plotBeeswarm(
-    .lm.obj = lm.cells.DA.50,
-    .stats.obj = Treatment.stats.50,
-    .coefs = "Depletion",
-    .swarm.title = "Depletion vs Baseline",
-    .row.space.scaler = 0.50,
-    .perc.plot = FALSE) +
+  .lm.obj = lm.cells.DA.50,
+  .stats.obj = Treatment.stats.50,
+  .coefs = "Depletion",
+  .swarm.title = "Depletion vs Baseline",
+  .row.space.scaler = 0.50,
+  .perc.plot = FALSE) +
   ggplot2::geom_vline(xintercept = -1,
                       color = "red",
                       linetype = "dashed")

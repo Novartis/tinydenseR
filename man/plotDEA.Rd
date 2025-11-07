@@ -10,7 +10,7 @@ plotDEA(
   .coefs,
   .order.by = "clustering",
   .markers = colnames(x = .lm.obj$graph[[.order.by]]$mean.exprs),
-  .FDR = 0.1,
+  .q = 0.1,
   .row.space.scaler = 0.2,
   .col.space.scaler = 0.065,
   .label.substr.rm = ""
@@ -27,7 +27,7 @@ plotDEA(
 
 \item{.markers}{A character vector with the markers to plot. Defaults to the column names of the \code{"clustering"} or \code{"celltyping"} mean expression matrix.}
 
-\item{.FDR}{The false discovery rate threshold to use for coloring the plot.}
+\item{.q}{The q-value threshold to use for coloring the plot.}
 
 \item{.row.space.scaler}{The scaler for the row space. Defaults to \code{0.2}.}
 

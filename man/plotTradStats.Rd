@@ -9,7 +9,7 @@ plotTradStats(
   .stats.obj,
   .split.by = "clustering",
   .coefs = colnames(x = .stats.obj$trad[[.split.by]]$fit$coefficients),
-  .FDR = 0.1,
+  .q = 0.1,
   .row.space.scaler = 0.2,
   .col.space.scaler = 0.07,
   .label.substr.rm = ""
@@ -24,7 +24,7 @@ plotTradStats(
 
 \item{.coefs}{The coefficient level to plot.}
 
-\item{.FDR}{The false discovery rate threshold to use for coloring the plot.}
+\item{.q}{The q-value threshold to use for coloring the plot.}
 
 \item{.row.space.scaler}{The scaler for the row space. Defaults to 0.2.}
 

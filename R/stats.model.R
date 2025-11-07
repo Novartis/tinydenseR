@@ -211,7 +211,7 @@ get.stats <-
             })
     
     if(isTRUE(x = .verbose)){
-      message("\nretrieving PCA-weighted FDR q-values")
+      message("\nretrieving PCA-weighted q-values")
     }
     
     if(nrow(x = stats$fit$p.value) < 100){
@@ -283,7 +283,7 @@ get.stats <-
       
     }
     
-    stats$fit$pca.weighted.q.fdr <-
+    stats$fit$pca.weighted.q <-
       apply(X = stats$fit$p.value,
             MARGIN = 2,
             FUN = function(pvalues){

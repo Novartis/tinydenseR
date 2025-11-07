@@ -8,7 +8,7 @@ Description: tinydenseR is a landmark-based platform for single cell data analys
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Depends: 
     R (>= 4.1)
 LazyData: true

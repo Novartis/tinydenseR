@@ -478,7 +478,7 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.0.5,
                       "not sig.",
                       "more abundant")),
   .plot.title = "Activation vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -492,13 +492,13 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.0.5,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.0.5$fit$pca.weighted.q.fdr[,"Activation"] < 0.1,
+      test = Treatment.stats.0.5$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
                       "more abundant")),
   .plot.title = "Activation vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -524,8 +524,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-    .lm.obj = lm.cells.DE.0.5,
-    .stats.obj = Treatment.stats.0.5)
+  .lm.obj = lm.cells.DE.0.5,
+  .stats.obj = Treatment.stats.0.5)
 
 stat.test.percentages.DE.0.5 <-
   lm.cells.DE.0.5$map$clustering$cell.perc |>
@@ -847,7 +847,7 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.1,
                       "not sig.",
                       "more abundant")),
   .plot.title = "Activation vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -861,13 +861,13 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.1,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.1$fit$pca.weighted.q.fdr[,"Activation"] < 0.1,
+      test = Treatment.stats.1$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
                       "more abundant")),
   .plot.title = "Activation vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -893,8 +893,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-    .lm.obj = lm.cells.DE.1,
-    .stats.obj = Treatment.stats.1)
+  .lm.obj = lm.cells.DE.1,
+  .stats.obj = Treatment.stats.1)
 
 stat.test.percentages.DE.1 <-
   lm.cells.DE.1$map$clustering$cell.perc |>
@@ -1214,7 +1214,7 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.2,
                       "not sig.",
                       "more abundant")),
   .plot.title = "Activation vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -1228,13 +1228,13 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.2,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.2$fit$pca.weighted.q.fdr[,"Activation"] < 0.1,
+      test = Treatment.stats.2$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
                       "more abundant")),
   .plot.title = "Activation vs Baseline",
-  .color.label = "FDR < 10%",
+  .color.label = "q < 0.1",
   .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
   .point.size = 1,
   .panel.size = 2)   +
@@ -1260,8 +1260,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-    .lm.obj = lm.cells.DE.2,
-    .stats.obj = Treatment.stats.2)
+  .lm.obj = lm.cells.DE.2,
+  .stats.obj = Treatment.stats.2)
 
 stat.test.percentages.DE.2 <-
   lm.cells.DE.2$map$clustering$cell.perc |>
@@ -1311,12 +1311,12 @@ tinydenseR::plotBeeswarm(
   .FDR.from = "DensityWeightedBH")
 
 tinydenseR::plotBeeswarm(
-    .lm.obj = lm.cells.DE.2,
-    .stats.obj = Treatment.stats.2,
-    .coefs = "Activation",
-    .swarm.title = "Activation vs Baseline",
-    .row.space.scaler = 0.5,
-    .perc.plot = FALSE)
+  .lm.obj = lm.cells.DE.2,
+  .stats.obj = Treatment.stats.2,
+  .coefs = "Activation",
+  .swarm.title = "Activation vs Baseline",
+  .row.space.scaler = 0.5,
+  .perc.plot = FALSE)
 
 .dea.2 <-
   tinydenseR::get.dea(

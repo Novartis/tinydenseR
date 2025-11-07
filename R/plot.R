@@ -441,8 +441,8 @@ plotUMAP <-
 #' @param .lm.obj A list object initialized with setup.lm.obj and processed with get.landmarks, get.graph and get.map.
 #' @param .stats.obj  The list object that is the result of running get.stats.
 #' @param .coefs The coefficient level to plot.
-#' @param .FDR The false discovery rate threshold to use for coloring the plot. Defaults to 1/10 (10%).
-#' @param .FDR.from The source of the FDR values. Can be set to "density.weighted.bh.fdr", or "pca.weighted.q.fdr". Defaults to "pca.weighted.q.fdr".
+#' @param .q The q-value threshold to use for coloring the plot. Defaults to 0.1.
+#' @param .q.from The source of the q values. Can be set to "density.weighted.bh.fdr", or "pca.weighted.q". Defaults to "pca.weighted.q".
 #' @param .split.by The variable to split the plot by. Can be set to "none", "clustering", or "celltyping". If either of the two latter, .coefs must be provided and, if not, defaults to showing the first coefficient in formula. Defaults to "none".
 #' @param .swarm.title The title of the swarm plot. If NULL and if there are no facets (facets are only used if length of `.coefs` is greater than 1 and pops are split by clustering or celltyping), the title will be set to the value of .coefs.
 #' @param .label.substr.rm The substring to remove from the labels.
@@ -459,8 +459,8 @@ plotBeeswarm <-
     .lm.obj,
     .stats.obj,
     .coefs,
-    .FDR = 1/10,
-    .FDR.from = "pca.weighted.q.fdr",
+    .q = 0.1,
+    .q.from = "pca.weighted.q",
     .split.by = if(length(x = .coefs) > 1) "none" else "clustering",
     .swarm.title = NULL,
     .label.substr.rm = "",
@@ -472,7 +472,7 @@ plotBeeswarm <-
     .legend.position = "right",
     .perc.plot = TRUE) {
     
-    sig <- adj.p <- facets <- pos.t <- neg.t <- FDR.bars <- dat.df <- value <- split.by <- .coef <- cell.perc <- pop <- NULL
+    sig <- adj.p <- facets <- pos.t <- neg.t <- q.bars <- dat.df <- value <- split.by <- .coef <- cell.perc <- pop <- NULL
     
     .split.by <-
       match.arg(arg = .split.by,
@@ -488,9 +488,9 @@ plotBeeswarm <-
                             "top",
                             "none"))
     
-    .FDR.from <-
-      match.arg(arg = .FDR.from,
-                choices = c("pca.weighted.q.fdr",
+    .q.from <-
+      match.arg(arg = .q.from,
+                choices = c("pca.weighted.q",
                             "density.weighted.bh.fdr"))
     
     if(.split.by != "none"){
@@ -510,10 +510,10 @@ plotBeeswarm <-
                           plot.title = ggplot2::element_text(hjust = 0.5),
                           legend.position = "bottom") +
            ggplot2::labs(title = "percentages",
-                         x = "mean % across\nall samples",
+                         x = "",
                          y = "",
                          size = "%") +
-           ggplot2::scale_x_discrete(labels = "%") +
+           ggplot2::scale_x_discrete(labels = "mean % across\nall samples") +
            ggplot2::scale_size_continuous(range = log2(x = x$cell.perc + 1) |>
                                             range() |>
                                             I()) +
@@ -547,8 +547,8 @@ plotBeeswarm <-
                             names_to = "split.by",
                             values_to = "value",
                             cols_vary = "slowest") |>
-        dplyr::bind_cols(sig = as.data.frame(x = (.stats.obj$fit[[.FDR.from]][!(.lm.obj$graph[[.split.by]]$ids %in% 
-                                                                           .lm.obj$map$cl.ct.to.ign),.coefs] < .FDR)) |>
+        dplyr::bind_cols(sig = as.data.frame(x = (.stats.obj$fit[[.q.from]][!(.lm.obj$graph[[.split.by]]$ids %in% 
+                                                                                .lm.obj$map$cl.ct.to.ign),.coefs] < .q)) |>
                            tidyr::pivot_longer(cols = tidyselect::everything(),
                                                names_to = "split.by",
                                                values_to = "adj.p",
@@ -581,7 +581,7 @@ plotBeeswarm <-
           dplyr::mutate(.data = dat.df,
                         facets = split.by,
                         split.by = rep(x = .lm.obj$graph[[.split.by]]$ids[!(.lm.obj$graph[[.split.by]]$ids %in% 
-                                                                               .lm.obj$map$cl.ct.to.ign)] |>
+                                                                              .lm.obj$map$cl.ct.to.ign)] |>
                                          as.character(),
                                        times = length(x = .coefs)))
         
@@ -596,7 +596,7 @@ plotBeeswarm <-
                                             .lm.obj$map$cl.ct.to.ign),
                                         .coefs],
           sig =
-            ifelse(test = .stats.obj$fit[[.FDR.from]][,.coefs] < .FDR,
+            ifelse(test = .stats.obj$fit[[.q.from]][,.coefs] < .q,
                    yes = ifelse(test = .stats.obj$fit$coefficients[,.coefs] > 0,
                                 yes = "more abundant",
                                 no = "less abundant"),
@@ -604,7 +604,7 @@ plotBeeswarm <-
                                         .lm.obj$map$cl.ct.to.ign)],
           split.by =
             .lm.obj$graph$clustering$ids[!(.lm.obj$graph$clustering$ids %in% 
-                                              .lm.obj$map$cl.ct.to.ign)] |>
+                                             .lm.obj$map$cl.ct.to.ign)] |>
             as.character()) |>
         droplevels()
       
@@ -622,7 +622,7 @@ plotBeeswarm <-
             .stats.obj$fit$coefficients[!(.lm.obj$graph$celltyping$ids %in% 
                                             .lm.obj$map$cl.ct.to.ign),.coefs],
           sig =
-            ifelse(test = .stats.obj$fit[[.FDR.from]][,.coefs] < .FDR,
+            ifelse(test = .stats.obj$fit[[.q.from]][,.coefs] < .q,
                    yes = ifelse(test = .stats.obj$fit$coefficients[,.coefs] > 0,
                                 yes = "more abundant",
                                 no = "less abundant"),
@@ -630,7 +630,7 @@ plotBeeswarm <-
                                         .lm.obj$map$cl.ct.to.ign)],
           split.by =
             .lm.obj$graph$celltyping$ids[!(.lm.obj$graph$celltyping$ids %in% 
-                                              .lm.obj$map$cl.ct.to.ign)] |>
+                                             .lm.obj$map$cl.ct.to.ign)] |>
             as.character()) |>
         droplevels()
       
@@ -660,7 +660,7 @@ plotBeeswarm <-
                   fixed = FALSE)  
            },
            x = "abundance\nlog2(+0.5)FC",
-           color = paste0("FDR < ", .FDR*100, "%")) +
+           color = paste0("q < ", .q)) +
          {
            if(isTRUE(x = .facets)) {
              ggplot2::facet_grid(cols = ggplot2::vars(facets), 
@@ -963,7 +963,7 @@ plotSamplePCA <-
 #' @param .stats.obj  The list object that is the result of running get.stats.
 #' @param .coefs The coefficient level to plot.
 #' @param .split.by The variable to split the plot by. Can be set to "clustering" or "celltyping". Defaults to "clustering".
-#' @param .FDR The false discovery rate threshold to use for coloring the plot.
+#' @param .q The q-value threshold to use for coloring the plot.
 #' @param .row.space.scaler The scaler for the row space. Defaults to 0.2.
 #' @param .col.space.scaler The scaler for the column space. Defaults to 0.5.
 #' @param .label.substr.rm The substring to remove from the labels.
@@ -975,7 +975,7 @@ plotTradStats <-
     .stats.obj,
     .split.by = "clustering",
     .coefs = colnames(x = .stats.obj$trad[[.split.by]]$fit$coefficients),
-    .FDR = 0.1,
+    .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.07,
     .label.substr.rm = ""
@@ -1041,7 +1041,7 @@ plotTradStats <-
                         yes = "fewer cells",
                         no = "more cells") |>
                       ifelse(
-                        test = adj.p < .FDR,
+                        test = adj.p < .q,
                         no = "not sig.")  |>
                       factor(levels = c("fewer cells",
                                         "not sig.",
@@ -1102,9 +1102,8 @@ plotTradStats <-
                           show.legend = TRUE) +
       {if(!(is.na(x = dat.df$sig.shape) |> all())){
         ggplot2::continuous_scale(aesthetics = "stroke",
-                                  name =  paste0("FDR < ",
-                                                 .FDR*100,
-                                                 "%"),
+                                  name =  paste0("q < ",
+                                                 .q),
                                   palette = function(x){scales::rescale(x = x, c(0, 1))},
                                   labels = "TRUE")
       }} +
@@ -1119,10 +1118,10 @@ plotTradStats <-
                     y = "",
                     fill = "log2(+0.5)FC",
                     size = if((is.na(x = dat.df$sig.shape) |> all())) {
-                      paste0("adj.p\n(",
+                      paste0("q\n(",
                              "all > ",
-                             .FDR,
-                             ")")} else "adj.p") +
+                             .q,
+                             ")")} else "q") +
       ggh4x::force_panelsizes(col = grid::unit(x = (as.character(x = dat.df$term) |> unique() |> nchar() |> max()) *
                                                  (unique(x = dat.df$term) |> length()) *
                                                  .col.space.scaler,
@@ -1208,14 +1207,14 @@ plotTradPerc <-
     
     if((!is.null(x = .dodge.by)) &
        (!is.null(x = .line.by))){
-         stop("only one of .dodge.by or .line.by can be provided")
+      stop("only one of .dodge.by or .line.by can be provided")
     }
     
     .orientation <-
       match.arg(arg = .orientation,
                 choices = c("wide",
                             "square"))
-
+    
     dat.df <-
       data.frame(
         sample = rownames(x = .lm.obj$metadata),
@@ -1265,7 +1264,7 @@ plotTradPerc <-
                                   sqrt() |>
                                   ceiling(),
                                 scales = "free_y")    
-            }
+          }
         } else {
           ggplot2::ggtitle(label = .pop)
         }
@@ -1515,7 +1514,7 @@ plotAbundance <-
 #' @param .coefs The coefficient level to plot.
 #' @param .order.by The variable to order the row (proteins) by. Can be set to `"clustering"` or `"celltyping"`. Defaults to `"clustering"`.
 #' @param .markers A character vector with the markers to plot. Defaults to the column names of the `"clustering"` or `"celltyping"` mean expression matrix.
-#' @param .FDR The false discovery rate threshold to use for coloring the plot.
+#' @param .q The q-value threshold to use for coloring the plot.
 #' @param .row.space.scaler The scaler for the row space. Defaults to `0.2`.
 #' @param .col.space.scaler The scaler for the column space. Defaults to `0.5`.
 #' @param .label.substr.rm The substring to remove from the labels.
@@ -1528,7 +1527,7 @@ plotDEA <-
     .coefs,
     .order.by = "clustering",
     .markers = colnames(x = .lm.obj$graph[[.order.by]]$mean.exprs),
-    .FDR = 0.1,
+    .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.065,
     .label.substr.rm = ""
@@ -1568,7 +1567,7 @@ plotDEA <-
                         yes = "lower",
                         no = "higher") |>
                       ifelse(
-                        test = adj.p < .FDR,
+                        test = adj.p < .q,
                         no = "not sig.")  |>
                       factor(levels = c("lower",
                                         "not sig.",
@@ -1627,9 +1626,8 @@ plotDEA <-
                                      range = I(x = c(3,6))) +
       {if(!(is.na(x = dat.df$sig.shape) |> all())){
         ggplot2::continuous_scale(aesthetics = "stroke",
-                                  name =  paste0("FDR < ",
-                                                 .FDR*100,
-                                                 "%"),
+                                  name =  paste0("q < ",
+                                                 .q),
                                   palette = function(x){scales::rescale(x = x, c(0, 1))},
                                   labels = "TRUE") 
       }} +
@@ -1646,7 +1644,7 @@ plotDEA <-
                     size = if((is.na(x = dat.df$sig.shape) |> all())) {
                       paste0("adj.p\n(",
                              "all > ",
-                             .FDR,
+                             .q,
                              ")")} else "adj.p") +
       ggh4x::force_panelsizes(col = grid::unit(x = (as.character(x = dat.df$term) |> unique() |> nchar() |> max()) *
                                                  (unique(x = dat.df$term) |> length()) *

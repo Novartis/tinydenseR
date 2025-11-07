@@ -8,8 +8,8 @@ plotBeeswarm(
   .lm.obj,
   .stats.obj,
   .coefs,
-  .FDR = 1/10,
-  .FDR.from = "pca.weighted.q.fdr",
+  .q = 0.1,
+  .q.from = "pca.weighted.q",
   .split.by = if (length(x = .coefs) > 1) "none" else "clustering",
   .swarm.title = NULL,
   .label.substr.rm = "",
@@ -29,9 +29,9 @@ plotBeeswarm(
 
 \item{.coefs}{The coefficient level to plot.}
 
-\item{.FDR}{The false discovery rate threshold to use for coloring the plot. Defaults to 1/10 (10\%).}
+\item{.q}{The q-value threshold to use for coloring the plot. Defaults to 0.1.}
 
-\item{.FDR.from}{The source of the FDR values. Can be set to "density.weighted.bh.fdr", or "pca.weighted.q.fdr". Defaults to "pca.weighted.q.fdr".}
+\item{.q.from}{The source of the q values. Can be set to "density.weighted.bh.fdr", or "pca.weighted.q". Defaults to "pca.weighted.q".}
 
 \item{.split.by}{The variable to split the plot by. Can be set to "none", "clustering", or "celltyping". If either of the two latter, .coefs must be provided and, if not, defaults to showing the first coefficient in formula. Defaults to "none".}
 
