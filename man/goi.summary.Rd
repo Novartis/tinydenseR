@@ -2,7 +2,7 @@
 % Please edit documentation in R/goi.R
 \name{goi.summary}
 \alias{goi.summary}
-\title{Creates several summaries from a list of genes of interest.}
+\title{Summarize gene expression patterns for genes of interest}
 \usage{
 goi.summary(
   .lm.obj,
@@ -14,22 +14,78 @@ goi.summary(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with \code{get.graph} and \code{get.map}.}
+\item{.lm.obj}{A list object initialized with \code{setup.lm.obj} and processed
+with \code{get.graph} and \code{get.map}. Must contain RNA assay data.}
 
-\item{.goi}{A character vector of genes of interest.}
+\item{.goi}{Character vector of gene names to summarize. All genes must exist
+in \code{.lm.obj$raw.lm} column names.}
 
-\item{.id.idx}{An index of the cluster or celltype. If NULL, all landmarks are used.}
+\item{.id.idx}{Integer index of a specific landmark to analyze. If NULL (default),
+uses \code{.id} parameter or all cells. Rarely used directly.}
 
-\item{.id}{The id of the cluster or celltype. If NULL, all landmarks are used.}
+\item{.id}{Character vector of cluster or cell type IDs to filter analysis.
+If NULL (default), includes all clusters/cell types. Use this to focus on
+specific populations (e.g., \code{c("cluster.01", "cluster.02")}).}
 
-\item{.id.from}{The source of the id. Can be set to "clustering" or "celltyping". Defaults to NULL.}
+\item{.id.from}{Character specifying whether \code{.id} refers to "clustering"
+or "celltyping" identifiers. Default is "clustering".}
 
-\item{.verbose}{Logical indicating whether to print verbose output.}
+\item{.verbose}{Logical, whether to print progress messages. Default TRUE.}
 }
 \value{
-The .lm.obj with the goi field populated with the updated cluster/celltype names.
+A named list with one element per gene in \code{.goi}. Each gene's
+element contains:
+\describe{
+\item{\code{$clustering}}{List with \code{$ids}, \code{$cell.count}, and
+\code{$cell.perc} for cluster-level summaries with pos./neg. prefixes}
+\item{\code{$celltyping}}{Same structure as clustering but for cell types
+(NULL if cell typing not performed)}
+\item{\code{$all}}{Same structure but only pos./neg. categories without
+cluster/cell type breakdown}
+}
+
+Cell counts are matrices with samples as rows and categories as columns.
+Cell percentages show within-sample proportions.
 }
 \description{
-This function creates several summaries typically used in scRNAseq data
-analysis from  a list of genes of interest (GOI).
+Generates summaries of gene expression for specified genes of interest (GOI),
+including detection status (positive/negative), cell counts, and percentages
+across samples. Useful for identifying marker gene expression patterns across
+clusters or cell types.
+}
+\details{
+For each gene of interest, the function:
+\enumerate{
+\item Determines which cells express the gene (pos.) vs don't express it (neg.)
+\item Creates three parallel summary structures:
+\itemize{
+\item \code{clustering} - summaries by cluster IDs with pos./neg. prefix
+\item \code{celltyping} - summaries by cell type labels with pos./neg. prefix (if available)
+\item \code{all} - summaries by pos./neg. status only
+}
+\item Computes cell counts and percentages for each category per sample
+}
+
+The function operates on mapped cells (after \code{get.map}), allowing you to
+optionally filter to specific clusters or cell types using \code{.id} parameter.
+}
+\examples{
+\dontrun{
+# Complete workflow with gene expression summary
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |>
+  get.graph() |>
+  get.map()
+
+# Summarize expression of marker genes
+markers <- c("CD4", "CD8A", "CD19")
+goi_results <- goi.summary(lm.cells, markers)
+
+# Check CD4 expression by cluster
+goi_results$CD4$clustering$cell.perc
+
+# Focus analysis on specific clusters only
+goi_results <- goi.summary(lm.cells, markers, 
+                           .id = c("cluster.01", "cluster.02"))
+}
 }

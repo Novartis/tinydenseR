@@ -14,21 +14,60 @@ lm.cluster(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj.}
+\item{.lm.obj}{A tinydenseR object with \code{$graph} component from \code{get.graph}.}
 
-\item{.cl.method}{A character value that determines the clustering method. Options are "snn" for shared nearest neighbors and "fgraph" for fuzzy graph.}
+\item{.cl.method}{Character specifying clustering method: "snn" (shared nearest neighbors)
+or "fgraph" (fuzzy graph from UMAP). Default "snn".}
 
-\item{.cl.resolution.parameter}{A numeric value that determines the granularity of the clustering. Higher values result in more clusters.}
+\item{.cl.resolution.parameter}{Numeric resolution for Leiden clustering (default 0.8).
+Internally scaled by 1e-3 for CPM objective. Higher values yield finer clusters.}
 
-\item{.seed}{An integer value that sets the seed for reproducibility.}
+\item{.seed}{Integer seed for reproducibility (default 123).}
 
-\item{.verbose}{A logical value indicating whether to print messages about the clustering process.}
+\item{.verbose}{Logical for progress messages (default TRUE).}
 
-\item{.small.size}{An integer value that determines the size of clusters that are considered "stragglers". Stragglers are assigned to the cluster they are most connected to.}
+\item{.small.size}{Integer threshold for straggler absorption (default 3). Clusters smaller
+than this are merged into most connected neighbors.}
 }
 \value{
-The .lm.obj now containing a list that includes the cluster assignments for each landmark, mean cluster expression values as well as the mean expression heatmap.
+Updated \code{.lm.obj} with \code{$graph$clustering} containing:
+\itemize{
+\item \code{ids}: Factor of cluster assignments for each landmark
+\item \code{mean.exprs}: Matrix of mean expression per cluster (top PCs for RNA, all markers for cyto)
+\item \code{pheatmap}: Heatmap object showing cluster profiles
+}
 }
 \description{
-This function performs Leiden clustering on the landmarks.
+Applies Leiden community detection to partition landmarks into clusters based on either
+the SNN graph or UMAP fuzzy graph. Clusters are used for visualization and as a coarser
+grouping for statistical testing. This is a wrapper around \code{leiden.cluster}.
+}
+\details{
+For RNA data, the heatmap displays top contributors to each principal component (6 genes
+per PC: 3 most positive, 3 most negative). For cytometry, all markers are shown.
+
+The fuzzy graph method ("fgraph") uses probabilistic UMAP edges and may produce more
+visually coherent clusters in UMAP space. The SNN method uses Jaccard similarity and
+often gives more stable results for downstream statistics.
+}
+\examples{
+\dontrun{
+# After graph construction
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |>
+  get.graph()
+
+# Extract clustering (called internally by get.graph)
+lm.cells <- lm.cluster(lm.cells)
+
+# Higher resolution clustering
+lm.cells <- lm.cluster(lm.cells, .cl.resolution.parameter = 200)
+
+# Use fuzzy graph instead of SNN
+lm.cells <- lm.cluster(lm.cells, .cl.method = "fgraph")
+}
+
+}
+\seealso{
+\code{\link{leiden.cluster}}, \code{\link{get.graph}}
 }

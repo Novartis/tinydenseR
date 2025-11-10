@@ -7,11 +7,16 @@
 get.adj.matrix(.nn.idx)
 }
 \arguments{
-\item{.nn.idx}{A matrix where each row represents a cell and each column represents a nearest neighbor. The elements of the matrix are the indices of the nearest neighbors.}
+\item{.nn.idx}{A matrix where each row represents a cell and each column represents a nearest
+neighbor index. Element (i,k) is the index of the k-th nearest neighbor of cell i.}
 }
 \value{
-A non-symetric sparse matrix representation of the nearest neighbors.
+A non-symmetric sparse matrix (dgCMatrix) of dimensions n×n where n is the number of
+cells. Entry (i,j) = 1 if j is among i's nearest neighbors, 0 otherwise.
 }
 \description{
-This function converts a matrix of nearest neighbors into a non-symetric sparse matrix representation.
+Converts a nearest neighbor index matrix into a sparse adjacency matrix. Each entry (i,j)
+indicates that cell j is a nearest neighbor of cell i. The resulting matrix is non-symmetric
+(i can be neighbor of j without j being neighbor of i).
 }
+\keyword{internal}

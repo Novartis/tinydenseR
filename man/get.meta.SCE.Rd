@@ -2,27 +2,55 @@
 % Please edit documentation in R/preprocess.R
 \name{get.meta.SCE}
 \alias{get.meta.SCE}
-\title{Extract metadata from SingleCellExperiment object}
+\title{Extract Sample-Level Metadata from SingleCellExperiment Object}
 \usage{
 get.meta.SCE(.sce.obj, .sample.var, .verbose = TRUE)
 }
 \arguments{
-\item{.sce.obj}{A SingleCellExperiment object containing cell metadata.}
+\item{.sce.obj}{SingleCellExperiment object with cell-level metadata in \code{colData}.}
 
-\item{.sample.var}{A character string specifying the metadata column to use for sample identification.}
+\item{.sample.var}{Character: column name in \code{colData(.sce.obj)} identifying samples.}
 
-\item{.verbose}{A logical specifying whether to print progress messages. Default is TRUE.}
+\item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
-A data frame containing sample-wise metadata with sample names as rownames.
+Data frame with one row per sample, containing only sample-level metadata columns.
+Rownames are sample IDs from \code{.sample.var}.
 }
 \description{
-This function extracts sample-wise metadata from a SingleCellExperiment object.
+Extracts sample-wise metadata from a SingleCellExperiment object by identifying which colData
+columns have consistent values within each sample. Identical logic to Seurat metadata extraction
+but adapted for SCE's \code{colData} structure. Returns a data frame suitable for
+\code{setup.lm.obj(.meta = ...)}.
+}
+\details{
+SingleCellExperiment stores cell-level metadata in \code{colData}. This function:
+\enumerate{
+\item Converts \code{colData} to data frame
+\item Groups by \code{.sample.var}
+\item Identifies columns with unique values within each sample (sample-level)
+\item Excludes varying columns (cell-level) with warning
+\item Returns one row per sample
+}
+
+Common sample-level variables include experimental conditions, batches, donors. Common cell-level
+variables include QC metrics, clusters, cell types.
 }
 \examples{
 \dontrun{
-# Assuming you have a SingleCellExperiment object with sample metadata
+# Extract sample metadata from SCE object
 meta <- get.meta.SCE(.sce.obj = sce.obj,
                      .sample.var = "sample_id")
+
+# Use with get.cells
+cells <- get.cells.SCE(.sce.obj = sce.obj,
+                       .meta = meta,
+                       .sample.var = "sample_id")
 }
+
+}
+\seealso{
+\code{\link{get.meta}} for automatic format detection,
+\code{\link{get.meta.Seurat}} for Seurat objects,
+\code{\link{get.cells.SCE}} for extracting count data
 }

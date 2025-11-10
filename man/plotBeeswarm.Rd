@@ -23,36 +23,80 @@ plotBeeswarm(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks, get.graph and get.map.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{.stats.obj}{The list object that is the result of running get.stats.}
+\item{.stats.obj}{Statistical results from \code{get.stats()}.}
 
-\item{.coefs}{The coefficient level to plot.}
+\item{.coefs}{Character vector of coefficient names from the design matrix to plot. Must match
+column names in \code{.stats.obj$fit$coefficients}. Can plot single or multiple coefficients.}
 
-\item{.q}{The q-value threshold to use for coloring the plot. Defaults to 0.1.}
+\item{.q}{Numeric q-value threshold for significance coloring (default 0.1). Points with
+q < threshold are colored by direction (red/blue), otherwise gray.}
 
-\item{.q.from}{The source of the q values. Can be set to "density.weighted.bh.fdr", or "pca.weighted.q". Defaults to "pca.weighted.q".}
+\item{.q.from}{Character specifying q-value source: "pca.weighted.q" (default, PCA-variance weighted)
+or "density.weighted.bh.fdr" (density weighted). See \code{get.stats()} for details.}
 
-\item{.split.by}{The variable to split the plot by. Can be set to "none", "clustering", or "celltyping". If either of the two latter, .coefs must be provided and, if not, defaults to showing the first coefficient in formula. Defaults to "none".}
+\item{.split.by}{Character controlling plot faceting: "none" (default if multiple coefficients),
+"clustering" (split by clusters), or "celltyping" (split by cell types). Default "clustering"
+for single coefficient.}
 
-\item{.swarm.title}{The title of the swarm plot. If NULL and if there are no facets (facets are only used if length of \code{.coefs} is greater than 1 and pops are split by clustering or celltyping), the title will be set to the value of .coefs.}
+\item{.swarm.title}{Character plot title. If NULL and no facets, uses coefficient name.}
 
-\item{.label.substr.rm}{The substring to remove from the labels.}
+\item{.label.substr.rm}{Character substring to remove from axis labels (default "").}
 
-\item{.point.size}{The size of the points in the plot. Defaults to 0.1.}
+\item{.point.size}{Numeric point size (default 0.1).}
 
-\item{.facet.scales}{The scales to use. Defaults to "fixed".}
+\item{.facet.scales}{Character facet scales: "fixed" (default), "free", "free_x", "free_y".}
 
-\item{.row.space.scaler}{The scaler for the row space. Defaults to 0.2.}
+\item{.row.space.scaler}{Numeric scaling factor for row height when splitting (default 0.2 inches per row).}
 
-\item{.col.space.scaler}{The scaler for the column space. Defaults to 0.1.}
+\item{.col.space.scaler}{Numeric scaling factor for column width when splitting (default 0.1).}
 
-\item{.panel.width}{The width of the panel. Defaults to 1.5 and is used only if the length of \code{.coefs} is greater than 1.}
+\item{.panel.width}{Numeric panel width in inches when plotting multiple coefficients (default 1.5).}
 
-\item{.legend.position}{The position of the legend. Defaults to "bottom" and can be set to "left", "top", "bottom", "right" or "none".}
+\item{.legend.position}{Character: "right" (default), "bottom", "left", "top", "none".}
 
-\item{.perc.plot}{If TRUE, the percentages of cells in each cluster or celltype are plotted. Defaults to TRUE. If FALSE, only the beeswarm plot is shown.}
+\item{.perc.plot}{Logical whether to show cell percentage plot alongside beeswarm (default TRUE).
+Only applies when \code{.split.by != "none"}.}
+}
+\value{
+A \code{ggplot} object (single plot) or combined plot using \code{patchwork} (when
+\code{.perc.plot = TRUE} and \code{.split.by != "none"}).
 }
 \description{
-This function plots the statistics of modeling outcomes as a function of the sample wise sum of cell-landmark neighboring probabilities
+Creates a beeswarm plot showing effect sizes (log fold changes) from differential abundance
+testing, with points colored by significance. Optionally splits results by cluster or cell type
+and displays mean cell percentages alongside for biological context.
+}
+\details{
+The beeswarm layout prevents overlapping points, making it easier to assess the distribution
+of effect sizes across landmarks. Red indicates significant increases (log FC > 0), blue indicates
+significant decreases, and gray indicates non-significant changes.
+
+When split by clustering/celltyping, the percentage plot shows mean cell type abundances across
+samples, helping interpret whether changes occur in rare or common populations.
+}
+\examples{
+\dontrun{
+# After statistical testing
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |>
+  get.graph() |>
+  get.map()
+
+design <- model.matrix(~ Condition + Replicate, data = .meta)
+stats <- get.stats(lm.cells, .design = design)
+
+# Basic beeswarm split by clusters
+plotBeeswarm(lm.cells, stats, .coefs = "ConditionB")
+
+# Multiple coefficients without splitting
+plotBeeswarm(lm.cells, stats, 
+             .coefs = c("ConditionB", "ConditionC"),
+             .split.by = "none")
+}
+
+}
+\seealso{
+\code{\link{get.stats}}, \code{\link{plotAbundance}}
 }

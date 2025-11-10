@@ -2,7 +2,7 @@
 % Please edit documentation in R/stats.model.R
 \name{get.marker}
 \alias{get.marker}
-\title{Differential Expression Analysis Comparing Cell Subsets}
+\title{Marker Gene/Protein Identification via Pairwise Comparison}
 \usage{
 get.marker(
   .lm.obj,
@@ -15,25 +15,114 @@ get.marker(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with
-get.landmarks, get.graph, get.map and get.stats.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{.geneset.ls}{A list of character vectors specifying the gene sets to be used in differential gene set score analysis (via pseudobulk GSVA). Default is NULL (no gene set scoring is run).}
+\item{.geneset.ls}{Optional named list of character vectors defining gene sets for GSVA enrichment.
+Only for RNA data.}
 
-\item{.id1.idx}{A list of integer vectors specifying the indices of the landmarks to be used for .id1. Default is NULL.}
+\item{.id1.idx}{Optional list of integer vectors specifying landmark indices for group 1. If
+provided, only cells with these landmarks as nearest neighbors are included.}
 
-\item{.id2.idx}{A list of integer vectors specifying the indices of the landmarks to be used for .id2. Default is NULL.}
+\item{.id2.idx}{Optional list of integer vectors specifying landmark indices for group 2. If
+provided, only cells with these landmarks as nearest neighbors are included.}
 
-\item{.id1}{A character vector specifying the ids to be used.}
+\item{.id1}{Character vector of cluster/celltype IDs for group 1 (test group). Required if
+\code{.id1.idx} not provided.}
 
-\item{.id2}{A character vector specifying the ids to be used. Default is \code{..all.other.subsets..}.}
+\item{.id2}{Character vector of cluster/celltype IDs for group 2 (reference group). Default
+\code{"..all.other.subsets.."} compares group 1 to all other cells. Can specify specific IDs
+for pairwise comparisons.}
 
-\item{.id.from}{A character specifying the source of the ids. Options are "clustering" and "celltyping".}
+\item{.id.from}{Character: "clustering" (default) or "celltyping". Source of IDs in \code{.id1}
+and \code{.id2}.}
 }
 \value{
-The .lm.obj now containing the stats from fitting a linear model for each marker in each cluster.
+List containing marker analysis results:
+\describe{
+\item{\code{pseudobulk1}}{Pseudobulk expression for group 1 (features × samples)}
+\item{\code{pseudobulk2}}{Pseudobulk expression for group 2 (features × samples)}
+\item{\code{design}}{Design matrix with Intercept and Group columns}
+\item{\code{fit}}{limma fit object}
+\item{\code{logFC}}{Log fold changes (group 1 vs group 2)}
+\item{\code{p.value}}{P-values for each feature}
+\item{\code{adj.p}}{FDR-adjusted p-values}
+\item{\code{gsva}}{If \code{.geneset.ls} provided: GSVA enrichment comparison}
+}
 }
 \description{
-This function performs differential expression analysis for each feature
-comparing cell subsets.
+Identifies marker genes/proteins that distinguish one cell subset from another (or all others) by
+performing pseudobulk differential expression between groups. Unlike \code{get.dea} which tests
+experimental conditions, this compares cell populations to find defining features. Useful for
+characterizing clusters and validating cell type annotations.
+}
+\details{
+The marker identification workflow:
+\enumerate{
+\item \strong{Cell selection}: Extract cells belonging to group 1 (\code{.id1}) and group 2
+(\code{.id2})
+\item \strong{Pseudobulk aggregation}: Sum expression across cells within each group per sample
+\item \strong{Two-group comparison}: Fit model with design \code{~ Group}
+\item \strong{Statistical testing}: limma-voom (RNA) or limma (cytometry)
+\item \strong{FDR correction}: Adjust p-values across all features
+}
+
+\strong{Common use cases:}
+\itemize{
+\item \strong{One-vs-all}: Default \code{.id2 = "..all.other.subsets.."} finds markers that
+uniquely identify a cluster
+\item \strong{Pairwise}: Specify both \code{.id1} and \code{.id2} to compare two specific
+populations (e.g., CD4 vs CD8 T cells)
+\item \strong{Combined groups}: Provide multiple IDs in \code{.id1} to find markers for a
+meta-population
+}
+
+\strong{Interpreting results:}
+\itemize{
+\item Positive logFC: Higher expression in group 1 (potential markers)
+\item Negative logFC: Higher expression in group 2 (anti-markers)
+\item Look for both high fold change AND statistical significance
+}
+
+\strong{Difference from get.dea:}
+\itemize{
+\item \code{get.dea}: Tests experimental conditions (treatment vs control) within populations
+\item \code{get.marker}: Tests cell populations (cluster A vs B) within the same experiment
+}
+}
+\examples{
+\dontrun{
+# After mapping and clustering
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |> get.graph() |> get.map()
+
+# Find markers for cluster 1 vs all others
+markers.cl1 <- get.marker(lm.cells,
+                          .id1 = "1",
+                          .id.from = "clustering")
+
+# Top upregulated markers
+top.markers <- markers.cl1$logFC[
+  markers.cl1$adj.p < 0.05 & markers.cl1$logFC > 1
+]
+
+# Pairwise comparison: CD4 T cells vs CD8 T cells
+markers.cd4vcd8 <- get.marker(lm.cells,
+                              .id1 = c("1", "3"),  # CD4 T clusters
+                              .id2 = c("2", "4"),  # CD8 T clusters
+                              .id.from = "clustering")
+
+# With gene set enrichment
+hallmark.sets <- list(
+  "GLYCOLYSIS" = c("HK2", "PFKP", "LDHA"),
+  "OXIDATIVE_PHOS" = c("ATP5A", "COX5A", "NDUFA4")
+)
+markers.gsva <- get.marker(lm.cells,
+                           .id1 = "1",
+                           .geneset.ls = hallmark.sets)
+}
+
+}
+\seealso{
+\code{\link{get.map}} (required), \code{\link{get.dea}} for condition-based DE,
+\code{\link{plotHeatmap}} for visualizing expression patterns
 }

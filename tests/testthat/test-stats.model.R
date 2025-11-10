@@ -89,7 +89,7 @@ test_that("get.marker requires valid id parameters", {
   expect_error(get.marker(.lm.obj = .lm.obj),
                "Please provide .id1 or .id1.idx")
   expect_error(get.marker(.lm.obj = .lm.obj, .id1 = "C"),
-               "C not found in clustering")
+               "not found in clustering")
 
 })
   

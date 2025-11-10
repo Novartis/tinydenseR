@@ -2,7 +2,7 @@
 % Please edit documentation in R/landmarks.R
 \name{setup.lm.obj}
 \alias{setup.lm.obj}
-\title{Setup object for landmark identification and modeling}
+\title{Initialize tinydenseR object for landmark-based analysis}
 \usage{
 setup.lm.obj(
   .cells,
@@ -23,27 +23,96 @@ setup.lm.obj(
 )
 }
 \arguments{
-\item{.cells}{A named list containing the on-disk location of RDS files containing one expression matrix for each sample. List names correspond to sample names.}
+\item{.cells}{A named list of file paths (character strings) pointing to RDS files,
+each containing one expression matrix per sample. For RNA: sparse matrix (dgCMatrix)
+with genes as rows and cells as columns. For cytometry: matrix with cells as rows and
+markers as columns. List names become sample identifiers.}
 
-\item{.meta}{A data frame containing the sample-wise metadata.}
+\item{.meta}{A data.frame with sample-level metadata. Rownames must match names in
+\code{.cells} exactly. Used for batch correction and downstream modeling.}
 
-\item{.markers}{A character vector specifying the markers to use for landmark identification. Default is NULL. Applies only if \code{assay.type} is \code{"cyto"} since all features are included for \code{"RNA"}.}
+\item{.markers}{Character vector of marker names to use for landmark identification.
+Only applicable for \code{.assay.type = "cyto"}. If NULL, uses all markers from
+the first sample. Ignored for RNA data (uses HVG selection instead).}
 
-\item{.harmony.var}{A character vector specifying the metadata variables to use for Harmony integration. Default is NULL. If provided, these variables must be present in the metadata.}
+\item{.harmony.var}{Character vector of column names from \code{.meta} to use for
+Harmony batch correction. If NULL, no batch correction is performed.}
 
-\item{.assay.type}{A character string specifying the assay type. Default is \code{"cyto"}. Must be one of \code{"cyto"} or \code{"RNA"}.}
+\item{.assay.type}{Character string: "cyto" for cytometry (default) or "RNA" for
+scRNA-seq. Determines normalization strategy and feature selection approach.}
 
-\item{.verbose}{A logical specifying whether to print progress messages. Default is TRUE.}
+\item{.verbose}{Logical, whether to print progress messages. Default TRUE.}
 
-\item{.seed}{An integer specifying the .seed for reproducibility. Default is 123.}
+\item{.seed}{Integer for random seed to ensure reproducibility. Default 123.}
 
-\item{.prop.landmarks}{A numeric value between 0 and 1 specifying the proportion of cells to use as landmarks. Default is 0.1 (10\% of total cells), with a maximum of 5000 landmarks.}
+\item{.prop.landmarks}{Numeric between 0 and 1 specifying proportion of cells to
+sample as landmarks. Default 0.1 (10\%). Total landmarks capped at about 5000 regardless.}
 
-\item{.n.threads}{An integer specifying the number of threads to use. Default is the max allowed by the system.}
+\item{.n.threads}{Integer for parallel processing. Default automatically detects
+maximum available threads (using BLAS settings on HPC, or \code{detectCores()} locally).}
 }
 \value{
-A list object initialized with the input parameters.
+A list object with initialized structure containing:
+\describe{
+\item{\code{$cells}}{Input file paths}
+\item{\code{$metadata}}{Sample metadata with added cell count columns}
+\item{\code{$key}}{Named vector mapping future landmarks to samples}
+\item{\code{$spec}}{Specifications including \code{n.cells}, \code{n.perSample}}
+\item{\code{$assay.type}}{Assay type ("cyto" or "RNA")}
+\item{\code{$markers}}{Marker list (cytometry only)}
+\item{\code{$harmony.var}}{Batch variables (if provided)}
+\item{Empty slots}{lm, scaled.lm, raw.lm, pca, graph, map, etc. - populated by downstream functions}
+}
 }
 \description{
-This function initializes an object for landmark identification and modeling.
+Creates and validates the main tinydenseR object structure that will hold
+expression data, metadata, and analysis results throughout the workflow.
+This is the required first step before landmark identification.
+}
+\details{
+This function:
+\enumerate{
+\item Validates input data structure and compatibility
+\item Calculates the number of landmarks to sample per sample (max 5000 total)
+\item Creates a "key" vector mapping landmarks to samples
+\item Initializes empty slots for downstream analyses (PCA, graph, mapping)
+\item Performs quality checks (warns if sample sizes vary >10-fold)
+}
+
+The landmark sampling strategy aims for proportional representation across samples
+while capping total landmarks at 5000 for computational efficiency. Smaller samples
+may have relatively more landmarks sampled to ensure adequate representation.
+}
+\examples{
+\dontrun{
+# Prepare data (from README workflow)
+.meta <- get.meta(.obj = sim_trajectory, .sample.var = "Sample")
+.cells <- get.cells(.exprs = sim_trajectory, 
+                    .meta = .meta,
+                    .sample.var = "Sample")
+
+# Basic setup for RNA data
+lm.cells <- setup.lm.obj(
+  .cells = .cells,
+  .meta = .meta,
+  .assay.type = "RNA",
+  .prop.landmarks = 0.15
+)
+
+# Cytometry workflow with marker selection
+lm.cells <- setup.lm.obj(
+  .cells = .cells,
+  .meta = .meta,
+  .markers = c("CD3", "CD4", "CD8", "CD19"),
+  .assay.type = "cyto"
+)
+
+# RNA workflow with batch correction
+lm.cells <- setup.lm.obj(
+  .cells = .cells,
+  .meta = .meta,
+  .harmony.var = "batch",
+  .assay.type = "RNA"
+)
+}
 }

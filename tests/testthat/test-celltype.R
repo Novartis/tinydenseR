@@ -30,7 +30,7 @@ test_that("celltyping validates input mapping", {
     "B_cells" = c("cluster.01")  # Same cluster mapped to multiple celltypes
   )
   expect_error(celltyping(.lm.obj = .lm.obj, .celltyping.map = .celltyping.map.multi),
-               "following cluster\\(s\\) mapping to more than one celltyping")
+               "Cluster\\(s\\) mapped to multiple cell types")
   
   # Test unmapped clusters
   .celltyping.map.incomplete <- list(
@@ -38,7 +38,7 @@ test_that("celltyping validates input mapping", {
     # cluster.02 is not mapped
   )
   expect_error(celltyping(.lm.obj = .lm.obj, .celltyping.map = .celltyping.map.incomplete),
-               "every cluster must be mapped to at least one celltyping")
+               "Every cluster must be mapped to a cell type")
 })
 
 test_that("celltyping requires named list", {
@@ -49,5 +49,5 @@ test_that("celltyping requires named list", {
   # Test unnamed list
   .celltyping.map.unnamed <- list(c("cluster.01"))
   expect_error(celltyping(.lm.obj = .lm.obj, .celltyping.map = .celltyping.map.unnamed),
-               "names of .celltyping.map cannot be NULL")
+               "Cell type names are missing")
 })

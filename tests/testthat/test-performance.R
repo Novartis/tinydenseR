@@ -25,7 +25,7 @@ test_that("functions handle empty inputs gracefully", {
   empty_meta <- data.frame(condition = "A", row.names = "sample2")
   
   expect_error(setup.lm.obj(.cells = empty_cells, .meta = empty_meta),
-               "names of .cells must be the same as rownames of .meta")
+               "Sample names mismatch between .cells and .meta")
   
   # Test get.stats with invalid inputs
   expect_error(get.stats(.lm.obj = list()))

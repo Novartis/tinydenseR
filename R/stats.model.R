@@ -14,18 +14,116 @@
 # limitations under the License.
 #####
 
-#' Get stats
+#' Differential Abundance Testing
 #'
-#' Fits a model of outcomes as a function of the sample wise sum of cell-landmark neighboring probabilities
+#' Performs landmark-based differential abundance (DA) testing using limma on log-transformed fuzzy 
+#' densities. Tests which landmarks (cell populations) change in abundance between conditions. More 
+#' sensitive than traditional cluster-level testing because landmarks can capture within-cluster 
+#' heterogeneity. Uses PCA-weighted q-values that leverage the correlation structure among 
+#' landmarks to improve statistical power.
 #'
-#' @param .lm.obj A list object initialized with setup.lm.obj and processed with get.landmarks, get.graph and get.map.
-#' @param .design A matrix specifying the design matrix to be used.
-#' @param .contrasts A matrix specifying the contrasts to be used.
-#' @param .block A character vector of length one indicating which column of `.lm.obj$metadata` to be used as blocking factor.
-#' @param .verbose A logical indicating whether to print progress messages.
-#' @param .seed An integer to set the seed for reproducibility.
-#' @return The .lm.obj now containing the stats from fitting a voomLmFit model.
+#' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
+#' @param .design Design matrix specifying the experimental design. Rows correspond to samples 
+#'   (matching \code{.lm.obj$cells}), columns to coefficients. Create with \code{model.matrix()}.
+#' @param .contrasts Optional contrast matrix for specific comparisons. Each column defines one 
+#'   contrast. Create with \code{limma::makeContrasts()}. If NULL, tests all coefficients in 
+#'   \code{.design}.
+#' @param .block Optional character: column name in \code{.lm.obj$metadata} for blocking factor 
+#'   (e.g., "Donor", "Batch"). Accounts for within-block correlation using \code{duplicateCorrelation}.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#' @param .seed Integer: random seed for reproducibility in blocking correlation estimation. Default 123.
+#'   
+#' @return List containing differential abundance results:
+#'   \describe{
+#'     \item{\code{y}}{log2(fuzzy density + 0.5) matrix: landmarks × samples}
+#'     \item{\code{fit}}{limma MArrayLM object after eBayes with moderated statistics}
+#'     \item{\code{fit$density.weighted.bh.fdr}}{Density-weighted BH FDR adjustment (matrix: landmarks × coefficients)}
+#'     \item{\code{fit$pca.weighted.q}}{PCA-weighted q-values (matrix: landmarks × coefficients)}
+#'     \item{\code{trad}}{List with traditional cluster-level DA results:}
+#'     \item{\code{trad$clustering$fit}}{limma fit for cluster percentages}
+#'     \item{\code{trad$celltyping$fit}}{limma fit for celltype percentages (if celltyping exists)}
+#'   }
+#'   
+#' @details
+#' The landmark-based DA testing workflow:
+#' \enumerate{
+#'   \item Computes log2(fuzzy density + 0.5) for each landmark across samples
+#'   \item Fits linear model: \code{lmFit(y ~ design)}
+#'   \item If blocking specified: estimates within-block correlation via \code{duplicateCorrelation}
+#'   \item Applies contrasts if provided
+#'   \item Performs empirical Bayes moderation: \code{eBayes()}
+#'   \item Computes density-weighted FDR and PCA-weighted q-values
+#'   \item Performs traditional cluster/celltype-level DA for comparison
+#' }
+#' 
+#' \strong{Advantages over cluster-level testing:}
+#' \itemize{
+#'   \item Detects subtle shifts within clusters
+#'   \item No arbitrary clustering thresholds
+#'   \item Continuous representation of cell state space
+#'   \item Powered by limma's variance shrinkage
+#' }
+#' 
+#' \strong{Design matrix considerations:}
+#' \itemize{
+#'   \item Include intercept for standard comparisons
+#'   \item No-intercept models with continuous covariates assume zero-centering (warning issued)
+#'   \item Must be full rank (checked automatically)
+#' }
+#' 
+#' \strong{PCA-weighted q-value procedure:}
+#' 
+#' Standard FDR methods assume independent tests, but landmarks are correlated in 
+#' the cell state space. To account for this:
+#' 
+#' \enumerate{
+#'   \item \strong{Residualize PCs}: Regress out design matrix from landmark PCA embeddings to 
+#'     obtain covariates independent of experimental factors
+#'   \item \strong{Estimate π₀}: Use \code{swfdr::lm_pi0} to estimate the proportion of true 
+#'     nulls conditional on PC coordinates. Landmarks in similar cell states have correlated 
+#'     p-values; PCA captures this spatial structure
+#'   \item \strong{Conservative safeguard}: If global π₀ < 0.6, apply π₀ floor of 0.6 to prevent 
+#'     anti-conservative estimates in high-signal regimes
+#'   \item \strong{Compute q-values}: Use \code{swfdr::lm_qvalue} to calculate spatially-weighted 
+#'     FDR that properly accounts for landmark correlation structure
+#' }
+#' 
+#' This approach is more powerful than standard BH adjustment when landmarks exhibit correlated 
+#' expression, while maintaining proper FDR control. Falls back to standard q-value 
+#' or BH for small test sets (<1000 landmarks).
+#' 
+#' @seealso \code{\link{get.map}} (required predecessor), \code{\link{plotBeeswarm}} for 
+#'   visualization, \code{\link{plotTradStats}} for comparison with cluster-level tests
+#'   
+#' @examples
+#' \dontrun{
+#' # After mapping
+#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#'   get.landmarks() |> get.graph() |> get.map()
+#' 
+#' # Simple two-group comparison
+#' design <- model.matrix(~ Condition, data = .meta)
+#' stats <- get.stats(lm.cells, .design = design)
+#' 
+#' # Visualize results
+#' plotBeeswarm(lm.cells, stats, .coefs = "ConditionB")
+#' 
+#' # Complex design with contrasts
+#' design <- model.matrix(~ 0 + Group, data = .meta)
+#' contrasts <- limma::makeContrasts(
+#'   TvsC = GroupTreatment - GroupControl,
+#'   T1vsT2 = GroupTreatment1 - GroupTreatment2,
+#'   levels = design
+#' )
+#' stats <- get.stats(lm.cells, .design = design, .contrasts = contrasts)
+#' 
+#' # With blocking for paired samples
+#' design <- model.matrix(~ Timepoint, data = .meta)
+#' stats <- get.stats(lm.cells, .design = design, .block = "Subject")
+#' }
+#' 
 #' @export
+#'
 get.stats <-
   function(
     .lm.obj,
@@ -518,21 +616,99 @@ get.stats <-
 
 #' Differential Expression Analysis
 #'
-#' This function performs differential expression analysis for each feature
-#' using .coef as response. If provided, only cells within .id are used.
+#' Performs pseudobulk differential expression (DE) analysis for genes/markers. Aggregates cells 
+#' into pseudobulk samples, then uses limma-voom (RNA) or limma (cytometry) to test for DE. Can 
+#' restrict analysis to specific clusters/cell types, and optionally perform gene set enrichment 
+#' via GSVA.
 #'
-#' @param .lm.obj A list object initialized with setup.lm.obj and processed with
-#' get.landmarks, get.graph, get.map and get.stats.
-#' @param .design A matrix specifying the design matrix to be used.
-#' @param .contrasts A matrix specifying the contrasts to be used.
-#' @param .block A character vector of length one indicating which column of `.lm.obj$metadata` to be used as blocking factor.
-#' @param .geneset.ls A list of character vectors specifying the gene sets to be used in differential gene set score analysis (via pseudobulk GSVA). Default is NULL (no gene set scoring is run).
-#' @param .id.idx A list of integer vectors specifying the indices of the landmarks to be used. Default is NULL. If provided, cells in each sample that have the selected landmark as first neighbor are included.
-#' @param .id A character vector specifying the ids to be used. Default is NULL.
-#' @param .id.from A character specifying the source of the ids. Default is NULL.
-#' Options are "clustering" and "celltyping".
-#' @param .verbose A logical indicating whether to print progress messages. Default is TRUE.
-#' @return The .lm.obj now containing the stats from fitting a linear model for each marker in each cluster.
+#' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
+#' @param .design Design matrix specifying experimental design. Rows = samples, columns = coefficients.
+#' @param .contrasts Optional contrast matrix for specific comparisons. Create with 
+#'   \code{limma::makeContrasts()}. If NULL, tests all \code{.design} coefficients.
+#' @param .block Optional character: column name in \code{.lm.obj$metadata} for blocking factor 
+#'   (e.g., "Donor"). Accounts for within-block correlation.
+#' @param .geneset.ls Optional named list of character vectors defining gene sets for GSVA enrichment 
+#'   analysis. Only for RNA data. Example: \code{list("Tcell" = c("CD3D", "CD3E"), "Bcell" = c("CD19", "MS4A1"))}.
+#' @param .id.idx Optional list of integer vectors specifying landmark indices to include. If provided, 
+#'   only cells with these landmarks as nearest neighbors are aggregated. Useful for custom cell selection.
+#' @param .id Optional character vector of cluster/celltype IDs to restrict analysis to. Uses 
+#'   \code{.id.from} to determine source.
+#' @param .id.from Character: "clustering" or "celltyping". Source of IDs when \code{.id} is specified.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'   
+#' @return List containing DE analysis results:
+#'   \describe{
+#'     \item{\code{pseudobulk}}{Pseudobulk expression matrix (features × samples)}
+#'     \item{\code{counts}}{For RNA: raw pseudobulk counts before voom transformation}
+#'     \item{\code{voom}}{For RNA: voom object with mean-variance trend}
+#'     \item{\code{fit}}{limma MArrayLM fit object}
+#'     \item{\code{coefficients}}{Log fold change matrix (features × coefficients)}
+#'     \item{\code{p.value}}{P-values (features × coefficients)}
+#'     \item{\code{adj.p}}{FDR-adjusted p-values (features × coefficients)}
+#'     \item{\code{gsva}}{If \code{.geneset.ls} provided: GSVA enrichment scores and statistics}
+#'   }
+#'   
+#' @details
+#' The pseudobulk DE workflow:
+#' \enumerate{
+#'   \item \strong{Cell selection}: If \code{.id} or \code{.id.idx} specified, filter to those cells. 
+#'     Otherwise use all cells.
+#'   \item \strong{Pseudobulk aggregation}: Sum counts/expression across cells within each sample
+#'   \item \strong{Outlier removal}: Exclude samples with <10\% of average pseudobulk size
+#'   \item \strong{Normalization}:
+#'     \itemize{
+#'       \item RNA: TMM normalization + voom transformation
+#'       \item Cytometry: log2 transformation
+#'     }
+#'   \item \strong{Linear modeling}: \code{lmFit} with optional blocking
+#'   \item \strong{Empirical Bayes}: Variance shrinkage via \code{eBayes}
+#'   \item \strong{GSVA} (optional): Gene set variation analysis on pseudobulk
+#' }
+#' 
+#' \strong{When to use pseudobulk DE:}
+#' \itemize{
+#'   \item Identifying marker genes for cell types/states
+#'   \item Testing treatment effects on gene expression
+#'   \item Comparing expression between conditions within specific populations
+#' }
+#' 
+#' \strong{Pseudobulk vs single-cell DE:}
+#' Pseudobulk aggregation:
+#' \itemize{
+#'   \item Respects biological replication (samples as units)
+#'   \item Appropriate statistical framework (no pseudoreplication)
+#'   \item Better power for moderate effects
+#'   \item Recommended for between-sample comparisons
+#' }
+#' 
+#' @seealso \code{\link{get.map}} (required), \code{\link{plotDEA}} for heatmap visualization,
+#'   \code{\link{get.marker}} for marker gene identification
+#'   
+#' @examples
+#' \dontrun{
+#' # After mapping
+#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#'   get.landmarks() |> get.graph() |> get.map()
+#' 
+#' # DE analysis on all cells
+#' design <- model.matrix(~ Condition, data = .meta)
+#' dea <- get.dea(lm.cells, .design = design)
+#' plotDEA(lm.cells, dea, .coefs = "ConditionB")
+#' 
+#' # DE within specific cell type
+#' dea.tcell <- get.dea(lm.cells, .design = design,
+#'                      .id = c("1", "2", "3"),
+#'                      .id.from = "clustering")
+#' 
+#' # With gene set enrichment
+#' hallmark.sets <- list(
+#'   "INTERFERON_RESPONSE" = c("ISG15", "ISG20", "IFIT1"),
+#'   "INFLAMMATORY_RESPONSE" = c("IL1B", "TNF", "CXCL8")
+#' )
+#' dea.gsva <- get.dea(lm.cells, .design = design,
+#'                     .geneset.ls = hallmark.sets)
+#' }
+#' 
 #' @export
 #'
 get.dea <-
@@ -917,20 +1093,109 @@ get.dea <-
     
   }
 
-#' Differential Expression Analysis Comparing Cell Subsets
+#' Marker Gene/Protein Identification via Pairwise Comparison
 #'
-#' This function performs differential expression analysis for each feature
-#' comparing cell subsets.
+#' Identifies marker genes/proteins that distinguish one cell subset from another (or all others) by 
+#' performing pseudobulk differential expression between groups. Unlike \code{get.dea} which tests 
+#' experimental conditions, this compares cell populations to find defining features. Useful for 
+#' characterizing clusters and validating cell type annotations.
 #'
-#' @param .lm.obj A list object initialized with setup.lm.obj and processed with
-#' get.landmarks, get.graph, get.map and get.stats.
-#' @param .geneset.ls A list of character vectors specifying the gene sets to be used in differential gene set score analysis (via pseudobulk GSVA). Default is NULL (no gene set scoring is run).
-#' @param .id1 A character vector specifying the ids to be used.
-#' @param .id2 A character vector specifying the ids to be used. Default is `..all.other.subsets..`.
-#' @param .id.from A character specifying the source of the ids. Options are "clustering" and "celltyping".
-#' @param .id1.idx A list of integer vectors specifying the indices of the landmarks to be used for .id1. Default is NULL.
-#' @param .id2.idx A list of integer vectors specifying the indices of the landmarks to be used for .id2. Default is NULL.
-#' @return The .lm.obj now containing the stats from fitting a linear model for each marker in each cluster.
+#' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
+#' @param .geneset.ls Optional named list of character vectors defining gene sets for GSVA enrichment. 
+#'   Only for RNA data.
+#' @param .id1.idx Optional list of integer vectors specifying landmark indices for group 1. If 
+#'   provided, only cells with these landmarks as nearest neighbors are included.
+#' @param .id2.idx Optional list of integer vectors specifying landmark indices for group 2. If 
+#'   provided, only cells with these landmarks as nearest neighbors are included.
+#' @param .id1 Character vector of cluster/celltype IDs for group 1 (test group). Required if 
+#'   \code{.id1.idx} not provided.
+#' @param .id2 Character vector of cluster/celltype IDs for group 2 (reference group). Default 
+#'   \code{"..all.other.subsets.."} compares group 1 to all other cells. Can specify specific IDs 
+#'   for pairwise comparisons.
+#' @param .id.from Character: "clustering" (default) or "celltyping". Source of IDs in \code{.id1} 
+#'   and \code{.id2}.
+#'   
+#' @return List containing marker analysis results:
+#'   \describe{
+#'     \item{\code{pseudobulk1}}{Pseudobulk expression for group 1 (features × samples)}
+#'     \item{\code{pseudobulk2}}{Pseudobulk expression for group 2 (features × samples)}
+#'     \item{\code{design}}{Design matrix with Intercept and Group columns}
+#'     \item{\code{fit}}{limma fit object}
+#'     \item{\code{logFC}}{Log fold changes (group 1 vs group 2)}
+#'     \item{\code{p.value}}{P-values for each feature}
+#'     \item{\code{adj.p}}{FDR-adjusted p-values}
+#'     \item{\code{gsva}}{If \code{.geneset.ls} provided: GSVA enrichment comparison}
+#'   }
+#'   
+#' @details
+#' The marker identification workflow:
+#' \enumerate{
+#'   \item \strong{Cell selection}: Extract cells belonging to group 1 (\code{.id1}) and group 2 
+#'     (\code{.id2})
+#'   \item \strong{Pseudobulk aggregation}: Sum expression across cells within each group per sample
+#'   \item \strong{Two-group comparison}: Fit model with design \code{~ Group}
+#'   \item \strong{Statistical testing}: limma-voom (RNA) or limma (cytometry)
+#'   \item \strong{FDR correction}: Adjust p-values across all features
+#' }
+#' 
+#' \strong{Common use cases:}
+#' \itemize{
+#'   \item \strong{One-vs-all}: Default \code{.id2 = "..all.other.subsets.."} finds markers that 
+#'     uniquely identify a cluster
+#'   \item \strong{Pairwise}: Specify both \code{.id1} and \code{.id2} to compare two specific 
+#'     populations (e.g., CD4 vs CD8 T cells)
+#'   \item \strong{Combined groups}: Provide multiple IDs in \code{.id1} to find markers for a 
+#'     meta-population
+#' }
+#' 
+#' \strong{Interpreting results:}
+#' \itemize{
+#'   \item Positive logFC: Higher expression in group 1 (potential markers)
+#'   \item Negative logFC: Higher expression in group 2 (anti-markers)
+#'   \item Look for both high fold change AND statistical significance
+#' }
+#' 
+#' \strong{Difference from get.dea:}
+#' \itemize{
+#'   \item \code{get.dea}: Tests experimental conditions (treatment vs control) within populations
+#'   \item \code{get.marker}: Tests cell populations (cluster A vs B) within the same experiment
+#' }
+#' 
+#' @seealso \code{\link{get.map}} (required), \code{\link{get.dea}} for condition-based DE,
+#'   \code{\link{plotHeatmap}} for visualizing expression patterns
+#'   
+#' @examples
+#' \dontrun{
+#' # After mapping and clustering
+#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#'   get.landmarks() |> get.graph() |> get.map()
+#' 
+#' # Find markers for cluster 1 vs all others
+#' markers.cl1 <- get.marker(lm.cells,
+#'                           .id1 = "1",
+#'                           .id.from = "clustering")
+#' 
+#' # Top upregulated markers
+#' top.markers <- markers.cl1$logFC[
+#'   markers.cl1$adj.p < 0.05 & markers.cl1$logFC > 1
+#' ]
+#' 
+#' # Pairwise comparison: CD4 T cells vs CD8 T cells
+#' markers.cd4vcd8 <- get.marker(lm.cells,
+#'                               .id1 = c("1", "3"),  # CD4 T clusters
+#'                               .id2 = c("2", "4"),  # CD8 T clusters
+#'                               .id.from = "clustering")
+#' 
+#' # With gene set enrichment
+#' hallmark.sets <- list(
+#'   "GLYCOLYSIS" = c("HK2", "PFKP", "LDHA"),
+#'   "OXIDATIVE_PHOS" = c("ATP5A", "COX5A", "NDUFA4")
+#' )
+#' markers.gsva <- get.marker(lm.cells,
+#'                            .id1 = "1",
+#'                            .geneset.ls = hallmark.sets)
+#' }
+#' 
 #' @export
 #'
 get.marker <-

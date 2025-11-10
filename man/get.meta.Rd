@@ -2,35 +2,58 @@
 % Please edit documentation in R/preprocess.R
 \name{get.meta}
 \alias{get.meta}
-\title{Extract metadata automatically detecting input type}
+\title{Extract Sample-Level Metadata with Automatic Format Detection}
 \usage{
 get.meta(.obj, .sample.var, .verbose = TRUE)
 }
 \arguments{
-\item{.obj}{The object containing metadata. Can be either:
+\item{.obj}{Object containing cell-level metadata. Can be:
 \itemize{
-\item A Seurat object (for get.meta.Seurat or get.meta.Seurat5)
-\item A SingleCellExperiment object (for get.meta.SCE)
+\item Seurat object (v4 or v5) - calls \code{get.meta.Seurat} or \code{get.meta.Seurat5}
+\item SingleCellExperiment object - calls \code{get.meta.SCE}
 }}
 
-\item{.sample.var}{A character string specifying the metadata column to use for sample identification.}
+\item{.sample.var}{Character: column name in object metadata identifying samples.}
 
-\item{.verbose}{A logical specifying whether to print progress messages. Default is TRUE.}
+\item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
-A data frame containing sample-wise metadata with sample names as rownames.
+Data frame with one row per sample, containing only sample-level metadata columns.
+Rownames are sample IDs.
 }
 \description{
-This function automatically detects the input type and calls the appropriate function to extract sample-wise metadata.
+Convenience wrapper that automatically detects input format (Seurat v4/v5 or SingleCellExperiment)
+and calls the appropriate metadata extraction function. Simplifies workflow by eliminating need
+to know object version.
+}
+\details{
+This function inspects the class of \code{.obj} to determine format:
+\itemize{
+\item \code{Seurat}: Checks first assay for Assay5 class to distinguish v4 from v5
+\item \code{SingleCellExperiment}: Uses standard \code{colData} accessor
+}
+
+Automatically filters to sample-level metadata by testing which columns have consistent values
+within each sample. Cell-level columns (varying within samples) are excluded with a warning.
 }
 \examples{
 \dontrun{
-# Example 1: Using a Seurat object
+# Example 1: Seurat object (auto-detects v4 vs v5)
 meta <- get.meta(.obj = seurat.obj,
                  .sample.var = "sample_id")
 
-# Example 2: Using a SingleCellExperiment object
+# Example 2: SingleCellExperiment object
 meta <- get.meta(.obj = sce.obj,
-                 .sample.var = "sample_id")
+                 .sample.var = "Sample")
+
+# Use with get.cells
+cells <- get.cells(.exprs = seurat.obj,
+                   .meta = meta,
+                   .sample.var = "sample_id")
 }
+
+}
+\seealso{
+\code{\link{get.meta.Seurat}}, \code{\link{get.meta.Seurat5}},
+\code{\link{get.meta.SCE}}, \code{\link{get.cells}} for extracting count data
 }

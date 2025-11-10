@@ -16,22 +16,57 @@ plotTradStats(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks, get.graph and get.map.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{.stats.obj}{The list object that is the result of running get.stats.}
+\item{.stats.obj}{Statistical results from \code{get.stats()} (must include traditional analysis).}
 
-\item{.split.by}{The variable to split the plot by. Can be set to "clustering" or "celltyping". Defaults to "clustering".}
+\item{.split.by}{Character: "clustering" (default) or "celltyping" - which population grouping to use.}
 
-\item{.coefs}{The coefficient level to plot.}
+\item{.coefs}{Character vector of coefficient names to plot. Defaults to all coefficients from
+traditional model.}
 
-\item{.q}{The q-value threshold to use for coloring the plot.}
+\item{.q}{Numeric q-value threshold for significance stars (default 0.1).}
 
-\item{.row.space.scaler}{The scaler for the row space. Defaults to 0.2.}
+\item{.row.space.scaler}{Numeric scaling for row height (default 0.2 inches per population).}
 
-\item{.col.space.scaler}{The scaler for the column space. Defaults to 0.5.}
+\item{.col.space.scaler}{Numeric scaling for column width (default 0.5 inches per coefficient).}
 
-\item{.label.substr.rm}{The substring to remove from the labels.}
+\item{.label.substr.rm}{Character substring to remove from labels (default "").}
+}
+\value{
+A \code{ggplot} heatmap with log fold changes colored by magnitude and significance
+indicated by asterisks.
 }
 \description{
-This function plots the statistics of modeling outcomes as a function of the abundance of the cells in each cluster or celltype.
+Visualizes results from traditional cluster/cell type-level differential abundance testing.
+Shows effect sizes as heatmap with significance markers, providing a complementary view to
+landmark-based analysis for easier interpretation at the population level.
+}
+\details{
+Traditional analysis tests for DA at the cluster/celltype level by aggregating cell counts
+per sample, then using standard models (typically edgeR). This provides:
+\itemize{
+\item Easier biological interpretation (known populations vs abstract landmarks)
+\item Comparison to landmark-based results for validation
+\item Detection of broad shifts affecting entire populations
+}
+
+Note: Traditional analysis is less sensitive to subtle within-cluster variation that
+landmark-based methods can detect.
+}
+\examples{
+\dontrun{
+# After get.stats with traditional analysis
+stats <- get.stats(lm.cells, .design = design)
+
+# Heatmap of cluster-level changes
+plotTradStats(lm.cells, stats, .split.by = "clustering")
+
+# Cell type-level changes
+plotTradStats(lm.cells, stats, .split.by = "celltyping")
+}
+
+}
+\seealso{
+\code{\link{get.stats}}, \code{\link{plotTradPerc}}, \code{\link{plotBeeswarm}}
 }

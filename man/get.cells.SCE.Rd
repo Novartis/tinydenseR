@@ -2,7 +2,7 @@
 % Please edit documentation in R/preprocess.R
 \name{get.cells.SCE}
 \alias{get.cells.SCE}
-\title{Create .cells object from SingleCellExperiment object}
+\title{Create .cells Object from SingleCellExperiment Object}
 \usage{
 get.cells.SCE(
   .sce.obj,
@@ -15,45 +15,64 @@ get.cells.SCE(
 )
 }
 \arguments{
-\item{.sce.obj}{A SingleCellExperiment object containing expression data.}
+\item{.sce.obj}{SingleCellExperiment object containing expression data in assays.}
 
-\item{.meta}{A data frame containing the sample-wise metadata. Row names must be sample names matching elements of the object metadata specified by \code{.sample.var}. Required for filtering valid samples.}
+\item{.meta}{Data frame with sample-level metadata. Rownames must be sample IDs matching values
+in \code{.sce.obj@colData[[.sample.var]]}. Required for filtering valid samples.}
 
-\item{.sample.var}{A character string specifying the metadata column to use for sample identification. This column will be used to split cells into samples.}
+\item{.sample.var}{Character: column name in \code{colData(.sce.obj)} identifying which sample
+each cell belongs to (e.g., "sample_id", "Sample").}
 
-\item{.assay}{A character string specifying the assay to use. Default is "counts".}
+\item{.assay}{Character: assay name to extract. Default "counts". Can also be "logcounts",
+"normcounts", or any assay in \code{assayNames(.sce.obj)}.}
 
-\item{.min.cells.per.sample}{An integer specifying the minimum number of cells required per sample. Samples with fewer cells will be excluded. Default is 10.}
+\item{.min.cells.per.sample}{Integer: minimum cells required per sample. Default 10.}
 
-\item{.compress}{A logical specifying whether to compress the RDS files. Default is FALSE for faster I/O.}
+\item{.compress}{Logical: compress RDS files? Default FALSE for faster I/O.}
 
-\item{.verbose}{A logical specifying whether to print progress messages. Default is TRUE.}
+\item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
-A named list containing the on-disk location of RDS files containing one expression matrix for each sample, suitable for use with setup.lm.obj.
+Named list of file paths to temporary RDS files, one per sample. Only includes samples
+meeting minimum cell threshold and present in \code{.meta}.
 }
 \description{
-This function facilitates the creation of a .cells object suitable for setup.lm.obj from a SingleCellExperiment object.
+Converts a SingleCellExperiment (SCE) object into tinydenseR's .cells format. SCE is the standard
+Bioconductor container for single-cell data. Each sample's cells are extracted and saved as
+temporary RDS files.
+}
+\details{
+SingleCellExperiment is the Bioconductor standard for single-cell data, used by many analysis
+packages. This function extracts cells sample-by-sample and converts to sparse dgCMatrix format
+for memory-efficient storage.
+
+The function verifies that \code{colnames(.sce.obj)} exist, as these are required for proper
+cell tracking.
 }
 \examples{
 \dontrun{
-# Fetch example data
+# Load example data
 trajectory_data <- fetch_trajectory_data()
-sim_trajectory.meta <- trajectory_data$meta
-sim_trajectory <- trajectory_data$SCE
-
-# Process metadata for tinydenseR format
-sim_trajectory.meta <- sim_trajectory.meta[, c("Condition", "Replicate", "Sample")] |>
+sim_trajectory.meta <- trajectory_data$meta |>
+  dplyr::select(Condition, Replicate, Sample) |>
   unique()
 rownames(sim_trajectory.meta) <- sim_trajectory.meta$Sample
+sim_trajectory <- trajectory_data$SCE
 
-# Use the SCE object directly
+# Convert SCE directly to .cells format
 cells <- get.cells.SCE(.sce.obj = sim_trajectory,
+                       .meta = sim_trajectory.meta,
                        .sample.var = "Sample")
 
-# Use with setup.lm.obj
+# Use in tinydenseR workflow
 lm.obj <- setup.lm.obj(.cells = cells,
                        .meta = sim_trajectory.meta,
                        .assay.type = "RNA")
 }
+
+}
+\seealso{
+\code{\link{get.cells}} for automatic format detection,
+\code{\link{get.cells.Seurat}} for Seurat objects,
+\code{\link{setup.lm.obj}} for next workflow step
 }

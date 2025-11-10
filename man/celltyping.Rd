@@ -2,18 +2,77 @@
 % Please edit documentation in R/celltype.R
 \name{celltyping}
 \alias{celltyping}
-\title{Map clusters to celltypes.}
+\title{Manually assign cell type labels to clusters}
 \usage{
 celltyping(.lm.obj, .celltyping.map)
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks and get.graph.}
+\item{.lm.obj}{A list object initialized with \code{setup.lm.obj} and processed
+with \code{get.landmarks} and \code{get.graph}. Must contain
+\code{.lm.obj$graph$clustering$ids}.}
 
-\item{.celltyping.map}{A named list, where names are celltypes and each elemt is a character vector of cluster mapping to each respective celltype. A celltype can be comprised of more than one cluster, but each cluser can only be mapped to one celltype.}
+\item{.celltyping.map}{A named list mapping cell types to cluster IDs.
+List names are cell type labels (e.g., "CD4.T.cells"), and each element
+is a character vector of cluster IDs (e.g., c("cluster.01", "cluster.02"))
+that belong to that cell type. Requirements:
+\itemize{
+\item Each cell type name must be unique
+\item Each cluster can only map to one cell type
+\item All clusters in \code{.lm.obj$graph$clustering$ids} must be mapped
+}}
 }
 \value{
-The .lm.obj with the celltyping field populated with the celltype mapping, mean celltype expression values as well as the mean expression heatmap.
+The \code{.lm.obj} with the following updated fields:
+\describe{
+\item{\code{$graph$celltyping$ids}}{Factor vector of cell type labels
+for each landmark}
+\item{\code{$graph$celltyping$mean.exprs}}{Matrix of mean expression
+values per cell type (rows) by features (columns). For RNA data,
+displays z-scored expression of top PC-loading genes. For cytometry
+data, shows z-scored marker intensities.}
+\item{\code{$graph$celltyping$pheatmap}}{Heatmap object (from
+\code{pheatmap} package) visualizing mean expression patterns across
+cell types}
+}
 }
 \description{
-This function maps clusters to cell types.
+This function allows manual annotation of clusters by mapping one or more
+clusters to biologically meaningful cell type labels. This is particularly
+useful in cytometry experiments, where there typically is a larger number of
+cells and lineage marker-based hierarchical analysis is common.
+}
+\details{
+Manual cell type annotation is useful when:
+\itemize{
+\item Domain expertise is needed for fine-grained annotations
+\item Custom groupings are required for specific analyses
+\item Working with cytometry data where marker combinations define cell types
+}
+
+Cell type labels assigned here will be used in downstream analyses:
+\itemize{
+\item \code{\link{get.map}} propagates labels to all cells via nearest landmarks
+\item \code{\link{get.stats}} enables cell-type-level differential abundance testing
+\item \code{\link{get.dea}} enables cell-type-specific differential expression analysis
+}
+}
+\examples{
+\dontrun{
+# After clustering with get.graph()
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |>
+  get.graph()
+
+# Map clusters to cell types
+celltype_map <- list(
+  "CD4.T.cells" = c("cluster.01", "cluster.02"),
+  "CD8.T.cells" = c("cluster.03"),
+  "B.cells" = c("cluster.04", "cluster.05")
+)
+lm.cells <- celltyping(lm.cells, celltype_map)
+}
+}
+\seealso{
+\code{\link{get.map}} for automatic cell typing with symphony reference objects,
+\code{\link{lm.cluster}} for the clustering that produces cluster IDs used here
 }

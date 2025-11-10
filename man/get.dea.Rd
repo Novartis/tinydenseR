@@ -17,30 +17,108 @@ get.dea(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with
-get.landmarks, get.graph, get.map and get.stats.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{.design}{A matrix specifying the design matrix to be used.}
+\item{.design}{Design matrix specifying experimental design. Rows = samples, columns = coefficients.}
 
-\item{.contrasts}{A matrix specifying the contrasts to be used.}
+\item{.contrasts}{Optional contrast matrix for specific comparisons. Create with
+\code{limma::makeContrasts()}. If NULL, tests all \code{.design} coefficients.}
 
-\item{.block}{A character vector of length one indicating which column of \code{.lm.obj$metadata} to be used as blocking factor.}
+\item{.block}{Optional character: column name in \code{.lm.obj$metadata} for blocking factor
+(e.g., "Donor"). Accounts for within-block correlation.}
 
-\item{.geneset.ls}{A list of character vectors specifying the gene sets to be used in differential gene set score analysis (via pseudobulk GSVA). Default is NULL (no gene set scoring is run).}
+\item{.geneset.ls}{Optional named list of character vectors defining gene sets for GSVA enrichment
+analysis. Only for RNA data. Example: \code{list("Tcell" = c("CD3D", "CD3E"), "Bcell" = c("CD19", "MS4A1"))}.}
 
-\item{.id.idx}{A list of integer vectors specifying the indices of the landmarks to be used. Default is NULL. If provided, cells in each sample that have the selected landmark as first neighbor are included.}
+\item{.id.idx}{Optional list of integer vectors specifying landmark indices to include. If provided,
+only cells with these landmarks as nearest neighbors are aggregated. Useful for custom cell selection.}
 
-\item{.id}{A character vector specifying the ids to be used. Default is NULL.}
+\item{.id}{Optional character vector of cluster/celltype IDs to restrict analysis to. Uses
+\code{.id.from} to determine source.}
 
-\item{.id.from}{A character specifying the source of the ids. Default is NULL.
-Options are "clustering" and "celltyping".}
+\item{.id.from}{Character: "clustering" or "celltyping". Source of IDs when \code{.id} is specified.}
 
-\item{.verbose}{A logical indicating whether to print progress messages. Default is TRUE.}
+\item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
-The .lm.obj now containing the stats from fitting a linear model for each marker in each cluster.
+List containing DE analysis results:
+\describe{
+\item{\code{pseudobulk}}{Pseudobulk expression matrix (features × samples)}
+\item{\code{counts}}{For RNA: raw pseudobulk counts before voom transformation}
+\item{\code{voom}}{For RNA: voom object with mean-variance trend}
+\item{\code{fit}}{limma MArrayLM fit object}
+\item{\code{coefficients}}{Log fold change matrix (features × coefficients)}
+\item{\code{p.value}}{P-values (features × coefficients)}
+\item{\code{adj.p}}{FDR-adjusted p-values (features × coefficients)}
+\item{\code{gsva}}{If \code{.geneset.ls} provided: GSVA enrichment scores and statistics}
+}
 }
 \description{
-This function performs differential expression analysis for each feature
-using .coef as response. If provided, only cells within .id are used.
+Performs pseudobulk differential expression (DE) analysis for genes/markers. Aggregates cells
+into pseudobulk samples, then uses limma-voom (RNA) or limma (cytometry) to test for DE. Can
+restrict analysis to specific clusters/cell types, and optionally perform gene set enrichment
+via GSVA.
+}
+\details{
+The pseudobulk DE workflow:
+\enumerate{
+\item \strong{Cell selection}: If \code{.id} or \code{.id.idx} specified, filter to those cells.
+Otherwise use all cells.
+\item \strong{Pseudobulk aggregation}: Sum counts/expression across cells within each sample
+\item \strong{Outlier removal}: Exclude samples with <10\\% of average pseudobulk size
+\item \strong{Normalization}:
+\itemize{
+\item RNA: TMM normalization + voom transformation
+\item Cytometry: log2 transformation
+}
+\item \strong{Linear modeling}: \code{lmFit} with optional blocking
+\item \strong{Empirical Bayes}: Variance shrinkage via \code{eBayes}
+\item \strong{GSVA} (optional): Gene set variation analysis on pseudobulk
+}
+
+\strong{When to use pseudobulk DE:}
+\itemize{
+\item Identifying marker genes for cell types/states
+\item Testing treatment effects on gene expression
+\item Comparing expression between conditions within specific populations
+}
+
+\strong{Pseudobulk vs single-cell DE:}
+Pseudobulk aggregation:
+\itemize{
+\item Respects biological replication (samples as units)
+\item Appropriate statistical framework (no pseudoreplication)
+\item Better power for moderate effects
+\item Recommended for between-sample comparisons
+}
+}
+\examples{
+\dontrun{
+# After mapping
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |> get.graph() |> get.map()
+
+# DE analysis on all cells
+design <- model.matrix(~ Condition, data = .meta)
+dea <- get.dea(lm.cells, .design = design)
+plotDEA(lm.cells, dea, .coefs = "ConditionB")
+
+# DE within specific cell type
+dea.tcell <- get.dea(lm.cells, .design = design,
+                     .id = c("1", "2", "3"),
+                     .id.from = "clustering")
+
+# With gene set enrichment
+hallmark.sets <- list(
+  "INTERFERON_RESPONSE" = c("ISG15", "ISG20", "IFIT1"),
+  "INFLAMMATORY_RESPONSE" = c("IL1B", "TNF", "CXCL8")
+)
+dea.gsva <- get.dea(lm.cells, .design = design,
+                    .geneset.ls = hallmark.sets)
+}
+
+}
+\seealso{
+\code{\link{get.map}} (required), \code{\link{plotDEA}} for heatmap visualization,
+\code{\link{get.marker}} for marker gene identification
 }

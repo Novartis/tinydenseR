@@ -15,26 +15,58 @@ interactFeatPlot(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks, get.graph and get.lm.features.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.lm.features.stats()}.}
 
-\item{.n.feat}{The number of top features to plot. Defaults to 10.}
+\item{.n.feat}{Integer number of top features to display in hover tooltip (default 10).
+Currently not implemented - displays all features from \code{$interact.plot$lm.features}.}
 
-\item{.plot.dims}{The dimensions to plot. Can be set to "umap", "pca", or a combination of two column names from .lm.obj$lm. Defaults to "umap".}
+\item{.plot.dims}{Character specifying plot dimensions. Options:
+\itemize{
+\item \code{"umap"} - UMAP coordinates (default)
+\item \code{"pca"} - PCA coordinates (specify PCs with \code{.PC.x}, \code{.PC.y})
+\item Vector of 2 feature names from \code{colnames(.lm.obj$lm)} for custom biplot
+}}
 
-\item{.PC.x}{The principal component to plot on the x-axis. Defaults to 1 (PC1).}
+\item{.PC.x}{Integer specifying x-axis PC when \code{.plot.dims = "pca"} (default 1).}
 
-\item{.PC.y}{The principal component to plot on the y-axis. Defaults to 2 (PC2).}
+\item{.PC.y}{Integer specifying y-axis PC when \code{.plot.dims = "pca"} (default 2).}
 
-\item{.panel.size}{The size of the panel.}
+\item{.panel.size}{Numeric panel width/height in inches (default 1.5).}
 
-\item{.point.size}{The size of the points in the plot.}
+\item{.point.size}{Numeric point size (default 2).}
 }
 \value{
-A ggiraph object if the ggiraph package is available, otherwise a ggplot object.
+If \pkg{ggiraph} is available, returns an interactive \code{girafe} object with hover
+tooltips. Otherwise returns a static \code{ggplot} object with a warning.
 }
 \description{
-This function plots the summary of the landmark feature discovery.
+Creates an interactive scatter plot showing landmarks in reduced dimensions (UMAP, PCA, or
+custom features) with hover tooltips displaying the top characteristic features for each
+landmark. Requires \code{get.lm.features.stats()} to have been run first.
 }
 \note{
-Interactive features require the ggiraph package. If ggiraph is not available, a static plot will be returned with a warning.
+Interactive features require the \pkg{ggiraph} package. Install with
+\code{install.packages("ggiraph")} for full functionality.
+}
+\examples{
+\dontrun{
+# Typical workflow for interactive feature exploration
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks(.nHVG = 500) |>
+  get.graph() |>
+  get.lm.features.stats()
+
+# Interactive UMAP with feature tooltips
+interactFeatPlot(lm.cells)
+
+# PCA biplot with PC2 vs PC3
+interactFeatPlot(lm.cells, .plot.dims = "pca", .PC.x = 2, .PC.y = 3)
+
+# Custom feature biplot (cytometry example)
+interactFeatPlot(lm.cells, .plot.dims = c("CD3", "CD4"))
+}
+
+}
+\seealso{
+\code{\link{get.lm.features.stats}} for computing feature signatures
 }

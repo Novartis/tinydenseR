@@ -2,7 +2,7 @@
 % Please edit documentation in R/preprocess.R
 \name{get.cells.Seurat}
 \alias{get.cells.Seurat}
-\title{Create .cells object from Seurat v4 object}
+\title{Create .cells Object from Seurat v4 Object}
 \usage{
 get.cells.Seurat(
   .seurat.obj,
@@ -16,68 +16,79 @@ get.cells.Seurat(
 )
 }
 \arguments{
-\item{.seurat.obj}{A Seurat v4 object containing expression data.}
+\item{.seurat.obj}{Seurat v4 object containing expression data. Must use Assay class (not Assay5).}
 
-\item{.meta}{A data frame containing the sample-wise metadata. Row names must be sample names matching elements of the object metadata specified by \code{.sample.var}. Required for filtering valid samples.}
+\item{.meta}{Data frame with sample-level metadata. Rownames must be sample IDs matching values
+in \code{.seurat.obj@meta.data[[.sample.var]]}. Required for filtering valid samples.}
 
-\item{.sample.var}{A character string specifying the metadata column to use for sample identification. This column will be used to split cells into samples.}
+\item{.sample.var}{Character: column name in \code{.seurat.obj@meta.data} identifying which sample
+each cell belongs to (e.g., "sample_id", "Sample", "orig.ident").}
 
-\item{.assay}{A character string specifying the assay to use. Default is "RNA".}
+\item{.assay}{Character: assay name to extract. Default "RNA".}
 
-\item{.slot}{A character string specifying the data slot to use. Default is "counts".}
+\item{.slot}{Character: data slot to extract. Default "counts". Can also be "data" (normalized)
+or "scale.data" (scaled).}
 
-\item{.min.cells.per.sample}{An integer specifying the minimum number of cells required per sample. Samples with fewer cells will be excluded. Default is 10.}
+\item{.min.cells.per.sample}{Integer: minimum cells required per sample. Default 10.}
 
-\item{.compress}{A logical specifying whether to compress the RDS files. Default is FALSE for faster I/O.}
+\item{.compress}{Logical: compress RDS files? Default FALSE for faster I/O.}
 
-\item{.verbose}{A logical specifying whether to print progress messages. Default is TRUE.}
+\item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
-A named list containing the on-disk location of RDS files containing one expression matrix for each sample, suitable for use with setup.lm.obj.
+Named list of file paths to temporary RDS files, one per sample. Only includes samples
+meeting minimum cell threshold and present in \code{.meta}.
 }
 \description{
-This function facilitates the creation of a .cells object suitable for setup.lm.obj from a Seurat v4 object.
+Converts a Seurat v4 object into tinydenseR's .cells format. Unlike v5, Seurat v4 stores all
+data in a single slot per assay. Each sample's cells are extracted and saved as temporary RDS files.
+}
+\details{
+Seurat v4 uses a simpler assay structure than v5, with all data stored in a single matrix per slot.
+This function extracts cells sample-by-sample and converts to sparse dgCMatrix format for
+memory-efficient storage.
+
+Compatible with Seurat versions < 5.0.0 or when using legacy Assay class in v5.
 }
 \examples{
 \dontrun{
-# Fetch example data
+# Load example data
 trajectory_data <- fetch_trajectory_data()
-sim_trajectory.meta <- trajectory_data$meta
-sim_trajectory <- trajectory_data$SCE
-
-# Process metadata for tinydenseR format
-sim_trajectory.meta <- sim_trajectory.meta[, c("Condition", "Replicate", "Sample")] |>
+sim_trajectory.meta <- trajectory_data$meta |>
+  dplyr::select(Condition, Replicate, Sample) |>
   unique()
 rownames(sim_trajectory.meta) <- sim_trajectory.meta$Sample
 
-# Extract count data from SCE for subset of samples
-sim_trajectory.counts.A_R1 <-
- SingleCellExperiment::counts(sim_trajectory)[, sim_trajectory@colData$Sample == "A_R1"]
-sim_trajectory.counts.B_R1 <-
- SingleCellExperiment::counts(sim_trajectory)[, sim_trajectory@colData$Sample == "B_R1"]
+# Create Seurat v4 object
+counts.A_R1 <- SingleCellExperiment::counts(trajectory_data$SCE)[, 
+                 trajectory_data$SCE$Sample == "A_R1"]
+counts.B_R1 <- SingleCellExperiment::counts(trajectory_data$SCE)[, 
+                 trajectory_data$SCE$Sample == "B_R1"]
+combined.counts <- cbind(counts.A_R1, counts.B_R1)
 
-# Create a Seurat v4 object from the example data
-# First, combine the matrices
-combined.counts <- cbind(sim_trajectory.counts.A_R1, sim_trajectory.counts.B_R1)
-
-# Create cell metadata
 cell.meta <- data.frame(
-  sample_id = c(rep("A_R1", ncol(sim_trajectory.counts.A_R1)),
-                rep("B_R1", ncol(sim_trajectory.counts.B_R1))),
+  sample_id = c(rep("A_R1", ncol(counts.A_R1)),
+                rep("B_R1", ncol(counts.B_R1))),
   row.names = colnames(combined.counts)
 )
 
-# Create Seurat object (will be v4 format by default in older Seurat versions)
 seurat.obj <- CreateSeuratObject(counts = combined.counts,
                                  meta.data = cell.meta)
 
-# Create .cells object
+# Convert to .cells format
 cells <- get.cells.Seurat(.seurat.obj = seurat.obj,
+                          .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
                           .sample.var = "sample_id")
 
-# Use with setup.lm.obj
+# Use in tinydenseR workflow
 lm.obj <- setup.lm.obj(.cells = cells,
                        .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
                        .assay.type = "RNA")
 }
+
+}
+\seealso{
+\code{\link{get.cells}} for automatic format detection,
+\code{\link{get.cells.Seurat5}} for Seurat v5 objects,
+\code{\link{setup.lm.obj}} for next workflow step
 }

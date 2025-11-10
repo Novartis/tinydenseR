@@ -7,11 +7,53 @@
 get.lm.features.stats(.lm.obj)
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.landmarks} (PCA required).}
 }
 \value{
-A list that includes the feature discovery results for each landmark.
+Updated \code{.lm.obj} with \code{$interact.plot$lm.features} containing:
+\itemize{
+\item \code{res}: List of data frames (one per landmark) with top 10 feature importances
+\item \code{html}: HTML-formatted tables for interactive plotting
+}
+Feature importance is the signed loading from the landmark's top principal component.
 }
 \description{
-This function identifies features that are most characteristic for each landmark based on the PCA rotation matrix.
+Identifies the most characteristic features (genes or markers) for each landmark by
+determining which features contribute most strongly to the landmark's defining principal
+component. This creates landmark-specific feature signatures useful for interpretation.
+}
+\details{
+\strong{Algorithm:}
+\enumerate{
+\item For each landmark, identify the PC with highest absolute value (its "defining" PC)
+\item Extract that PC's rotation vector (feature loadings)
+\item Multiply by sign of landmark's PC score to preserve directionality
+\item Rank features by signed loading; keep top 10
+}
+
+Positive loadings indicate features that increase along the PC direction, negative indicate
+features that decrease. The signed values reflect how the landmark is characterized relative
+to the population average.
+
+Results are stored for use in \code{interactFeatPlot}, which displays feature signatures
+when hovering over landmarks in UMAP plots.
+}
+\examples{
+\dontrun{
+# After landmark selection and graph construction
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |>
+  get.graph() |>
+  get.lm.features.stats()
+
+# View feature signature for first landmark
+head(lm.cells$interact.plot$lm.features$res[[1]])
+
+# Use in interactive plotting
+plotPCA(lm.cells, .hover.stats = "marker")
+}
+
+}
+\seealso{
+\code{\link{interactFeatPlot}}, \code{\link{get.landmarks}}
 }

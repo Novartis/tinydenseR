@@ -14,13 +14,70 @@
 # limitations under the License.
 #####
 
-#' Map clusters to celltypes.
+#' Manually assign cell type labels to clusters
 #'
-#' This function maps clusters to cell types.
+#' This function allows manual annotation of clusters by mapping one or more
+#' clusters to biologically meaningful cell type labels. This is particularly
+#' useful in cytometry experiments, where there typically is a larger number of
+#' cells and lineage marker-based hierarchical analysis is common.
 #'
-#' @param .lm.obj A list object initialized with setup.lm.obj and processed with get.landmarks and get.graph.
-#' @param .celltyping.map A named list, where names are celltypes and each elemt is a character vector of cluster mapping to each respective celltype. A celltype can be comprised of more than one cluster, but each cluser can only be mapped to one celltype.
-#' @returns The .lm.obj with the celltyping field populated with the celltype mapping, mean celltype expression values as well as the mean expression heatmap.
+#' @details
+#' Manual cell type annotation is useful when:
+#' \itemize{
+#'   \item Domain expertise is needed for fine-grained annotations
+#'   \item Custom groupings are required for specific analyses
+#'   \item Working with cytometry data where marker combinations define cell types
+#' }
+#' 
+#' Cell type labels assigned here will be used in downstream analyses:
+#' \itemize{
+#'   \item \code{\link{get.map}} propagates labels to all cells via nearest landmarks
+#'   \item \code{\link{get.stats}} enables cell-type-level differential abundance testing
+#'   \item \code{\link{get.dea}} enables cell-type-specific differential expression analysis
+#' }
+#'
+#' @param .lm.obj A list object initialized with \code{setup.lm.obj} and processed 
+#'   with \code{get.landmarks} and \code{get.graph}. Must contain 
+#'   \code{.lm.obj$graph$clustering$ids}.
+#' @param .celltyping.map A named list mapping cell types to cluster IDs. 
+#'   List names are cell type labels (e.g., "CD4.T.cells"), and each element 
+#'   is a character vector of cluster IDs (e.g., c("cluster.01", "cluster.02")) 
+#'   that belong to that cell type. Requirements:
+#'   \itemize{
+#'     \item Each cell type name must be unique
+#'     \item Each cluster can only map to one cell type
+#'     \item All clusters in \code{.lm.obj$graph$clustering$ids} must be mapped
+#'   }
+#' @examples
+#' \dontrun{
+#' # After clustering with get.graph()
+#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#'   get.landmarks() |>
+#'   get.graph()
+#' 
+#' # Map clusters to cell types
+#' celltype_map <- list(
+#'   "CD4.T.cells" = c("cluster.01", "cluster.02"),
+#'   "CD8.T.cells" = c("cluster.03"),
+#'   "B.cells" = c("cluster.04", "cluster.05")
+#' )
+#' lm.cells <- celltyping(lm.cells, celltype_map)
+#' }
+#' @return The \code{.lm.obj} with the following updated fields:
+#'   \describe{
+#'     \item{\code{$graph$celltyping$ids}}{Factor vector of cell type labels 
+#'       for each landmark}
+#'     \item{\code{$graph$celltyping$mean.exprs}}{Matrix of mean expression 
+#'       values per cell type (rows) by features (columns). For RNA data, 
+#'       displays z-scored expression of top PC-loading genes. For cytometry 
+#'       data, shows z-scored marker intensities.}
+#'     \item{\code{$graph$celltyping$pheatmap}}{Heatmap object (from 
+#'       \code{pheatmap} package) visualizing mean expression patterns across 
+#'       cell types}
+#'   }
+#' @seealso 
+#'   \code{\link{get.map}} for automatic cell typing with symphony reference objects,
+#'   \code{\link{lm.cluster}} for the clustering that produces cluster IDs used here
 #' @export
 celltyping <-
   function(.lm.obj,
@@ -30,13 +87,17 @@ celltyping <-
     
     if(names(x = .celltyping.map) |>
        is.null()){
-      stop("names of .celltyping.map cannot be NULL")
+      stop("Cell type names are missing. Each element in .celltyping.map must have a name.\n",
+           "Example: list(\"CD4.T.cells\" = c(\"cluster.01\"), \"CD8.T.cells\" = c(\"cluster.02\"))")
     }
     
     if(names(x = .celltyping.map) |>
        duplicated() |>
        any()){
-      stop("names of .celltyping.map cannot be duplicated")
+      stop(paste0("Duplicate cell type names detected: ",
+                  paste(names(.celltyping.map)[duplicated(names(.celltyping.map))],
+                        collapse = ", "),
+                  "\nEach cell type must have a unique name."))
     }
     
     cls.in.map <-
@@ -44,32 +105,40 @@ celltyping <-
              use.names = FALSE)
     
     if(anyDuplicated(x = cls.in.map)){
-      stop(paste0("following cluster(s) mapping to more than one celltyping: ",
+      stop(paste0("Cluster(s) mapped to multiple cell types: ",
                   paste(cls.in.map[duplicated(x = cls.in.map)],
-                        collapse = ", ")))
+                        collapse = ", "),
+                  "\nEach cluster can only belong to one cell type."))
     }
     
     if(any(!(unique(x = .lm.obj$graph$clustering$ids) %in%
              cls.in.map))){
-      stop(paste0("every cluster must be mapped to at least one celltyping: ",
+      stop(paste0("Every cluster must be mapped to a cell type. Unmapped clusters: ",
                   paste(unique(x = .lm.obj$graph$clustering$ids)[
                     !(unique(x = .lm.obj$graph$clustering$ids) %in%
                         cls.in.map)],
-                    collapse = ", ")))
+                    collapse = ", "),
+                  "\nAdd these to .celltyping.map or merge them with existing clusters."))
       
     }
     
     if(!all(cls.in.map %in%
             unique(x = .lm.obj$graph$clustering$ids))){
-      stop(paste0("at least one cluster in .celltyping.map is not present in .lm.obj$graph$clustering$ids: ",
+      stop(paste0("Invalid cluster ID(s) in .celltyping.map: ",
                   paste(cls.in.map[!(cls.in.map %in%
                                        unique(x = .lm.obj$graph$clustering$ids))],
-                        collapse = ", ")))
+                        collapse = ", "),
+                  "\nThese clusters do not exist in .lm.obj$graph$clustering$ids.",
+                  "\nRun lm.cluster() to see available cluster IDs."))
     }
     
     .lm.obj$graph$celltyping <-
       vector(mode = "list")
     
+    # Create cell type labels by:
+    # 1. Inverting the map: cluster IDs -> cell type names
+    # 2. Indexing by cluster IDs to get corresponding cell type for each landmark
+    # 3. Converting to factor to maintain consistency with clustering$ids
     .lm.obj$graph$celltyping$ids <-
       .celltyping.map |>
       (\(x)
@@ -84,6 +153,9 @@ celltyping <-
       )() |>
       as.factor()
     
+    # For RNA: select top PC-loading genes for heatmap visualization
+    # Takes top 3 positive and top 3 negative loadings per PC to capture
+    # genes that drive the major axes of variation
     if(.lm.obj$assay.type == "RNA") {
       
       top <-

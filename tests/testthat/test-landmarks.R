@@ -79,28 +79,28 @@ test_that("setup.lm.obj throws error when .cells names don't match .meta rowname
   .cells <- list(wrong_name = tempfile())
   .meta <- data.frame(row.names = "sample1", group = "A")
   expect_error(setup.lm.obj(.cells = .cells, .meta = .meta),
-               "names of .cells must be the same as rownames of .meta")
+               "Sample names mismatch between .cells and .meta")
 })
 
 test_that("setup.lm.obj throws error when .harmony.var not in metadata", {
   .cells <- list(sample1 = tempfile())
   .meta <- data.frame(row.names = "sample1", group = "A")
   expect_error(setup.lm.obj(.cells = .cells, .meta = .meta, .harmony.var = "missing_var"),
-               "variables in .harmony.var were not found in the metadata")
+               "Variables not found in metadata")
 })
 
 test_that("setup.lm.obj throws error when .markers insufficient for cyto", {
   .cells <- list(sample1 = tempfile())
   .meta <- data.frame(row.names = "sample1", group = "A")
   expect_error(setup.lm.obj(.cells = .cells, .meta = .meta, .markers = c("CD3"), .assay.type = "cyto"),
-               ".markers must contain at least 3 markers")
+               ".markers must contain at least 3 markers for meaningful dimensionality reduction")
 })
 
 test_that("setup.lm.obj throws error when .markers used with RNA", {
   .cells <- list(sample1 = tempfile())
   .meta <- data.frame(row.names = "sample1", group = "A")
   expect_error(setup.lm.obj(.cells = .cells, .meta = .meta, .markers = c("CD3"), .assay.type = "RNA"),
-               ".markers argument is only applicable for cytometry data analysis")
+               ".markers argument only applies to cytometry data")
 })
 
 # Test for get.landmarks
@@ -108,7 +108,7 @@ test_that("setup.lm.obj throws error when .markers used with RNA", {
 test_that("get.landmarks validates input properly", {
   # Test that get.landmarks expects a proper .lm.obj structure
   expect_error(get.landmarks(.lm.obj = list()),
-               "Input .lm.obj is not valid. Make sure to initialize it with setup.lm.obj")  # Should error due to missing required fields
+               "Invalid .lm.obj: missing structure")  # Should error due to missing required fields
   
   # Test with incomplete object
   incomplete_obj <- list(
@@ -116,5 +116,5 @@ test_that("get.landmarks validates input properly", {
     cells = list()
   )
   expect_error(get.landmarks(.lm.obj = incomplete_obj),
-               "Input .lm.obj is not valid. Make sure to initialize it with setup.lm.obj")  # Should error due to missing required fields
+               "Invalid .lm.obj structure")  # Should error due to missing required fields
 })

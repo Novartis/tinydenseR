@@ -14,20 +14,90 @@
 # limitations under the License.
 #####
 
-#' Setup object for landmark identification and modeling
+#' Initialize tinydenseR object for landmark-based analysis
 #'
-#' This function initializes an object for landmark identification and modeling.
+#' Creates and validates the main tinydenseR object structure that will hold
+#' expression data, metadata, and analysis results throughout the workflow.
+#' This is the required first step before landmark identification.
 #'
-#' @param .cells A named list containing the on-disk location of RDS files containing one expression matrix for each sample. List names correspond to sample names.
-#' @param .meta A data frame containing the sample-wise metadata.
-#' @param .markers A character vector specifying the markers to use for landmark identification. Default is NULL. Applies only if `assay.type` is `"cyto"` since all features are included for `"RNA"`.
-#' @param .harmony.var A character vector specifying the metadata variables to use for Harmony integration. Default is NULL. If provided, these variables must be present in the metadata.
-#' @param .assay.type A character string specifying the assay type. Default is `"cyto"`. Must be one of `"cyto"` or `"RNA"`.
-#' @param .verbose A logical specifying whether to print progress messages. Default is TRUE.
-#' @param .seed An integer specifying the .seed for reproducibility. Default is 123.
-#' @param .prop.landmarks A numeric value between 0 and 1 specifying the proportion of cells to use as landmarks. Default is 0.1 (10% of total cells), with a maximum of 5000 landmarks.
-#' @param .n.threads An integer specifying the number of threads to use. Default is the max allowed by the system.
-#' @return A list object initialized with the input parameters.
+#' @details
+#' This function:
+#' \enumerate{
+#'   \item Validates input data structure and compatibility
+#'   \item Calculates the number of landmarks to sample per sample (max 5000 total)
+#'   \item Creates a "key" vector mapping landmarks to samples
+#'   \item Initializes empty slots for downstream analyses (PCA, graph, mapping)
+#'   \item Performs quality checks (warns if sample sizes vary >10-fold)
+#' }
+#' 
+#' The landmark sampling strategy aims for proportional representation across samples
+#' while capping total landmarks at 5000 for computational efficiency. Smaller samples
+#' may have relatively more landmarks sampled to ensure adequate representation.
+#' 
+#' @param .cells A named list of file paths (character strings) pointing to RDS files,
+#'   each containing one expression matrix per sample. For RNA: sparse matrix (dgCMatrix)
+#'   with genes as rows and cells as columns. For cytometry: matrix with cells as rows and
+#' markers as columns. List names become sample identifiers.
+#' @param .meta A data.frame with sample-level metadata. Rownames must match names in
+#'   \code{.cells} exactly. Used for batch correction and downstream modeling.
+#' @param .markers Character vector of marker names to use for landmark identification.
+#'   Only applicable for \code{.assay.type = "cyto"}. If NULL, uses all markers from
+#'   the first sample. Ignored for RNA data (uses HVG selection instead).
+#' @param .harmony.var Character vector of column names from \code{.meta} to use for
+#'   Harmony batch correction. If NULL, no batch correction is performed.
+#' @param .assay.type Character string: "cyto" for cytometry (default) or "RNA" for
+#'   scRNA-seq. Determines normalization strategy and feature selection approach.
+#' @param .verbose Logical, whether to print progress messages. Default TRUE.
+#' @param .seed Integer for random seed to ensure reproducibility. Default 123.
+#' @param .prop.landmarks Numeric between 0 and 1 specifying proportion of cells to
+#'   sample as landmarks. Default 0.1 (10%). Total landmarks capped at about 5000 regardless.
+#' @param .n.threads Integer for parallel processing. Default automatically detects
+#'   maximum available threads (using BLAS settings on HPC, or \code{detectCores()} locally).
+#' 
+#' @return A list object with initialized structure containing:
+#'   \describe{
+#'     \item{\code{$cells}}{Input file paths}
+#'     \item{\code{$metadata}}{Sample metadata with added cell count columns}
+#'     \item{\code{$key}}{Named vector mapping future landmarks to samples}
+#'     \item{\code{$spec}}{Specifications including \code{n.cells}, \code{n.perSample}}
+#'     \item{\code{$assay.type}}{Assay type ("cyto" or "RNA")}
+#'     \item{\code{$markers}}{Marker list (cytometry only)}
+#'     \item{\code{$harmony.var}}{Batch variables (if provided)}
+#'     \item{Empty slots}{lm, scaled.lm, raw.lm, pca, graph, map, etc. - populated by downstream functions}
+#'   }
+#' 
+#' @examples
+#' \dontrun{
+#' # Prepare data (from README workflow)
+#' .meta <- get.meta(.obj = sim_trajectory, .sample.var = "Sample")
+#' .cells <- get.cells(.exprs = sim_trajectory, 
+#'                     .meta = .meta,
+#'                     .sample.var = "Sample")
+#' 
+#' # Basic setup for RNA data
+#' lm.cells <- setup.lm.obj(
+#'   .cells = .cells,
+#'   .meta = .meta,
+#'   .assay.type = "RNA",
+#'   .prop.landmarks = 0.15
+#' )
+#' 
+#' # Cytometry workflow with marker selection
+#' lm.cells <- setup.lm.obj(
+#'   .cells = .cells,
+#'   .meta = .meta,
+#'   .markers = c("CD3", "CD4", "CD8", "CD19"),
+#'   .assay.type = "cyto"
+#' )
+#' 
+#' # RNA workflow with batch correction
+#' lm.cells <- setup.lm.obj(
+#'   .cells = .cells,
+#'   .meta = .meta,
+#'   .harmony.var = "batch",
+#'   .assay.type = "RNA"
+#' )
+#' }
 #' @export
 #'
 setup.lm.obj <-
@@ -60,22 +130,24 @@ setup.lm.obj <-
       
       if(!inherits(x = .harmony.var,
                    what = "character")){
-        stop(".harmony.var must be a character vector")
+        stop(".harmony.var must be a character vector.")
       }
       
       if(!all(.harmony.var %in% colnames(x = .meta))){
-        stop(paste0("The following variables in .harmony.var were not found in the metadata: ",
-                    paste0(.harmony.var[!(.harmony.var %in% colnames(x = .meta))],
-                           collapse = ", ")))
+        stop("Variables not found in metadata: ",
+             paste(.harmony.var[!(.harmony.var %in% colnames(x = .meta))],
+                   collapse = ", "),
+             "\nCheck column names in .meta with colnames(.meta).")
       }
       
     }
     
     if(!is.null(x = .markers)){
       if(.assay.type == "RNA"){
-        stop(".markers argument is only applicable for cytometry data analysis" )
+        stop(".markers argument only applies to cytometry data.\n",
+             "For RNA data, feature selection uses highly variable genes (HVG) automatically.")
       } else if(length(x = .markers) < 3){
-        stop(".markers must contain at least 3 markers")
+        stop(".markers must contain at least 3 markers for meaningful dimensionality reduction.")
       }
     }
     
@@ -86,7 +158,8 @@ setup.lm.obj <-
     
     if(!all(rownames(x = .meta) ==
             names(x = .cells))){
-      stop("names of .cells must be the same as rownames of .meta")
+      stop("Sample names mismatch between .cells and .meta.\n",
+           "names(.cells) must exactly match rownames(.meta) in the same order.")
     }
     
     if(!inherits(x = .cells,
@@ -95,7 +168,8 @@ setup.lm.obj <-
     }
     
     if((.prop.landmarks < 0) | (.prop.landmarks > 1)){
-      stop(".prop.landmarks must be a numeric value between 0 and 1")
+      stop(".prop.landmarks must be between 0 and 1 (e.g., 0.1 for 10% of cells).\n",
+           "Current value: ", .prop.landmarks)
     }
     
     .lm.obj.nm <-
@@ -205,26 +279,31 @@ setup.lm.obj <-
     .lm.obj$spec$n.cells <-
       n.cells
     
+    # Quality check: warn if sample sizes are highly imbalanced (>10-fold difference)
     if((max(.lm.obj$spec$n.cells) / min(.lm.obj$spec$n.cells)) > 10){
       
-      if(any(.lm.obj$spec$n.cells < 1000)){
-        warning("A very large difference in the number of cells across samples was detected. In particular for cytometry experiments, it is advisable to remove samples with fewer than 1000 cells.")
-      }
+      warning("Sample size imbalance detected: largest/smallest ratio > 10.\n",
+              "Smallest sample has ", min(.lm.obj$spec$n.cells), " cells.\n",
+              "Consider removing low-quality samples or downsampling large samples for more balanced representation.")
       
-      warning(paste0("\nThe ratio of the largest to the smallest number of cells in the dataset is greater than 10.\n\nThis can lead to unreliable results.\n\nThe number of cells in the smallest sample is ",
-                     min(.lm.obj$spec$n.cells),
-                     ".\n\nMake sure to exclude low quality samples and proceed at your own discretion."))
+      if(any(.lm.obj$spec$n.cells < 1000)){
+        warning("Large variation in sample sizes detected. For cytometry, samples with <1000 cells may be unreliable.")
+      }
       
     } 
     
+    # Calculate target number of landmarks: 10% of total cells, capped at 5000
     .lm.obj$spec$target.lm.n <-
       pmin(sum(.lm.obj$spec$n.cells) * .prop.landmarks,
            5e3)
     
+    # Allocate landmarks per sample: proportional to sample size, but capped
     .lm.obj$spec$n.perSample <-
       pmin(ceiling(x = .lm.obj$spec$n.cells * .prop.landmarks),
            ceiling(x = .lm.obj$spec$target.lm.n / length(x = .lm.obj$cells)))
     
+    # Create key vector: maps each future landmark to its sample
+    # (will be used after landmark selection to link back to metadata)
     .lm.obj$key <-
       seq_along(along.with = .lm.obj$cells) |>
       rep(times = .lm.obj$spec$n.perSample) |>
@@ -259,18 +338,89 @@ setup.lm.obj <-
     
   }
 
-#' Get landmarks
+#' Identify landmarks via leverage score sampling
 #'
-#' This function identifies landmarks from the input expression matrices.
+#' Selects representative "landmark" cells from the full dataset using a two-pass
+#' leverage score sampling strategy. Landmarks capture the representative cells
+#' while being computationally tractable for downstream graph construction and mapping.
 #'
-#' @param .lm.obj An object initialized with setup.lm.obj.
-#' @param .verbose A logical specifying whether to print progress messages. Default is TRUE.
-#' @param .seed An integer specifying the .seed for reproducibility. Default is 123.
-#' @param .nHVG An integer specifying the number of highly variable genes to use for landmark identification. Default is 5000
-#' @param .nPC An integer specifying the number of principal components to use for landmark identification. Default is 30.
-#' @param .exc.vdj.mito.ribo.genes.from.hvg A logical specifying whether to exclude VDJ, mitochondrial, and ribosomal genes from the highly variable genes. Default is TRUE.
-#' @param .force.in A character vector specifying the genes to force into the landmark set. Default is NULL. Applies only if `assay.type` is `"RNA"` since all features are included for `"cyto"`.
-#' @return The .lm.obj now containing the landmarks, a key linking each landmark to a row of .metadata and the PCA object.
+#' @details
+#' **Two-pass landmark selection algorithm:**
+#' 
+#' \strong{Pass 1 - Initial sampling:}
+#' \enumerate{
+#'   \item For RNA: normalize, log-transform, select top HVGs per sample
+#'   \item For cytometry: use specified markers
+#'   \item Compute sample-specific PCA
+#'   \item Calculate leverage scores (sum of squared PC loadings per cell)
+#'   \item Sample landmarks proportionally to leverage scores
+#' }
+#' 
+#' \strong{Pass 2 - Refinement:}
+#' \enumerate{
+#'   \item Pool landmarks from all samples
+#'   \item Compute dataset-wide PCA on pooled landmarks
+#'   \item Project ALL cells onto this shared PC space
+#'   \item Recalculate leverage scores using shared PCA
+#'   \item Resample landmarks with improved scores (final set)
+#' }
+#' 
+#' This two-pass approach ensures landmarks are representative of global
+#' (not just sample-specific) variation patterns. Leverage score sampling
+#' prioritizes cells in high-variance regions while maintaining diversity.
+#' 
+#' **Optional Harmony integration:**
+#' If \code{.harmony.var} was specified in \code{setup.lm.obj}, performs
+#' batch correction on landmark PC embeddings. This creates a reference
+#' object for mapping query cells in a batch-corrected space.
+#' 
+#' @param .lm.obj Object initialized with \code{setup.lm.obj}.
+#' @param .verbose Logical, print progress messages. Default TRUE.
+#' @param .seed Integer for reproducibility. Default 123.
+#' @param .nHVG Integer, number of highly variable genes to select for RNA data.
+#'   Default 5000. Ignored for cytometry. Higher values capture more variation
+#'   but increase computation time.
+#' @param .nPC Integer, number of principal components for dimensionality reduction.
+#'   Default 30. Must be less than the number of cells in smallest sample.
+#' @param .exc.vdj.mito.ribo.genes.from.hvg Logical, whether to exclude V(D)J
+#'   recombination genes, mitochondrial genes (MT-), and ribosomal genes (RP)
+#'   from HVG selection (RNA only). Default TRUE. Recommended to avoid
+#'   technical/biological noise dominating variation.
+#' @param .force.in Character vector of gene names to force into the feature set
+#'   regardless of variance (RNA only). Useful for known markers. Default NULL.
+#' 
+#' @return Updated \code{.lm.obj} with populated fields:
+#'   \describe{
+#'     \item{\code{$raw.lm}}{Raw expression matrix for landmarks}
+#'     \item{\code{$lm}}{Landmark expression on selected features (HVGs or markers; (log2-transformed and library size normalized for RNA))}
+#'     \item{\code{$scaled.lm}}{Z-scored landmark expression (for visualization)}
+#'     \item{\code{$pca}}{List containing:
+#'       \itemize{
+#'         \item \code{$embed} - PC coordinates for landmarks
+#'         \item \code{$rotation} - Feature loadings (PC directions)
+#'         \item \code{$center} - Feature means
+#'         \item \code{$scale} - Feature standard deviations  
+#'         \item \code{$sdev} - Standard deviations of PCs
+#'         \item \code{$HVG} - Selected feature names
+#'       }
+#'     }
+#'     \item{\code{$harmony.obj}}{Symphony reference object (if Harmony used), for mapping new cells}
+#'   }
+#' 
+#' @examples
+#' \dontrun{
+#' # Typical workflow (from README)
+#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#'   get.landmarks(.nHVG = 500, .nPC = 3)
+#' 
+#' # RNA with more PCs and custom HVGs
+#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#'   get.landmarks(.nPC = 50, .nHVG = 3000)
+#' 
+#' # Force specific markers into feature set
+#' lm.cells <- get.landmarks(lm.cells, 
+#'                           .force.in = c("CD3D", "CD4", "CD8A"))
+#' }
 #' @export
 #'
 get.landmarks <-
@@ -286,7 +436,8 @@ get.landmarks <-
     
     if(names(x = .lm.obj) |>
        is.null()){
-      stop("Input .lm.obj is not valid. Make sure to initialize it with setup.lm.obj")
+      stop("Invalid .lm.obj: missing structure.\n",
+           "Initialize with setup.lm.obj() first.")
     }
     
     if(!identical(
@@ -307,14 +458,18 @@ get.landmarks <-
             "harmony.var",
             "interact.plot",
             "harmony.obj"))){
-      stop("Input .lm.obj is not valid. Make sure to initialize it with setup.lm.obj")
+      stop("Invalid .lm.obj structure.\n",
+           "Ensure it was created with setup.lm.obj() and not manually modified.")
     }
     
     if(any(.nPC > min(.lm.obj$metadata$n.cells))){
-      stop(paste0("Number of principal components (.nPC) must be less than or equal to the number of cells in the smallest sample:",
-                  min(.lm.obj$metadata$n.cells)))
+      stop("Too many PCs requested: .nPC (", .nPC, ") exceeds smallest sample size (",
+           min(.lm.obj$metadata$n.cells), ").\n",
+           "Reduce .nPC or remove small samples.")
     }
     
+    # PASS 1: Sample-wise landmark selection using local PCA
+    # For each sample independently, compute PCA and select landmarks via leverage scores
     .lm.obj$raw.lm <-
       seq_along(along.with = .lm.obj$cells) |>
       stats::setNames(nm = names(x = .lm.obj$cells)) |>
@@ -327,9 +482,10 @@ get.landmarks <-
           
           if(!inherits(x = mat,
                        what = "dgCMatrix")){
-            stop("RNA expression matrices must be a sparse matrix of class dgCMatrix")
+            stop("RNA expression matrices must be sparse (dgCMatrix class).\n")
           }
           
+          # Identify genes to exclude from HVG selection (VDJ, mitochondrial, ribosomal)
           if(isTRUE(x = .exc.vdj.mito.ribo.genes.from.hvg)) {
             
             vdj.mito.ribo <-
@@ -345,15 +501,18 @@ get.landmarks <-
             
           }
           
+          # Normalize and log-transform RNA data
           mat <-
             Matrix::t(x = mat) |>
             (\(x)
+             # Size factor normalization: scale each cell by its total counts
              x / (Matrix::rowSums(x = x) / mean(x = Matrix::rowSums(x = x)))
             )()
           
           mat@x <-
             log2(x = mat@x + 1)
           
+          # Select top HVGs by variance
           HVG <-
             sparseMatrixStats::colVars(x = mat[,!colnames(x = mat) %in% vdj.mito.ribo]) |>
             order(decreasing = TRUE) |>
@@ -375,8 +534,11 @@ get.landmarks <-
         mat.sd <-
           sparseMatrixStats::colSds(x = mat)
         
+        # Compute leverage scores: sum of squared PC loadings per cell
+        # Cells with high leverage contribute most to defining PC space
         if(.lm.obj$assay.type == "RNA"){
           
+          # For RNA: use efficient truncated SVD (irlba)
           lev.score <-
             irlba::irlba(A = mat,
                          nv = .nPC,
@@ -388,6 +550,7 @@ get.landmarks <-
           
         } else {
           
+          # For cytometry: scale then use full SVD (smaller feature space)
           mat <-
             ((Matrix::t(x = mat) - mat.mean) /
                mat.sd) |>
@@ -403,6 +566,7 @@ get.landmarks <-
           
         }
         
+        # Sample landmarks proportionally to leverage scores
         lm.sample <-
           sample(x = nrow(x = mat),
                  size = .lm.obj$spec$n.perSample[[.cells.idx]],
@@ -450,6 +614,7 @@ get.landmarks <-
       message("getting landmark pca")
     }
     
+    # Compute dataset-wide HVG selection and PCA on pooled Pass 1 landmarks
     if(.lm.obj$assay.type == "RNA"){
       
       if(isTRUE(x = .exc.vdj.mito.ribo.genes.from.hvg)) {
@@ -473,15 +638,17 @@ get.landmarks <-
                     what = "character")){
           if(any(!.force.in %in% colnames(x = .lm.obj$raw.lm))){
             
-            warning(paste0(paste0(.force.in[!(.force.in %in% colnames(x = .lm.obj$raw.lm))],
-                                  collapse = ", "),
-                           "could not be found in the gene expression set"))
+            warning("Genes not found in expression data: ",
+                    paste(.force.in[!(.force.in %in% colnames(x = .lm.obj$raw.lm))],
+                          collapse = ", "))
             
           }
           
+          # Ensure forced-in genes are not excluded
           vdj.mito.ribo <-
             vdj.mito.ribo[!vdj.mito.ribo %in% .force.in]
           
+          # Get indices of forced-in genes for later merging with HVGs
           .force.in.idx <-
             which(x = colnames(x = .lm.obj$raw.lm)[!colnames(x = .lm.obj$raw.lm) %in% vdj.mito.ribo] %in% .force.in)
           
@@ -494,6 +661,7 @@ get.landmarks <-
                  length = 0)
       }
       
+      # Normalize and log-transform pooled landmarks
       .lm.obj$lm <-
         .lm.obj$raw.lm /
         (Matrix::rowSums(x = .lm.obj$raw.lm) /
@@ -502,6 +670,7 @@ get.landmarks <-
       .lm.obj$lm@x <-
         log2(x = .lm.obj$lm@x + 1)
       
+      # Select HVGs across all pooled landmarks, merge with forced-in genes
       HVG <-
         sparseMatrixStats::colVars(
           x = .lm.obj$lm[,!colnames(x = .lm.obj$lm) %in% vdj.mito.ribo]) |>
@@ -590,9 +759,12 @@ get.landmarks <-
       c(pca_res,
         .lm.obj$pca)
     
+    # Optional: Perform Harmony batch correction on landmark embeddings
     if(!is.null(x = .lm.obj$harmony.var)){
       
       set.seed(seed = .seed)
+      # Run Harmony to correct for batch effects in PC space
+      # nclust parameter: adaptive based on landmark count (min 20, max 100)
       tmp.harmony <- 
         harmony::RunHarmony(data_mat = .lm.obj$pca$embed, 
                             meta_data = .lm.obj$metadata[.lm.obj$key,],
@@ -633,7 +805,9 @@ get.landmarks <-
       
     }
     
-    # use learned dataset-wide PCA to re-assess sample-wise landmarks leverage scores
+    # PASS 2: Refine landmark selection using dataset-wide PCA
+    # Now that we have initial landmarks from all samples, compute global PCA
+    # and reselect landmarks based on leverage scores in this shared space
     .lm.obj$raw.lm <-
       seq_along(along.with = .lm.obj$cells) |>
       stats::setNames(nm = names(x = .lm.obj$cells)) |> 
@@ -660,9 +834,10 @@ get.landmarks <-
           
         }
         
+        # Calculate leverage scores in shared PC space (Harmony-corrected if applicable)
         if(!is.null(x = .lm.obj$harmony.obj)){
           
-          # Map query
+          # Map cells to Harmony-corrected space using Symphony
           corr_embed <-
             symphony::mapQuery(exp_query = Matrix::t(x = mat[,colnames(x = .lm.obj$lm)]),
                                metadata_query = matrix(data = 1,
@@ -674,6 +849,7 @@ get.landmarks <-
                                do_normalize = FALSE,
                                do_umap = FALSE)$Z
           
+          # Standardize features for SVD
           Y <-
             Matrix::t(x = mat[,colnames(x = .lm.obj$lm)]) |>
             (\(x)
@@ -682,6 +858,7 @@ get.landmarks <-
             )() |>
             Matrix::t()
           
+          # Compute approximate feature loadings in Harmony space via SVD
           Yt.X <-
             Matrix::crossprod(x = (corr_embed - Matrix::rowMeans(x = corr_embed)) |>
                                 Matrix::t(),
@@ -703,6 +880,7 @@ get.landmarks <-
           #        sign())) |>
           #  Matrix::t()
           
+          # Compute leverage scores using Harmony-corrected loadings
           lev.score <-
             ((Y %*% res$v) %*%
                diag(x = 1 / res$d)) |>
@@ -712,6 +890,7 @@ get.landmarks <-
           
         } else {
           
+          # Without Harmony: project cells onto global PCA and compute leverage scores
           lev.score <-
             (((((Matrix::t(x = mat[,colnames(x = .lm.obj$lm)]) - .lm.obj$pca$center) /
                   .lm.obj$pca$scale) |>
@@ -724,15 +903,18 @@ get.landmarks <-
           
         }
         
+        # Sample landmarks proportionally to leverage scores
         lm.sample <-
           sample(x = nrow(x = mat),
                  size = .lm.obj$spec$n.perSample[[.cells.idx]],
                  replace = FALSE,
                  prob = lev.score)
         
+        # Extract raw counts for sampled landmarks
         landmarks <-
           if(.lm.obj$assay.type == "RNA"){
             
+            # For RNA: reload to get raw counts, add sample prefix to cell IDs
             readRDS(file = .lm.obj$cells[[.cells.idx]])[,lm.sample] |>
               Matrix::t() |>
               (\(x)
@@ -763,6 +945,7 @@ get.landmarks <-
       message("getting landmark pca")
     }
     
+    # Recompute PCA on refined Pass 2 landmarks (final feature set and embedding)
     if(.lm.obj$assay.type == "RNA"){
       
       .lm.obj$lm <-
@@ -878,8 +1061,10 @@ get.landmarks <-
     .lm.obj$pca$HVG <-
       names(x = HVG)
     
+    # Reconstruct landmark expression matrices from PCA (denoised versions)
     if(.lm.obj$assay.type == "RNA"){
       
+      # Z-scored version: for visualization/heatmaps
       .lm.obj$scaled.lm <-
         (.lm.obj$pca$embed %*% Matrix::t(x = .lm.obj$pca$rotation)) |>
         Matrix::t() |>
@@ -894,6 +1079,7 @@ get.landmarks <-
                                    colnames(x = .lm.obj$lm)))
         )()
       
+      # Log-normalized version: back-transformed from PCA, de-noised
       .lm.obj$lm <-
         (.lm.obj$pca$embed %*% Matrix::t(x = .lm.obj$pca$rotation)) |>
         Matrix::t() |>
@@ -966,6 +1152,12 @@ get.landmarks <-
         message("Returning approximated rotations.")
       }
       
+      # Approximate feature loadings for Harmony-corrected space
+      # Since Harmony operates in PC space (not feature space), we need to
+      # back-calculate approximate loadings via SVD of corrected_PCs vs residualized_features
+      # This is an approximation: Harmony corrections are non-linear, so perfect
+      # feature loadings don't exist. But this gives reasonable loadings for interpretation.
+      
       # Build design matrix Z with intercept
       Z <-
         stats::model.matrix(object = ~ 1 + ., 
@@ -1018,7 +1210,14 @@ get.landmarks <-
     
   }
 
-#' Check if running on HPC
+#' Detect if running on High-Performance Computing cluster (internal)
+#' 
+#' Checks environment variables to determine if code is executing on an HPC
+#' system with a job scheduler (SLURM, LSF, PBS, SGE, OAR). Used to optimize
+#' thread detection strategy.
+#' 
+#' @return Logical: TRUE if HPC scheduler detected, FALSE otherwise
+#' @keywords internal
 is.hpc <- function() {
   # Common environment variables for HPC schedulers
   scheduler_vars <- c("SLURM_JOB_ID", "LSB_JOBID", "PBS_JOBID", "SGE_JOB_ID", "OAR_JOB_ID")

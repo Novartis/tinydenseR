@@ -17,24 +17,61 @@ plotDEA(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with \code{get.landmarks}, \code{get.graph} and \code{get.map}.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{.dea.obj}{The list object that is the result of running \code{get.dea}.}
+\item{.dea.obj}{Differential expression results from \code{get.dea()}.}
 
-\item{.coefs}{The coefficient level to plot.}
+\item{.coefs}{Character vector of coefficient names to plot.}
 
-\item{.order.by}{The variable to order the row (proteins) by. Can be set to \code{"clustering"} or \code{"celltyping"}. Defaults to \code{"clustering"}.}
+\item{.order.by}{Character: "clustering" (default) or "celltyping" - order rows by mean expression
+in these groups.}
 
-\item{.markers}{A character vector with the markers to plot. Defaults to the column names of the \code{"clustering"} or \code{"celltyping"} mean expression matrix.}
+\item{.markers}{Character vector of feature names (genes/proteins) to plot. Defaults to features
+shown in cluster/celltype heatmap (top PC contributors for RNA, all markers for cytometry).}
 
-\item{.q}{The q-value threshold to use for coloring the plot.}
+\item{.q}{Numeric q-value threshold for significance stars (default 0.1).}
 
-\item{.row.space.scaler}{The scaler for the row space. Defaults to \code{0.2}.}
+\item{.row.space.scaler}{Numeric row height scaling (default 0.2 inches per feature).}
 
-\item{.col.space.scaler}{The scaler for the column space. Defaults to \code{0.5}.}
+\item{.col.space.scaler}{Numeric column width scaling (default 0.5 inches per coefficient).}
 
-\item{.label.substr.rm}{The substring to remove from the labels.}
+\item{.label.substr.rm}{Character substring to remove from labels (default "").}
+}
+\value{
+A \code{ggplot} heatmap with log2 fold changes colored and significance marked.
 }
 \description{
-This function plots the statistics of modeling outcomes as a function of feature (e.g., genes or proteins) expression.
+Visualizes differential expression results as a heatmap showing log fold changes for genes/markers
+across coefficients. Rows ordered by cluster/celltype expression patterns, with significance
+indicated by asterisks. Helps identify which features drive population-level changes.
+}
+\details{
+This function shows which genes/markers are differentially expressed between conditions,
+organized by their expression patterns across clusters/cell types. The ordering helps identify:
+\itemize{
+\item Marker genes defining specific populations
+\item Broadly vs. specifically regulated features
+\item Cell type-specific transcriptional responses
+}
+
+For RNA data, typically shows top PC-loading genes. For cytometry, shows all markers.
+}
+\examples{
+\dontrun{
+# After DEA
+design <- model.matrix(~ Condition, data = .meta)
+dea <- get.dea(lm.cells, .design = design)
+
+# Heatmap of DE genes
+plotDEA(lm.cells, dea, .coefs = "ConditionB", .order.by = "clustering")
+
+# Focus on specific markers
+plotDEA(lm.cells, dea, 
+        .coefs = "ConditionB",
+        .markers = c("CD4", "CD8A", "CD3D"))
+}
+
+}
+\seealso{
+\code{\link{get.dea}}, \code{\link{plotBeeswarm}}
 }

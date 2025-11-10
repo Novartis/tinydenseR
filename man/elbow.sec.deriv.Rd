@@ -2,26 +2,53 @@
 % Please edit documentation in R/elbow.finder.R
 \name{elbow.sec.deriv}
 \alias{elbow.sec.deriv}
-\title{Find elbow point using second derivative method}
+\title{Find elbow point using second derivative method (internal)}
 \usage{
 elbow.sec.deriv(x, smooth = TRUE, df = NULL, sort.order = c("asc", "desc"))
 }
 \arguments{
-\item{x}{Numeric vector (e.g., PCA eigenvalues in decreasing order)}
+\item{x}{Numeric vector of values (e.g., eigenvalues, explained variance).
+Must have at least 4 values for second derivative calculation.}
 
-\item{smooth}{Logical, whether to apply smoothing spline}
+\item{smooth}{Logical, whether to apply smoothing spline before computing
+second derivative. Default TRUE. Only applied if length(x) > 6.}
 
-\item{df}{Degrees of freedom for smoothing (auto-calculated if NULL)}
+\item{df}{Degrees of freedom for smoothing spline. If NULL (default),
+auto-calculated as min(length(x) * 0.7, 10). Lower values = smoother fit.}
 
-\item{sort.order}{Character, either \code{asc} or \code{desc} for sorting order
+\item{sort.order}{Character, either "asc" or "desc". Specifies the expected
+ordering of meaningful values:
 \itemize{
-\item \code{asc}  for Laplacian Eigenmaps eigenvalues (increasing).
-\item \code{desc} for PCA eigenvalues (decreasing).
-}}
+\item \code{"asc"} - values increase with importance (Laplacian Eigenmaps)
+\item \code{"desc"} - values decrease with importance (PCA eigenvalues)
+}
+The algorithm works on sorted data, so this ensures correct interpretation.}
 }
 \value{
-List with index, value, and second derivative at elbow point
+List with three elements:
+\describe{
+\item{\code{index}}{Integer index of elbow point in original \code{x} vector}
+\item{\code{value}}{Numeric value of \code{x} at the elbow point}
+\item{\code{sec.deriv}}{Maximum second derivative value (diagnostic)}
+}
 }
 \description{
-Find elbow point using second derivative method
+Detects the "elbow" in a curve by finding where the second derivative
+(rate of change of the slope) is maximized. This identifies the point
+where the curve transitions from steep to flat, commonly used for
+determining optimal dimensionality in PCA or Laplacian Eigenmaps.
 }
+\details{
+The algorithm:
+\enumerate{
+\item Sorts values according to \code{sort.order}
+\item Optionally smooths with spline to reduce noise
+\item Normalizes to \verb{[0,1]} range for scale-invariance
+\item Computes second derivative using \code{diff(..., differences = 2)}
+\item Returns index where second derivative is largest
+}
+
+Smoothing is recommended for noisy data but requires at least 7 points.
+The \code{df} parameter controls smoothing strength: lower values = smoother.
+}
+\keyword{internal}

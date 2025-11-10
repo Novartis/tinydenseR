@@ -2,27 +2,55 @@
 % Please edit documentation in R/preprocess.R
 \name{get.meta.Seurat5}
 \alias{get.meta.Seurat5}
-\title{Extract metadata from Seurat v5 object}
+\title{Extract Sample-Level Metadata from Seurat v5 Object}
 \usage{
 get.meta.Seurat5(.seurat.obj, .sample.var, .verbose = TRUE)
 }
 \arguments{
-\item{.seurat.obj}{A Seurat v5 object containing cell metadata.}
+\item{.seurat.obj}{Seurat v5 object with cell-level metadata in \code{@meta.data}.}
 
-\item{.sample.var}{A character string specifying the metadata column to use for sample identification.}
+\item{.sample.var}{Character: column name in \code{.seurat.obj@meta.data} identifying samples.}
 
-\item{.verbose}{A logical specifying whether to print progress messages. Default is TRUE.}
+\item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
-A data frame containing sample-wise metadata with sample names as rownames.
+Data frame with one row per sample, containing only sample-level metadata columns.
+Rownames are sample IDs from \code{.sample.var}.
 }
 \description{
-This function extracts sample-wise metadata from a Seurat v5 object.
+Extracts sample-wise metadata from a Seurat v5 object by identifying which metadata columns have
+consistent values within each sample (sample-level variables). Cell-level variables are excluded
+with a warning. Returns a data frame suitable for \code{setup.lm.obj(.meta = ...)}.
+}
+\details{
+This function automatically distinguishes sample-level from cell-level metadata:
+\itemize{
+\item \strong{Sample-level}: Variables with identical values for all cells within each sample
+(e.g., Condition, Batch, Treatment). These are kept.
+\item \strong{Cell-level}: Variables that vary between cells in the same sample (e.g., nCount_RNA,
+percent.mt, cluster). These are excluded with a warning.
+}
+
+The \code{.sample.var} column is always included. Only distinct rows are returned (one per sample).
+
+Useful when you've stored experimental design information in the Seurat object and want to
+extract it for tinydenseR analysis.
 }
 \examples{
 \dontrun{
-# Assuming you have a Seurat v5 object with sample metadata
+# Assuming Seurat object has sample metadata
 meta <- get.meta.Seurat5(.seurat.obj = seurat.obj,
                          .sample.var = "sample_id")
+
+# Use with get.cells
+cells <- get.cells.Seurat5(.seurat.obj = seurat.obj,
+                           .meta = meta,
+                           .sample.var = "sample_id")
 }
+
+}
+\seealso{
+\code{\link{get.meta}} for automatic format detection,
+\code{\link{get.meta.Seurat}} for Seurat v4,
+\code{\link{get.cells.Seurat5}} for extracting count data
 }

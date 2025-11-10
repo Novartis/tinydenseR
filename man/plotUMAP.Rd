@@ -2,7 +2,8 @@
 % Please edit documentation in R/plot.R
 \name{plotUMAP}
 \alias{plotUMAP}
-\title{Plot UMAP}
+\title{Plot UMAP
+Plot UMAP}
 \usage{
 plotUMAP(
   .lm.obj,
@@ -20,33 +21,80 @@ plotUMAP(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks and get.graph.}
+\item{.lm.obj}{A tinydenseR object with UMAP computed via \code{get.graph()}.}
 
-\item{.feature}{The .feature to plot. It can be a numeric vector or a factor of length equal to the number of landmarks (nrow(.lm.obj$lm)). If numeric, the plot will be colored in relation to the median value of the .feature, or by .midpoint. If a factor, the plot will be colored by the levels of the factor.}
+\item{.feature}{Numeric vector or factor of length \code{nrow(.lm.obj$lm)} to color points by.
+Defaults to cluster IDs from \code{$graph$clustering$ids}. Can be:
+\itemize{
+\item Numeric: gene expression, fold changes, statistics (uses diverging color scale)
+\item Factor: clusters, cell types, conditions (uses discrete color palette)
+}}
 
-\item{.cat.feature.color}{The color palette to use in case .feature is categorical. Defaults to  colors (row 1, cols 1:5).}
+\item{.cat.feature.color}{Character vector of colors for categorical features. Default uses
+\code{Color.Palette[1,1:5]} (5-color palette, interpolated to match factor levels).}
 
-\item{.panel.size}{The size of the panel.}
+\item{.panel.size}{Numeric panel width/height in inches (default 2).}
 
-\item{.midpoint}{The midpoint for the color scale. Only used if .feature is numeric. Defaults to the median of the .feature.}
+\item{.midpoint}{Numeric midpoint for diverging color scale (continuous features only).
+Defaults to median of \code{.feature}.}
 
-\item{.plot.title}{The title of the plot.}
+\item{.plot.title}{Character plot title (default "").}
 
-\item{.color.label}{The label of the color scale.}
+\item{.color.label}{Character legend title (default "").}
 
-\item{.legend.position}{The position of the legend. Defaults to "right" and can be set to "left", "top", "bottom" or "none".}
+\item{.legend.position}{Character legend position: "right" (default), "left", "top", "bottom", or "none".}
 
-\item{.point.size}{The size of the points in the plot.}
+\item{.point.size}{Numeric point size (default 0.1).}
 
-\item{.seed}{The .seed for the random number generator.}
+\item{.seed}{Integer random seed for plot point ordering (default 123).}
 
-\item{.hover.stats}{The statistics to show in the hover. Defaults to "none" and can be set to "marker" to show top features associated with each neighborhood compared to all others.}
+\item{.hover.stats}{Character specifying hover information: "none" (default) or "marker" (shows
+landmark feature signatures from \code{get.lm.features.stats()}). Requires \pkg{ggiraph}.}
 
-\item{.hover.n.features}{The number of top features to show in the hover in each fold change direction. Defaults to 10 (i.e., 20 total features, 10 in each direction).}
+\item{.hover.n.features}{Integer number of features per direction in hover (default 10).
+Currently not implemented.}
+}
+\value{
+A \code{ggplot} object (static) or \code{girafe} object (interactive, if \pkg{ggiraph}
+available and \code{.hover.stats != "none"}).
 }
 \description{
-This function plots the dimensionality reduction of the landmarks (UMAP).
+Visualizes landmarks in UMAP space with flexible coloring by features, clusters, or statistical
+results. Supports both continuous (e.g., gene expression, fold changes) and categorical
+(e.g., clusters, cell types) overlays. Optional interactive hover shows landmark feature signatures.
+Identical interface to \code{plotPCA()} for easy comparison.
 }
 \note{
-Interactive hover features (when .hover.stats != "none") require the ggiraph package. If ggiraph is not available, a static plot will be returned with a warning.
+Requires \code{get.graph()} to have been run. Interactive hover features require the
+\pkg{ggiraph} package. Install with \code{install.packages("ggiraph")}.
+}
+\examples{
+\dontrun{
+# After graph construction
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |>
+  get.graph()
+
+# Basic UMAP
+plotUMAP(lm.cells, .point.size = 1)
+
+# Color by gene expression
+plotUMAP(lm.cells, .feature = lm.cells$lm[,"CD4"], .color.label = "CD4")
+
+# Color by fold change from get.stats()
+condition.stats <- get.stats(lm.cells, .design = design)
+plotUMAP(lm.cells, 
+         .feature = condition.stats$fit$coefficients[,"ConditionB"],
+         .color.label = "log2 FC", 
+         .midpoint = 0)
+
+# Interactive with feature hover
+lm.cells <- get.lm.features.stats(lm.cells)
+plotUMAP(lm.cells, .hover.stats = "marker")
+}
+
+}
+\seealso{
+\code{\link{plotPCA}} for PCA visualization, \code{\link{get.graph}},
+\code{\link{get.lm.features.stats}} for hover feature computation
 }

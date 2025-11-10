@@ -2,18 +2,56 @@
 % Please edit documentation in R/plot.R
 \name{plotHeatmap}
 \alias{plotHeatmap}
-\title{Plot Heatmap}
+\title{Plot Mean Expression Heatmap}
 \usage{
 plotHeatmap(.lm.obj, .id.from = "clustering")
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks and get.graph.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.graph()}.}
 
-\item{.id.from}{Either \code{"clustering"} or \code{"celltyping"}. Defaults to \code{"clustering"}.}
+\item{.id.from}{Character: "clustering" or "celltyping" (default "clustering"). Determines which
+population definitions to show. Use "clustering" after \code{get.graph()}, or "celltyping" after
+manual annotation with \code{celltyping()}.}
 }
 \value{
-Returns a \code{gtable}, \code{gTree}, \code{grob}, \code{gDesc} object created with \code{pheatmap} and draws on the current device.
+A \code{gtable}/\code{grob} object (from \code{pheatmap}) rendered to the graphics device.
+The heatmap includes hierarchical clustering of both features and populations.
 }
 \description{
-This function plots a heatmap of mean expression values across clusters or cell types. For cytometry experiments, all markers in \code{.lm.obj$marker} are returned,  while the top 3 positive and negative genes contributing to each principal component are returned for scRNA-seq experiments.
+Displays a heatmap of mean marker/gene expression across clusters or cell types. Shows the expression
+patterns that define each population, helping to validate cluster annotations and identify marker genes.
+The heatmap is automatically generated during \code{get.graph()} and stored for quick display.
+}
+\details{
+The heatmap content depends on assay type:
+\itemize{
+\item \strong{Cytometry}: All markers from \code{.lm.obj$marker}
+\item \strong{RNA-seq}: Top 3 positive and 3 negative genes per PC (from highly variable genes)
+}
+
+Rows (features) are ordered by hierarchical clustering to group co-expressed markers/genes.
+Columns (populations) also clustered to reveal relationships between cell types.
+
+The heatmap is generated once during \code{get.graph()} and cached in
+\code{.lm.obj$graph[[.id.from]]$pheatmap}. This function simply displays the cached version.
+}
+\examples{
+\dontrun{
+# After clustering
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |> get.graph()
+
+# Show cluster marker heatmap
+plotHeatmap(lm.cells, .id.from = "clustering")
+
+# After manual annotation
+lm.cells <- celltyping(lm.cells, 
+                       .celltyping.map = list("CD4_T" = c("cluster.1", "cluster.3"),
+                                              "CD8_T" = c("cluster.2")))
+plotHeatmap(lm.cells, .id.from = "celltyping")
+}
+
+}
+\seealso{
+\code{\link{get.graph}}, \code{\link{celltyping}}
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{scatterPlot}
 \alias{scatterPlot}
-\title{Scatter plot}
+\title{Scatter Plot with Feature Coloring}
 \usage{
 scatterPlot(
   .x.feature,
@@ -21,35 +21,86 @@ scatterPlot(
 )
 }
 \arguments{
-\item{.x.feature}{The x-axis feature. Defaults to \code{.lm.obj$scaled.lm[,"CD3"]}.}
+\item{.x.feature}{Numeric vector for x-axis values (e.g., \code{.lm.obj$scaled.lm[,"CD3"]} or
+\code{.lm.obj$pca$embed[,"PC1"]}).}
 
-\item{.y.feature}{The y-axis feature. Defaults to \code{.lm.obj$pca$embed[,"PC1"]}.}
+\item{.y.feature}{Numeric vector for y-axis values.}
 
-\item{.color.feature}{The feature to color the plot by. Defaults to \code{.lm.obj$graph$clustering$ids}.}
+\item{.color.feature}{Optional vector for point colors. Can be numeric (continuous coloring) or
+categorical (discrete colors). If \code{NULL}, all points colored identically.}
 
-\item{.x.label}{The x-axis label. Defaults to "x".}
+\item{.x.label}{Character x-axis label (default "").}
 
-\item{.y.label}{The y-axis label. Defaults to "y".}
+\item{.y.label}{Character y-axis label (default "").}
 
-\item{.color.label}{The color label. Defaults to "cluster".}
+\item{.color.label}{Character color legend label (default "").}
 
-\item{.cat.feature.color}{The color palette to use in case .feature is categorical. Defaults to \code{Color.Palette[1,1:5]}.}
+\item{.cat.feature.color}{Color palette for categorical features
+(default \code{Color.Palette[1,1:5]}). Automatically interpolated if more categories exist.}
 
-\item{.panel.size}{The size of the panel.}
+\item{.panel.size}{Numeric vector \code{c(width, height)} in inches (default \code{c(2,2)}).}
 
-\item{.midpoint}{The midpoint of the color gradient. Defaults to the median of .color.feature. Only used if .color.feature is numeric.}
+\item{.midpoint}{Numeric midpoint for continuous color gradients. Defaults to median of
+\code{.color.feature}. Useful for centering diverging scales.}
 
-\item{.plot.title}{The title of the plot.}
+\item{.plot.title}{Character plot title (default "").}
 
-\item{.legend.position}{The position of the legend. Defaults to "right" and can be set to "left", "top", "bottom" or "none".}
+\item{.legend.position}{Character: "right", "left", "top", "bottom", or "none" (default "right").}
 
-\item{.point.size}{The size of the points.}
+\item{.point.size}{Numeric point size (default 0.1). Increase for smaller datasets.}
 
-\item{.seed}{The seed for the random number generator.}
+\item{.seed}{Integer random seed for point order randomization (default 123). Prevents systematic
+overplotting of one group by another.}
 }
 \value{
-A ggplot2 object.
+A \code{ggplot} object.
 }
 \description{
-This function plots a scatter plot of two features colored by a third feature.
+Creates a 2D scatter plot with flexible x/y features and optional coloring by a third feature.
+Useful for exploring relationships between any features in the tinydenseR object (scaled expression,
+PCA coordinates, graph embeddings, cluster IDs, metadata, etc.).
+}
+\details{
+This flexible plotting function enables custom visualizations beyond the standard \code{plotPCA}
+and \code{plotUMAP} interfaces. Use cases include:
+\itemize{
+\item Plotting Laplacian Eigenmap coordinates from \code{.lm.obj$graph$LE$embed}
+\item Exploring relationships between markers (e.g., CD3 vs CD4)
+\item Overlaying metadata on any 2D embedding
+\item Creating custom QC plots (e.g., library size vs mitochondrial \%)
+}
+
+Points are plotted in randomized order to avoid bias when groups overlap. For continuous color
+features, uses diverging blue-white-red scale. For categorical, generates discrete colors.
+}
+\examples{
+\dontrun{
+# After processing
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |> get.graph()
+
+# Plot PC1 vs PC2 colored by cluster
+scatterPlot(.x.feature = lm.cells$pca$embed[,"PC1"],
+            .y.feature = lm.cells$pca$embed[,"PC2"],
+            .color.feature = lm.cells$graph$clustering$ids,
+            .x.label = "PC1", .y.label = "PC2",
+            .color.label = "Cluster")
+
+# Marker expression relationship
+scatterPlot(.x.feature = lm.cells$scaled.lm[,"CD4"],
+            .y.feature = lm.cells$scaled.lm[,"CD8A"],
+            .color.feature = .meta$Condition,
+            .x.label = "CD4", .y.label = "CD8A",
+            .color.label = "Condition")
+
+# Laplacian Eigenmap coordinates
+scatterPlot(.x.feature = lm.cells$graph$LE$embed[,1],
+            .y.feature = lm.cells$graph$LE$embed[,2],
+            .color.feature = lm.cells$graph$clustering$ids,
+            .x.label = "LE1", .y.label = "LE2")
+}
+
+}
+\seealso{
+\code{\link{plotPCA}}, \code{\link{plotUMAP}}
 }

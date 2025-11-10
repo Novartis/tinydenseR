@@ -16,25 +16,79 @@ get.graph(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks.}
+\item{.lm.obj}{A tinydenseR object initialized with \code{setup.lm.obj} and processed with
+\code{get.landmarks}. Must contain \code{$lm} (landmark matrix) and \code{$pca} components.}
 
-\item{.k}{An integer value that determines the number of nearest neighbors to consider in the graph.}
+\item{.k}{Integer number of nearest neighbors for graph construction (default 20). Higher values
+create more connected graphs with broader cluster definitions.}
 
-\item{.scale}{A logical value indicating whether to scale the data before embedding. Default is FALSE for assay type RNA (to avoid scaling PCA results) and TRUE for cyto.}
+\item{.scale}{Logical indicating whether to scale features before UMAP. Defaults to FALSE for
+RNA assays (PCA already scaled) and TRUE for cytometry (feature scales vary).}
 
-\item{.verbose}{A logical value indicating whether to print messages about the embedding process.}
+\item{.verbose}{Logical for progress messages (default TRUE).}
 
-\item{.seed}{An integer value that sets the seed for reproducibility.}
+\item{.seed}{Integer seed for reproducibility of UMAP and clustering (default 123).}
 
-\item{.cl.method}{A character value that determines the clustering method. Options are "snn" for shared nearest neighbors and "fgraph" for fuzzy graph.}
+\item{.cl.method}{Character specifying clustering method: "snn" (shared nearest neighbors via
+Jaccard similarity) or "fgraph" (fuzzy graph from UMAP). Default "snn".}
 
-\item{.cl.resolution.parameter}{A numeric value that determines the granularity of the clustering. Higher values result in more clusters.}
+\item{.cl.resolution.parameter}{Numeric controlling cluster granularity (default 0.8). Higher
+values produce more fine-grained clusters.}
 
-\item{.small.size}{An integer value that determines the size of clusters that are considered "stragglers". Stragglers are assigned to the cluster they are most connected to. Defaults to 0.5\% of the number of cells.}
+\item{.small.size}{Integer threshold for straggler clusters (default 0.5\% of landmarks). Clusters
+smaller than this are absorbed into nearest large cluster.}
 }
 \value{
-The .lm.obj now containing a graph object with, for example, the UMAP embedding, cluster assignments, mean cluster expression values as well as the mean expression heatmap.
+Updated \code{.lm.obj} with \code{$graph} component containing:
+\itemize{
+\item \code{uwot}: UMAP model with embedding, nearest neighbors, fuzzy graph
+\item \code{LE}: Laplacian Eigenmap embedding and eigenspectrum
+\item \code{snn}: Shared nearest neighbor graph
+\item \code{clustering}: Cluster assignments from \code{lm.cluster}
+}
 }
 \description{
-This function performs graph-based clustering, dimensionality reduction, and map building of landmark
+Performs the core graph analysis workflow: UMAP embedding, Laplacian Eigenmap (LE) computation,
+and clustering of landmark cells. This creates the low-dimensional representation used for
+visualization and cluster identification.
+}
+\details{
+The function orchestrates several graph-based analyses:
+
+\strong{1. UMAP Embedding:}
+Computes 2D embedding for visualization using harmony-corrected PCA (if available) or raw data.
+Returns the UMAP model for later projection of query cells.
+
+\strong{2. Graph Construction:}
+Builds k-NN graph and computes SNN graph via Jaccard similarity of neighbor overlaps.
+
+\strong{3. Laplacian Eigenmap:}
+Computes spectral embedding by solving the generalized eigenvalue problem of the graph Laplacian.
+Automatically selects dimensionality via elbow detection on eigenvalue spectrum. Provides
+alternative to PCA that respects local graph structure.
+
+\strong{4. Clustering:}
+Applies Leiden algorithm to identify communities, with straggler absorption for robustness.
+}
+\examples{
+\dontrun{
+# Typical workflow after landmark selection
+lm.cells <- setup.lm.obj(.cells = .cells, 
+                          .meta = .meta,
+                          .assay.type = "RNA") |>
+  get.landmarks(.nHVG = 500, .nPC = 3) |>
+  get.graph(.k = 10)
+
+# Higher resolution for finer clusters
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |>
+  get.graph(.cl.resolution.parameter = 200)
+
+# Use fuzzy graph for clustering instead of SNN
+lm.cells <- get.graph(lm.cells, .cl.method = "fgraph")
+}
+
+}
+\seealso{
+\code{\link{setup.lm.obj}}, \code{\link{get.landmarks}}, \code{\link{lm.cluster}}
 }

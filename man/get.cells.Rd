@@ -2,7 +2,7 @@
 % Please edit documentation in R/preprocess.R
 \name{get.cells}
 \alias{get.cells}
-\title{Create .cells object automatically detecting input type}
+\title{Create .cells Object with Automatic Format Detection}
 \usage{
 get.cells(
   .exprs,
@@ -17,52 +17,73 @@ get.cells(
 )
 }
 \arguments{
-\item{.exprs}{The expression data. Can be either:
+\item{.exprs}{Expression data in one of three formats:
 \itemize{
-\item A named list of count matrices (for get.cells.list.mat)
-\item A Seurat object (for get.cells.Seurat or get.cells.Seurat5)
-\item A SingleCellExperiment object (for get.cells.SCE)
+\item Named list of count matrices (calls \code{get.cells.list.mat})
+\item Seurat object v4 or v5 (calls \code{get.cells.Seurat} or \code{get.cells.Seurat5})
+\item SingleCellExperiment object (calls \code{get.cells.SCE})
 }}
 
-\item{.meta}{A data frame containing the sample-wise metadata. Row names must be sample names matching the names of .exprs if .exprs is a list or elements of the object metadata specified by \code{.sample.var} if .exprs is a Seurat/SCE object. Required for list input.}
+\item{.meta}{Data frame with sample-level metadata. Required for list input. Rownames must match
+sample IDs. For Seurat/SCE, rownames must match values in \code{.sample.var} column.}
 
-\item{.sample.var}{A character string specifying the metadata column to use for sample identification. Required for Seurat/SCE input, ignored for list input.}
+\item{.sample.var}{Character: metadata column identifying samples. Required for Seurat/SCE,
+ignored for list input.}
 
-\item{.assay}{A character string specifying the assay to use. Default is "RNA" for Seurat, "counts" for SCE. Applies only to Seurat/SCE input.}
+\item{.assay}{Character: assay name. Default "RNA" for Seurat, "counts" for SCE. Ignored for
+list input.}
 
-\item{.layer.pattern}{A character string specifying the pattern to match layer names. Default is "counts". Applies only to Seurat v5 input.}
+\item{.layer.pattern}{Character: layer name pattern for Seurat v5. Default "counts". Ignored
+for other formats.}
 
-\item{.slot}{A character string specifying the data slot to use. Default is "counts". Applies only to Seurat v4 input.}
+\item{.slot}{Character: data slot for Seurat v4. Default "counts". Ignored for other formats.}
 
-\item{.min.cells.per.sample}{An integer specifying the minimum number of cells required per sample. Default is 10. Applies only to Seurat/SCE input.}
+\item{.min.cells.per.sample}{Integer: minimum cells per sample. Default 10. Ignored for list input.}
 
-\item{.compress}{A logical specifying whether to compress the RDS files. Default is FALSE for faster I/O.}
+\item{.compress}{Logical: compress RDS files? Default FALSE.}
 
-\item{.verbose}{A logical specifying whether to print progress messages. Default is TRUE.}
+\item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
-A named list containing the on-disk location of RDS files containing one expression matrix for each sample, suitable for use with setup.lm.obj.
+Named list of file paths to temporary RDS files, one per sample.
 }
 \description{
-This function automatically detects the input type and calls the appropriate function to create a .cells object suitable for setup.lm.obj.
+Convenience wrapper that automatically detects input format and calls the appropriate conversion
+function. Supports Seurat (v4/v5), SingleCellExperiment, and list of count matrices. Simplifies
+workflow by eliminating need to know which specific function to call.
+}
+\details{
+This function inspects the class of \code{.exprs} to determine format:
+\itemize{
+\item \code{Seurat}: Checks for Assay5 class to distinguish v4 from v5
+\item \code{SingleCellExperiment}: Maps "RNA" assay to "counts" if needed
+\item \code{list}: Validates names match \code{.meta} rownames
+}
+
+For Seurat v5, automatically handles layered data structure. For SCE, uses standard
+\code{assay()} accessor.
 }
 \examples{
 \dontrun{
-# Example 1: Using a named list of count matrices
-count.matrices <- list(
-  A_R1 = sim_trajectory.counts.A_R1,
-  B_R1 = sim_trajectory.counts.B_R1
-)
+# Example 1: List of count matrices
+count.matrices <- list(A_R1 = counts.A_R1, B_R1 = counts.B_R1)
 cells <- get.cells(.exprs = count.matrices,
                    .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ])
 
-# Example 2: Using a Seurat object
+# Example 2: Seurat object (auto-detects v4 vs v5)
 cells <- get.cells(.exprs = seurat.obj,
+                   .meta = sim_trajectory.meta,
                    .sample.var = "sample_id")
 
-# Example 3: Using a SingleCellExperiment object
+# Example 3: SingleCellExperiment object
 cells <- get.cells(.exprs = sce.obj,
-                   .sample.var = "sample_id",
+                   .meta = sim_trajectory.meta,
+                   .sample.var = "Sample",
                    .assay = "counts")
 }
+
+}
+\seealso{
+\code{\link{get.cells.list.mat}}, \code{\link{get.cells.Seurat}},
+\code{\link{get.cells.Seurat5}}, \code{\link{get.cells.SCE}}, \code{\link{setup.lm.obj}}
 }

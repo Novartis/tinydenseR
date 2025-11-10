@@ -49,10 +49,10 @@ test_that("workflow functions validate inputs properly", {
   cells_list <- list("sample1" = matrix(1:10, ncol=2))
   meta_df <- data.frame(condition = "A", row.names = "sample2")
   expect_error(setup.lm.obj(.cells = cells_list, .meta = meta_df),
-               "names of .cells must be the same as rownames of .meta")
+               "Sample names mismatch between .cells and .meta")
   
   # Test get.landmarks validation with incomplete object
   .lm.obj <- list(assay.type = "RNA")
   expect_error(get.landmarks(.lm.obj = .lm.obj),
-               "Input .lm.obj is not valid. Make sure to initialize it with setup.lm.obj")  # Should error due to missing required fields
+               "Invalid .lm.obj")  # Should error due to missing required fields
 })

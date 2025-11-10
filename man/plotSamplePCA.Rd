@@ -16,20 +16,64 @@ plotSamplePCA(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks, get.graph and get.map.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{.labels.from}{The source of the labels. Must be a .lm.obj$metadata column name. Defaults to the first column name of .lm.obj$metadata.}
+\item{.labels.from}{Character specifying metadata column for coloring points. Defaults to
+first column of \code{.lm.obj$metadata} (often "Condition" or "Sample").}
 
-\item{.cat.feature.color}{The color palette for the categories. Defaults to the Color.Palette.}
+\item{.cat.feature.color}{Character vector of colors for categorical labels (default
+\code{Color.Palette[1,1:5]}).}
 
-\item{.point.size}{The size of the points in the plot.}
+\item{.point.size}{Numeric point size (default 1).}
 
-\item{.panel.size}{The size of the panel.}
+\item{.panel.size}{Numeric panel width/height in inches (default 2).}
 
-\item{.midpoint}{The midpoint for the color gradient. Defaults to the median of the \code{.labels.from} column.}
+\item{.midpoint}{Numeric midpoint for diverging color scale (continuous labels only).
+Defaults to median of \code{.labels.from} column.}
 
-\item{.seed}{The .seed for the random number generator.}
+\item{.seed}{Integer random seed (default 123).}
+}
+\value{
+A \code{ggplot} object showing PC1 vs PC2 of sample-level density profiles.
 }
 \description{
-This function plots the PCA of samples in abundance estimate space.
+Visualizes samples in PCA space based on their landmark density profiles. This "reverse PCA"
+treats samples as observations and landmark densities as features, revealing sample-level
+patterns and clustering. Useful for quality control and identifying batch effects.
+}
+\details{
+This function performs PCA on log2-transformed landmark densities (samples × landmarks matrix).
+Samples with similar cellular composition will cluster together in PC space. The analysis:
+\itemize{
+\item Log-transforms densities: log2(density + 0.5) for variance stabilization
+\item Filters zero-variance landmarks
+\item Centers and scales features before PCA
+\item Computes top 2 PCs using truncated SVD
+}
+
+Useful for identifying:
+\itemize{
+\item Batch effects (samples clustering by technical rather than biological factors)
+\item Outlier samples with aberrant cellular profiles
+\item Main axes of variation in cellular composition
+}
+}
+\examples{
+\dontrun{
+# After mapping
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |>
+  get.graph() |>
+  get.map()
+
+# Color by condition
+plotSamplePCA(lm.cells, .labels.from = "Condition")
+
+# Color by replicate to check for batch effects
+plotSamplePCA(lm.cells, .labels.from = "Replicate")
+}
+
+}
+\seealso{
+\code{\link{get.map}}, \code{\link{plotPCA}}
 }

@@ -19,28 +19,50 @@ plotAbundance(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks, get.graph and get.map.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{.x.split}{The column of metadata to use in the x axis. Defaults to the first column of .lm.obj$metadata.}
+\item{.x.split}{Character specifying metadata column for x-axis grouping (default first column).}
 
-\item{.pop}{The name of the pop to plot in the y axis.}
+\item{.pop}{Character vector of population names to plot. If NULL, plots all.}
 
-\item{.pop.from}{Either \code{"clustering"} or \code{"celltyping"}. Defaults to \code{"clustering"}.}
+\item{.pop.from}{Character: "clustering" (default) or "celltyping".}
 
-\item{.subject.id}{If provided, draws a line connecting dots from the same subject.}
+\item{.subject.id}{Character metadata column for connecting paired samples with lines (e.g.,
+"Subject"). Default NULL.}
 
-\item{.color.by}{The column of metadata to use for coloring the points. Defaults to NULL, which makes all points \code{"black"}.}
+\item{.color.by}{Character metadata column for coloring points. Default NULL (all black).}
 
-\item{.x.space.scaler}{The scaler for the x axis Defaults to \code{0.5}.}
+\item{.x.space.scaler}{Numeric x-axis width scaling (default 0.25 inches per group).}
 
-\item{.height}{The height of the plot. Defaults to \code{1.5}.}
+\item{.height}{Numeric plot height in inches (default 1.5).}
 
-\item{.cat.feature.color}{The color palette for the categories. Defaults to the Color.Palette.}
+\item{.cat.feature.color}{Character vector of colors (default \code{Color.Palette[1,1:5]}).}
 
-\item{.seed}{The seed for the random number generator that control x-axis jitter. Defaults to \code{123}.}
+\item{.seed}{Integer random seed for jitter (default 123).}
 
-\item{.orientation}{The orientation of the plot. Can be set to \code{"wide"} or \code{"square"}. Defaults to \code{"wide"}.}
+\item{.orientation}{Character: "wide" (default) or "square" faceting.}
+}
+\value{
+A \code{ggplot} object showing cell abundances.
 }
 \description{
-This function plots the actual percentages from traditional analysis to facilitate visual inspection of value distributions.
+Creates dot/line plots showing cell percentages per sample. Similar to \code{plotTradPerc()}
+but with slightly different interface and styling options. Visualizes raw abundance data to
+inspect distributions and paired/longitudinal patterns.
+}
+\examples{
+\dontrun{
+# Basic abundance plot
+plotAbundance(lm.cells, .pop = "B.cells")
+
+# With paired subject lines
+plotAbundance(lm.cells, 
+              .pop = "B.cells",
+              .subject.id = "MouseID",
+              .color.by = "Treatment")
+}
+
+}
+\seealso{
+\code{\link{plotTradPerc}}, \code{\link{plotTradStats}}
 }

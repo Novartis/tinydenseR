@@ -2,7 +2,7 @@
 % Please edit documentation in R/lm.graph.embed.R
 \name{leiden.cluster}
 \alias{leiden.cluster}
-\title{Leiden clustering}
+\title{Leiden clustering with straggler absorption}
 \usage{
 leiden.cluster(
   .lm.obj = NULL,
@@ -14,21 +14,65 @@ leiden.cluster(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks. If provided, the function will use the Laplacian Eigenmap embedding from the .lm.obj for initialization. If NULL, the function will compute a 3-dimensional embedding using irlba on the similarity matrix.}
+\item{.lm.obj}{Optional tinydenseR object from \code{get.landmarks()} and
+\code{get.graph()}. If provided, uses Laplacian Eigenmap embedding for
+initialization. If NULL, computes 3D embedding from \code{.sim.matrix}.}
 
-\item{.sim.matrix}{A square matrix representing the graph of the cells. Elements of the matrix should be a similarity measure of pairs of observations.}
+\item{.sim.matrix}{Square similarity matrix (typically Jaccard similarity of
+k-NN graphs). Higher values indicate stronger connections between nodes.
+Self-loops (diagonal) are automatically removed.}
 
-\item{.resolution.parameter}{A numeric value that determines the granularity of the clustering. Higher values result in more clusters.}
+\item{.resolution.parameter}{Numeric controlling cluster granularity in Leiden
+CPM algorithm. Higher values (e.g., 0.0005-0.005) yield more/smaller clusters.
+Lower values yield fewer/larger clusters. Optimal value depends on data scale.}
 
-\item{.small.size}{An integer value that determines the size of clusters that are considered "stragglers". Stragglers are assigned to the cluster they are most connected to. Defaults to 0.5\% of the number of cells.}
+\item{.small.size}{Integer threshold for straggler clusters. Clusters with fewer
+cells are absorbed into neighbors. Default: 0.5\% of total nodes (floor(n/200)).}
 
-\item{.verbose}{A logical value indicating whether to print messages about the clustering process.}
+\item{.verbose}{Logical, print progress and cluster counts. Default TRUE.}
 
-\item{.seed}{An integer value that sets the seed for reproducibility.}
+\item{.seed}{Integer for reproducibility (affects k-means and Leiden). Default 123.}
 }
 \value{
-A factor vector of cluster assignments.
+Factor vector of cluster assignments with levels ordered by appearance.
+Labels are formatted as "cluster.01", "cluster.02", etc.
 }
 \description{
-This function performs Leiden clustering on a graph of cells. The graph is represented by an adjacency matrix, where the elements of the matrix are the likelihood that pairs of vertices are adjacent. The function returns a factor vector of cluster assignments.
+Performs community detection on a similarity graph using the Leiden algorithm,
+followed by reassignment of small "straggler" clusters to better-connected
+neighbors. This improves cluster quality by preventing tiny, isolated groups.
+}
+\details{
+\strong{Algorithm steps:}
+\enumerate{
+\item Initialize with k-means (up to 25 centers) on embedding to avoid singletons
+\item Run Leiden community detection with CPM objective function
+\item Identify "straggler" clusters smaller than \code{.small.size}
+\item For each straggler, compute mean connectivity to all keeper clusters
+\item Reassign straggler cells to the most connected keeper cluster
+\item Relabel clusters sequentially
+}
+
+\strong{Initialization strategy:}
+Uses Laplacian Eigenmap embedding (if available in \code{.lm.obj}), otherwise
+PCA embedding (first 3 components), or computes embedding from similarity matrix.
+K-means initialization helps Leiden start from reasonable communities rather than
+singleton nodes, improving stability.
+
+\strong{Straggler absorption:}
+Small clusters (< 0.5\% of total by default) often represent noise or transitional
+states. Rather than keeping them as separate clusters, they're merged with the
+most similar neighboring cluster based on mean edge weights.
+}
+\examples{
+\dontrun{
+# After building similarity matrix
+clusters <- leiden.cluster(
+  .lm.obj = lm.obj,
+  .sim.matrix = jaccard_sim,
+  .resolution.parameter = 0.001,
+  .small.size = 10  # Merge clusters < 10 cells
+)
+table(clusters)
+}
 }

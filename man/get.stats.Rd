@@ -2,7 +2,7 @@
 % Please edit documentation in R/stats.model.R
 \name{get.stats}
 \alias{get.stats}
-\title{Get stats}
+\title{Differential Abundance Testing}
 \usage{
 get.stats(
   .lm.obj,
@@ -14,21 +14,118 @@ get.stats(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks, get.graph and get.map.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{.design}{A matrix specifying the design matrix to be used.}
+\item{.design}{Design matrix specifying the experimental design. Rows correspond to samples
+(matching \code{.lm.obj$cells}), columns to coefficients. Create with \code{model.matrix()}.}
 
-\item{.contrasts}{A matrix specifying the contrasts to be used.}
+\item{.contrasts}{Optional contrast matrix for specific comparisons. Each column defines one
+contrast. Create with \code{limma::makeContrasts()}. If NULL, tests all coefficients in
+\code{.design}.}
 
-\item{.block}{A character vector of length one indicating which column of \code{.lm.obj$metadata} to be used as blocking factor.}
+\item{.block}{Optional character: column name in \code{.lm.obj$metadata} for blocking factor
+(e.g., "Donor", "Batch"). Accounts for within-block correlation using \code{duplicateCorrelation}.}
 
-\item{.verbose}{A logical indicating whether to print progress messages.}
+\item{.verbose}{Logical: print progress messages? Default TRUE.}
 
-\item{.seed}{An integer to set the seed for reproducibility.}
+\item{.seed}{Integer: random seed for reproducibility in blocking correlation estimation. Default 123.}
 }
 \value{
-The .lm.obj now containing the stats from fitting a voomLmFit model.
+List containing differential abundance results:
+\describe{
+\item{\code{y}}{log2(fuzzy density + 0.5) matrix: landmarks × samples}
+\item{\code{fit}}{limma MArrayLM object after eBayes with moderated statistics}
+\item{\code{fit$density.weighted.bh.fdr}}{Density-weighted BH FDR adjustment (matrix: landmarks × coefficients)}
+\item{\code{fit$pca.weighted.q}}{PCA-weighted q-values (matrix: landmarks × coefficients)}
+\item{\code{trad}}{List with traditional cluster-level DA results:}
+\item{\code{trad$clustering$fit}}{limma fit for cluster percentages}
+\item{\code{trad$celltyping$fit}}{limma fit for celltype percentages (if celltyping exists)}
+}
 }
 \description{
-Fits a model of outcomes as a function of the sample wise sum of cell-landmark neighboring probabilities
+Performs landmark-based differential abundance (DA) testing using limma on log-transformed fuzzy
+densities. Tests which landmarks (cell populations) change in abundance between conditions. More
+sensitive than traditional cluster-level testing because landmarks can capture within-cluster
+heterogeneity. Uses PCA-weighted q-values that leverage the correlation structure among
+landmarks to improve statistical power.
+}
+\details{
+The landmark-based DA testing workflow:
+\enumerate{
+\item Computes log2(fuzzy density + 0.5) for each landmark across samples
+\item Fits linear model: \code{lmFit(y ~ design)}
+\item If blocking specified: estimates within-block correlation via \code{duplicateCorrelation}
+\item Applies contrasts if provided
+\item Performs empirical Bayes moderation: \code{eBayes()}
+\item Computes density-weighted FDR and PCA-weighted q-values
+\item Performs traditional cluster/celltype-level DA for comparison
+}
+
+\strong{Advantages over cluster-level testing:}
+\itemize{
+\item Detects subtle shifts within clusters
+\item No arbitrary clustering thresholds
+\item Continuous representation of cell state space
+\item Powered by limma's variance shrinkage
+}
+
+\strong{Design matrix considerations:}
+\itemize{
+\item Include intercept for standard comparisons
+\item No-intercept models with continuous covariates assume zero-centering (warning issued)
+\item Must be full rank (checked automatically)
+}
+
+\strong{PCA-weighted q-value procedure:}
+
+Standard FDR methods assume independent tests, but landmarks are correlated in
+the cell state space. To account for this:
+
+\enumerate{
+\item \strong{Residualize PCs}: Regress out design matrix from landmark PCA embeddings to
+obtain covariates independent of experimental factors
+\item \strong{Estimate π₀}: Use \code{swfdr::lm_pi0} to estimate the proportion of true
+nulls conditional on PC coordinates. Landmarks in similar cell states have correlated
+p-values; PCA captures this spatial structure
+\item \strong{Conservative safeguard}: If global π₀ < 0.6, apply π₀ floor of 0.6 to prevent
+anti-conservative estimates in high-signal regimes
+\item \strong{Compute q-values}: Use \code{swfdr::lm_qvalue} to calculate spatially-weighted
+FDR that properly accounts for landmark correlation structure
+}
+
+This approach is more powerful than standard BH adjustment when landmarks exhibit correlated
+expression, while maintaining proper FDR control. Falls back to standard q-value
+or BH for small test sets (<1000 landmarks).
+}
+\examples{
+\dontrun{
+# After mapping
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |> get.graph() |> get.map()
+
+# Simple two-group comparison
+design <- model.matrix(~ Condition, data = .meta)
+stats <- get.stats(lm.cells, .design = design)
+
+# Visualize results
+plotBeeswarm(lm.cells, stats, .coefs = "ConditionB")
+
+# Complex design with contrasts
+design <- model.matrix(~ 0 + Group, data = .meta)
+contrasts <- limma::makeContrasts(
+  TvsC = GroupTreatment - GroupControl,
+  T1vsT2 = GroupTreatment1 - GroupTreatment2,
+  levels = design
+)
+stats <- get.stats(lm.cells, .design = design, .contrasts = contrasts)
+
+# With blocking for paired samples
+design <- model.matrix(~ Timepoint, data = .meta)
+stats <- get.stats(lm.cells, .design = design, .block = "Subject")
+}
+
+}
+\seealso{
+\code{\link{get.map}} (required predecessor), \code{\link{plotBeeswarm}} for
+visualization, \code{\link{plotTradStats}} for comparison with cluster-level tests
 }

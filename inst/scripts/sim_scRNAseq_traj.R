@@ -19,11 +19,6 @@ library(tidyverse)
 library(ggpubr)
 library(rstatix)
 
-wd <- "path/to/your/working/directory/"
-rd <- file.path(wd, "res")
-
-setwd(dir = wd)
-
 # Fetch trajectory data from miloR repository
 trajectory_data <- fetch_trajectory_data()
 

@@ -7,13 +7,19 @@
 fast.jaccard.r(.adj.matrix, .prune = 1/15)
 }
 \arguments{
-\item{.adj.matrix}{A non-symetric sparse matrix representation of the nearest neighbors.}
+\item{.adj.matrix}{A non-symmetric sparse adjacency matrix from \code{get.adj.matrix}, where
+entry (i,j)=1 indicates j is a nearest neighbor of i.}
 
-\item{.prune}{A numeric value that determines the threshold for pruning small values from the Jaccard index matrix.}
+\item{.prune}{A numeric threshold (default 1/15 ≈ 0.067) for pruning weak edges. Jaccard
+values below this are set to zero for sparsity.}
 }
 \value{
-A shared nearest neighbors sparse adjacency matrix of Jaccard indices.
+A symmetric sparse matrix of Jaccard indices representing the SNN graph. Higher values
+indicate greater neighbor overlap. Matrix is pruned and forced symmetric.
 }
 \description{
-This function calculates the Jaccard index between cells based on their nearest neighbors. The function is optimized for speed and memory efficiency.
+Computes a shared nearest neighbor (SNN) graph by calculating Jaccard similarity between
+cells based on their k-nearest neighbors. The Jaccard index J(A,B) = |A∩B| / |A∪B| measures
+the overlap of neighbor sets. This implementation uses sparse matrix operations for efficiency.
 }
+\keyword{internal}

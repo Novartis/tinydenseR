@@ -2,10 +2,16 @@
 % Please edit documentation in R/landmarks.R
 \name{is.hpc}
 \alias{is.hpc}
-\title{Check if running on HPC}
+\title{Detect if running on High-Performance Computing cluster (internal)}
 \usage{
 is.hpc()
 }
-\description{
-Check if running on HPC
+\value{
+Logical: TRUE if HPC scheduler detected, FALSE otherwise
 }
+\description{
+Checks environment variables to determine if code is executing on an HPC
+system with a job scheduler (SLURM, LSF, PBS, SGE, OAR). Used to optimize
+thread detection strategy.
+}
+\keyword{internal}

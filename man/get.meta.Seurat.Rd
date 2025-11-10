@@ -2,27 +2,49 @@
 % Please edit documentation in R/preprocess.R
 \name{get.meta.Seurat}
 \alias{get.meta.Seurat}
-\title{Extract metadata from Seurat v4 object}
+\title{Extract Sample-Level Metadata from Seurat v4 Object}
 \usage{
 get.meta.Seurat(.seurat.obj, .sample.var, .verbose = TRUE)
 }
 \arguments{
-\item{.seurat.obj}{A Seurat v4 object containing cell metadata.}
+\item{.seurat.obj}{Seurat v4 object with cell-level metadata in \code{@meta.data}.}
 
-\item{.sample.var}{A character string specifying the metadata column to use for sample identification.}
+\item{.sample.var}{Character: column name in \code{.seurat.obj@meta.data} identifying samples.}
 
-\item{.verbose}{A logical specifying whether to print progress messages. Default is TRUE.}
+\item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
-A data frame containing sample-wise metadata with sample names as rownames.
+Data frame with one row per sample, containing only sample-level metadata columns.
+Rownames are sample IDs from \code{.sample.var}.
 }
 \description{
-This function extracts sample-wise metadata from a Seurat v4 object.
+Extracts sample-wise metadata from a Seurat v4 object by identifying which metadata columns have
+consistent values within each sample. Identical functionality to \code{get.meta.Seurat5} but for
+v4 objects. Returns a data frame suitable for \code{setup.lm.obj(.meta = ...)}.
+}
+\details{
+Automatically distinguishes sample-level (consistent within samples) from cell-level (varying
+within samples) metadata. Only sample-level columns are retained. Cell-level columns are
+excluded with a warning if \code{.verbose = TRUE}.
+
+The algorithm groups by \code{.sample.var} and tests each column for uniqueness within groups.
+Columns with multiple unique values within any sample are classified as cell-level.
 }
 \examples{
 \dontrun{
-# Assuming you have a Seurat v4 object with sample metadata
+# Extract sample metadata from Seurat v4 object
 meta <- get.meta.Seurat(.seurat.obj = seurat.obj,
                         .sample.var = "sample_id")
+
+# Use with get.cells
+cells <- get.cells.Seurat(.seurat.obj = seurat.obj,
+                          .meta = meta,
+                          .sample.var = "sample_id")
 }
+
+}
+\seealso{
+\code{\link{get.meta}} for automatic format detection,
+\code{\link{get.meta.Seurat5}} for Seurat v5,
+\code{\link{get.cells.Seurat}} for extracting count data
 }

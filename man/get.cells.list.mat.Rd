@@ -2,50 +2,77 @@
 % Please edit documentation in R/preprocess.R
 \name{get.cells.list.mat}
 \alias{get.cells.list.mat}
-\title{Create .cells object from count matrices}
+\title{Create .cells Object from Count Matrices}
 \usage{
 get.cells.list.mat(.count.mat.list, .meta, .compress = FALSE, .verbose = TRUE)
 }
 \arguments{
-\item{.count.mat.list}{A named list containing count matrices for each sample. List names correspond to sample names and must match rownames of .meta. Each element can be a matrix, dgCMatrix, or similar matrix-like object.}
+\item{.count.mat.list}{Named list of count matrices, one per sample. Names must match
+\code{rownames(.meta)}. Each matrix can be dense, sparse (dgCMatrix), or similar matrix-like
+object with features as rows and cells as columns.}
 
-\item{.meta}{A data frame containing the sample-wise metadata. Rownames must match names of .count.mat.list.}
+\item{.meta}{Data frame with sample-level metadata. Rownames must match \code{names(.count.mat.list)}.
+Should include experimental variables like Condition, Replicate, etc.}
 
-\item{.compress}{A logical specifying whether to compress the RDS files. Default is FALSE for faster I/O.}
+\item{.compress}{Logical: compress RDS files? Default FALSE for faster I/O. Set TRUE to save disk
+space for large datasets.}
 
-\item{.verbose}{A logical specifying whether to print progress messages. Default is TRUE.}
+\item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
-A named list containing the on-disk location of RDS files containing one expression matrix for each sample, suitable for use with setup.lm.obj.
+Named list of file paths to temporary RDS files, one per sample. Structure suitable for
+\code{setup.lm.obj(.cells = ...)}.
 }
 \description{
-This function facilitates the creation of a .cells object suitable for setup.lm.obj from count matrices already loaded into memory.
+Converts a list of count matrices into tinydenseR's standardized .cells format. Each matrix
+represents one sample and is saved as a temporary RDS file for memory-efficient processing.
+Use this when you already have count data loaded in R memory.
+}
+\details{
+This function creates temporary RDS files containing each sample's count matrix. These files
+persist for the R session and allow tinydenseR to process data without loading all samples
+into memory simultaneously.
+
+All matrices in \code{.count.mat.list} should have:
+\itemize{
+\item Same feature names (rownames) across samples
+\item Cell barcodes as column names
+\item Raw or normalized counts (specify via \code{setup.lm.obj(.assay.type = ...)})
+}
 }
 \examples{
 \dontrun{
-# Fetch example data
+# Load example trajectory data
 trajectory_data <- fetch_trajectory_data()
 sim_trajectory.meta <- trajectory_data$meta
 sim_trajectory <- trajectory_data$SCE
   
-# Process metadata for tinydenseR format
+# Prepare sample-level metadata
 sim_trajectory.meta <- sim_trajectory.meta[, c("Condition", "Replicate", "Sample")] |>
   unique()
 rownames(sim_trajectory.meta) <- sim_trajectory.meta$Sample
 
-# Create .cells object using SCE method for subset
-.min.meta <- sim_trajectory.meta[c("A_R1", "B_R1"), ]
-.min.cells <- get.cells.SCE(.sce.obj = sim_trajectory,
-                            .sample.var = "Sample") |>
-  (\(x) x[.min.meta$Sample])()
+# Extract count matrices for two samples
+count.matrices <- list(
+  A_R1 = SingleCellExperiment::counts(sim_trajectory)[, 
+           sim_trajectory$Sample == "A_R1"],
+  B_R1 = SingleCellExperiment::counts(sim_trajectory)[, 
+           sim_trajectory$Sample == "B_R1"]
+)
 
 # Create .cells object
 cells <- get.cells.list.mat(.count.mat.list = count.matrices,
-                   .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ])
+                            .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ])
 
-# Use with setup.lm.obj
+# Use in tinydenseR workflow
 lm.obj <- setup.lm.obj(.cells = cells,
                        .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
                        .assay.type = "RNA")
 }
+
+}
+\seealso{
+\code{\link{get.cells}} for automatic format detection,
+\code{\link{get.cells.SCE}} for SingleCellExperiment input,
+\code{\link{setup.lm.obj}} for next step in workflow
 }

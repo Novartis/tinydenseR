@@ -19,28 +19,70 @@ plotTradPerc(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks, get.graph and get.map.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{.x.split}{The column of metadata to use in the x axis. Defaults to the first column of .lm.obj$metadata.}
+\item{.x.split}{Character specifying metadata column for x-axis grouping. Defaults to first
+column (often "Condition").}
 
-\item{.pop}{The name of the pop to plot in the y axis.}
+\item{.pop}{Character vector of population names to plot. If NULL, plots all populations from
+\code{.pop.from}.}
 
-\item{.pop.from}{Either \code{"clustering"} or \code{"celltyping"}. Defaults to \code{"clustering"}.}
+\item{.pop.from}{Character: "clustering" (default) or "celltyping" - which grouping to plot.}
 
-\item{.line.by}{If provided, draws a line connecting dots from the same subject.}
+\item{.line.by}{Character metadata column for connecting paired samples with lines (e.g.,
+"Subject" for longitudinal data). Default NULL (no lines).}
 
-\item{.dodge.by}{The column of metadata to use for coloring the points. Defaults to NULL, which makes all points \code{"black"}.}
+\item{.dodge.by}{Character metadata column for coloring/dodging points. Default NULL (all black).}
 
-\item{.x.space.scaler}{The scaler for the x axis Defaults to \code{0.5}.}
+\item{.x.space.scaler}{Numeric scaling factor for x-axis panel width (default 0.25 inches per group).}
 
-\item{.height}{The height of the plot. Defaults to \code{1.5}.}
+\item{.height}{Numeric plot height in inches (default 1.5).}
 
-\item{.cat.feature.color}{The color palette for the categories. Defaults to the Color.Palette.}
+\item{.cat.feature.color}{Character vector of colors for \code{.dodge.by} categories (default
+\code{Color.Palette[1,1:5]}).}
 
-\item{.seed}{The seed for the random number generator that control x-axis jitter. Defaults to \code{123}.}
+\item{.seed}{Integer random seed for x-axis jitter (default 123).}
 
-\item{.orientation}{The orientation of the plot. Can be set to \code{"wide"} or \code{"square"}. Defaults to \code{"wide"}.}
+\item{.orientation}{Character: "wide" (default, all populations in one row) or "square" (facet grid).}
+}
+\value{
+A \code{ggplot} object showing cell percentages with optional paired connections.
 }
 \description{
-This function plots the actual percentages from traditional analysis to facilitate visual inspection of value distributions.
+Creates dot/line plots showing cell percentages per sample for specific populations. Useful
+for visually inspecting distribution of cell abundances across conditions and identifying
+paired/longitudinal patterns. Complements statistical test results from \code{plotTradStats()}.
+}
+\details{
+This function visualizes the raw cell percentages used in traditional DA testing. Points show
+individual samples, and lines (if \code{.line.by} specified) connect repeated measures from
+the same subject/mouse. Useful for:
+\itemize{
+\item Inspecting data distribution before statistical testing
+\item Identifying outliers or batch effects
+\item Visualizing paired/longitudinal designs
+\item Confirming significant results have biological meaning
+}
+}
+\examples{
+\dontrun{
+# After mapping
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |>
+  get.graph() |>
+  get.map()
+
+# Plot CD4 T cells across conditions
+plotTradPerc(lm.cells, .pop = "CD4.T.cells", .x.split = "Condition")
+
+# Paired design with subject lines
+plotTradPerc(lm.cells, 
+             .pop = "CD4.T.cells",
+             .line.by = "Subject",
+             .dodge.by = "Timepoint")
+}
+
+}
+\seealso{
+\code{\link{plotTradStats}}, \code{\link{get.stats}}
 }

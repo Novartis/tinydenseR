@@ -16,25 +16,91 @@ get.map(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks and get.graph.}
+\item{.lm.obj}{A tinydenseR object with \code{$graph} component populated by \code{get.graph}.}
 
-\item{.ref.obj}{A symphony object with Z_corr field populated.}
+\item{.ref.obj}{Optional Symphony reference object for cell type annotation. Must have
+\code{Z_corr} field (harmony-corrected embeddings) and metadata with cell type labels.
+Only compatible with RNA assays. Replaces any existing \code{$graph$celltyping}.}
 
-\item{.integrate.vars}{A character vector of batch variables to integrate (column names in metadata).}
+\item{.integrate.vars}{Character vector of batch variables for integration (metadata columns).
+Currently not used in function body.}
 
-\item{.celltype.col.name}{The column name in the reference object metadata that contains cell type information.}
+\item{.celltype.col.name}{Column name in \code{.ref.obj$meta_data} containing cell type labels
+(default "cell_type"). Only relevant when \code{.ref.obj} is provided.}
 
-\item{.cl.ct.to.ign}{A character value that determines the cluster or cell type to ignore during mapping. Default is NULL. Use this to ignore clusters or cell types that are not relevant for the statistical analysis, such as erythrocytes in PBMC or BMMC, for example, wheresince their presence in such samples is more likely to be associated with technical artifacts during sample processing in the lab rather than biological phenotypes.}
+\item{.cl.ct.to.ign}{Optional cluster or cell type name to exclude from downstream statistics.
+Use for biologically irrelevant populations (e.g., erythrocytes in PBMC, which likely
+represent technical artifacts). Cells in this population are mapped but excluded from density
+calculations. Only one value allowed; merge multiple populations first via \code{celltyping}.}
 
-\item{.irrel.par}{A character vector of irrelevant parameters to exclude from the mapping. Default is NULL.}
+\item{.irrel.par}{Character vector of irrelevant parameters to exclude. Currently not used.}
 
-\item{.verbose}{A logical value indicating whether to print messages about the mapping process.}
+\item{.verbose}{Logical for progress messages (default TRUE).}
 
-\item{.seed}{An integer value that sets the seed for reproducibility.}
+\item{.seed}{Integer seed for reproducibility (default 123).}
 }
 \value{
-The .lm.obj now containing a list that includes the sample-wise sum of cell-landmark neighboring probabilities, celltypes (if available, see "celltyping") and cluster assignments for each cell, and nearest neighboring landmarks for each cell.
+Updated \code{.lm.obj} with \code{$map} component containing:
+\itemize{
+\item \code{fdens}: Matrix of fuzzy graph densities (landmarks × samples). Each entry is
+the sum of cell-landmark edge weights for that sample, excluding ignored populations.
+\item \code{cell.clustering}: Named vector of cluster assignments for all cells.
+\item \code{cell.celltyping}: Named vector of cell type assignments (if celltyping available).
+\item \code{nn.idx}: Nearest landmark indices for all cells.
+}
+If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with reference-based labels.
 }
 \description{
-This function maps cells to landmarks to derive the probability that each cell is in the neighborhood of a landmark.
+Projects all cells onto the landmark graph to compute probabilities of cell-landmark neighborhood.
+In addition, transfers cluster/cell type labels from landmarks to all cells.
+}
+\details{
+\strong{Workflow Overview:}
+
+For each sample, the function:
+\enumerate{
+\item Loads expression data and normalizes (size factors for RNA, marker subset for cytometry)
+\item Projects to PCA/Harmony space (matching landmark processing)
+\item Transforms to UMAP coordinates using the landmark UMAP model
+\item Assigns clusters/cell types by nearest landmark
+\item Computes fuzzy graph densities (cell-landmark edge weights)
+}
+
+\strong{Reference-Based Cell Typing:}
+
+When \code{.ref.obj} is provided:
+\itemize{
+\item Expression is mapped to reference via Symphony
+\item Cell types assigned by nearest neighbor in reference embedding
+\item Landmark cell types updated and used for visualization/statistics
+\item Replaces any existing manual cell type annotations
+}
+
+\strong{Fuzzy Graph Densities:}
+
+The \code{fdens} matrix quantifies how strongly each landmark is connected to cells in each
+sample. High values indicate the landmark's neighborhood is enriched in that sample. This
+forms the basis for differential abundance testing in \code{get.stats}.
+}
+\examples{
+\dontrun{
+# Complete workflow with mapping
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks(.nHVG = 500) |>
+  get.graph() |>
+  get.map()
+
+# Exclude erythrocytes from PBMC statistics
+lm.cells <- get.map(lm.cells, .cl.ct.to.ign = "Erythrocytes")
+
+# Use Symphony reference for cell typing (RNA data only)
+ref <- readRDS("pbmc_reference.rds")
+lm.cells <- get.map(lm.cells, 
+                    .ref.obj = ref, 
+                    .celltype.col.name = "cell_type")
+}
+
+}
+\seealso{
+\code{\link{get.graph}}, \code{\link{get.stats}}, \code{\link{celltyping}}
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/landmarks.R
 \name{get.landmarks}
 \alias{get.landmarks}
-\title{Get landmarks}
+\title{Identify landmarks via leverage score sampling}
 \usage{
 get.landmarks(
   .lm.obj,
@@ -15,23 +15,93 @@ get.landmarks(
 )
 }
 \arguments{
-\item{.lm.obj}{An object initialized with setup.lm.obj.}
+\item{.lm.obj}{Object initialized with \code{setup.lm.obj}.}
 
-\item{.verbose}{A logical specifying whether to print progress messages. Default is TRUE.}
+\item{.verbose}{Logical, print progress messages. Default TRUE.}
 
-\item{.seed}{An integer specifying the .seed for reproducibility. Default is 123.}
+\item{.seed}{Integer for reproducibility. Default 123.}
 
-\item{.nHVG}{An integer specifying the number of highly variable genes to use for landmark identification. Default is 5000}
+\item{.nHVG}{Integer, number of highly variable genes to select for RNA data.
+Default 5000. Ignored for cytometry. Higher values capture more variation
+but increase computation time.}
 
-\item{.nPC}{An integer specifying the number of principal components to use for landmark identification. Default is 30.}
+\item{.nPC}{Integer, number of principal components for dimensionality reduction.
+Default 30. Must be less than the number of cells in smallest sample.}
 
-\item{.exc.vdj.mito.ribo.genes.from.hvg}{A logical specifying whether to exclude VDJ, mitochondrial, and ribosomal genes from the highly variable genes. Default is TRUE.}
+\item{.exc.vdj.mito.ribo.genes.from.hvg}{Logical, whether to exclude V(D)J
+recombination genes, mitochondrial genes (MT-), and ribosomal genes (RP)
+from HVG selection (RNA only). Default TRUE. Recommended to avoid
+technical/biological noise dominating variation.}
 
-\item{.force.in}{A character vector specifying the genes to force into the landmark set. Default is NULL. Applies only if \code{assay.type} is \code{"RNA"} since all features are included for \code{"cyto"}.}
+\item{.force.in}{Character vector of gene names to force into the feature set
+regardless of variance (RNA only). Useful for known markers. Default NULL.}
 }
 \value{
-The .lm.obj now containing the landmarks, a key linking each landmark to a row of .metadata and the PCA object.
+Updated \code{.lm.obj} with populated fields:
+\describe{
+\item{\code{$raw.lm}}{Raw expression matrix for landmarks}
+\item{\code{$lm}}{Landmark expression on selected features (HVGs or markers; (log2-transformed and library size normalized for RNA))}
+\item{\code{$scaled.lm}}{Z-scored landmark expression (for visualization)}
+\item{\code{$pca}}{List containing:
+\itemize{
+\item \code{$embed} - PC coordinates for landmarks
+\item \code{$rotation} - Feature loadings (PC directions)
+\item \code{$center} - Feature means
+\item \code{$scale} - Feature standard deviations
+\item \code{$sdev} - Standard deviations of PCs
+\item \code{$HVG} - Selected feature names
+}
+}
+\item{\code{$harmony.obj}}{Symphony reference object (if Harmony used), for mapping new cells}
+}
 }
 \description{
-This function identifies landmarks from the input expression matrices.
+Selects representative "landmark" cells from the full dataset using a two-pass
+leverage score sampling strategy. Landmarks capture the representative cells
+while being computationally tractable for downstream graph construction and mapping.
+}
+\details{
+\strong{Two-pass landmark selection algorithm:}
+
+\strong{Pass 1 - Initial sampling:}
+\enumerate{
+\item For RNA: normalize, log-transform, select top HVGs per sample
+\item For cytometry: use specified markers
+\item Compute sample-specific PCA
+\item Calculate leverage scores (sum of squared PC loadings per cell)
+\item Sample landmarks proportionally to leverage scores
+}
+
+\strong{Pass 2 - Refinement:}
+\enumerate{
+\item Pool landmarks from all samples
+\item Compute dataset-wide PCA on pooled landmarks
+\item Project ALL cells onto this shared PC space
+\item Recalculate leverage scores using shared PCA
+\item Resample landmarks with improved scores (final set)
+}
+
+This two-pass approach ensures landmarks are representative of global
+(not just sample-specific) variation patterns. Leverage score sampling
+prioritizes cells in high-variance regions while maintaining diversity.
+
+\strong{Optional Harmony integration:}
+If \code{.harmony.var} was specified in \code{setup.lm.obj}, performs
+batch correction on landmark PC embeddings. This creates a reference
+object for mapping query cells in a batch-corrected space.
+}
+\examples{
+\dontrun{
+# Typical workflow (from README)
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks(.nHVG = 500, .nPC = 3)
+
+# RNA with more PCs and custom HVGs
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks(.nPC = 50, .nHVG = 3000)
+
+# Force specific markers into feature set
+lm.cells <- get.landmarks(lm.cells, 
+                          .force.in = c("CD3D", "CD4", "CD8A"))
+}
 }

@@ -20,42 +20,70 @@
 # This file contains functions for converting various single-cell data formats
 # into standardized formats compatible with tinydenseR workflows
 
-#' Create .cells object from count matrices
+#' Create .cells Object from Count Matrices
 #'
-#' This function facilitates the creation of a .cells object suitable for setup.lm.obj from count matrices already loaded into memory.
+#' Converts a list of count matrices into tinydenseR's standardized .cells format. Each matrix 
+#' represents one sample and is saved as a temporary RDS file for memory-efficient processing. 
+#' Use this when you already have count data loaded in R memory.
 #'
-#' @param .count.mat.list A named list containing count matrices for each sample. List names correspond to sample names and must match rownames of .meta. Each element can be a matrix, dgCMatrix, or similar matrix-like object.
-#' @param .meta A data frame containing the sample-wise metadata. Rownames must match names of .count.mat.list.
-#' @param .compress A logical specifying whether to compress the RDS files. Default is FALSE for faster I/O.
-#' @param .verbose A logical specifying whether to print progress messages. Default is TRUE.
-#' @return A named list containing the on-disk location of RDS files containing one expression matrix for each sample, suitable for use with setup.lm.obj.
+#' @param .count.mat.list Named list of count matrices, one per sample. Names must match 
+#'   \code{rownames(.meta)}. Each matrix can be dense, sparse (dgCMatrix), or similar matrix-like 
+#'   object with features as rows and cells as columns.
+#' @param .meta Data frame with sample-level metadata. Rownames must match \code{names(.count.mat.list)}. 
+#'   Should include experimental variables like Condition, Replicate, etc.
+#' @param .compress Logical: compress RDS files? Default FALSE for faster I/O. Set TRUE to save disk 
+#'   space for large datasets.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'   
+#' @return Named list of file paths to temporary RDS files, one per sample. Structure suitable for 
+#'   \code{setup.lm.obj(.cells = ...)}.
+#'   
+#' @details
+#' This function creates temporary RDS files containing each sample's count matrix. These files 
+#' persist for the R session and allow tinydenseR to process data without loading all samples 
+#' into memory simultaneously.
+#' 
+#' All matrices in \code{.count.mat.list} should have:
+#' \itemize{
+#'   \item Same feature names (rownames) across samples
+#'   \item Cell barcodes as column names
+#'   \item Raw or normalized counts (specify via \code{setup.lm.obj(.assay.type = ...)})
+#' }
+#' 
+#' @seealso \code{\link{get.cells}} for automatic format detection, 
+#'   \code{\link{get.cells.SCE}} for SingleCellExperiment input,
+#'   \code{\link{setup.lm.obj}} for next step in workflow
+#'   
 #' @examples
 #' \dontrun{
-#' # Fetch example data
+#' # Load example trajectory data
 #' trajectory_data <- fetch_trajectory_data()
 #' sim_trajectory.meta <- trajectory_data$meta
 #' sim_trajectory <- trajectory_data$SCE
 #'   
-#' # Process metadata for tinydenseR format
+#' # Prepare sample-level metadata
 #' sim_trajectory.meta <- sim_trajectory.meta[, c("Condition", "Replicate", "Sample")] |>
 #'   unique()
 #' rownames(sim_trajectory.meta) <- sim_trajectory.meta$Sample
 #' 
-#' # Create .cells object using SCE method for subset
-#' .min.meta <- sim_trajectory.meta[c("A_R1", "B_R1"), ]
-#' .min.cells <- get.cells.SCE(.sce.obj = sim_trajectory,
-#'                             .sample.var = "Sample") |>
-#'   (\(x) x[.min.meta$Sample])()
+#' # Extract count matrices for two samples
+#' count.matrices <- list(
+#'   A_R1 = SingleCellExperiment::counts(sim_trajectory)[, 
+#'            sim_trajectory$Sample == "A_R1"],
+#'   B_R1 = SingleCellExperiment::counts(sim_trajectory)[, 
+#'            sim_trajectory$Sample == "B_R1"]
+#' )
 #' 
 #' # Create .cells object
 #' cells <- get.cells.list.mat(.count.mat.list = count.matrices,
-#'                    .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ])
+#'                             .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ])
 #' 
-#' # Use with setup.lm.obj
+#' # Use in tinydenseR workflow
 #' lm.obj <- setup.lm.obj(.cells = cells,
 #'                        .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
 #'                        .assay.type = "RNA")
 #' }
+#' 
 #' @export
 #'
 get.cells.list.mat <-
@@ -64,6 +92,7 @@ get.cells.list.mat <-
            .compress = FALSE,
            .verbose = TRUE){
     
+    # Validate input types
     if(!inherits(x = .count.mat.list,
                  what = "list")){
       stop(".count.mat.list must be a list object")
@@ -73,6 +102,7 @@ get.cells.list.mat <-
       stop("names of .count.mat.list cannot be NULL")
     }
     
+    # Ensure list names match metadata rownames
     if(!all(rownames(x = .meta) ==
             names(x = .count.mat.list))){
       stop("names of .count.mat.list must be the same as rownames of .meta")
@@ -92,15 +122,16 @@ get.cells.list.mat <-
       cat("Creating .cells object from", length(x = .count.mat.list), "count matrices...\n")
     }
     
+    # Create temporary RDS file for each sample matrix
     .cells <-
       .count.mat.list[rownames(x = .meta)] |>
       lapply(FUN = function(mat){
         
-        # Create temporary file for this matrix
+        # Generate unique temporary file path
         uri <-
           tempfile(fileext = ".RDS")
         
-        # Save matrix as RDS file
+        # Save matrix to disk for memory-efficient processing
         saveRDS(object = mat,
                 file = uri,
                 compress = .compress)
@@ -117,68 +148,86 @@ get.cells.list.mat <-
     
   }
 
-#' Create .cells object from Seurat v5 object
+#' Create .cells Object from Seurat v5 Object
 #'
-#' This function facilitates the creation of a .cells object suitable for setup.lm.obj from a Seurat v5 object with layered data.
+#' Converts a Seurat v5 object with layered data into tinydenseR's .cells format. Handles Seurat's 
+#' v5 assay structure where data is split across multiple layers. Each sample's cells are extracted, 
+#' combined across layers, and saved as temporary RDS files.
 #'
-#' @param .seurat.obj A Seurat v5 object containing layered RNA data.
-#' @param .sample.var A character string specifying the metadata column to use for sample identification. This column will be used to split cells into samples.
-#' @param .meta A data frame containing the sample-wise metadata. Row names must be sample names matching elements of the object metadata specified by `.sample.var`. Required for filtering valid samples.
-#' @param .assay A character string specifying the assay to use. Default is "RNA".
-#' @param .layer.pattern A character string specifying the pattern to match layer names. Default is "counts" to match layers containing count data.
-#' @param .min.cells.per.sample An integer specifying the minimum number of cells required per sample. Samples with fewer cells will be excluded. Default is 10.
-#' @param .compress A logical specifying whether to compress the RDS files. Default is FALSE for faster I/O.
-#' @param .verbose A logical specifying whether to print progress messages. Default is TRUE.
-#' @return A named list containing the on-disk location of RDS files containing one expression matrix for each sample, suitable for use with setup.lm.obj.
+#' @param .seurat.obj Seurat v5 object containing layered RNA data. Must use Assay5 class.
+#' @param .meta Data frame with sample-level metadata. Rownames must be sample IDs matching values 
+#'   in \code{.seurat.obj@meta.data[[.sample.var]]}. Required for filtering valid samples.
+#' @param .sample.var Character: column name in \code{.seurat.obj@meta.data} identifying which sample 
+#'   each cell belongs to (e.g., "sample_id", "Sample", "orig.ident").
+#' @param .assay Character: assay name to extract. Default "RNA".
+#' @param .layer.pattern Character: pattern to match layer names. Default "counts" matches layers 
+#'   containing count data (e.g., "counts.Sample1", "counts.Sample2"). Uses \code{fixed = TRUE} matching.
+#' @param .min.cells.per.sample Integer: minimum cells required per sample. Samples with fewer cells 
+#'   are excluded. Default 10.
+#' @param .compress Logical: compress RDS files? Default FALSE for faster I/O.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'   
+#' @return Named list of file paths to temporary RDS files, one per sample. Only includes samples 
+#'   meeting minimum cell threshold and present in \code{.meta}.
+#'   
+#' @details
+#' Seurat v5 uses a layered assay structure where data for different samples may be stored in 
+#' separate layers. This function:
+#' \enumerate{
+#'   \item Identifies all layers matching \code{.layer.pattern}
+#'   \item Finds common genes across all layers
+#'   \item Extracts cells for each sample across matching layers
+#'   \item Combines layer data into single sparse matrix per sample
+#'   \item Saves as temporary RDS files for memory-efficient processing
+#' }
+#' 
+#' Only samples appearing in both the Seurat object and \code{.meta} rownames are processed.
+#' 
+#' @seealso \code{\link{get.cells}} for automatic format detection,
+#'   \code{\link{get.cells.Seurat}} for Seurat v4 objects,
+#'   \code{\link{setup.lm.obj}} for next workflow step
+#'   
 #' @examples
 #' \dontrun{
-#' # Fetch example data
+#' # Load example data
 #' trajectory_data <- fetch_trajectory_data()
-#' sim_trajectory.meta <- trajectory_data$meta
-#' sim_trajectory <- trajectory_data$SCE
-#'
-#' # Process metadata for tinydenseR format
-#' sim_trajectory.meta <- sim_trajectory.meta[, c("Condition", "Replicate", "Sample")] |>
+#' sim_trajectory.meta <- trajectory_data$meta |>
+#'   dplyr::select(Condition, Replicate, Sample) |>
 #'   unique()
 #' rownames(sim_trajectory.meta) <- sim_trajectory.meta$Sample
 #'
-#' # Use the SCE object directly for creating Seurat v5 object
-#' # Extract count data from SCE for subset of samples
-#' sim_trajectory.counts.A_R1 <- 
-#'  SingleCellExperiment::counts(sim_trajectory)[, sim_trajectory@colData$Sample == "A_R1"]
-#' sim_trajectory.counts.B_R1 <- 
-#'  SingleCellExperiment::counts(sim_trajectory)[, sim_trajectory@colData$Sample == "B_R1"]
-#'
-#' # Create a Seurat v5 object from the example data
-#' # First, combine the matrices
-#' combined.counts <- cbind(sim_trajectory.counts.A_R1, sim_trajectory.counts.B_R1)
+#' # Create Seurat v5 object from SCE data
+#' # Extract counts for two samples
+#' counts.A_R1 <- SingleCellExperiment::counts(trajectory_data$SCE)[, 
+#'                  trajectory_data$SCE$Sample == "A_R1"]
+#' counts.B_R1 <- SingleCellExperiment::counts(trajectory_data$SCE)[, 
+#'                  trajectory_data$SCE$Sample == "B_R1"]
+#' combined.counts <- cbind(counts.A_R1, counts.B_R1)
 #' 
-#' # Create cell metadata
+#' # Build cell metadata
 #' cell.meta <- data.frame(
-#'   sample_id = c(rep("A_R1", ncol(sim_trajectory.counts.A_R1)),
-#'                 rep("B_R1", ncol(sim_trajectory.counts.B_R1))),
+#'   sample_id = c(rep("A_R1", ncol(counts.A_R1)),
+#'                 rep("B_R1", ncol(counts.B_R1))),
 #'   row.names = colnames(combined.counts)
 #' )
 #' 
-#' # Create Seurat object
+#' # Create Seurat v5 object
 #' seurat.obj <- CreateSeuratObject(counts = combined.counts,
 #'                                  meta.data = cell.meta)
+#' seurat.obj[["RNA"]] <- as(seurat.obj[["RNA"]], "Assay5")
+#' seurat.obj <- JoinLayers(seurat.obj)
 #' 
-#' # Convert to v5 assay structure if needed
-#' if(packageVersion("Seurat") >= "5.0.0"){
-#'   seurat.obj[["RNA"]] <- as(seurat.obj[["RNA"]], "Assay5")
-#'   seurat.obj <- JoinLayers(seurat.obj)
-#' }
-#' 
-#' # Create .cells object
+#' # Convert to .cells format
 #' cells <- get.cells.Seurat5(.seurat.obj = seurat.obj,
+#'                            .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
 #'                            .sample.var = "sample_id")
 #' 
-#' # Use with setup.lm.obj
+#' # Use in tinydenseR workflow
 #' lm.obj <- setup.lm.obj(.cells = cells,
 #'                        .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
 #'                        .assay.type = "RNA")
 #' }
+#' 
 #' @export
 #'
 get.cells.Seurat5 <-
@@ -267,7 +316,7 @@ get.cells.Seurat5 <-
     .unique.samples <-
       unique(x = .seurat.obj@meta.data[[.sample.var]])
     
-    # Filter samples by minimum cell count
+    # Filter samples: must have minimum cells AND appear in .meta
     .sample.cell.counts <-
       table(.seurat.obj@meta.data[[.sample.var]])
     
@@ -351,61 +400,73 @@ get.cells.Seurat5 <-
     
   }
 
-#' Create .cells object from Seurat v4 object
+#' Create .cells Object from Seurat v4 Object
 #'
-#' This function facilitates the creation of a .cells object suitable for setup.lm.obj from a Seurat v4 object.
+#' Converts a Seurat v4 object into tinydenseR's .cells format. Unlike v5, Seurat v4 stores all 
+#' data in a single slot per assay. Each sample's cells are extracted and saved as temporary RDS files.
 #'
-#' @param .seurat.obj A Seurat v4 object containing expression data.
-#' @param .sample.var A character string specifying the metadata column to use for sample identification. This column will be used to split cells into samples.
-#' @param .meta A data frame containing the sample-wise metadata. Row names must be sample names matching elements of the object metadata specified by `.sample.var`. Required for filtering valid samples.
-#' @param .assay A character string specifying the assay to use. Default is "RNA".
-#' @param .slot A character string specifying the data slot to use. Default is "counts".
-#' @param .min.cells.per.sample An integer specifying the minimum number of cells required per sample. Samples with fewer cells will be excluded. Default is 10.
-#' @param .compress A logical specifying whether to compress the RDS files. Default is FALSE for faster I/O.
-#' @param .verbose A logical specifying whether to print progress messages. Default is TRUE.
-#' @return A named list containing the on-disk location of RDS files containing one expression matrix for each sample, suitable for use with setup.lm.obj.
+#' @param .seurat.obj Seurat v4 object containing expression data. Must use Assay class (not Assay5).
+#' @param .meta Data frame with sample-level metadata. Rownames must be sample IDs matching values 
+#'   in \code{.seurat.obj@meta.data[[.sample.var]]}. Required for filtering valid samples.
+#' @param .sample.var Character: column name in \code{.seurat.obj@meta.data} identifying which sample 
+#'   each cell belongs to (e.g., "sample_id", "Sample", "orig.ident").
+#' @param .assay Character: assay name to extract. Default "RNA".
+#' @param .slot Character: data slot to extract. Default "counts". Can also be "data" (normalized) 
+#'   or "scale.data" (scaled).
+#' @param .min.cells.per.sample Integer: minimum cells required per sample. Default 10.
+#' @param .compress Logical: compress RDS files? Default FALSE for faster I/O.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'   
+#' @return Named list of file paths to temporary RDS files, one per sample. Only includes samples 
+#'   meeting minimum cell threshold and present in \code{.meta}.
+#'   
+#' @details
+#' Seurat v4 uses a simpler assay structure than v5, with all data stored in a single matrix per slot. 
+#' This function extracts cells sample-by-sample and converts to sparse dgCMatrix format for 
+#' memory-efficient storage.
+#' 
+#' Compatible with Seurat versions < 5.0.0 or when using legacy Assay class in v5.
+#' 
+#' @seealso \code{\link{get.cells}} for automatic format detection,
+#'   \code{\link{get.cells.Seurat5}} for Seurat v5 objects,
+#'   \code{\link{setup.lm.obj}} for next workflow step
+#'   
 #' @examples
 #' \dontrun{
-#' # Fetch example data
+#' # Load example data
 #' trajectory_data <- fetch_trajectory_data()
-#' sim_trajectory.meta <- trajectory_data$meta
-#' sim_trajectory <- trajectory_data$SCE
-#'
-#' # Process metadata for tinydenseR format
-#' sim_trajectory.meta <- sim_trajectory.meta[, c("Condition", "Replicate", "Sample")] |>
+#' sim_trajectory.meta <- trajectory_data$meta |>
+#'   dplyr::select(Condition, Replicate, Sample) |>
 #'   unique()
 #' rownames(sim_trajectory.meta) <- sim_trajectory.meta$Sample
 #'
-#' # Extract count data from SCE for subset of samples
-#' sim_trajectory.counts.A_R1 <-
-#'  SingleCellExperiment::counts(sim_trajectory)[, sim_trajectory@colData$Sample == "A_R1"]
-#' sim_trajectory.counts.B_R1 <-
-#'  SingleCellExperiment::counts(sim_trajectory)[, sim_trajectory@colData$Sample == "B_R1"]
-#'
-#' # Create a Seurat v4 object from the example data
-#' # First, combine the matrices
-#' combined.counts <- cbind(sim_trajectory.counts.A_R1, sim_trajectory.counts.B_R1)
+#' # Create Seurat v4 object
+#' counts.A_R1 <- SingleCellExperiment::counts(trajectory_data$SCE)[, 
+#'                  trajectory_data$SCE$Sample == "A_R1"]
+#' counts.B_R1 <- SingleCellExperiment::counts(trajectory_data$SCE)[, 
+#'                  trajectory_data$SCE$Sample == "B_R1"]
+#' combined.counts <- cbind(counts.A_R1, counts.B_R1)
 #' 
-#' # Create cell metadata
 #' cell.meta <- data.frame(
-#'   sample_id = c(rep("A_R1", ncol(sim_trajectory.counts.A_R1)),
-#'                 rep("B_R1", ncol(sim_trajectory.counts.B_R1))),
+#'   sample_id = c(rep("A_R1", ncol(counts.A_R1)),
+#'                 rep("B_R1", ncol(counts.B_R1))),
 #'   row.names = colnames(combined.counts)
 #' )
 #' 
-#' # Create Seurat object (will be v4 format by default in older Seurat versions)
 #' seurat.obj <- CreateSeuratObject(counts = combined.counts,
 #'                                  meta.data = cell.meta)
 #' 
-#' # Create .cells object
+#' # Convert to .cells format
 #' cells <- get.cells.Seurat(.seurat.obj = seurat.obj,
+#'                           .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
 #'                           .sample.var = "sample_id")
 #' 
-#' # Use with setup.lm.obj
+#' # Use in tinydenseR workflow
 #' lm.obj <- setup.lm.obj(.cells = cells,
 #'                        .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
 #'                        .assay.type = "RNA")
 #' }
+#' 
 #' @export
 #'
 get.cells.Seurat <-
@@ -549,39 +610,59 @@ get.cells.Seurat <-
     
   }
 
-#' Create .cells object from SingleCellExperiment object
+#' Create .cells Object from SingleCellExperiment Object
 #'
-#' This function facilitates the creation of a .cells object suitable for setup.lm.obj from a SingleCellExperiment object.
+#' Converts a SingleCellExperiment (SCE) object into tinydenseR's .cells format. SCE is the standard 
+#' Bioconductor container for single-cell data. Each sample's cells are extracted and saved as 
+#' temporary RDS files.
 #'
-#' @param .sce.obj A SingleCellExperiment object containing expression data.
-#' @param .sample.var A character string specifying the metadata column to use for sample identification. This column will be used to split cells into samples.
-#' @param .meta A data frame containing the sample-wise metadata. Row names must be sample names matching elements of the object metadata specified by `.sample.var`. Required for filtering valid samples.
-#' @param .assay A character string specifying the assay to use. Default is "counts".
-#' @param .min.cells.per.sample An integer specifying the minimum number of cells required per sample. Samples with fewer cells will be excluded. Default is 10.
-#' @param .compress A logical specifying whether to compress the RDS files. Default is FALSE for faster I/O.
-#' @param .verbose A logical specifying whether to print progress messages. Default is TRUE.
-#' @return A named list containing the on-disk location of RDS files containing one expression matrix for each sample, suitable for use with setup.lm.obj.
+#' @param .sce.obj SingleCellExperiment object containing expression data in assays.
+#' @param .meta Data frame with sample-level metadata. Rownames must be sample IDs matching values 
+#'   in \code{.sce.obj@colData[[.sample.var]]}. Required for filtering valid samples.
+#' @param .sample.var Character: column name in \code{colData(.sce.obj)} identifying which sample 
+#'   each cell belongs to (e.g., "sample_id", "Sample").
+#' @param .assay Character: assay name to extract. Default "counts". Can also be "logcounts", 
+#'   "normcounts", or any assay in \code{assayNames(.sce.obj)}.
+#' @param .min.cells.per.sample Integer: minimum cells required per sample. Default 10.
+#' @param .compress Logical: compress RDS files? Default FALSE for faster I/O.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'   
+#' @return Named list of file paths to temporary RDS files, one per sample. Only includes samples 
+#'   meeting minimum cell threshold and present in \code{.meta}.
+#'   
+#' @details
+#' SingleCellExperiment is the Bioconductor standard for single-cell data, used by many analysis 
+#' packages. This function extracts cells sample-by-sample and converts to sparse dgCMatrix format 
+#' for memory-efficient storage.
+#' 
+#' The function verifies that \code{colnames(.sce.obj)} exist, as these are required for proper 
+#' cell tracking.
+#' 
+#' @seealso \code{\link{get.cells}} for automatic format detection,
+#'   \code{\link{get.cells.Seurat}} for Seurat objects,
+#'   \code{\link{setup.lm.obj}} for next workflow step
+#'   
 #' @examples
 #' \dontrun{
-#' # Fetch example data
+#' # Load example data
 #' trajectory_data <- fetch_trajectory_data()
-#' sim_trajectory.meta <- trajectory_data$meta
-#' sim_trajectory <- trajectory_data$SCE
-#'
-#' # Process metadata for tinydenseR format
-#' sim_trajectory.meta <- sim_trajectory.meta[, c("Condition", "Replicate", "Sample")] |>
+#' sim_trajectory.meta <- trajectory_data$meta |>
+#'   dplyr::select(Condition, Replicate, Sample) |>
 #'   unique()
 #' rownames(sim_trajectory.meta) <- sim_trajectory.meta$Sample
+#' sim_trajectory <- trajectory_data$SCE
 #'
-#' # Use the SCE object directly
+#' # Convert SCE directly to .cells format
 #' cells <- get.cells.SCE(.sce.obj = sim_trajectory,
+#'                        .meta = sim_trajectory.meta,
 #'                        .sample.var = "Sample")
 #'
-#' # Use with setup.lm.obj
+#' # Use in tinydenseR workflow
 #' lm.obj <- setup.lm.obj(.cells = cells,
 #'                        .meta = sim_trajectory.meta,
 #'                        .assay.type = "RNA")
 #' }
+#' 
 #' @export
 #'
 get.cells.SCE <-
@@ -725,42 +806,66 @@ get.cells.SCE <-
     
   }
 
-#' Create .cells object automatically detecting input type
+#' Create .cells Object with Automatic Format Detection
 #'
-#' This function automatically detects the input type and calls the appropriate function to create a .cells object suitable for setup.lm.obj.
+#' Convenience wrapper that automatically detects input format and calls the appropriate conversion 
+#' function. Supports Seurat (v4/v5), SingleCellExperiment, and list of count matrices. Simplifies 
+#' workflow by eliminating need to know which specific function to call.
 #'
-#' @param .exprs The expression data. Can be either:
-#'   - A named list of count matrices (for get.cells.list.mat)
-#'   - A Seurat object (for get.cells.Seurat or get.cells.Seurat5)
-#'   - A SingleCellExperiment object (for get.cells.SCE)
-#' @param .meta A data frame containing the sample-wise metadata. Row names must be sample names matching the names of .exprs if .exprs is a list or elements of the object metadata specified by `.sample.var` if .exprs is a Seurat/SCE object. Required for list input.
-#' @param .sample.var A character string specifying the metadata column to use for sample identification. Required for Seurat/SCE input, ignored for list input.
-#' @param .assay A character string specifying the assay to use. Default is "RNA" for Seurat, "counts" for SCE. Applies only to Seurat/SCE input.
-#' @param .layer.pattern A character string specifying the pattern to match layer names. Default is "counts". Applies only to Seurat v5 input.
-#' @param .slot A character string specifying the data slot to use. Default is "counts". Applies only to Seurat v4 input.
-#' @param .min.cells.per.sample An integer specifying the minimum number of cells required per sample. Default is 10. Applies only to Seurat/SCE input.
-#' @param .compress A logical specifying whether to compress the RDS files. Default is FALSE for faster I/O.
-#' @param .verbose A logical specifying whether to print progress messages. Default is TRUE.
-#' @return A named list containing the on-disk location of RDS files containing one expression matrix for each sample, suitable for use with setup.lm.obj.
+#' @param .exprs Expression data in one of three formats:
+#'   \itemize{
+#'     \item Named list of count matrices (calls \code{get.cells.list.mat})
+#'     \item Seurat object v4 or v5 (calls \code{get.cells.Seurat} or \code{get.cells.Seurat5})
+#'     \item SingleCellExperiment object (calls \code{get.cells.SCE})
+#'   }
+#' @param .meta Data frame with sample-level metadata. Required for list input. Rownames must match 
+#'   sample IDs. For Seurat/SCE, rownames must match values in \code{.sample.var} column.
+#' @param .sample.var Character: metadata column identifying samples. Required for Seurat/SCE, 
+#'   ignored for list input.
+#' @param .assay Character: assay name. Default "RNA" for Seurat, "counts" for SCE. Ignored for 
+#'   list input.
+#' @param .layer.pattern Character: layer name pattern for Seurat v5. Default "counts". Ignored 
+#'   for other formats.
+#' @param .slot Character: data slot for Seurat v4. Default "counts". Ignored for other formats.
+#' @param .min.cells.per.sample Integer: minimum cells per sample. Default 10. Ignored for list input.
+#' @param .compress Logical: compress RDS files? Default FALSE.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'   
+#' @return Named list of file paths to temporary RDS files, one per sample.
+#'   
+#' @details
+#' This function inspects the class of \code{.exprs} to determine format:
+#' \itemize{
+#'   \item \code{Seurat}: Checks for Assay5 class to distinguish v4 from v5
+#'   \item \code{SingleCellExperiment}: Maps "RNA" assay to "counts" if needed
+#'   \item \code{list}: Validates names match \code{.meta} rownames
+#' }
+#' 
+#' For Seurat v5, automatically handles layered data structure. For SCE, uses standard 
+#' \code{assay()} accessor.
+#' 
+#' @seealso \code{\link{get.cells.list.mat}}, \code{\link{get.cells.Seurat}}, 
+#'   \code{\link{get.cells.Seurat5}}, \code{\link{get.cells.SCE}}, \code{\link{setup.lm.obj}}
+#'   
 #' @examples
 #' \dontrun{
-#' # Example 1: Using a named list of count matrices
-#' count.matrices <- list(
-#'   A_R1 = sim_trajectory.counts.A_R1,
-#'   B_R1 = sim_trajectory.counts.B_R1
-#' )
+#' # Example 1: List of count matrices
+#' count.matrices <- list(A_R1 = counts.A_R1, B_R1 = counts.B_R1)
 #' cells <- get.cells(.exprs = count.matrices,
 #'                    .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ])
 #' 
-#' # Example 2: Using a Seurat object
+#' # Example 2: Seurat object (auto-detects v4 vs v5)
 #' cells <- get.cells(.exprs = seurat.obj,
+#'                    .meta = sim_trajectory.meta,
 #'                    .sample.var = "sample_id")
 #' 
-#' # Example 3: Using a SingleCellExperiment object
+#' # Example 3: SingleCellExperiment object
 #' cells <- get.cells(.exprs = sce.obj,
-#'                    .sample.var = "sample_id",
+#'                    .meta = sim_trajectory.meta,
+#'                    .sample.var = "Sample",
 #'                    .assay = "counts")
 #' }
+#' 
 #' @export
 #'
 get.cells <-
@@ -879,20 +984,49 @@ get.cells <-
 # Metadata Extraction Functions
 # ============================================================================
 
-#' Extract metadata from Seurat v5 object
+#' Extract Sample-Level Metadata from Seurat v5 Object
 #'
-#' This function extracts sample-wise metadata from a Seurat v5 object.
+#' Extracts sample-wise metadata from a Seurat v5 object by identifying which metadata columns have 
+#' consistent values within each sample (sample-level variables). Cell-level variables are excluded 
+#' with a warning. Returns a data frame suitable for \code{setup.lm.obj(.meta = ...)}.
 #'
-#' @param .seurat.obj A Seurat v5 object containing cell metadata.
-#' @param .sample.var A character string specifying the metadata column to use for sample identification.
-#' @param .verbose A logical specifying whether to print progress messages. Default is TRUE.
-#' @return A data frame containing sample-wise metadata with sample names as rownames.
+#' @param .seurat.obj Seurat v5 object with cell-level metadata in \code{@meta.data}.
+#' @param .sample.var Character: column name in \code{.seurat.obj@meta.data} identifying samples.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'   
+#' @return Data frame with one row per sample, containing only sample-level metadata columns. 
+#'   Rownames are sample IDs from \code{.sample.var}.
+#'   
+#' @details
+#' This function automatically distinguishes sample-level from cell-level metadata:
+#' \itemize{
+#'   \item \strong{Sample-level}: Variables with identical values for all cells within each sample 
+#'     (e.g., Condition, Batch, Treatment). These are kept.
+#'   \item \strong{Cell-level}: Variables that vary between cells in the same sample (e.g., nCount_RNA, 
+#'     percent.mt, cluster). These are excluded with a warning.
+#' }
+#' 
+#' The \code{.sample.var} column is always included. Only distinct rows are returned (one per sample).
+#' 
+#' Useful when you've stored experimental design information in the Seurat object and want to 
+#' extract it for tinydenseR analysis.
+#' 
+#' @seealso \code{\link{get.meta}} for automatic format detection, 
+#'   \code{\link{get.meta.Seurat}} for Seurat v4,
+#'   \code{\link{get.cells.Seurat5}} for extracting count data
+#'   
 #' @examples
 #' \dontrun{
-#' # Assuming you have a Seurat v5 object with sample metadata
+#' # Assuming Seurat object has sample metadata
 #' meta <- get.meta.Seurat5(.seurat.obj = seurat.obj,
 #'                          .sample.var = "sample_id")
+#' 
+#' # Use with get.cells
+#' cells <- get.cells.Seurat5(.seurat.obj = seurat.obj,
+#'                            .meta = meta,
+#'                            .sample.var = "sample_id")
 #' }
+#' 
 #' @export
 #'
 get.meta.Seurat5 <-
@@ -972,20 +1106,43 @@ get.meta.Seurat5 <-
     
   }
 
-#' Extract metadata from Seurat v4 object
+#' Extract Sample-Level Metadata from Seurat v4 Object
 #'
-#' This function extracts sample-wise metadata from a Seurat v4 object.
+#' Extracts sample-wise metadata from a Seurat v4 object by identifying which metadata columns have 
+#' consistent values within each sample. Identical functionality to \code{get.meta.Seurat5} but for 
+#' v4 objects. Returns a data frame suitable for \code{setup.lm.obj(.meta = ...)}.
 #'
-#' @param .seurat.obj A Seurat v4 object containing cell metadata.
-#' @param .sample.var A character string specifying the metadata column to use for sample identification.
-#' @param .verbose A logical specifying whether to print progress messages. Default is TRUE.
-#' @return A data frame containing sample-wise metadata with sample names as rownames.
+#' @param .seurat.obj Seurat v4 object with cell-level metadata in \code{@meta.data}.
+#' @param .sample.var Character: column name in \code{.seurat.obj@meta.data} identifying samples.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'   
+#' @return Data frame with one row per sample, containing only sample-level metadata columns. 
+#'   Rownames are sample IDs from \code{.sample.var}.
+#'   
+#' @details
+#' Automatically distinguishes sample-level (consistent within samples) from cell-level (varying 
+#' within samples) metadata. Only sample-level columns are retained. Cell-level columns are 
+#' excluded with a warning if \code{.verbose = TRUE}.
+#' 
+#' The algorithm groups by \code{.sample.var} and tests each column for uniqueness within groups. 
+#' Columns with multiple unique values within any sample are classified as cell-level.
+#' 
+#' @seealso \code{\link{get.meta}} for automatic format detection, 
+#'   \code{\link{get.meta.Seurat5}} for Seurat v5,
+#'   \code{\link{get.cells.Seurat}} for extracting count data
+#'   
 #' @examples
 #' \dontrun{
-#' # Assuming you have a Seurat v4 object with sample metadata
+#' # Extract sample metadata from Seurat v4 object
 #' meta <- get.meta.Seurat(.seurat.obj = seurat.obj,
 #'                         .sample.var = "sample_id")
+#' 
+#' # Use with get.cells
+#' cells <- get.cells.Seurat(.seurat.obj = seurat.obj,
+#'                           .meta = meta,
+#'                           .sample.var = "sample_id")
 #' }
+#' 
 #' @export
 #'
 get.meta.Seurat <-
@@ -1065,20 +1222,49 @@ get.meta.Seurat <-
     
   }
 
-#' Extract metadata from SingleCellExperiment object
+#' Extract Sample-Level Metadata from SingleCellExperiment Object
 #'
-#' This function extracts sample-wise metadata from a SingleCellExperiment object.
+#' Extracts sample-wise metadata from a SingleCellExperiment object by identifying which colData 
+#' columns have consistent values within each sample. Identical logic to Seurat metadata extraction 
+#' but adapted for SCE's \code{colData} structure. Returns a data frame suitable for 
+#' \code{setup.lm.obj(.meta = ...)}.
 #'
-#' @param .sce.obj A SingleCellExperiment object containing cell metadata.
-#' @param .sample.var A character string specifying the metadata column to use for sample identification.
-#' @param .verbose A logical specifying whether to print progress messages. Default is TRUE.
-#' @return A data frame containing sample-wise metadata with sample names as rownames.
+#' @param .sce.obj SingleCellExperiment object with cell-level metadata in \code{colData}.
+#' @param .sample.var Character: column name in \code{colData(.sce.obj)} identifying samples.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'   
+#' @return Data frame with one row per sample, containing only sample-level metadata columns. 
+#'   Rownames are sample IDs from \code{.sample.var}.
+#'   
+#' @details
+#' SingleCellExperiment stores cell-level metadata in \code{colData}. This function:
+#' \enumerate{
+#'   \item Converts \code{colData} to data frame
+#'   \item Groups by \code{.sample.var}
+#'   \item Identifies columns with unique values within each sample (sample-level)
+#'   \item Excludes varying columns (cell-level) with warning
+#'   \item Returns one row per sample
+#' }
+#' 
+#' Common sample-level variables include experimental conditions, batches, donors. Common cell-level 
+#' variables include QC metrics, clusters, cell types.
+#' 
+#' @seealso \code{\link{get.meta}} for automatic format detection, 
+#'   \code{\link{get.meta.Seurat}} for Seurat objects,
+#'   \code{\link{get.cells.SCE}} for extracting count data
+#'   
 #' @examples
 #' \dontrun{
-#' # Assuming you have a SingleCellExperiment object with sample metadata
+#' # Extract sample metadata from SCE object
 #' meta <- get.meta.SCE(.sce.obj = sce.obj,
 #'                      .sample.var = "sample_id")
+#' 
+#' # Use with get.cells
+#' cells <- get.cells.SCE(.sce.obj = sce.obj,
+#'                        .meta = meta,
+#'                        .sample.var = "sample_id")
 #' }
+#' 
 #' @export
 #'
 get.meta.SCE <-
@@ -1163,26 +1349,52 @@ get.meta.SCE <-
     
   }
 
-#' Extract metadata automatically detecting input type
+#' Extract Sample-Level Metadata with Automatic Format Detection
 #'
-#' This function automatically detects the input type and calls the appropriate function to extract sample-wise metadata.
+#' Convenience wrapper that automatically detects input format (Seurat v4/v5 or SingleCellExperiment) 
+#' and calls the appropriate metadata extraction function. Simplifies workflow by eliminating need 
+#' to know object version.
 #'
-#' @param .obj The object containing metadata. Can be either:
-#'   - A Seurat object (for get.meta.Seurat or get.meta.Seurat5)
-#'   - A SingleCellExperiment object (for get.meta.SCE)
-#' @param .sample.var A character string specifying the metadata column to use for sample identification.
-#' @param .verbose A logical specifying whether to print progress messages. Default is TRUE.
-#' @return A data frame containing sample-wise metadata with sample names as rownames.
+#' @param .obj Object containing cell-level metadata. Can be:
+#'   \itemize{
+#'     \item Seurat object (v4 or v5) - calls \code{get.meta.Seurat} or \code{get.meta.Seurat5}
+#'     \item SingleCellExperiment object - calls \code{get.meta.SCE}
+#'   }
+#' @param .sample.var Character: column name in object metadata identifying samples.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'   
+#' @return Data frame with one row per sample, containing only sample-level metadata columns. 
+#'   Rownames are sample IDs.
+#'   
+#' @details
+#' This function inspects the class of \code{.obj} to determine format:
+#' \itemize{
+#'   \item \code{Seurat}: Checks first assay for Assay5 class to distinguish v4 from v5
+#'   \item \code{SingleCellExperiment}: Uses standard \code{colData} accessor
+#' }
+#' 
+#' Automatically filters to sample-level metadata by testing which columns have consistent values 
+#' within each sample. Cell-level columns (varying within samples) are excluded with a warning.
+#' 
+#' @seealso \code{\link{get.meta.Seurat}}, \code{\link{get.meta.Seurat5}}, 
+#'   \code{\link{get.meta.SCE}}, \code{\link{get.cells}} for extracting count data
+#'   
 #' @examples
 #' \dontrun{
-#' # Example 1: Using a Seurat object
+#' # Example 1: Seurat object (auto-detects v4 vs v5)
 #' meta <- get.meta(.obj = seurat.obj,
 #'                  .sample.var = "sample_id")
 #' 
-#' # Example 2: Using a SingleCellExperiment object
+#' # Example 2: SingleCellExperiment object
 #' meta <- get.meta(.obj = sce.obj,
-#'                  .sample.var = "sample_id")
+#'                  .sample.var = "Sample")
+#' 
+#' # Use with get.cells
+#' cells <- get.cells(.exprs = seurat.obj,
+#'                    .meta = meta,
+#'                    .sample.var = "sample_id")
 #' }
+#' 
 #' @export
 #'
 get.meta <-
