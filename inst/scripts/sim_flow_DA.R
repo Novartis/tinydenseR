@@ -18,11 +18,9 @@ library(tinydenseR)
 library(tidyverse)
 library(ggpubr)
 library(rstatix)
-
-wd <- "path/to/your/working/directory/"
-rd <- file.path(wd, "res")
-
-setwd(dir = wd)
+library(patchwork)
+library(ggh4x)
+library(Matrix)
 
 set.seed(42)
 
@@ -367,26 +365,6 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DA.0.5,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.0.5$fit$density.weighted.bh.fdr[,"Depletion"] < 0.1,
-      no = "not sig.")  |>
-    factor(levels = c("less abundant",
-                      "not sig.",
-                      "more abundant")),
-  .plot.title = "Depletion vs Baseline",
-  .color.label = "q < 0.1",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
-  .point.size = 1,
-  .panel.size = 2)   +
-    ggplot2::labs(subtitle = "hypothesis testing"))
-
-(tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DA.0.5,
-  .feature =
-    ifelse(
-      test = Treatment.stats.0.5$fit$coefficients[,"Depletion"] < 0,
-      yes = "less abundant",
-      no = "more abundant") |>
-    ifelse(
       test = Treatment.stats.0.5$fit$pca.weighted.q[,"Depletion"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
@@ -705,26 +683,6 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DA.5,
                      .point.size = 1,
                      .midpoint = 0) +
     ggplot2::theme(plot.subtitle = ggplot2::element_blank()))
-
-(tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DA.5,
-  .feature =
-    ifelse(
-      test = Treatment.stats.5$fit$coefficients[,"Depletion"] < 0,
-      yes = "less abundant",
-      no = "more abundant") |>
-    ifelse(
-      test = Treatment.stats.5$fit$density.weighted.bh.fdr[,"Depletion"] < 0.1,
-      no = "not sig.")  |>
-    factor(levels = c("less abundant",
-                      "not sig.",
-                      "more abundant")),
-  .plot.title = "Depletion vs Baseline",
-  .color.label = "q < 0.1",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
-  .point.size = 1,
-  .panel.size = 2)   +
-    ggplot2::labs(subtitle = "hypothesis testing"))
 
 (tinydenseR::plotPCA(
   .lm.obj = lm.cells.DA.5,
@@ -1063,26 +1021,6 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DA.50,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.50$fit$density.weighted.bh.fdr[,"Depletion"] < 0.1,
-      no = "not sig.")  |>
-    factor(levels = c("less abundant",
-                      "not sig.",
-                      "more abundant")),
-  .plot.title = "Depletion vs Baseline",
-  .color.label = "q < 0.1",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
-  .point.size = 1,
-  .panel.size = 2)   +
-    ggplot2::labs(subtitle = "hypothesis testing"))
-
-(tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DA.50,
-  .feature =
-    ifelse(
-      test = Treatment.stats.50$fit$coefficients[,"Depletion"] < 0,
-      yes = "less abundant",
-      no = "more abundant") |>
-    ifelse(
       test = Treatment.stats.50$fit$pca.weighted.q[,"Depletion"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
@@ -1195,3 +1133,65 @@ tinydenseR::plotDEA(
 .subset.dea.50$adj.p
 .subset.dea.50$coefficients
 
+# permutation tests
+source(file = "https://raw.githubusercontent.com/Novartis/tinydenseR/inst/scripts/perm_utils.R")
+
+# For each condition (0.5%, 5%, 50%), run exact permutation test
+conditions <- list(
+  "0.5%" = list(lm_obj = lm.cells.DA.0.5, 
+                meta = .meta.DA.0.5),
+  "5%"   = list(lm_obj = lm.cells.DA.5, 
+                meta = .meta.DA.5),
+  "50%"   = list(lm_obj = lm.cells.DA.50, 
+                 meta = .meta.DA.50)
+)
+
+results_list <- 
+  names(x = conditions) |>
+  lapply(FUN = function(nm) {
+    
+    print(nm)
+    
+    cond <- 
+      conditions[[nm]]
+    
+    res  <-
+      run_stratified_permutation_test(lm_obj = cond$lm_obj, 
+                                      meta_df = cond$meta, 
+                                      coef_name = "Depletion")
+    res$condition <-
+      nm
+    
+    res
+  })
+
+# Row-bind
+results <-
+  dplyr::bind_rows(results_list)
+
+# Sanity check MCC values
+cat("\n=== MCC Validation ===\n")
+for (cond_name in names(conditions)) {
+  cond_results <- results[results$condition == cond_name, ]
+  cat(sprintf("\n%s:\n", cond_name))
+  cat("  Observed MCC:", unique(cond_results$mcc[cond_results$type == "observed"]), "\n")
+  cat("  Complement MCC:", unique(cond_results$mcc[cond_results$type == "complement"]), "\n")
+  cat("  MCC range for permuted:", 
+      paste(range(cond_results$mcc[cond_results$type == "permuted"], na.rm = TRUE), collapse = " to "), "\n")
+}
+
+# Verify expected values across all conditions
+stopifnot(all(results$mcc[results$type == "observed"] == 1.0, na.rm = TRUE))
+stopifnot(all(abs(results$mcc[results$type == "complement"] - (-1.0)) < 1e-10, na.rm = TRUE))
+cat("\n✓ MCC validation passed!\n\n")
+
+# Quick summary
+results |>
+  group_by(condition, type) |>
+  summarise(mean_sig = mean(n_sig),
+            mean_mcc = mean(mcc, na.rm = TRUE),
+            .groups = "drop")
+
+# Plot results
+plot_n_sig(results = results)
+plot_min_q(results = results)

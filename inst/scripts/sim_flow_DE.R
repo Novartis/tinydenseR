@@ -18,11 +18,9 @@ library(tinydenseR)
 library(tidyverse)
 library(ggpubr)
 library(rstatix)
-
-wd <- "path/to/your/working/directory/"
-rd <- file.path(wd, "res")
-
-setwd(dir = wd)
+library(patchwork)
+library(ggh4x)
+library(Matrix)
 
 set.seed(42)
 
@@ -472,26 +470,6 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.0.5,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.0.5$fit$density.weighted.bh.fdr[,"Activation"] < 0.1,
-      no = "not sig.")  |>
-    factor(levels = c("less abundant",
-                      "not sig.",
-                      "more abundant")),
-  .plot.title = "Activation vs Baseline",
-  .color.label = "q < 0.1",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
-  .point.size = 1,
-  .panel.size = 2)   +
-    ggplot2::labs(subtitle = "hypothesis testing"))
-
-(tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.0.5,
-  .feature =
-    ifelse(
-      test = Treatment.stats.0.5$fit$coefficients[,"Activation"] < 0,
-      yes = "less abundant",
-      no = "more abundant") |>
-    ifelse(
       test = Treatment.stats.0.5$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
@@ -524,8 +502,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-  .lm.obj = lm.cells.DE.0.5,
-  .stats.obj = Treatment.stats.0.5)
+    .lm.obj = lm.cells.DE.0.5,
+    .stats.obj = Treatment.stats.0.5)
 
 stat.test.percentages.DE.0.5 <-
   lm.cells.DE.0.5$map$clustering$cell.perc |>
@@ -565,15 +543,6 @@ stat.test.percentages.DE.0.5 <-
   .x.space.scaler = 0.3
 ) + 
     ggplot2::labs(title = "within-cluster abundance"))
-
-tinydenseR::plotBeeswarm(
-  .lm.obj = lm.cells.DE.0.5,
-  .stats.obj = Treatment.stats.0.5,
-  .coefs = "Activation",
-  .swarm.title = "Activation vs Baseline",
-  .row.space.scaler = 0.5,
-  .perc.plot = FALSE,
-  .FDR.from = "DensityWeightedBH")
 
 tinydenseR::plotBeeswarm(
   .lm.obj = lm.cells.DE.0.5,
@@ -841,26 +810,6 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.1,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.1$fit$density.weighted.bh.fdr[,"Activation"] < 0.1,
-      no = "not sig.")  |>
-    factor(levels = c("less abundant",
-                      "not sig.",
-                      "more abundant")),
-  .plot.title = "Activation vs Baseline",
-  .color.label = "q < 0.1",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
-  .point.size = 1,
-  .panel.size = 2)   +
-    ggplot2::labs(subtitle = "hypothesis testing"))
-
-(tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.1,
-  .feature =
-    ifelse(
-      test = Treatment.stats.1$fit$coefficients[,"Activation"] < 0,
-      yes = "less abundant",
-      no = "more abundant") |>
-    ifelse(
       test = Treatment.stats.1$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
@@ -893,8 +842,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-  .lm.obj = lm.cells.DE.1,
-  .stats.obj = Treatment.stats.1)
+    .lm.obj = lm.cells.DE.1,
+    .stats.obj = Treatment.stats.1)
 
 stat.test.percentages.DE.1 <-
   lm.cells.DE.1$map$clustering$cell.perc |>
@@ -933,15 +882,6 @@ stat.test.percentages.DE.1 <-
   .x.space.scaler = 0.3
 ) + 
     ggplot2::labs(title = "within-cluster abundance"))
-
-tinydenseR::plotBeeswarm(
-  .lm.obj = lm.cells.DE.1,
-  .stats.obj = Treatment.stats.1,
-  .coefs = "Activation",
-  .swarm.title = "Activation vs Baseline",
-  .row.space.scaler = 0.5,
-  .perc.plot = FALSE,
-  .FDR.from = "DensityWeightedBH")
 
 tinydenseR::plotBeeswarm(
   .lm.obj = lm.cells.DE.1,
@@ -1208,26 +1148,6 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.2,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.2$fit$density.weighted.bh.fdr[,"Activation"] < 0.1,
-      no = "not sig.")  |>
-    factor(levels = c("less abundant",
-                      "not sig.",
-                      "more abundant")),
-  .plot.title = "Activation vs Baseline",
-  .color.label = "q < 0.1",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
-  .point.size = 1,
-  .panel.size = 2)   +
-    ggplot2::labs(subtitle = "hypothesis testing"))
-
-(tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.2,
-  .feature =
-    ifelse(
-      test = Treatment.stats.2$fit$coefficients[,"Activation"] < 0,
-      yes = "less abundant",
-      no = "more abundant") |>
-    ifelse(
       test = Treatment.stats.2$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
@@ -1260,8 +1180,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-  .lm.obj = lm.cells.DE.2,
-  .stats.obj = Treatment.stats.2)
+    .lm.obj = lm.cells.DE.2,
+    .stats.obj = Treatment.stats.2)
 
 stat.test.percentages.DE.2 <-
   lm.cells.DE.2$map$clustering$cell.perc |>
@@ -1302,21 +1222,12 @@ stat.test.percentages.DE.2 <-
     ggplot2::labs(title = "within-cluster abundance"))
 
 tinydenseR::plotBeeswarm(
-  .lm.obj = lm.cells.DE.2,
-  .stats.obj = Treatment.stats.2,
-  .coefs = "Activation",
-  .swarm.title = "Activation vs Baseline",
-  .row.space.scaler = 0.5,
-  .perc.plot = FALSE,
-  .FDR.from = "DensityWeightedBH")
-
-tinydenseR::plotBeeswarm(
-  .lm.obj = lm.cells.DE.2,
-  .stats.obj = Treatment.stats.2,
-  .coefs = "Activation",
-  .swarm.title = "Activation vs Baseline",
-  .row.space.scaler = 0.5,
-  .perc.plot = FALSE)
+    .lm.obj = lm.cells.DE.2,
+    .stats.obj = Treatment.stats.2,
+    .coefs = "Activation",
+    .swarm.title = "Activation vs Baseline",
+    .row.space.scaler = 0.5,
+    .perc.plot = FALSE)
 
 .dea.2 <-
   tinydenseR::get.dea(
@@ -1358,3 +1269,66 @@ tinydenseR::plotDEA(
 
 .subset.dea.2$adj.p
 .subset.dea.2$coefficients
+
+# permutation tests
+source(file = "https://raw.githubusercontent.com/Novartis/tinydenseR/inst/scripts/perm_utils.R")
+
+# For each condition (0.5SD, 1SD, 2SD), run exact permutation test
+conditions <- list(
+  "0.5SD" = list(lm_obj = lm.cells.DE.0.5,
+                 meta = .meta.DE.0.5),
+  "1SD"   = list(lm_obj = lm.cells.DE.1, 
+                 meta = .meta.DE.1),
+  "2SD"   = list(lm_obj = lm.cells.DE.2, 
+                 meta = .meta.DE.2)
+)
+
+results_list <- 
+  names(x = conditions) |>
+  lapply(FUN = function(nm) {
+    
+    print(nm)
+    
+    cond <- 
+      conditions[[nm]]
+    
+    res  <-
+      run_stratified_permutation_test(lm_obj = cond$lm_obj, 
+                                      meta_df = cond$meta, 
+                                      coef_name = "Activation")
+    res$condition <-
+      nm
+    
+    res
+  })
+
+# Row-bind
+results <-
+  dplyr::bind_rows(results_list)
+
+# Sanity check MCC values
+cat("\n=== MCC Validation ===\n")
+for (cond_name in names(conditions)) {
+  cond_results <- results[results$condition == cond_name, ]
+  cat(sprintf("\n%s:\n", cond_name))
+  cat("  Observed MCC:", unique(cond_results$mcc[cond_results$type == "observed"]), "\n")
+  cat("  Complement MCC:", unique(cond_results$mcc[cond_results$type == "complement"]), "\n")
+  cat("  MCC range for permuted:", 
+      paste(range(cond_results$mcc[cond_results$type == "permuted"], na.rm = TRUE), collapse = " to "), "\n")
+}
+
+# Verify expected values across all conditions
+stopifnot(all(results$mcc[results$type == "observed"] == 1.0, na.rm = TRUE))
+stopifnot(all(abs(results$mcc[results$type == "complement"] - (-1.0)) < 1e-10, na.rm = TRUE))
+cat("\n✓ MCC validation passed!\n\n")
+
+# Quick summary
+results |>
+  group_by(condition, type) |>
+  summarise(mean_sig = mean(n_sig),
+            mean_mcc = mean(mcc, na.rm = TRUE),
+            .groups = "drop")
+
+# Plot results
+plot_n_sig(results = results)
+plot_min_q(results = results)
