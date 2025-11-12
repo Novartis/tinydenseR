@@ -1,0 +1,31 @@
+# Codecov configuration for tinydenseR
+# See: https://docs.codecov.com/docs/codecov-yaml
+
+# Coverage target enforcement
+coverage:
+  status:
+    project:
+      default:
+        target: 80%           # Minimum coverage for entire project
+        threshold: 1%         # Allow 1% drop before failing
+        if_ci_failed: error   # Fail if CI fails
+    patch:
+      default:
+        target: 80%           # New code must have 80% coverage
+        threshold: 1%
+
+# Comment settings for pull requests
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+
+# Ignore paths that shouldn't count toward coverage
+ignore:
+  - "tests/"              # Test files themselves
+  - "inst/scripts/"       # Example/benchmark scripts
+  - "data-raw/"           # Data preparation scripts
+  - "artwork/"            # Artwork files
+  - "man/"                # Documentation
