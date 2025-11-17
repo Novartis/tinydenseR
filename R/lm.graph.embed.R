@@ -325,16 +325,17 @@ fast.jaccard.r <-
 
 #' Graph embedding of landmarks
 #'
-#' Performs the core graph analysis workflow: UMAP embedding, Laplacian Eigenmap (LE) computation, 
-#' and clustering of landmark cells. This creates the low-dimensional representation used for 
-#' visualization and cluster identification.
+#' Builds k-NN graph and trains UMAP model for landmark cells. This creates the graph structure 
+#' and transformation model required for generating fuzzy density matrices in \code{get.map}. 
+#' Clustering is performed as a secondary step for visualization and interpretation, but is not 
+#' the primary objective.
 #'
 #' @param .lm.obj A tinydenseR object initialized with \code{setup.lm.obj} and processed with 
-#'   \code{get.landmarks}. Must contain \code{$lm} (landmark matrix) and \code{$pca} components.
+#'   \code{get.landmarks}.
 #' @param .k Integer number of nearest neighbors for graph construction (default 20). Higher values 
-#'   create more connected graphs with broader cluster definitions.
+#'   create more connected graphs and smoother UMAP embeddings.
 #' @param .scale Logical indicating whether to scale features before UMAP. Defaults to FALSE for 
-#'   RNA assays (PCA already scaled) and TRUE for cytometry (feature scales vary).
+#'   RNA assays (PCA already scaled) and TRUE for cytometry.
 #' @param .verbose Logical for progress messages (default TRUE).
 #' @param .seed Integer seed for reproducibility of UMAP and clustering (default 123).
 #' @param .cl.method Character specifying clustering method: "snn" (shared nearest neighbors via 
@@ -346,29 +347,49 @@ fast.jaccard.r <-
 #'   
 #' @return Updated \code{.lm.obj} with \code{$graph} component containing:
 #'   \itemize{
-#'     \item \code{uwot}: UMAP model with embedding, nearest neighbors, fuzzy graph
-#'     \item \code{LE}: Laplacian Eigenmap embedding and eigenspectrum
-#'     \item \code{snn}: Shared nearest neighbor graph
-#'     \item \code{clustering}: Cluster assignments from \code{lm.cluster}
+#'     \item \code{uwot}: UMAP model with multiple components:
+#'       \itemize{
+#'         \item \code{$embedding}: 2D UMAP coordinates for visualization
+#'         \item \code{$nn$euclidean$idx}: k-NN indices matrix (cells × k neighbors)
+#'         \item \code{$nn$euclidean$dist}: k-NN distance matrix
+#'         \item \code{$fgraph}: Fuzzy graph (landmark-landmark probabilistic edges) for optional clustering
+#'         \item \code{$model}: Trained UMAP model for projecting query cells in \code{get.map}
+#'       }
+#'     \item \code{adj.matrix}: Sparse k-NN adjacency matrix (non-symmetric).
+#'     \item \code{snn}: Shared nearest neighbor graph via Jaccard similarity.
+#'     \item \code{LE}: Laplacian Eigenmap embedding (\code{$embed}) and eigenvalue spectrum, computed 
+#'       from symmetrized k-NN graph. Used for clustering initialization only.
+#'     \item \code{clustering}: Cluster assignments from Leiden algorithm with straggler absorption.
 #'   }
 #'   
 #' @details
-#' The function orchestrates several graph-based analyses:
+#' The function orchestrates graph-based analysis in the following order:
 #' 
-#' \strong{1. UMAP Embedding:}
-#' Computes 2D embedding for visualization using harmony-corrected PCA (if available) or raw data.
-#' Returns the UMAP model for later projection of query cells.
+#' \strong{1. k-NN Graph Construction:}
+#' Builds k-nearest neighbor graph from PCA/Harmony embeddings and converts it to multiple 
+#' representations for different downstream applications:
+#' \itemize{
+#'   \item \code{adj.matrix}: Non-symmetric sparse adjacency matrix (used to compute SNN graph)
+#'   \item \code{snn}: Shared nearest neighbor graph via Jaccard similarity (used for clustering)
+#'   \item \code{W.sym}: Symmetrized binary adjacency (used for Laplacian Eigenmap spectral analysis)
+#' }
 #' 
-#' \strong{2. Graph Construction:}
-#' Builds k-NN graph and computes SNN graph via Jaccard similarity of neighbor overlaps.
+#' \strong{2. UMAP Model Training:}
+#' Trains UMAP transformation on landmark cells with \code{ret_model=TRUE} to enable projection of 
+#' query cells later. The UMAP model includes the fuzzy graph (cell-landmark edge weights) which is 
+#' essential for computing fuzzy density matrices in \code{get.map}. The UMAP model is the primary output 
+#' of \code{get.graph}.
 #' 
-#' \strong{3. Laplacian Eigenmap:}
-#' Computes spectral embedding by solving the generalized eigenvalue problem of the graph Laplacian.
-#' Automatically selects dimensionality via elbow detection on eigenvalue spectrum. Provides 
-#' alternative to PCA that respects local graph structure.
+#' \strong{3. Laplacian Eigenmap (LE):}
+#' Computes spectral embedding by solving the generalized eigenvalue problem of the graph Laplacian. 
+#' Dimensionality is automatically selected via elbow detection on eigenvalue spectrum. The LE 
+#' embedding is currently used only for warm-start initialization in clustering.
 #' 
-#' \strong{4. Clustering:}
-#' Applies Leiden algorithm to identify communities, with straggler absorption for robustness.
+#' \strong{4. Clustering (Secondary):}
+#' Applies Leiden algorithm to identify communities for visualization and interpretation. Uses SNN 
+#' graph (Jaccard similarity) or UMAP fuzzy graph depending on \code{.cl.method}. Small "straggler" 
+#' clusters are absorbed into neighbors. While useful for exploration, clustering is not required 
+#' for downstream statistical analysis, unless traditional analysis is requested later in \code{get.stats}.
 #' 
 #' @seealso \code{\link{setup.lm.obj}}, \code{\link{get.landmarks}}, \code{\link{lm.cluster}}
 #' 
@@ -580,25 +601,36 @@ get.graph <-
 #' @param .ref.obj Optional Symphony reference object for cell type annotation. Must have 
 #'   \code{Z_corr} field (harmony-corrected embeddings) and metadata with cell type labels. 
 #'   Only compatible with RNA assays. Replaces any existing \code{$graph$celltyping}.
-#' @param .integrate.vars Character vector of batch variables for integration (metadata columns). 
-#'   Currently not used in function body.
 #' @param .celltype.col.name Column name in \code{.ref.obj$meta_data} containing cell type labels 
 #'   (default "cell_type"). Only relevant when \code{.ref.obj} is provided.
 #' @param .cl.ct.to.ign Optional cluster or cell type name to exclude from downstream statistics. 
 #'   Use for biologically irrelevant populations (e.g., erythrocytes in PBMC, which likely 
 #'   represent technical artifacts). Cells in this population are mapped but excluded from density 
 #'   calculations. Only one value allowed; merge multiple populations first via \code{celltyping}.
-#' @param .irrel.par Character vector of irrelevant parameters to exclude. Currently not used.
 #' @param .verbose Logical for progress messages (default TRUE).
 #' @param .seed Integer seed for reproducibility (default 123).
 #'   
 #' @return Updated \code{.lm.obj} with \code{$map} component containing:
 #'   \itemize{
 #'     \item \code{fdens}: Matrix of fuzzy graph densities (landmarks × samples). Each entry is 
-#'       the sum of cell-landmark edge weights for that sample, excluding ignored populations.
-#'     \item \code{cell.clustering}: Named vector of cluster assignments for all cells.
-#'     \item \code{cell.celltyping}: Named vector of cell type assignments (if celltyping available).
-#'     \item \code{nn.idx}: Nearest landmark indices for all cells.
+#'       the sum of cell-landmark edge weights for that sample, normalized by sample size and 
+#'       excluding ignored populations.
+#'     \item \code{clustering$ids}: List of named character vectors (one per sample) with cluster 
+#'       assignments for all cells.
+#'     \item \code{clustering$cell.count}: Matrix (samples × clusters) of cell counts per cluster 
+#'       per sample. Used for "traditional" compositional statistics.
+#'     \item \code{clustering$cell.perc}: Matrix (samples × clusters) of percentage of cells per 
+#'       cluster per sample. Used for "traditional" compositional statistics.
+#'     \item \code{celltyping$ids}: List of named character vectors (one per sample) with cell type 
+#'       assignments (only if celltyping available or \code{.ref.obj} provided).
+#'     \item \code{celltyping$cell.count}: Matrix (samples × cell types) of cell counts per cell type 
+#'       per sample. Used for "traditional" compositional statistics.
+#'     \item \code{celltyping$cell.perc}: Matrix (samples × cell types) of percentage of cells per 
+#'       cell type per sample. Used for "traditional" compositional statistics.
+#'     \item \code{nearest.landmarks}: List of matrices (one per sample) with nearest landmark indices 
+#'       for all cells from UMAP transform.
+#'     \item \code{cl.ct.to.ign}: Character value recording which cluster/cell type was excluded 
+#'       from statistics (NULL if none).
 #'   }
 #'   If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with reference-based labels.
 #'   
@@ -650,10 +682,8 @@ get.graph <-
 get.map <-
   function(.lm.obj,
            .ref.obj = NULL,
-           .integrate.vars = NULL,
            .celltype.col.name = "cell_type",
            .cl.ct.to.ign = NULL,
-           .irrel.par = NULL,
            .verbose = TRUE,
            .seed = 123){
     

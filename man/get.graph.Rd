@@ -17,13 +17,13 @@ get.graph(
 }
 \arguments{
 \item{.lm.obj}{A tinydenseR object initialized with \code{setup.lm.obj} and processed with
-\code{get.landmarks}. Must contain \code{$lm} (landmark matrix) and \code{$pca} components.}
+\code{get.landmarks}.}
 
 \item{.k}{Integer number of nearest neighbors for graph construction (default 20). Higher values
-create more connected graphs with broader cluster definitions.}
+create more connected graphs and smoother UMAP embeddings.}
 
 \item{.scale}{Logical indicating whether to scale features before UMAP. Defaults to FALSE for
-RNA assays (PCA already scaled) and TRUE for cytometry (feature scales vary).}
+RNA assays (PCA already scaled) and TRUE for cytometry.}
 
 \item{.verbose}{Logical for progress messages (default TRUE).}
 
@@ -41,34 +41,55 @@ smaller than this are absorbed into nearest large cluster.}
 \value{
 Updated \code{.lm.obj} with \code{$graph} component containing:
 \itemize{
-\item \code{uwot}: UMAP model with embedding, nearest neighbors, fuzzy graph
-\item \code{LE}: Laplacian Eigenmap embedding and eigenspectrum
-\item \code{snn}: Shared nearest neighbor graph
-\item \code{clustering}: Cluster assignments from \code{lm.cluster}
+\item \code{uwot}: UMAP model with multiple components:
+\itemize{
+\item \code{$embedding}: 2D UMAP coordinates for visualization
+\item \code{$nn$euclidean$idx}: k-NN indices matrix (cells × k neighbors)
+\item \code{$nn$euclidean$dist}: k-NN distance matrix
+\item \code{$fgraph}: Fuzzy graph (landmark-landmark probabilistic edges) for optional clustering
+\item \code{$model}: Trained UMAP model for projecting query cells in \code{get.map}
+}
+\item \code{adj.matrix}: Sparse k-NN adjacency matrix (non-symmetric).
+\item \code{snn}: Shared nearest neighbor graph via Jaccard similarity.
+\item \code{LE}: Laplacian Eigenmap embedding (\code{$embed}) and eigenvalue spectrum, computed
+from symmetrized k-NN graph. Used for clustering initialization only.
+\item \code{clustering}: Cluster assignments from Leiden algorithm with straggler absorption.
 }
 }
 \description{
-Performs the core graph analysis workflow: UMAP embedding, Laplacian Eigenmap (LE) computation,
-and clustering of landmark cells. This creates the low-dimensional representation used for
-visualization and cluster identification.
+Builds k-NN graph and trains UMAP model for landmark cells. This creates the graph structure
+and transformation model required for generating fuzzy density matrices in \code{get.map}.
+Clustering is performed as a secondary step for visualization and interpretation, but is not
+the primary objective.
 }
 \details{
-The function orchestrates several graph-based analyses:
+The function orchestrates graph-based analysis in the following order:
 
-\strong{1. UMAP Embedding:}
-Computes 2D embedding for visualization using harmony-corrected PCA (if available) or raw data.
-Returns the UMAP model for later projection of query cells.
+\strong{1. k-NN Graph Construction:}
+Builds k-nearest neighbor graph from PCA/Harmony embeddings and converts it to multiple
+representations for different downstream applications:
+\itemize{
+\item \code{adj.matrix}: Non-symmetric sparse adjacency matrix (used to compute SNN graph)
+\item \code{snn}: Shared nearest neighbor graph via Jaccard similarity (used for clustering)
+\item \code{W.sym}: Symmetrized binary adjacency (used for Laplacian Eigenmap spectral analysis)
+}
 
-\strong{2. Graph Construction:}
-Builds k-NN graph and computes SNN graph via Jaccard similarity of neighbor overlaps.
+\strong{2. UMAP Model Training:}
+Trains UMAP transformation on landmark cells with \code{ret_model=TRUE} to enable projection of
+query cells later. The UMAP model includes the fuzzy graph (cell-landmark edge weights) which is
+essential for computing fuzzy density matrices in \code{get.map}. The UMAP model is the primary output
+of \code{get.graph}.
 
-\strong{3. Laplacian Eigenmap:}
+\strong{3. Laplacian Eigenmap (LE):}
 Computes spectral embedding by solving the generalized eigenvalue problem of the graph Laplacian.
-Automatically selects dimensionality via elbow detection on eigenvalue spectrum. Provides
-alternative to PCA that respects local graph structure.
+Dimensionality is automatically selected via elbow detection on eigenvalue spectrum. The LE
+embedding is currently used only for warm-start initialization in clustering.
 
-\strong{4. Clustering:}
-Applies Leiden algorithm to identify communities, with straggler absorption for robustness.
+\strong{4. Clustering (Secondary):}
+Applies Leiden algorithm to identify communities for visualization and interpretation. Uses SNN
+graph (Jaccard similarity) or UMAP fuzzy graph depending on \code{.cl.method}. Small "straggler"
+clusters are absorbed into neighbors. While useful for exploration, clustering is not required
+for downstream statistical analysis, unless traditional analysis is requested later in \code{get.stats}.
 }
 \examples{
 \dontrun{

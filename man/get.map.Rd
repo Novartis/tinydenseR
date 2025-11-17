@@ -7,10 +7,8 @@
 get.map(
   .lm.obj,
   .ref.obj = NULL,
-  .integrate.vars = NULL,
   .celltype.col.name = "cell_type",
   .cl.ct.to.ign = NULL,
-  .irrel.par = NULL,
   .verbose = TRUE,
   .seed = 123
 )
@@ -22,9 +20,6 @@ get.map(
 \code{Z_corr} field (harmony-corrected embeddings) and metadata with cell type labels.
 Only compatible with RNA assays. Replaces any existing \code{$graph$celltyping}.}
 
-\item{.integrate.vars}{Character vector of batch variables for integration (metadata columns).
-Currently not used in function body.}
-
 \item{.celltype.col.name}{Column name in \code{.ref.obj$meta_data} containing cell type labels
 (default "cell_type"). Only relevant when \code{.ref.obj} is provided.}
 
@@ -32,8 +27,6 @@ Currently not used in function body.}
 Use for biologically irrelevant populations (e.g., erythrocytes in PBMC, which likely
 represent technical artifacts). Cells in this population are mapped but excluded from density
 calculations. Only one value allowed; merge multiple populations first via \code{celltyping}.}
-
-\item{.irrel.par}{Character vector of irrelevant parameters to exclude. Currently not used.}
 
 \item{.verbose}{Logical for progress messages (default TRUE).}
 
@@ -43,10 +36,24 @@ calculations. Only one value allowed; merge multiple populations first via \code
 Updated \code{.lm.obj} with \code{$map} component containing:
 \itemize{
 \item \code{fdens}: Matrix of fuzzy graph densities (landmarks × samples). Each entry is
-the sum of cell-landmark edge weights for that sample, excluding ignored populations.
-\item \code{cell.clustering}: Named vector of cluster assignments for all cells.
-\item \code{cell.celltyping}: Named vector of cell type assignments (if celltyping available).
-\item \code{nn.idx}: Nearest landmark indices for all cells.
+the sum of cell-landmark edge weights for that sample, normalized by sample size and
+excluding ignored populations.
+\item \code{clustering$ids}: List of named character vectors (one per sample) with cluster
+assignments for all cells.
+\item \code{clustering$cell.count}: Matrix (samples × clusters) of cell counts per cluster
+per sample. Used for "traditional" compositional statistics.
+\item \code{clustering$cell.perc}: Matrix (samples × clusters) of percentage of cells per
+cluster per sample. Used for "traditional" compositional statistics.
+\item \code{celltyping$ids}: List of named character vectors (one per sample) with cell type
+assignments (only if celltyping available or \code{.ref.obj} provided).
+\item \code{celltyping$cell.count}: Matrix (samples × cell types) of cell counts per cell type
+per sample. Used for "traditional" compositional statistics.
+\item \code{celltyping$cell.perc}: Matrix (samples × cell types) of percentage of cells per
+cell type per sample. Used for "traditional" compositional statistics.
+\item \code{nearest.landmarks}: List of matrices (one per sample) with nearest landmark indices
+for all cells from UMAP transform.
+\item \code{cl.ct.to.ign}: Character value recording which cluster/cell type was excluded
+from statistics (NULL if none).
 }
 If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with reference-based labels.
 }
