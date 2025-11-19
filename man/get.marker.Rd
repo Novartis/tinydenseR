@@ -37,16 +37,18 @@ for pairwise comparisons.}
 and \code{.id2}.}
 }
 \value{
-List containing marker analysis results:
+limma MArrayLM fit object with moderated statistics and additional slots:
 \describe{
-\item{\code{pseudobulk1}}{Pseudobulk expression for group 1 (features × samples)}
-\item{\code{pseudobulk2}}{Pseudobulk expression for group 2 (features × samples)}
-\item{\code{design}}{Design matrix with Intercept and Group columns}
-\item{\code{fit}}{limma fit object}
-\item{\code{logFC}}{Log fold changes (group 1 vs group 2)}
-\item{\code{p.value}}{P-values for each feature}
-\item{\code{adj.p}}{FDR-adjusted p-values}
-\item{\code{gsva}}{If \code{.geneset.ls} provided: GSVA enrichment comparison}
+\item{\code{coefficients}}{Log fold changes (features × coefficients), nested in fit}
+\item{\code{p.value}}{P-values (features × coefficients), nested in fit}
+\item{\code{adj.p}}{FDR-adjusted p-values (features × coefficients)}
+\item{\code{smpl.outlier.1}}{Logical vector: samples excluded from group 1}
+\item{\code{smpl.outlier.2}}{Logical vector: samples excluded from group 2}
+\item{\code{id1.idx}}{List of integer vectors: cells included per sample for group 1}
+\item{\code{id2.idx}}{List of integer vectors: cells included per sample for group 2}
+\item{\code{n.pseudo1}}{Integer vector: pseudobulk cell counts per sample for group 1}
+\item{\code{n.pseudo2}}{Integer vector: pseudobulk cell counts per sample for group 2}
+\item{\code{geneset}}{(RNA only, if \code{.geneset.ls} provided) GSVA fit object with \code{$adj.p} and \code{$E} (enrichment scores)}
 }
 }
 \description{
@@ -60,9 +62,14 @@ The marker identification workflow:
 \enumerate{
 \item \strong{Cell selection}: Extract cells belonging to group 1 (\code{.id1}) and group 2
 (\code{.id2})
-\item \strong{Pseudobulk aggregation}: Sum expression across cells within each group per sample
-\item \strong{Two-group comparison}: Fit model with design \code{~ Group}
-\item \strong{Statistical testing}: limma-voom (RNA) or limma (cytometry)
+\item \strong{Pseudobulk aggregation}:
+\itemize{
+\item RNA: Sum raw counts across cells within each group per sample
+\item Cytometry: Compute column medians of marker expression across cells within each group per sample
+}
+\item \strong{Outlier removal}: (RNA only) Exclude samples with <10\\% of average pseudobulk cell count from either group
+\item \strong{Paired comparison}: Fit model \code{~ .ids + .pairs} where \code{.ids} is the group indicator (.id1 vs .id2) and \code{.pairs} controls for sample of origin (blocking factor)
+\item \strong{Statistical testing}: limma-voom with TMM normalization (RNA) or limma (cytometry)
 \item \strong{FDR correction}: Adjust p-values across all features
 }
 
@@ -97,18 +104,19 @@ lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
 
 # Find markers for cluster 1 vs all others
 markers.cl1 <- get.marker(lm.cells,
-                          .id1 = "1",
+                          .id1 = "cluster.1",
                           .id.from = "clustering")
 
-# Top upregulated markers
-top.markers <- markers.cl1$logFC[
-  markers.cl1$adj.p < 0.05 & markers.cl1$logFC > 1
+# Top upregulated markers (accessing .id1 coefficient)
+top.markers <- rownames(markers.cl1$coefficients)[
+  markers.cl1$adj.p[, ".id1"] < 0.05 & 
+  markers.cl1$coefficients[, ".id1"] > 1
 ]
 
 # Pairwise comparison: CD4 T cells vs CD8 T cells
 markers.cd4vcd8 <- get.marker(lm.cells,
-                              .id1 = c("1", "3"),  # CD4 T clusters
-                              .id2 = c("2", "4"),  # CD8 T clusters
+                              .id1 = c("cluster.1", "cluster.3"),  # CD4 T clusters
+                              .id2 = c("cluster.2", "cluster.4"),  # CD8 T clusters
                               .id.from = "clustering")
 
 # With gene set enrichment
@@ -117,7 +125,7 @@ hallmark.sets <- list(
   "OXIDATIVE_PHOS" = c("ATP5A", "COX5A", "NDUFA4")
 )
 markers.gsva <- get.marker(lm.cells,
-                           .id1 = "1",
+                           .id1 = "cluster.1",
                            .geneset.ls = hallmark.sets)
 }
 

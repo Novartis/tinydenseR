@@ -36,12 +36,14 @@
 #' @return List containing differential abundance results:
 #'   \describe{
 #'     \item{\code{y}}{log2(fuzzy density + 0.5) matrix: landmarks × samples}
-#'     \item{\code{fit}}{limma MArrayLM object after eBayes with moderated statistics}
-#'     \item{\code{fit$density.weighted.bh.fdr}}{Density-weighted BH FDR adjustment (matrix: landmarks × coefficients)}
-#'     \item{\code{fit$pca.weighted.q}}{PCA-weighted q-values (matrix: landmarks × coefficients)}
-#'     \item{\code{trad}}{List with traditional cluster-level DA results:}
-#'     \item{\code{trad$clustering$fit}}{limma fit for cluster percentages}
-#'     \item{\code{trad$celltyping$fit}}{limma fit for celltype percentages (if celltyping exists)}
+#'     \item{\code{fit}}{limma MArrayLM object after eBayes with moderated statistics, containing:}
+#'     \item{\code{fit$coefficients}}{Log fold changes (landmarks × coefficients), nested in fit}
+#'     \item{\code{fit$p.value}}{P-values (landmarks × coefficients), nested in fit}
+#'     \item{\code{fit$density.weighted.bh.fdr}}{Density-weighted BH FDR adjustment (landmarks × coefficients)}
+#'     \item{\code{fit$pca.weighted.q}}{PCA-weighted q-values (landmarks × coefficients)}
+#'     \item{\code{trad}}{List with traditional cluster-level DA results}
+#'     \item{\code{trad$clustering$fit}}{limma fit for cluster percentages with \code{$adj.p} slot}
+#'     \item{\code{trad$celltyping$fit}}{limma fit for celltype percentages with \code{$adj.p} slot (if celltyping exists)}
 #'   }
 #'   
 #' @details
@@ -638,14 +640,15 @@ get.stats <-
 #'   
 #' @return List containing DE analysis results:
 #'   \describe{
-#'     \item{\code{pseudobulk}}{Pseudobulk expression matrix (features × samples)}
-#'     \item{\code{counts}}{For RNA: raw pseudobulk counts before voom transformation}
-#'     \item{\code{voom}}{For RNA: voom object with mean-variance trend}
-#'     \item{\code{fit}}{limma MArrayLM fit object}
+#'     \item{\code{fit}}{limma MArrayLM fit object with moderated statistics}
 #'     \item{\code{coefficients}}{Log fold change matrix (features × coefficients)}
 #'     \item{\code{p.value}}{P-values (features × coefficients)}
 #'     \item{\code{adj.p}}{FDR-adjusted p-values (features × coefficients)}
-#'     \item{\code{gsva}}{If \code{.geneset.ls} provided: GSVA enrichment scores and statistics}
+#'     \item{\code{smpl.outlier}}{Logical vector indicating which samples were excluded as outliers}
+#'     \item{\code{id.idx}}{List of integer vectors showing which cells were included per sample}
+#'     \item{\code{n.pseudo}}{Integer vector of pseudobulk cell counts per sample}
+#'     \item{\code{geneset}}{(RNA only, if \code{.geneset.ls} provided) GSVA results with \code{$fit} 
+#'       (limma fit), \code{$E} (enrichment scores), \code{$adj.p} (adjusted p-values)}
 #'   }
 #'   
 #' @details
@@ -653,16 +656,20 @@ get.stats <-
 #' \enumerate{
 #'   \item \strong{Cell selection}: If \code{.id} or \code{.id.idx} specified, filter to those cells. 
 #'     Otherwise use all cells.
-#'   \item \strong{Pseudobulk aggregation}: Sum counts/expression across cells within each sample
-#'   \item \strong{Outlier removal}: Exclude samples with <10\% of average pseudobulk size
+#'   \item \strong{Pseudobulk aggregation}: 
+#'     \itemize{
+#'       \item RNA: Sum raw counts across cells within each sample
+#'       \item Cytometry: Compute column medians of marker expression across cells within each sample
+#'     }
+#'   \item \strong{Outlier removal}: (RNA only) Exclude samples with <10\% of average pseudobulk cell count
 #'   \item \strong{Normalization}:
 #'     \itemize{
-#'       \item RNA: TMM normalization + voom transformation
-#'       \item Cytometry: log2 transformation
+#'       \item RNA: TMM normalization (\code{edgeR::calcNormFactors}) + voom transformation for variance modeling
+#'       \item Cytometry: Data used as-is (assumes pre-transformed input)
 #'     }
-#'   \item \strong{Linear modeling}: \code{lmFit} with optional blocking
-#'   \item \strong{Empirical Bayes}: Variance shrinkage via \code{eBayes}
-#'   \item \strong{GSVA} (optional): Gene set variation analysis on pseudobulk
+#'   \item \strong{Linear modeling}: \code{limma::lmFit} with optional blocking for paired/repeated samples
+#'   \item \strong{Empirical Bayes}: Variance shrinkage via \code{limma::eBayes(robust = TRUE)}
+#'   \item \strong{GSVA} (optional, RNA only): Gene set variation analysis on voom-normalized expression
 #' }
 #' 
 #' \strong{When to use pseudobulk DE:}
@@ -1115,16 +1122,18 @@ get.dea <-
 #' @param .id.from Character: "clustering" (default) or "celltyping". Source of IDs in \code{.id1} 
 #'   and \code{.id2}.
 #'   
-#' @return List containing marker analysis results:
+#' @return limma MArrayLM fit object with moderated statistics and additional slots:
 #'   \describe{
-#'     \item{\code{pseudobulk1}}{Pseudobulk expression for group 1 (features × samples)}
-#'     \item{\code{pseudobulk2}}{Pseudobulk expression for group 2 (features × samples)}
-#'     \item{\code{design}}{Design matrix with Intercept and Group columns}
-#'     \item{\code{fit}}{limma fit object}
-#'     \item{\code{logFC}}{Log fold changes (group 1 vs group 2)}
-#'     \item{\code{p.value}}{P-values for each feature}
-#'     \item{\code{adj.p}}{FDR-adjusted p-values}
-#'     \item{\code{gsva}}{If \code{.geneset.ls} provided: GSVA enrichment comparison}
+#'     \item{\code{coefficients}}{Log fold changes (features × coefficients), nested in fit}
+#'     \item{\code{p.value}}{P-values (features × coefficients), nested in fit}
+#'     \item{\code{adj.p}}{FDR-adjusted p-values (features × coefficients)}
+#'     \item{\code{smpl.outlier.1}}{Logical vector: samples excluded from group 1}
+#'     \item{\code{smpl.outlier.2}}{Logical vector: samples excluded from group 2}
+#'     \item{\code{id1.idx}}{List of integer vectors: cells included per sample for group 1}
+#'     \item{\code{id2.idx}}{List of integer vectors: cells included per sample for group 2}
+#'     \item{\code{n.pseudo1}}{Integer vector: pseudobulk cell counts per sample for group 1}
+#'     \item{\code{n.pseudo2}}{Integer vector: pseudobulk cell counts per sample for group 2}
+#'     \item{\code{geneset}}{(RNA only, if \code{.geneset.ls} provided) GSVA fit object with \code{$adj.p} and \code{$E} (enrichment scores)}
 #'   }
 #'   
 #' @details
@@ -1132,9 +1141,14 @@ get.dea <-
 #' \enumerate{
 #'   \item \strong{Cell selection}: Extract cells belonging to group 1 (\code{.id1}) and group 2 
 #'     (\code{.id2})
-#'   \item \strong{Pseudobulk aggregation}: Sum expression across cells within each group per sample
-#'   \item \strong{Two-group comparison}: Fit model with design \code{~ Group}
-#'   \item \strong{Statistical testing}: limma-voom (RNA) or limma (cytometry)
+#'   \item \strong{Pseudobulk aggregation}: 
+#'     \itemize{
+#'       \item RNA: Sum raw counts across cells within each group per sample
+#'       \item Cytometry: Compute column medians of marker expression across cells within each group per sample
+#'     }
+#'   \item \strong{Outlier removal}: (RNA only) Exclude samples with <10\% of average pseudobulk cell count from either group
+#'   \item \strong{Paired comparison}: Fit model \code{~ .ids + .pairs} where \code{.ids} is the group indicator (.id1 vs .id2) and \code{.pairs} controls for sample of origin (blocking factor)
+#'   \item \strong{Statistical testing}: limma-voom with TMM normalization (RNA) or limma (cytometry)
 #'   \item \strong{FDR correction}: Adjust p-values across all features
 #' }
 #' 
@@ -1172,18 +1186,19 @@ get.dea <-
 #' 
 #' # Find markers for cluster 1 vs all others
 #' markers.cl1 <- get.marker(lm.cells,
-#'                           .id1 = "1",
+#'                           .id1 = "cluster.1",
 #'                           .id.from = "clustering")
 #' 
-#' # Top upregulated markers
-#' top.markers <- markers.cl1$logFC[
-#'   markers.cl1$adj.p < 0.05 & markers.cl1$logFC > 1
+#' # Top upregulated markers (accessing .id1 coefficient)
+#' top.markers <- rownames(markers.cl1$coefficients)[
+#'   markers.cl1$adj.p[, ".id1"] < 0.05 & 
+#'   markers.cl1$coefficients[, ".id1"] > 1
 #' ]
 #' 
 #' # Pairwise comparison: CD4 T cells vs CD8 T cells
 #' markers.cd4vcd8 <- get.marker(lm.cells,
-#'                               .id1 = c("1", "3"),  # CD4 T clusters
-#'                               .id2 = c("2", "4"),  # CD8 T clusters
+#'                               .id1 = c("cluster.1", "cluster.3"),  # CD4 T clusters
+#'                               .id2 = c("cluster.2", "cluster.4"),  # CD8 T clusters
 #'                               .id.from = "clustering")
 #' 
 #' # With gene set enrichment
@@ -1192,7 +1207,7 @@ get.dea <-
 #'   "OXIDATIVE_PHOS" = c("ATP5A", "COX5A", "NDUFA4")
 #' )
 #' markers.gsva <- get.marker(lm.cells,
-#'                            .id1 = "1",
+#'                            .id1 = "cluster.1",
 #'                            .geneset.ls = hallmark.sets)
 #' }
 #' 

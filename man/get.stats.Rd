@@ -34,12 +34,14 @@ contrast. Create with \code{limma::makeContrasts()}. If NULL, tests all coeffici
 List containing differential abundance results:
 \describe{
 \item{\code{y}}{log2(fuzzy density + 0.5) matrix: landmarks × samples}
-\item{\code{fit}}{limma MArrayLM object after eBayes with moderated statistics}
-\item{\code{fit$density.weighted.bh.fdr}}{Density-weighted BH FDR adjustment (matrix: landmarks × coefficients)}
-\item{\code{fit$pca.weighted.q}}{PCA-weighted q-values (matrix: landmarks × coefficients)}
-\item{\code{trad}}{List with traditional cluster-level DA results:}
-\item{\code{trad$clustering$fit}}{limma fit for cluster percentages}
-\item{\code{trad$celltyping$fit}}{limma fit for celltype percentages (if celltyping exists)}
+\item{\code{fit}}{limma MArrayLM object after eBayes with moderated statistics, containing:}
+\item{\code{fit$coefficients}}{Log fold changes (landmarks × coefficients), nested in fit}
+\item{\code{fit$p.value}}{P-values (landmarks × coefficients), nested in fit}
+\item{\code{fit$density.weighted.bh.fdr}}{Density-weighted BH FDR adjustment (landmarks × coefficients)}
+\item{\code{fit$pca.weighted.q}}{PCA-weighted q-values (landmarks × coefficients)}
+\item{\code{trad}}{List with traditional cluster-level DA results}
+\item{\code{trad$clustering$fit}}{limma fit for cluster percentages with \code{$adj.p} slot}
+\item{\code{trad$celltyping$fit}}{limma fit for celltype percentages with \code{$adj.p} slot (if celltyping exists)}
 }
 }
 \description{

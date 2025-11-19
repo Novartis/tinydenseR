@@ -43,14 +43,15 @@ only cells with these landmarks as nearest neighbors are aggregated. Useful for 
 \value{
 List containing DE analysis results:
 \describe{
-\item{\code{pseudobulk}}{Pseudobulk expression matrix (features × samples)}
-\item{\code{counts}}{For RNA: raw pseudobulk counts before voom transformation}
-\item{\code{voom}}{For RNA: voom object with mean-variance trend}
-\item{\code{fit}}{limma MArrayLM fit object}
+\item{\code{fit}}{limma MArrayLM fit object with moderated statistics}
 \item{\code{coefficients}}{Log fold change matrix (features × coefficients)}
 \item{\code{p.value}}{P-values (features × coefficients)}
 \item{\code{adj.p}}{FDR-adjusted p-values (features × coefficients)}
-\item{\code{gsva}}{If \code{.geneset.ls} provided: GSVA enrichment scores and statistics}
+\item{\code{smpl.outlier}}{Logical vector indicating which samples were excluded as outliers}
+\item{\code{id.idx}}{List of integer vectors showing which cells were included per sample}
+\item{\code{n.pseudo}}{Integer vector of pseudobulk cell counts per sample}
+\item{\code{geneset}}{(RNA only, if \code{.geneset.ls} provided) GSVA results with \code{$fit}
+(limma fit), \code{$E} (enrichment scores), \code{$adj.p} (adjusted p-values)}
 }
 }
 \description{
@@ -64,16 +65,20 @@ The pseudobulk DE workflow:
 \enumerate{
 \item \strong{Cell selection}: If \code{.id} or \code{.id.idx} specified, filter to those cells.
 Otherwise use all cells.
-\item \strong{Pseudobulk aggregation}: Sum counts/expression across cells within each sample
-\item \strong{Outlier removal}: Exclude samples with <10\\% of average pseudobulk size
+\item \strong{Pseudobulk aggregation}:
+\itemize{
+\item RNA: Sum raw counts across cells within each sample
+\item Cytometry: Compute column medians of marker expression across cells within each sample
+}
+\item \strong{Outlier removal}: (RNA only) Exclude samples with <10\\% of average pseudobulk cell count
 \item \strong{Normalization}:
 \itemize{
-\item RNA: TMM normalization + voom transformation
-\item Cytometry: log2 transformation
+\item RNA: TMM normalization (\code{edgeR::calcNormFactors}) + voom transformation for variance modeling
+\item Cytometry: Data used as-is (assumes pre-transformed input)
 }
-\item \strong{Linear modeling}: \code{lmFit} with optional blocking
-\item \strong{Empirical Bayes}: Variance shrinkage via \code{eBayes}
-\item \strong{GSVA} (optional): Gene set variation analysis on pseudobulk
+\item \strong{Linear modeling}: \code{limma::lmFit} with optional blocking for paired/repeated samples
+\item \strong{Empirical Bayes}: Variance shrinkage via \code{limma::eBayes(robust = TRUE)}
+\item \strong{GSVA} (optional, RNA only): Gene set variation analysis on voom-normalized expression
 }
 
 \strong{When to use pseudobulk DE:}
