@@ -32,7 +32,7 @@
 #' Cell type labels assigned here will be used in downstream analyses:
 #' \itemize{
 #'   \item \code{\link{get.map}} propagates labels to all cells via nearest landmarks
-#'   \item \code{\link{get.stats}} enables cell-type-level differential abundance testing
+#'   \item \code{\link{get.stats}} enables cell-type-level differential abundance testing in traditional analysis
 #'   \item \code{\link{get.dea}} enables cell-type-specific differential expression analysis
 #' }
 #'
@@ -59,7 +59,8 @@
 #' celltype_map <- list(
 #'   "CD4.T.cells" = c("cluster.01", "cluster.02"),
 #'   "CD8.T.cells" = c("cluster.03"),
-#'   "B.cells" = c("cluster.04", "cluster.05")
+#'   "B.cells" = c("cluster.04", "cluster.05"),
+#'   "unknown" = c("cluster.06")
 #' )
 #' lm.cells <- celltyping(lm.cells, celltype_map)
 #' }
