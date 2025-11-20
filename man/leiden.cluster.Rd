@@ -16,7 +16,8 @@ leiden.cluster(
 \arguments{
 \item{.lm.obj}{Optional tinydenseR object from \code{get.landmarks()} and
 \code{get.graph()}. If provided, uses Laplacian Eigenmap embedding for
-initialization. If NULL, computes 3D embedding from \code{.sim.matrix}.}
+initialization (if computed successfully), otherwise falls back to PCA embedding.
+If NULL, computes 3D embedding from \code{.sim.matrix} via truncated SVD.}
 
 \item{.sim.matrix}{Square similarity matrix (typically Jaccard similarity of
 k-NN graphs). Higher values indicate stronger connections between nodes.
@@ -54,15 +55,18 @@ neighbors. This improves cluster quality by preventing tiny, isolated groups.
 }
 
 \strong{Initialization strategy:}
-Uses Laplacian Eigenmap embedding (if available in \code{.lm.obj}), otherwise
-PCA embedding (first 3 components), or computes embedding from similarity matrix.
+Uses Laplacian Eigenmap embedding (if computed and available in \code{.lm.obj$graph$LE$embed}),
+otherwise PCA embedding (up to first 3 components), or computes 3D embedding from
+similarity matrix via truncated SVD (\code{irlba}) when \code{.lm.obj} is NULL.
 K-means initialization helps Leiden start from reasonable communities rather than
 singleton nodes, improving stability.
 
 \strong{Straggler absorption:}
 Small clusters (< 0.5\% of total by default) often represent noise or transitional
 states. Rather than keeping them as separate clusters, they're merged with the
-most similar neighboring cluster based on mean edge weights.
+most similar neighboring cluster based on mean edge weights. For sparse similarity
+matrices, the mean is computed by normalizing the sum of stored values by the full
+submatrix size to properly account for implicit zeros.
 }
 \examples{
 \dontrun{

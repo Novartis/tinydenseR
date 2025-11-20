@@ -55,10 +55,12 @@ for all cells from UMAP transform.
 \item \code{cl.ct.to.ign}: Character value recording which cluster/cell type was excluded
 from statistics (NULL if none).
 }
-If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with reference-based labels.
+If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with list containing \code{$ids}
+(factor of cell type assignments for landmarks), \code{$mean.exprs} (matrix of mean expression
+per cell type), and \code{$pheatmap} (heatmap object).
 }
 \description{
-Projects all cells onto the landmark graph to compute probabilities of cell-landmark neighborhood.
+Projects all cells onto the landmark graph to compute fuzzy graph edge weights between cells and landmarks.
 In addition, transfers cluster/cell type labels from landmarks to all cells.
 }
 \details{
@@ -68,9 +70,9 @@ For each sample, the function:
 \enumerate{
 \item Loads expression data and normalizes (size factors for RNA, marker subset for cytometry)
 \item Projects to PCA/Harmony space (matching landmark processing)
-\item Transforms to UMAP coordinates using the landmark UMAP model
+\item Uses landmark UMAP model to compute fuzzy graph (cell-landmark edge weights) and find nearest landmarks
 \item Assigns clusters/cell types by nearest landmark
-\item Computes fuzzy graph densities (cell-landmark edge weights)
+\item Aggregates fuzzy graph edge weights into landmark densities per sample
 }
 
 \strong{Reference-Based Cell Typing:}

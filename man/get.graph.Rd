@@ -20,7 +20,8 @@ get.graph(
 \code{get.landmarks}.}
 
 \item{.k}{Integer number of nearest neighbors for graph construction (default 20). Higher values
-create more connected graphs and smoother UMAP embeddings.}
+create more connected graphs and smoother UMAP embeddings. Used for k-NN graph construction
+and passed to \code{uwot::umap} as \code{n_neighbors}.}
 
 \item{.scale}{Logical indicating whether to scale features before UMAP. Defaults to FALSE for
 RNA assays (PCA already scaled) and TRUE for cytometry.}
@@ -44,16 +45,20 @@ Updated \code{.lm.obj} with \code{$graph} component containing:
 \item \code{uwot}: UMAP model with multiple components:
 \itemize{
 \item \code{$embedding}: 2D UMAP coordinates for visualization
-\item \code{$nn$euclidean$idx}: k-NN indices matrix (cells × k neighbors)
+\item \code{$nn$euclidean$idx}: k-NN indices matrix (landmarks × k neighbors)
 \item \code{$nn$euclidean$dist}: k-NN distance matrix
 \item \code{$fgraph}: Fuzzy graph (landmark-landmark probabilistic edges) for optional clustering
 \item \code{$model}: Trained UMAP model for projecting query cells in \code{get.map}
 }
 \item \code{adj.matrix}: Sparse k-NN adjacency matrix (non-symmetric).
 \item \code{snn}: Shared nearest neighbor graph via Jaccard similarity.
-\item \code{LE}: Laplacian Eigenmap embedding (\code{$embed}) and eigenvalue spectrum, computed
-from symmetrized k-NN graph. Used for clustering initialization only.
-\item \code{clustering}: Cluster assignments from Leiden algorithm with straggler absorption.
+\item \code{LE}: Laplacian Eigenmap components computed from symmetrized k-NN graph, including
+\code{$W.sym} (symmetrized adjacency), \code{$L} (Laplacian), \code{$Disqrt} (degree matrix),
+\code{$vectors}, \code{$values}, \code{$converged}, \code{$nontriv} (non-trivial eigenvalue indices),
+\code{$elbow} (selected dimensionality), \code{$keep} (retained eigenvectors), and \code{$embed}
+(final normalized embedding). Used for clustering initialization only.
+\item \code{clustering}: List containing \code{$ids} (factor of cluster assignments), \code{$mean.exprs}
+(matrix of mean expression per cluster), and \code{$pheatmap} (heatmap object).
 }
 }
 \description{
@@ -76,8 +81,9 @@ representations for different downstream applications:
 
 \strong{2. UMAP Model Training:}
 Trains UMAP transformation on landmark cells with \code{ret_model=TRUE} to enable projection of
-query cells later. The UMAP model includes the fuzzy graph (cell-landmark edge weights) which is
-essential for computing fuzzy density matrices in \code{get.map}. The UMAP model is the primary output
+query cells later. The UMAP model includes the fuzzy graph (landmark-landmark probabilistic edges) which
+is used for optional clustering and, after projection in \code{get.map}, generates cell-landmark
+edge weights essential for computing fuzzy density matrices. The UMAP model is the primary output
 of \code{get.graph}.
 
 \strong{3. Laplacian Eigenmap (LE):}

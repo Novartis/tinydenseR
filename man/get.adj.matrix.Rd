@@ -12,11 +12,12 @@ neighbor index. Element (i,k) is the index of the k-th nearest neighbor of cell 
 }
 \value{
 A non-symmetric sparse matrix (dgCMatrix) of dimensions n×n where n is the number of
-cells. Entry (i,j) = 1 if j is among i's nearest neighbors, 0 otherwise.
+cells. Entry (j,i) = 1 if j is among i's nearest neighbors, 0 otherwise. That is, row j
+contains 1s in columns corresponding to cells that have j as a neighbor.
 }
 \description{
-Converts a nearest neighbor index matrix into a sparse adjacency matrix. Each entry (i,j)
-indicates that cell j is a nearest neighbor of cell i. The resulting matrix is non-symmetric
-(i can be neighbor of j without j being neighbor of i).
+Converts a nearest neighbor index matrix into a sparse adjacency matrix. The resulting matrix
+is non-symmetric (i can be neighbor of j without j being neighbor of i). Note that the matrix
+orientation places neighbors in rows and source cells in columns.
 }
 \keyword{internal}

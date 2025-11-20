@@ -20,7 +20,8 @@ lm.cluster(
 or "fgraph" (fuzzy graph from UMAP). Default "snn".}
 
 \item{.cl.resolution.parameter}{Numeric resolution for Leiden clustering (default 0.8).
-Internally scaled by 1e-3 for CPM objective. Higher values yield finer clusters.}
+Internally scaled by 1e-3 for CPM objective. Higher values
+yield finer/more clusters.}
 
 \item{.seed}{Integer seed for reproducibility (default 123).}
 
@@ -33,7 +34,8 @@ than this are merged into most connected neighbors.}
 Updated \code{.lm.obj} with \code{$graph$clustering} containing:
 \itemize{
 \item \code{ids}: Factor of cluster assignments for each landmark
-\item \code{mean.exprs}: Matrix of mean expression per cluster (top PCs for RNA, all markers for cyto)
+\item \code{mean.exprs}: Matrix of mean expression per cluster. For RNA: top features
+from PCA rotation (6 genes per PC: 3 highest, 3 lowest loadings). For cytometry: all markers.
 \item \code{pheatmap}: Heatmap object showing cluster profiles
 }
 }
@@ -44,11 +46,12 @@ grouping for statistical testing. This is a wrapper around \code{leiden.cluster}
 }
 \details{
 For RNA data, the heatmap displays top contributors to each principal component (6 genes
-per PC: 3 most positive, 3 most negative). For cytometry, all markers are shown.
+per PC: 3 most positive, 3 most negative loadings). For cytometry, all markers are shown.
 
-The fuzzy graph method ("fgraph") uses probabilistic UMAP edges and may produce more
-visually coherent clusters in UMAP space. The SNN method uses Jaccard similarity and
-often gives more stable results for downstream statistics.
+The fuzzy graph method ("fgraph") uses probabilistic UMAP edges (pruned with tolerance 1/20
+to remove weak connections) and may produce more visually coherent clusters in UMAP space.
+The SNN method uses Jaccard similarity of k-NN overlaps and often gives more stable results
+for downstream statistics.
 }
 \examples{
 \dontrun{
