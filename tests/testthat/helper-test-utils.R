@@ -76,3 +76,49 @@ create_test_design <- function(n_samples, include_intercept = TRUE) {
     matrix(sample(c(0, 1), n_samples, replace = TRUE), ncol = 1)
   }
 }
+
+#' Run full pipeline for stability testing
+#' @param test_data Output from create_test_lm_obj
+#' @param seed Random seed for reproducibility
+#' @param verbose Print progress messages
+#' @param nPC Number of principal components (default NULL for auto)
+#' @param k Number of neighbors for kNN graph (default NULL for auto)
+run_full_pipeline <- function(test_data, seed = 123, verbose = FALSE, nPC = NULL, k = NULL) {
+  # Determine appropriate nPC if not specified
+  if (is.null(nPC)) {
+    first_mat <- readRDS(test_data$cells[[1]])
+    n_cells <- nrow(first_mat) * length(test_data$cells)
+    n_markers <- ncol(first_mat)
+    # Use min of: 30 (default), smallest sample size, or n_markers
+    nPC <- min(30, n_cells, n_markers)
+  }
+  
+  # Determine appropriate k if not specified
+  if (is.null(k)) {
+    first_mat <- readRDS(test_data$cells[[1]])
+    n_landmarks <- ceiling(nrow(first_mat) * length(test_data$cells) * 0.15)  # default prop
+    # k must be < n_landmarks; use min(5, n_landmarks-1)
+    k <- min(5, max(2, n_landmarks - 1))
+  }
+  
+  result <- setup.lm.obj(
+    .cells = test_data$cells,
+    .meta = test_data$meta,
+    .markers = names(test_data$cells[[1]] |> readRDS() |> colnames()),
+    .assay.type = "cyto",
+    .verbose = verbose
+  ) |>
+    get.landmarks(.verbose = verbose, .seed = seed, .nPC = nPC) |>
+    get.graph(.k = k, .verbose = verbose, .seed = seed) |>
+    get.map(.verbose = verbose, .seed = seed)
+  
+  return(result)
+}
+
+#' Compute Jaccard similarity between two character vectors
+#' @param set1 First set
+#' @param set2 Second set
+#' @return Jaccard index (0 to 1)
+jaccard_similarity <- function(set1, set2) {
+  length(intersect(set1, set2)) / length(union(set1, set2))
+}
