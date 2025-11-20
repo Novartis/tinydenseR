@@ -17,8 +17,7 @@ plotPCA(
   .legend.position = "right",
   .point.size = 0.1,
   .seed = 123,
-  .hover.stats = "none",
-  .hover.n.features = 10
+  .hover.stats = "none"
 )
 }
 \arguments{
@@ -56,13 +55,13 @@ Defaults to median of \code{.feature}.}
 
 \item{.hover.stats}{Character specifying hover information: "none" (default) or "marker" (shows
 landmark feature signatures from \code{get.lm.features.stats()}). Requires \pkg{ggiraph}.}
-
-\item{.hover.n.features}{Integer number of features per direction in hover (default 10).
-Currently not implemented.}
 }
 \value{
-A \code{ggplot} object (static) or \code{girafe} object (interactive, if \pkg{ggiraph}
-available and \code{.hover.stats != "none"}).
+Plot object (class depends on interactivity):
+\describe{
+\item{Static ggplot}{\code{.hover.stats = "none"} returns a \code{ggplot} object}
+\item{Interactive girafe}{\code{.hover.stats != "none"} returns a \code{girafe} object (if \pkg{ggiraph} installed), otherwise falls back to static \code{ggplot} with warning}
+}
 }
 \description{
 Visualizes landmarks in PCA space with flexible coloring by features, clusters, or statistical

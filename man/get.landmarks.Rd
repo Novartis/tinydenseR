@@ -39,20 +39,26 @@ regardless of variance (RNA only). Useful for known markers. Default NULL.}
 \value{
 Updated \code{.lm.obj} with populated fields:
 \describe{
-\item{\code{$raw.lm}}{Raw expression matrix for landmarks}
-\item{\code{$lm}}{Landmark expression on selected features (HVGs or markers; (log2-transformed and library size normalized for RNA))}
-\item{\code{$scaled.lm}}{Z-scored landmark expression (for visualization)}
-\item{\code{$pca}}{List containing:
+\item{\code{$raw.lm}}{Raw counts matrix for landmarks (landmarks × features)}
+\item{\code{$lm}}{Processed landmark expression on selected features (landmarks × features):
 \itemize{
-\item \code{$embed} - PC coordinates for landmarks
-\item \code{$rotation} - Feature loadings (PC directions)
-\item \code{$center} - Feature means
-\item \code{$scale} - Feature standard deviations
-\item \code{$sdev} - Standard deviations of PCs
-\item \code{$HVG} - Selected feature names
+\item RNA: PCA-reconstructed denoised expression (log2-scale after library size normalization)
+\item Cytometry: Original marker values on selected markers
 }
 }
-\item{\code{$harmony.obj}}{Symphony reference object (if Harmony used), for mapping new cells}
+\item{\code{$scaled.lm}}{Z-scored landmark expression (landmarks × features, for visualization/heatmaps)}
+\item{\code{$pca}}{List containing PCA results:
+\itemize{
+\item \code{$embed} - PC coordinates for landmarks (landmarks × PCs)
+\item \code{$rotation} - Feature loadings (features × PCs)
+\item \code{$center} - Feature means (length = # features)
+\item \code{$scale} - Feature standard deviations (length = # features)
+\item \code{$sdev} - Standard deviations of PCs (length = # PCs)
+\item \code{$HVG} - Selected feature names (character vector)
+}
+If Harmony used: \code{$embed} and \code{$rotation} are Harmony-corrected/approximated
+}
+\item{\code{$harmony.obj}}{Symphony reference object (if \code{.harmony.var} specified), used for batch-corrected mapping of query cells}
 }
 }
 \description{

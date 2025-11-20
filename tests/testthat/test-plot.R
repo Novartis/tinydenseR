@@ -89,24 +89,4 @@ test_that("input validation for other plotting functions", {
   expect_error(plotDEA(.lm.obj = list(), .dea.obj = list(), .coefs = "test"))
 })
 
-test_that("interactFeatPlot validates input structure", {
-  # Test that interactFeatPlot expects proper structure
-  expect_error(interactFeatPlot(.lm.obj = list()))
-  
-  # Test with minimal structure that should work
-  .lm.obj <- list(
-    graph = list(uwot = list(embedding = matrix(runif(20), ncol=2))),
-    pca = list(embed = matrix(runif(20), ncol=2)),
-    lm = data.frame(A=runif(10), B=runif(10)),
-    interact.plot = list(lm.features = list(html = rep("feature", 10)))
-  )
-  
-  result <- interactFeatPlot(.lm.obj)
-  
-  # Check result type based on whether ggiraph is available
-  if (requireNamespace("ggiraph", quietly = TRUE)) {
-    expect_true(inherits(x = result, what = "girafe"))
-  } else {
-    expect_true(inherits(x = result, what = "ggplot"))
-  }
-})
+

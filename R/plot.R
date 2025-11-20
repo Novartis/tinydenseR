@@ -19,157 +19,6 @@
   requireNamespace("ggiraph", quietly = TRUE)
 }
 
-#' Plot landmark feature discovery summary
-#'
-#' Creates an interactive scatter plot showing landmarks in reduced dimensions (UMAP, PCA, or 
-#' custom features) with hover tooltips displaying the top characteristic features for each 
-#' landmark. Requires \code{get.lm.features.stats()} to have been run first.
-#'
-#' @param .lm.obj A tinydenseR object processed through \code{get.lm.features.stats()}.
-#' @param .n.feat Integer number of top features to display in hover tooltip (default 10). 
-#'   Currently not implemented - displays all features from \code{$interact.plot$lm.features}.
-#' @param .plot.dims Character specifying plot dimensions. Options:
-#'   \itemize{
-#'     \item \code{"umap"} - UMAP coordinates (default)
-#'     \item \code{"pca"} - PCA coordinates (specify PCs with \code{.PC.x}, \code{.PC.y})
-#'     \item Vector of 2 feature names from \code{colnames(.lm.obj$lm)} for custom biplot
-#'   }
-#' @param .PC.x Integer specifying x-axis PC when \code{.plot.dims = "pca"} (default 1).
-#' @param .PC.y Integer specifying y-axis PC when \code{.plot.dims = "pca"} (default 2).
-#' @param .panel.size Numeric panel width/height in inches (default 1.5).
-#' @param .point.size Numeric point size (default 2).
-#'   
-#' @return If \pkg{ggiraph} is available, returns an interactive \code{girafe} object with hover 
-#'   tooltips. Otherwise returns a static \code{ggplot} object with a warning.
-#'   
-#' @note Interactive features require the \pkg{ggiraph} package. Install with 
-#'   \code{install.packages("ggiraph")} for full functionality.
-#'   
-#' @seealso \code{\link{get.lm.features.stats}} for computing feature signatures
-#' 
-#' @examples
-#' \dontrun{
-#' # Typical workflow for interactive feature exploration
-#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
-#'   get.landmarks(.nHVG = 500) |>
-#'   get.graph() |>
-#'   get.lm.features.stats()
-#' 
-#' # Interactive UMAP with feature tooltips
-#' interactFeatPlot(lm.cells)
-#' 
-#' # PCA biplot with PC2 vs PC3
-#' interactFeatPlot(lm.cells, .plot.dims = "pca", .PC.x = 2, .PC.y = 3)
-#' 
-#' # Custom feature biplot (cytometry example)
-#' interactFeatPlot(lm.cells, .plot.dims = c("CD3", "CD4"))
-#' }
-#' 
-#' @export
-interactFeatPlot <-
-  function(
-    .lm.obj,
-    .n.feat = 10,
-    .plot.dims = "umap",
-    .PC.x = 1,
-    .PC.y = 2,
-    .panel.size = 1.5,
-    .point.size = 2
-  ){
-    
-    # R CMD check appeasement
-    .plot.x <- .plot.y <- topFeatTab <- NULL
-    
-    if(length(x = .plot.dims) > 2){
-      stop(".plot.dims must be 'umap', 'pca', or a vector of 2 feature names.\n",
-           "Current length: ", length(x = .plot.dims))
-    }
-    
-    # Validate plot dimensions
-    .plot.dims <-
-      match.arg(arg = .plot.dims,
-                choices = c(
-                  "umap",
-                  "pca",
-                  colnames(x = .lm.obj$lm)
-                ),
-                several.ok = TRUE)
-    
-    # Extract x-axis coordinates based on plot type
-    .plot.x <-
-      if(.plot.dims == "umap"){
-        .lm.obj$graph$uwot$embedding[,1]
-      } else if(.plot.dims == "pca"){
-        .lm.obj$pca$embed[,.PC.x]
-      } else {
-        .lm.obj$lm[,.plot.dims[1]]
-      }
-    
-    # Extract y-axis coordinates based on plot type
-    .plot.y <-
-      if(.plot.dims == "umap"){
-        .lm.obj$graph$uwot$embedding[,2]
-      } else if(.plot.dims == "pca"){
-        .lm.obj$pca$embed[,.PC.y]
-      } else {
-        .lm.obj$lm[,.plot.dims[2]]
-      }
-    
-    # Build data frame for plotting
-    dat.df <-
-      cbind(.plot.x,
-            .plot.y) |>
-      as.data.frame()
-    
-    # Set column names to match plot type
-    colnames(x = dat.df) <-
-      if(.plot.dims == "umap"){
-        paste0("umap.",1:2)
-      } else if(.plot.dims == "pca"){
-        paste0("PC",c(.PC.x,.PC.y))
-      } else {
-        .plot.dims
-      }
-    
-    # Attach HTML tooltips with feature signatures
-    dat.df$topFeatTab <-
-      .lm.obj$interact.plot$lm.features$html
-    
-    # Create base plot
-    p <-
-      ggplot2::ggplot(data = dat.df,
-                      mapping = ggplot2::aes(x = !!rlang::sym(colnames(x = dat.df)[1]),
-                                             y = !!rlang::sym(colnames(x = dat.df)[2]),
-                                             tooltip = topFeatTab)) +
-      ggplot2::theme_bw() +
-      ggplot2::labs(title = "top marker",
-                    subtitle = "stats (hover)") +
-      ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                     plot.subtitle = ggplot2::element_text(hjust = 0.5)) +
-      ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
-                                                units = "in"),
-                              col = grid::unit(x = .panel.size,
-                                               units = "in"))
-    
-    # Add interactivity if ggiraph is available
-    if (.is_ggiraph_available()) {
-      p <- p + ggiraph::geom_point_interactive(size = I(x = .point.size))
-      
-      # Return interactive plot with zoom
-      ggiraph::girafe(ggobj = p) |>
-        ggiraph::girafe_options(
-          ggiraph::opts_zoom(max = 10,
-                             min = 1)
-        )
-    } else {
-      # Fallback to static plot if ggiraph not installed
-      warning("ggiraph package not available. Install with install.packages('ggiraph') for interactive features.\n",
-              "Returning static plot instead.", 
-              call. = FALSE)
-      p + ggplot2::geom_point(size = I(x = .point.size))
-    }
-  }
-
 #' Plot PCA
 #'
 #' Visualizes landmarks in PCA space with flexible coloring by features, clusters, or statistical 
@@ -198,11 +47,12 @@ interactFeatPlot <-
 #' @param .seed Integer random seed for plot point ordering (default 123).
 #' @param .hover.stats Character specifying hover information: "none" (default) or "marker" (shows 
 #'   landmark feature signatures from \code{get.lm.features.stats()}). Requires \pkg{ggiraph}.
-#' @param .hover.n.features Integer number of features per direction in hover (default 10). 
-#'   Currently not implemented.
 #'   
-#' @return A \code{ggplot} object (static) or \code{girafe} object (interactive, if \pkg{ggiraph} 
-#'   available and \code{.hover.stats != "none"}).
+#' @return Plot object (class depends on interactivity):
+#'   \describe{
+#'     \item{Static ggplot}{\code{.hover.stats = "none"} returns a \code{ggplot} object}
+#'     \item{Interactive girafe}{\code{.hover.stats != "none"} returns a \code{girafe} object (if \pkg{ggiraph} installed), otherwise falls back to static \code{ggplot} with warning}
+#'   }
 #'   
 #' @note Interactive hover features require the \pkg{ggiraph} package. Install with 
 #'   \code{install.packages("ggiraph")}.
@@ -245,8 +95,7 @@ plotPCA <-
            .legend.position = "right",
            .point.size = 0.1,
            .seed = 123,
-           .hover.stats = "none",
-           .hover.n.features = 10){
+           .hover.stats = "none"){
     
     # R CMD check appeasement
     topFeatTab <- feature <- NULL
@@ -413,11 +262,12 @@ plotPCA <-
 #' @param .seed Integer random seed for plot point ordering (default 123).
 #' @param .hover.stats Character specifying hover information: "none" (default) or "marker" (shows 
 #'   landmark feature signatures from \code{get.lm.features.stats()}). Requires \pkg{ggiraph}.
-#' @param .hover.n.features Integer number of features per direction in hover (default 10). 
-#'   Currently not implemented.
 #'   
-#' @return A \code{ggplot} object (static) or \code{girafe} object (interactive, if \pkg{ggiraph} 
-#'   available and \code{.hover.stats != "none"}).
+#' @return Plot object (class depends on interactivity):
+#'   \describe{
+#'     \item{Static ggplot}{\code{.hover.stats = "none"} returns a \code{ggplot} object}
+#'     \item{Interactive girafe}{\code{.hover.stats != "none"} returns a \code{girafe} object (if \pkg{ggiraph} installed), otherwise falls back to static \code{ggplot} with warning}
+#'   }
 #'   
 #' @note Requires \code{get.graph()} to have been run. Interactive hover features require the 
 #'   \pkg{ggiraph} package. Install with \code{install.packages("ggiraph")}.
@@ -462,8 +312,7 @@ plotUMAP <-
            .legend.position = "right",
            .point.size = 0.1,
            .seed = 123,
-           .hover.stats = "none",
-           .hover.n.features = 10){
+           .hover.stats = "none"){
     
     # R CMD check appeasement
     umap.1 <- umap.2 <- topFeatTab <- feature <- NULL
@@ -611,8 +460,11 @@ plotUMAP <-
 #' @param .perc.plot Logical whether to show cell percentage plot alongside beeswarm (default TRUE). 
 #'   Only applies when \code{.split.by != "none"}.
 #'   
-#' @return A \code{ggplot} object (single plot) or combined plot using \code{patchwork} (when 
-#'   \code{.perc.plot = TRUE} and \code{.split.by != "none"}).
+#' @return A \code{patchwork} object combining plots:
+#'   \describe{
+#'     \item{With percentages}{\code{.perc.plot = TRUE} and \code{.split.by != "none"}: percentage plot + beeswarm plot side-by-side}
+#'     \item{Beeswarm only}{Otherwise: beeswarm plot alone (still wrapped in patchwork)}
+#'   }
 #'   
 #' @details
 #' The beeswarm layout prevents overlapping points, making it easier to assess the distribution 
@@ -905,23 +757,66 @@ plotBeeswarm <-
     
   }
 
-#' Bidimensional plots for markers expression visualization
+#' Bidimensional Hexbin Plot for Marker Expression
 #'
-#' This function plots the expression of two markers in a bidimensional plot.
+#' Creates hexagonal binning plots to visualize the joint distribution of two markers across 
+#' landmarks. Useful for exploring marker coexpression patterns and identifying cell populations. 
+#' Optionally overlays reference density from all landmarks when plotting a specific cluster/celltype.
 #'
-#' @param .lm.obj A list object initialized with setup.lm.obj and processed with get.landmarks and get.graph.
-#' @param .id The id of the cluster or celltype to plot. If NULL, all landmarks are plotted.
-#' @param .id.from The source of the id. Can be set to "clustering" or "celltyping". Defaults to "clustering".
-#' @param .x.feature The x-axis marker. Defaults to "CD3".
-#' @param .y.feature The y-axis marker. Defaults to "CD20".
-#' @param .bins The number of bins for the hexagonal plot. Defaults to 128.
-#' @param .legend.position The position of the legend. Defaults to "right" and can be set to "left", "top", "bottom" or "none".
-#' @param .plot.title The title of the plot.
-#' @param .panel.size The size of the panel.
-#' @param .reference If TRUE, the plot will show the density of the landmarks. Defaults to TRUE.
-#' @param .density.bins The number of bins for the density plot. Defaults to 32.
-#' @param .sd.range The range of the standard deviation outside which cells are considered outliers and excluded from plot. Defaults to c(-3, 6).
-#'
+#' @param .lm.obj A tinydenseR object processed through \code{get.landmarks()} and \code{get.graph()}.
+#' @param .id Optional character: cluster or celltype ID to highlight. If NULL (default), plots all landmarks.
+#' @param .id.from Character: "clustering" (default) or "celltyping". Source of \code{.id}.
+#' @param .x.feature Character: column name from \code{.lm.obj$lm} for x-axis (default "CD3").
+#' @param .y.feature Character: column name from \code{.lm.obj$lm} for y-axis (default "CD20").
+#' @param .bins Integer: number of hexagonal bins for main plot (default 128). Higher values = finer resolution.
+#' @param .legend.position Character: "right" (default), "left", "top", "bottom", or "none".
+#' @param .plot.title Character: plot title (default "").
+#' @param .panel.size Numeric: panel width/height in inches (default 1.5).
+#' @param .reference Logical: if TRUE (default) and \code{.id} is specified, overlay reference density 
+#'   contours from all landmarks for comparison.
+#' @param .density.bins Integer: number of bins for reference density contours (default 32).
+#' @param .sd.range Numeric vector: range of standard deviations for outlier exclusion (default c(-3, 6)). 
+#'   Currently not implemented in the function.
+#'   
+#' @return A \code{ggplot} object with hexagonal binning showing marker coexpression.
+#'   
+#' @details
+#' The function creates a hexagonal heatmap where:
+#' \itemize{
+#'   \item Each hexagon represents a bin in 2D marker expression space
+#'   \item Color intensity (red gradient) indicates cell density (log2 scale)
+#'   \item For cytometry data, expression values are divided by 50 for scaling
+#'   \item When \code{.id} is specified and \code{.reference = TRUE}, gray density contours 
+#'     show the distribution of all landmarks for context
+#' }
+#' 
+#' This visualization helps identify:
+#' \itemize{
+#'   \item Marker coexpression patterns (e.g., CD3+CD4+ vs CD3+CD8+ populations)
+#'   \item Whether a cluster is truly distinct from the background
+#'   \item Outlier populations in marker expression space
+#' }
+#' 
+#' @seealso \code{\link{plotPCA}}, \code{\link{plotUMAP}} for dimensionality reduction visualizations
+#' 
+#' @examples
+#' \dontrun{
+#' # After landmark identification and graph construction
+#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#'   get.landmarks() |>
+#'   get.graph()
+#' 
+#' # All landmarks
+#' plot2Markers(lm.cells, .x.feature = "CD3", .y.feature = "CD4")
+#' 
+#' # Specific cluster with reference density
+#' plot2Markers(lm.cells, 
+#'              .id = "1", 
+#'              .x.feature = "CD3", 
+#'              .y.feature = "CD8",
+#'              .reference = TRUE)
+#' }
+#' 
 #' @export
 plot2Markers <-
   function(.lm.obj,
@@ -990,24 +885,21 @@ plot2Markers <-
       
       p <-
         p +
-        ggplot2::scale_x_continuous(labels = scales::label_math(expr = 10^.x),
-                                    limits = (.lm.obj$lm[,colnames(x = .lm.obj$lm) %in%
-                                                           .x.feature, drop = TRUE]/50) |>
+        ggplot2::scale_x_continuous(limits = (.lm.obj$lm[,colnames(x = .lm.obj$lm) %in%
+                                                           .x.feature, drop = TRUE]) |>
                                       (\(x)
                                        range(x[!((x > (mean(x = x) + .sd.range[2]*stats::sd(x = x))) |
                                                    (x < (mean(x = x) + .sd.range[1]*stats::sd(x = x))))])
                                       )()) +
-        ggplot2::scale_y_continuous(labels = scales::label_math(expr = 10^.x),
-                                    limits = (.lm.obj$lm[,colnames(x = .lm.obj$lm) %in%
-                                                           .y.feature, drop = TRUE]/50) |>
+        ggplot2::scale_y_continuous(limits = (.lm.obj$lm[,colnames(x = .lm.obj$lm) %in%
+                                                           .y.feature, drop = TRUE]) |>
                                       (\(x)
                                        range(x[!((x > (mean(x = x) + .sd.range[2]*stats::sd(x = x))) |
                                                    (x < (mean(x = x) + .sd.range[1]*stats::sd(x = x))))])
-                                      )()) +
-        ggplot2::annotation_logticks(base = 10)
+                                      )())
       
     }
-    
+
     if(!is.null(x = .id) &
        isTRUE(x = .reference)) {
       
@@ -1023,8 +915,6 @@ plot2Markers <-
       
     }
     
-    #if(is.null(x = .color.from)){
-    
     p <-
       p +
       ggnewscale::new_scale(new_aes = "fill") +
@@ -1033,18 +923,6 @@ plot2Markers <-
                                    high = unname(obj = Color.Palette[1,2]),
                                    trans = "log2")
     
-    #} else {
-    #
-    #p <-
-    #  p +
-    #  ggplot2::geom_point(mapping = ggplot2::aes(color = t),
-    #                      size = I(x = 0.1)) +
-    #  ggplot2::scale_color_gradient2(low = unname(obj = Color.Palette[1,1]),
-    #                                 mid = unname(obj = Color.Palette[1,6]),
-    #                                 high = unname(obj = Color.Palette[1,2]),
-    #                                 midpoint = 0)
-    #
-    #}
     
     p +
       ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
@@ -1204,8 +1082,9 @@ plotSamplePCA <-
 #' @param .col.space.scaler Numeric scaling for column width (default 0.5 inches per coefficient).
 #' @param .label.substr.rm Character substring to remove from labels (default "").
 #'   
-#' @return A \code{ggplot} heatmap with log fold changes colored by magnitude and significance 
-#'   indicated by asterisks.
+#' @return A \code{patchwork} object combining two plots: (1) a dot plot showing mean cell 
+#'   percentages per population, and (2) a heatmap showing log fold changes colored by magnitude 
+#'   with significance indicated by asterisks.
 #'   
 #' @details
 #' Traditional analysis tests for DA at the cluster/celltype level by aggregating cell counts 
@@ -1634,14 +1513,17 @@ plotTradPerc <-
 
 #' Plot Abundance
 #'
-#' Creates dot/line plots showing cell percentages per sample. Similar to \code{plotTradPerc()} 
-#' but with slightly different interface and styling options. Visualizes raw abundance data to 
-#' inspect distributions and paired/longitudinal patterns.
+#' Creates dot/line plots showing log2-transformed landmark fuzzy densities (abundances) per sample. 
+#' Unlike \code{plotTradPerc()} which plots cell percentages at the cluster/celltype level, this 
+#' function plots landmark-level abundances. Useful for inspecting distributions and 
+#' paired/longitudinal patterns at the landmark resolution.
 #'
 #' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
 #' @param .x.split Character specifying metadata column for x-axis grouping (default first column).
-#' @param .pop Character vector of population names to plot. If NULL, plots all.
-#' @param .pop.from Character: "clustering" (default) or "celltyping".
+#' @param .pop Character vector of population names to plot. If NULL, plots all landmarks. If 
+#'   specified, plots only landmarks belonging to that population (from \code{.pop.from}).
+#' @param .pop.from Character: "clustering" (default) or "celltyping" - which grouping to use for 
+#'   filtering landmarks when \code{.pop} is specified.
 #' @param .subject.id Character metadata column for connecting paired samples with lines (e.g., 
 #'   "Subject"). Default NULL.
 #' @param .color.by Character metadata column for coloring points. Default NULL (all black).
@@ -1651,7 +1533,7 @@ plotTradPerc <-
 #' @param .seed Integer random seed for jitter (default 123).
 #' @param .orientation Character: "wide" (default) or "square" faceting.
 #'   
-#' @return A \code{ggplot} object showing cell abundances.
+#' @return A \code{ggplot} object showing log2-transformed landmark abundances (fuzzy densities).
 #'   
 #' @seealso \code{\link{plotTradPerc}}, \code{\link{plotTradStats}}
 #' 
@@ -1844,12 +1726,14 @@ plotAbundance <-
 #'   in these groups.
 #' @param .markers Character vector of feature names (genes/proteins) to plot. Defaults to features 
 #'   shown in cluster/celltype heatmap (top PC contributors for RNA, all markers for cytometry).
-#' @param .q Numeric q-value threshold for significance stars (default 0.1).
+#' @param .q Numeric adjusted p-value threshold for significance marking (default 0.1).
 #' @param .row.space.scaler Numeric row height scaling (default 0.2 inches per feature).
-#' @param .col.space.scaler Numeric column width scaling (default 0.5 inches per coefficient).
+#' @param .col.space.scaler Numeric column width scaling (default 0.065 inches per coefficient).
 #' @param .label.substr.rm Character substring to remove from labels (default "").
 #'   
-#' @return A \code{ggplot} heatmap with log2 fold changes colored and significance marked.
+#' @return A \code{ggplot} heatmap showing effect sizes (log2 fold changes for RNA, estimated 
+#'   differences for cytometry) with point size indicating adjusted p-values and asterisks marking 
+#'   features meeting the significance threshold.
 #'   
 #' @details
 #' This function shows which genes/markers are differentially expressed between conditions, 
@@ -2043,13 +1927,15 @@ plotDEA <-
 #' @param .x.feature Numeric vector for x-axis values (e.g., \code{.lm.obj$scaled.lm[,"CD3"]} or 
 #'   \code{.lm.obj$pca$embed[,"PC1"]}).
 #' @param .y.feature Numeric vector for y-axis values.
-#' @param .color.feature Optional vector for point colors. Can be numeric (continuous coloring) or 
-#'   categorical (discrete colors). If \code{NULL}, all points colored identically.
+#' @param .color.feature Optional vector for point colors. Can be numeric (continuous coloring with 
+#'   diverging blue-white-red scale) or categorical (discrete colors). If \code{NULL}, all points 
+#'   receive default ggplot2 coloring.
 #' @param .x.label Character x-axis label (default "").
 #' @param .y.label Character y-axis label (default "").
 #' @param .color.label Character color legend label (default "").
-#' @param .cat.feature.color Color palette for categorical features 
-#'   (default \code{Color.Palette[1,1:5]}). Automatically interpolated if more categories exist.
+#' @param .cat.feature.color Character vector of colors for categorical features 
+#'   (default \code{Color.Palette[1,1:5]}). Automatically interpolated if more categories than 
+#'   colors exist.
 #' @param .panel.size Numeric vector \code{c(width, height)} in inches (default \code{c(2,2)}).
 #' @param .midpoint Numeric midpoint for continuous color gradients. Defaults to median of 
 #'   \code{.color.feature}. Useful for centering diverging scales.
@@ -2071,8 +1957,12 @@ plotDEA <-
 #'   \item Creating custom QC plots (e.g., library size vs mitochondrial %)
 #' }
 #' 
-#' Points are plotted in randomized order to avoid bias when groups overlap. For continuous color 
-#' features, uses diverging blue-white-red scale. For categorical, generates discrete colors.
+#' Points are plotted in randomized order (controlled by \code{.seed}) to avoid systematic 
+#' overplotting bias when groups overlap. 
+#' 
+#' For numeric \code{.color.feature}, applies a diverging color scale (blue-white-red) centered 
+#' at \code{.midpoint} (defaults to median). For categorical features, generates discrete colors 
+#' by interpolating \code{.cat.feature.color}.
 #' 
 #' @seealso \code{\link{plotPCA}}, \code{\link{plotUMAP}}
 #' 

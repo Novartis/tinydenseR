@@ -29,16 +29,18 @@ in these groups.}
 \item{.markers}{Character vector of feature names (genes/proteins) to plot. Defaults to features
 shown in cluster/celltype heatmap (top PC contributors for RNA, all markers for cytometry).}
 
-\item{.q}{Numeric q-value threshold for significance stars (default 0.1).}
+\item{.q}{Numeric adjusted p-value threshold for significance marking (default 0.1).}
 
 \item{.row.space.scaler}{Numeric row height scaling (default 0.2 inches per feature).}
 
-\item{.col.space.scaler}{Numeric column width scaling (default 0.5 inches per coefficient).}
+\item{.col.space.scaler}{Numeric column width scaling (default 0.065 inches per coefficient).}
 
 \item{.label.substr.rm}{Character substring to remove from labels (default "").}
 }
 \value{
-A \code{ggplot} heatmap with log2 fold changes colored and significance marked.
+A \code{ggplot} heatmap showing effect sizes (log2 fold changes for RNA, estimated
+differences for cytometry) with point size indicating adjusted p-values and asterisks marking
+features meeting the significance threshold.
 }
 \description{
 Visualizes differential expression results as a heatmap showing log fold changes for genes/markers

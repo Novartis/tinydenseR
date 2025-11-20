@@ -60,8 +60,11 @@ for single coefficient.}
 Only applies when \code{.split.by != "none"}.}
 }
 \value{
-A \code{ggplot} object (single plot) or combined plot using \code{patchwork} (when
-\code{.perc.plot = TRUE} and \code{.split.by != "none"}).
+A \code{patchwork} object combining plots:
+\describe{
+\item{With percentages}{\code{.perc.plot = TRUE} and \code{.split.by != "none"}: percentage plot + beeswarm plot side-by-side}
+\item{Beeswarm only}{Otherwise: beeswarm plot alone (still wrapped in patchwork)}
+}
 }
 \description{
 Creates a beeswarm plot showing effect sizes (log fold changes) from differential abundance

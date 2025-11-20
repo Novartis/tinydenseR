@@ -23,9 +23,11 @@ plotAbundance(
 
 \item{.x.split}{Character specifying metadata column for x-axis grouping (default first column).}
 
-\item{.pop}{Character vector of population names to plot. If NULL, plots all.}
+\item{.pop}{Character vector of population names to plot. If NULL, plots all landmarks. If
+specified, plots only landmarks belonging to that population (from \code{.pop.from}).}
 
-\item{.pop.from}{Character: "clustering" (default) or "celltyping".}
+\item{.pop.from}{Character: "clustering" (default) or "celltyping" - which grouping to use for
+filtering landmarks when \code{.pop} is specified.}
 
 \item{.subject.id}{Character metadata column for connecting paired samples with lines (e.g.,
 "Subject"). Default NULL.}
@@ -43,12 +45,13 @@ plotAbundance(
 \item{.orientation}{Character: "wide" (default) or "square" faceting.}
 }
 \value{
-A \code{ggplot} object showing cell abundances.
+A \code{ggplot} object showing log2-transformed landmark abundances (fuzzy densities).
 }
 \description{
-Creates dot/line plots showing cell percentages per sample. Similar to \code{plotTradPerc()}
-but with slightly different interface and styling options. Visualizes raw abundance data to
-inspect distributions and paired/longitudinal patterns.
+Creates dot/line plots showing log2-transformed landmark fuzzy densities (abundances) per sample.
+Unlike \code{plotTradPerc()} which plots cell percentages at the cluster/celltype level, this
+function plots landmark-level abundances. Useful for inspecting distributions and
+paired/longitudinal patterns at the landmark resolution.
 }
 \examples{
 \dontrun{

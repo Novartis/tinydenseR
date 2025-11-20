@@ -35,8 +35,8 @@ Positive loadings indicate features that increase along the PC direction, negati
 features that decrease. The signed values reflect how the landmark is characterized relative
 to the population average.
 
-Results are stored for use in \code{interactFeatPlot}, which displays feature signatures
-when hovering over landmarks in UMAP plots.
+Results are stored for use in \code{plotPCA} and \code{plotUMAP}, which displays feature signatures
+when hovering over landmarks when \code{.hover.stats = "marker"}.
 }
 \examples{
 \dontrun{
@@ -55,5 +55,5 @@ plotPCA(lm.cells, .hover.stats = "marker")
 
 }
 \seealso{
-\code{\link{interactFeatPlot}}, \code{\link{get.landmarks}}
+\code{\link{plotPCA}}, \code{\link{plotUMAP}}, \code{\link{get.landmarks}}
 }

@@ -26,8 +26,9 @@ scatterPlot(
 
 \item{.y.feature}{Numeric vector for y-axis values.}
 
-\item{.color.feature}{Optional vector for point colors. Can be numeric (continuous coloring) or
-categorical (discrete colors). If \code{NULL}, all points colored identically.}
+\item{.color.feature}{Optional vector for point colors. Can be numeric (continuous coloring with
+diverging blue-white-red scale) or categorical (discrete colors). If \code{NULL}, all points
+receive default ggplot2 coloring.}
 
 \item{.x.label}{Character x-axis label (default "").}
 
@@ -35,8 +36,9 @@ categorical (discrete colors). If \code{NULL}, all points colored identically.}
 
 \item{.color.label}{Character color legend label (default "").}
 
-\item{.cat.feature.color}{Color palette for categorical features
-(default \code{Color.Palette[1,1:5]}). Automatically interpolated if more categories exist.}
+\item{.cat.feature.color}{Character vector of colors for categorical features
+(default \code{Color.Palette[1,1:5]}). Automatically interpolated if more categories than
+colors exist.}
 
 \item{.panel.size}{Numeric vector \code{c(width, height)} in inches (default \code{c(2,2)}).}
 
@@ -70,8 +72,12 @@ and \code{plotUMAP} interfaces. Use cases include:
 \item Creating custom QC plots (e.g., library size vs mitochondrial \%)
 }
 
-Points are plotted in randomized order to avoid bias when groups overlap. For continuous color
-features, uses diverging blue-white-red scale. For categorical, generates discrete colors.
+Points are plotted in randomized order (controlled by \code{.seed}) to avoid systematic
+overplotting bias when groups overlap.
+
+For numeric \code{.color.feature}, applies a diverging color scale (blue-white-red) centered
+at \code{.midpoint} (defaults to median). For categorical features, generates discrete colors
+by interpolating \code{.cat.feature.color}.
 }
 \examples{
 \dontrun{

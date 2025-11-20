@@ -32,19 +32,23 @@
 #' }
 #' 
 #' **Initialization strategy:**
-#' Uses Laplacian Eigenmap embedding (if available in \code{.lm.obj}), otherwise
-#' PCA embedding (first 3 components), or computes embedding from similarity matrix.
+#' Uses Laplacian Eigenmap embedding (if computed and available in \code{.lm.obj$graph$LE$embed}),
+#' otherwise PCA embedding (up to first 3 components), or computes 3D embedding from
+#' similarity matrix via truncated SVD (\code{irlba}) when \code{.lm.obj} is NULL.
 #' K-means initialization helps Leiden start from reasonable communities rather than
 #' singleton nodes, improving stability.
 #' 
 #' **Straggler absorption:**
 #' Small clusters (< 0.5% of total by default) often represent noise or transitional
 #' states. Rather than keeping them as separate clusters, they're merged with the
-#' most similar neighboring cluster based on mean edge weights.
+#' most similar neighboring cluster based on mean edge weights. For sparse similarity
+#' matrices, the mean is computed by normalizing the sum of stored values by the full
+#' submatrix size to properly account for implicit zeros.
 #'
 #' @param .lm.obj Optional tinydenseR object from \code{get.landmarks()} and
 #'   \code{get.graph()}. If provided, uses Laplacian Eigenmap embedding for
-#'   initialization. If NULL, computes 3D embedding from \code{.sim.matrix}.
+#'   initialization (if computed successfully), otherwise falls back to PCA embedding.
+#'   If NULL, computes 3D embedding from \code{.sim.matrix} via truncated SVD.
 #' @param .sim.matrix Square similarity matrix (typically Jaccard similarity of
 #'   k-NN graphs). Higher values indicate stronger connections between nodes.
 #'   Self-loops (diagonal) are automatically removed.
@@ -254,15 +258,16 @@ leiden.cluster <-
 
 #' Sparse matrix representation of nearest neighbors
 #' 
-#' Converts a nearest neighbor index matrix into a sparse adjacency matrix. Each entry (i,j) 
-#' indicates that cell j is a nearest neighbor of cell i. The resulting matrix is non-symmetric 
-#' (i can be neighbor of j without j being neighbor of i).
+#' Converts a nearest neighbor index matrix into a sparse adjacency matrix. The resulting matrix 
+#' is non-symmetric (i can be neighbor of j without j being neighbor of i). Note that the matrix 
+#' orientation places neighbors in rows and source cells in columns.
 #' 
 #' @param .nn.idx A matrix where each row represents a cell and each column represents a nearest 
 #'   neighbor index. Element (i,k) is the index of the k-th nearest neighbor of cell i.
 #'   
 #' @return A non-symmetric sparse matrix (dgCMatrix) of dimensions n×n where n is the number of 
-#'   cells. Entry (i,j) = 1 if j is among i's nearest neighbors, 0 otherwise.
+#'   cells. Entry (j,i) = 1 if j is among i's nearest neighbors, 0 otherwise. That is, row j 
+#'   contains 1s in columns corresponding to cells that have j as a neighbor.
 #'
 #' @keywords internal
 #'
@@ -288,12 +293,14 @@ get.adj.matrix <-
 #' the overlap of neighbor sets. This implementation uses sparse matrix operations for efficiency.
 #'
 #' @param .adj.matrix A non-symmetric sparse adjacency matrix from \code{get.adj.matrix}, where 
-#'   entry (i,j)=1 indicates j is a nearest neighbor of i.
+#'   entry (j,i)=1 indicates j is among i's nearest neighbors (neighbors in rows, cells in columns).
 #' @param .prune A numeric threshold (default 1/15 ≈ 0.067) for pruning weak edges. Jaccard 
 #'   values below this are set to zero for sparsity.
 #'   
 #' @return A symmetric sparse matrix of Jaccard indices representing the SNN graph. Higher values 
-#'   indicate greater neighbor overlap. Matrix is pruned and forced symmetric.
+#'   indicate greater neighbor overlap. Entry (i,j) gives the Jaccard similarity between cell i 
+#'   and cell j based on their shared k-nearest neighbors. Matrix is pruned to remove weak 
+#'   connections and forced symmetric.
 #'   
 #' @keywords internal
 #'
@@ -333,7 +340,8 @@ fast.jaccard.r <-
 #' @param .lm.obj A tinydenseR object initialized with \code{setup.lm.obj} and processed with 
 #'   \code{get.landmarks}.
 #' @param .k Integer number of nearest neighbors for graph construction (default 20). Higher values 
-#'   create more connected graphs and smoother UMAP embeddings.
+#'   create more connected graphs and smoother UMAP embeddings. Used for k-NN graph construction 
+#'   and passed to \code{uwot::umap} as \code{n_neighbors}.
 #' @param .scale Logical indicating whether to scale features before UMAP. Defaults to FALSE for 
 #'   RNA assays (PCA already scaled) and TRUE for cytometry.
 #' @param .verbose Logical for progress messages (default TRUE).
@@ -350,16 +358,20 @@ fast.jaccard.r <-
 #'     \item \code{uwot}: UMAP model with multiple components:
 #'       \itemize{
 #'         \item \code{$embedding}: 2D UMAP coordinates for visualization
-#'         \item \code{$nn$euclidean$idx}: k-NN indices matrix (cells × k neighbors)
+#'         \item \code{$nn$euclidean$idx}: k-NN indices matrix (landmarks × k neighbors)
 #'         \item \code{$nn$euclidean$dist}: k-NN distance matrix
 #'         \item \code{$fgraph}: Fuzzy graph (landmark-landmark probabilistic edges) for optional clustering
 #'         \item \code{$model}: Trained UMAP model for projecting query cells in \code{get.map}
 #'       }
 #'     \item \code{adj.matrix}: Sparse k-NN adjacency matrix (non-symmetric).
 #'     \item \code{snn}: Shared nearest neighbor graph via Jaccard similarity.
-#'     \item \code{LE}: Laplacian Eigenmap embedding (\code{$embed}) and eigenvalue spectrum, computed 
-#'       from symmetrized k-NN graph. Used for clustering initialization only.
-#'     \item \code{clustering}: Cluster assignments from Leiden algorithm with straggler absorption.
+#'     \item \code{LE}: Laplacian Eigenmap components computed from symmetrized k-NN graph, including 
+#'       \code{$W.sym} (symmetrized adjacency), \code{$L} (Laplacian), \code{$Disqrt} (degree matrix), 
+#'       \code{$vectors}, \code{$values}, \code{$converged}, \code{$nontriv} (non-trivial eigenvalue indices), 
+#'       \code{$elbow} (selected dimensionality), \code{$keep} (retained eigenvectors), and \code{$embed} 
+#'       (final normalized embedding). Used for clustering initialization only.
+#'     \item \code{clustering}: List containing \code{$ids} (factor of cluster assignments), \code{$mean.exprs} 
+#'       (matrix of mean expression per cluster), and \code{$pheatmap} (heatmap object).
 #'   }
 #'   
 #' @details
@@ -376,8 +388,9 @@ fast.jaccard.r <-
 #' 
 #' \strong{2. UMAP Model Training:}
 #' Trains UMAP transformation on landmark cells with \code{ret_model=TRUE} to enable projection of 
-#' query cells later. The UMAP model includes the fuzzy graph (cell-landmark edge weights) which is 
-#' essential for computing fuzzy density matrices in \code{get.map}. The UMAP model is the primary output 
+#' query cells later. The UMAP model includes the fuzzy graph (landmark-landmark probabilistic edges) which 
+#' is used for optional clustering and, after projection in \code{get.map}, generates cell-landmark 
+#' edge weights essential for computing fuzzy density matrices. The UMAP model is the primary output 
 #' of \code{get.graph}.
 #' 
 #' \strong{3. Laplacian Eigenmap (LE):}
@@ -593,7 +606,7 @@ get.graph <-
 
 #' Mapping cells to landmarks
 #'
-#' Projects all cells onto the landmark graph to compute probabilities of cell-landmark neighborhood.
+#' Projects all cells onto the landmark graph to compute fuzzy graph edge weights between cells and landmarks.
 #' In addition, transfers cluster/cell type labels from landmarks to all cells.
 #' 
 #'
@@ -632,7 +645,9 @@ get.graph <-
 #'     \item \code{cl.ct.to.ign}: Character value recording which cluster/cell type was excluded 
 #'       from statistics (NULL if none).
 #'   }
-#'   If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with reference-based labels.
+#'   If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with list containing \code{$ids} 
+#'   (factor of cell type assignments for landmarks), \code{$mean.exprs} (matrix of mean expression 
+#'   per cell type), and \code{$pheatmap} (heatmap object).
 #'   
 #' @details
 #' \strong{Workflow Overview:}
@@ -640,9 +655,9 @@ get.graph <-
 #' For each sample, the function:
 #' 1. Loads expression data and normalizes (size factors for RNA, marker subset for cytometry)
 #' 2. Projects to PCA/Harmony space (matching landmark processing)
-#' 3. Transforms to UMAP coordinates using the landmark UMAP model
+#' 3. Uses landmark UMAP model to compute fuzzy graph (cell-landmark edge weights) and find nearest landmarks
 #' 4. Assigns clusters/cell types by nearest landmark
-#' 5. Computes fuzzy graph densities (cell-landmark edge weights)
+#' 5. Aggregates fuzzy graph edge weights into landmark densities per sample
 #' 
 #' \strong{Reference-Based Cell Typing:}
 #' 
@@ -1258,7 +1273,8 @@ get.map <-
 #' @param .cl.method Character specifying clustering method: "snn" (shared nearest neighbors) 
 #'   or "fgraph" (fuzzy graph from UMAP). Default "snn".
 #' @param .cl.resolution.parameter Numeric resolution for Leiden clustering (default 0.8). 
-#'   Internally scaled by 1e-3 for CPM objective. Higher values yield finer clusters.
+#'   Internally scaled by 1e-3 for CPM objective. Higher values 
+#'   yield finer/more clusters.
 #' @param .seed Integer seed for reproducibility (default 123).
 #' @param .verbose Logical for progress messages (default TRUE).
 #' @param .small.size Integer threshold for straggler absorption (default 3). Clusters smaller 
@@ -1267,17 +1283,19 @@ get.map <-
 #' @return Updated \code{.lm.obj} with \code{$graph$clustering} containing:
 #'   \itemize{
 #'     \item \code{ids}: Factor of cluster assignments for each landmark
-#'     \item \code{mean.exprs}: Matrix of mean expression per cluster (top PCs for RNA, all markers for cyto)
+#'     \item \code{mean.exprs}: Matrix of mean expression per cluster. For RNA: top features 
+#'       from PCA rotation (6 genes per PC: 3 highest, 3 lowest loadings). For cytometry: all markers.
 #'     \item \code{pheatmap}: Heatmap object showing cluster profiles
 #'   }
 #'   
 #' @details
 #' For RNA data, the heatmap displays top contributors to each principal component (6 genes 
-#' per PC: 3 most positive, 3 most negative). For cytometry, all markers are shown.
+#' per PC: 3 most positive, 3 most negative loadings). For cytometry, all markers are shown.
 #' 
-#' The fuzzy graph method ("fgraph") uses probabilistic UMAP edges and may produce more 
-#' visually coherent clusters in UMAP space. The SNN method uses Jaccard similarity and 
-#' often gives more stable results for downstream statistics.
+#' The fuzzy graph method ("fgraph") uses probabilistic UMAP edges (pruned with tolerance 1/20 
+#' to remove weak connections) and may produce more visually coherent clusters in UMAP space. 
+#' The SNN method uses Jaccard similarity of k-NN overlaps and often gives more stable results 
+#' for downstream statistics.
 #' 
 #' @seealso \code{\link{leiden.cluster}}, \code{\link{get.graph}}
 #' 
@@ -1431,10 +1449,10 @@ lm.cluster <-
 #' features that decrease. The signed values reflect how the landmark is characterized relative 
 #' to the population average.
 #' 
-#' Results are stored for use in \code{interactFeatPlot}, which displays feature signatures 
-#' when hovering over landmarks in UMAP plots.
+#' Results are stored for use in \code{plotPCA} and \code{plotUMAP}, which displays feature signatures 
+#' when hovering over landmarks when \code{.hover.stats = "marker"}.
 #' 
-#' @seealso \code{\link{interactFeatPlot}}, \code{\link{get.landmarks}}
+#' @seealso \code{\link{plotPCA}}, \code{\link{plotUMAP}}, \code{\link{get.landmarks}}
 #' 
 #' @examples
 #' \dontrun{

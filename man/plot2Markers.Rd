@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{plot2Markers}
 \alias{plot2Markers}
-\title{Bidimensional plots for markers expression visualization}
+\title{Bidimensional Hexbin Plot for Marker Expression}
 \usage{
 plot2Markers(
   .lm.obj,
@@ -20,30 +20,76 @@ plot2Markers(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with setup.lm.obj and processed with get.landmarks and get.graph.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.landmarks()} and \code{get.graph()}.}
 
-\item{.id}{The id of the cluster or celltype to plot. If NULL, all landmarks are plotted.}
+\item{.id}{Optional character: cluster or celltype ID to highlight. If NULL (default), plots all landmarks.}
 
-\item{.id.from}{The source of the id. Can be set to "clustering" or "celltyping". Defaults to "clustering".}
+\item{.id.from}{Character: "clustering" (default) or "celltyping". Source of \code{.id}.}
 
-\item{.x.feature}{The x-axis marker. Defaults to "CD3".}
+\item{.x.feature}{Character: column name from \code{.lm.obj$lm} for x-axis (default "CD3").}
 
-\item{.y.feature}{The y-axis marker. Defaults to "CD20".}
+\item{.y.feature}{Character: column name from \code{.lm.obj$lm} for y-axis (default "CD20").}
 
-\item{.bins}{The number of bins for the hexagonal plot. Defaults to 128.}
+\item{.bins}{Integer: number of hexagonal bins for main plot (default 128). Higher values = finer resolution.}
 
-\item{.legend.position}{The position of the legend. Defaults to "right" and can be set to "left", "top", "bottom" or "none".}
+\item{.legend.position}{Character: "right" (default), "left", "top", "bottom", or "none".}
 
-\item{.plot.title}{The title of the plot.}
+\item{.plot.title}{Character: plot title (default "").}
 
-\item{.panel.size}{The size of the panel.}
+\item{.panel.size}{Numeric: panel width/height in inches (default 1.5).}
 
-\item{.reference}{If TRUE, the plot will show the density of the landmarks. Defaults to TRUE.}
+\item{.reference}{Logical: if TRUE (default) and \code{.id} is specified, overlay reference density
+contours from all landmarks for comparison.}
 
-\item{.density.bins}{The number of bins for the density plot. Defaults to 32.}
+\item{.density.bins}{Integer: number of bins for reference density contours (default 32).}
 
-\item{.sd.range}{The range of the standard deviation outside which cells are considered outliers and excluded from plot. Defaults to c(-3, 6).}
+\item{.sd.range}{Numeric vector: range of standard deviations for outlier exclusion (default c(-3, 6)).
+Currently not implemented in the function.}
+}
+\value{
+A \code{ggplot} object with hexagonal binning showing marker coexpression.
 }
 \description{
-This function plots the expression of two markers in a bidimensional plot.
+Creates hexagonal binning plots to visualize the joint distribution of two markers across
+landmarks. Useful for exploring marker coexpression patterns and identifying cell populations.
+Optionally overlays reference density from all landmarks when plotting a specific cluster/celltype.
+}
+\details{
+The function creates a hexagonal heatmap where:
+\itemize{
+\item Each hexagon represents a bin in 2D marker expression space
+\item Color intensity (red gradient) indicates cell density (log2 scale)
+\item For cytometry data, expression values are divided by 50 for scaling
+\item When \code{.id} is specified and \code{.reference = TRUE}, gray density contours
+show the distribution of all landmarks for context
+}
+
+This visualization helps identify:
+\itemize{
+\item Marker coexpression patterns (e.g., CD3+CD4+ vs CD3+CD8+ populations)
+\item Whether a cluster is truly distinct from the background
+\item Outlier populations in marker expression space
+}
+}
+\examples{
+\dontrun{
+# After landmark identification and graph construction
+lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |>
+  get.graph()
+
+# All landmarks
+plot2Markers(lm.cells, .x.feature = "CD3", .y.feature = "CD4")
+
+# Specific cluster with reference density
+plot2Markers(lm.cells, 
+             .id = "1", 
+             .x.feature = "CD3", 
+             .y.feature = "CD8",
+             .reference = TRUE)
+}
+
+}
+\seealso{
+\code{\link{plotPCA}}, \code{\link{plotUMAP}} for dimensionality reduction visualizations
 }

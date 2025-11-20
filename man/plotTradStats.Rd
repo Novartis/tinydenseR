@@ -34,8 +34,9 @@ traditional model.}
 \item{.label.substr.rm}{Character substring to remove from labels (default "").}
 }
 \value{
-A \code{ggplot} heatmap with log fold changes colored by magnitude and significance
-indicated by asterisks.
+A \code{patchwork} object combining two plots: (1) a dot plot showing mean cell
+percentages per population, and (2) a heatmap showing log fold changes colored by magnitude
+with significance indicated by asterisks.
 }
 \description{
 Visualizes results from traditional cluster/cell type-level differential abundance testing.
