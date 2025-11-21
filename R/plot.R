@@ -570,6 +570,12 @@ plotBeeswarm <-
                          y = "",
                          size = "%") +
            ggplot2::scale_x_discrete(labels = "mean % across\nall samples") +
+           {
+             if(isFALSE(x = .order.ids)){
+               ggplot2::scale_y_discrete(limits = rev)
+             }
+               
+           } +
            ggplot2::scale_size_continuous(range = log2(x = x$cell.perc + 1) |>
                                             range() |>
                                             I()) +
@@ -639,7 +645,19 @@ plotBeeswarm <-
                         split.by = rep(x = .lm.obj$graph[[.split.by]]$ids[!(.lm.obj$graph[[.split.by]]$ids %in% 
                                                                               .lm.obj$map$cl.ct.to.ign)] |>
                                          as.character(),
-                                       times = length(x = .coefs)))
+                                       times = length(x = .coefs))  |> 
+            factor(levels = if(isTRUE(x = .order.ids)){
+              
+              .lm.obj$graph[[.split.by]]$pheatmap$tree_row$labels[
+                .lm.obj$graph[[.split.by]]$pheatmap$tree_row$order
+              ]
+            
+              } else {
+              
+              levels(x = .lm.obj$graph[[.split.by]]$ids)
+            
+                }) |>
+              droplevels())
         
       }
       
@@ -658,7 +676,7 @@ plotBeeswarm <-
       dat.df <-
         data.frame(
           value =
-            .stats.obj$fit$coefficients,
+            .stats.obj$fit$coefficients[,.coefs],
           sig =
             ifelse(test = .stats.obj$fit[[.q.from]][,.coefs] < .q,
                    yes = ifelse(test = .stats.obj$fit$coefficients[,.coefs] > 0,
@@ -717,6 +735,12 @@ plotBeeswarm <-
              ggplot2::facet_grid(cols = ggplot2::vars(facets), 
                                  scales = .facet.scales)
            }
+         } +
+         {
+           if(isFALSE(x = .order.ids)){
+             ggplot2::scale_y_discrete(limits = rev)
+           }
+           
          } +
          ggplot2::geom_point(position = ggplot2::position_jitter(width = 0,
                                                                  height = 0.25),
@@ -1173,6 +1197,12 @@ plotTradStats <-
                        y = "",
                        size = "%") +
          ggplot2::scale_x_discrete(labels = "mean % across\nall samples") +
+         {
+           if(isFALSE(x = .order.ids)){
+             ggplot2::scale_y_discrete(limits = rev)
+           }
+           
+         } +
          ggplot2::scale_size_continuous(range = log2(x = x$cell.perc + 1) |>
                                           range()) +
          ggplot2::geom_point() +
@@ -1238,7 +1268,7 @@ plotTradStats <-
                                    
                                  } else {
                                    
-                                   pop
+                                   colnames(x = .lm.obj$map[[.split.by]]$cell.perc)
                                    
                                  })) |>
       droplevels()
@@ -1277,6 +1307,12 @@ plotTradStats <-
                                                         format = "g",
                                                         digits = 1),
                                      range = I(x = c(3,6))) +
+      {
+        if(isFALSE(x = .order.ids)){
+          ggplot2::scale_y_discrete(limits = rev)
+        }
+        
+      } +
       ggplot2::geom_point(shape = 21,
                           mapping = ggplot2::aes(size = -log10(x = adj.p)),
                           color = "black",
