@@ -19,7 +19,8 @@ plotBeeswarm(
   .col.space.scaler = 0.1,
   .panel.width = 1.5,
   .legend.position = "right",
-  .perc.plot = TRUE
+  .perc.plot = TRUE,
+  .order.ids = FALSE
 )
 }
 \arguments{
@@ -58,6 +59,8 @@ for single coefficient.}
 
 \item{.perc.plot}{Logical whether to show cell percentage plot alongside beeswarm (default TRUE).
 Only applies when \code{.split.by != "none"}.}
+
+\item{.order.ids}{Logical whether to order IDs based on dendrogram order (default FALSE).}
 }
 \value{
 A \code{patchwork} object combining plots:

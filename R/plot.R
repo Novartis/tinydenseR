@@ -459,6 +459,7 @@ plotUMAP <-
 #' @param .legend.position Character: "right" (default), "bottom", "left", "top", "none".
 #' @param .perc.plot Logical whether to show cell percentage plot alongside beeswarm (default TRUE). 
 #'   Only applies when \code{.split.by != "none"}.
+#' @param .order.ids Logical whether to order IDs based on dendrogram order (default FALSE).
 #'   
 #' @return A \code{patchwork} object combining plots:
 #'   \describe{
@@ -513,7 +514,8 @@ plotBeeswarm <-
     .col.space.scaler = 0.1,
     .panel.width = 1.5,
     .legend.position = "right",
-    .perc.plot = TRUE) {
+    .perc.plot = TRUE,
+    .order.ids = FALSE) {
     
     sig <- adj.p <- facets <- pos.t <- neg.t <- q.bars <- dat.df <- value <- split.by <- .coef <- cell.perc <- pop <- NULL
     
@@ -542,12 +544,23 @@ plotBeeswarm <-
         data.frame(x = as.factor(x = 1),
                    pop = colnames(x = .lm.obj$map[[.split.by]]$cell.perc),
                    cell.perc = Matrix::colMeans(x = .lm.obj$map[[.split.by]]$cell.perc)) |>
+        dplyr::mutate(pop = factor(x = pop,
+                                   levels = if(isTRUE(x = .order.ids)){
+                                     
+                                     .lm.obj$graph[[.split.by]]$pheatmap$tree_row$labels[
+                                       .lm.obj$graph[[.split.by]]$pheatmap$tree_row$order
+                                     ]
+                                     
+                                   } else {
+                                     
+                                     pop
+                                     
+                                   })) |>
         (\(x)
          ggplot2::ggplot(data = x,
                          mapping = ggplot2::aes(x = x,
                                                 y = pop,
                                                 size = cell.perc)) +
-           ggplot2::scale_y_discrete(limits = rev) +
            ggplot2::theme_minimal() +
            ggplot2::theme(legend.margin = ggplot2::margin(t = -10, r = 0, b = 0, l = 0),
                           plot.title = ggplot2::element_text(hjust = 0.5),
@@ -630,51 +643,46 @@ plotBeeswarm <-
         
       }
       
-    } else if(.split.by == "clustering"){
+    } else {
       
-      dat.df <-
-        data.frame(
-          value =
-            .stats.obj$fit$coefficients[!(.lm.obj$graph$clustering$ids %in% 
-                                            .lm.obj$map$cl.ct.to.ign),
-                                        .coefs],
-          sig =
-            ifelse(test = .stats.obj$fit[[.q.from]][,.coefs] < .q,
-                   yes = ifelse(test = .stats.obj$fit$coefficients[,.coefs] > 0,
-                                yes = "more abundant",
-                                no = "less abundant"),
-                   no = "not sig.")[!(.lm.obj$graph$clustering$ids %in% 
-                                        .lm.obj$map$cl.ct.to.ign)],
-          split.by =
-            .lm.obj$graph$clustering$ids[!(.lm.obj$graph$clustering$ids %in% 
-                                             .lm.obj$map$cl.ct.to.ign)] |>
-            as.character()) |>
-        droplevels()
-      
-    } else if(.split.by == "celltyping"){
-      
-      if(is.null(x = .lm.obj$graph$celltyping$ids)){
+      if(.split.by == "celltyping"){
         
-        stop(".lm.obj$graph$celltyping$ids could not be found")
+        if(is.null(x = .lm.obj$graph$celltyping$ids)){
+          
+          stop(".lm.obj$graph$celltyping$ids could not be found")
+          
+        }
         
       }
       
       dat.df <-
         data.frame(
           value =
-            .stats.obj$fit$coefficients[!(.lm.obj$graph$celltyping$ids %in% 
-                                            .lm.obj$map$cl.ct.to.ign),.coefs],
+            .stats.obj$fit$coefficients,
           sig =
             ifelse(test = .stats.obj$fit[[.q.from]][,.coefs] < .q,
                    yes = ifelse(test = .stats.obj$fit$coefficients[,.coefs] > 0,
                                 yes = "more abundant",
                                 no = "less abundant"),
-                   no = "not sig.")[!(.lm.obj$graph$celltyping$ids %in% 
-                                        .lm.obj$map$cl.ct.to.ign)],
+                   no = "not sig."),
           split.by =
-            .lm.obj$graph$celltyping$ids[!(.lm.obj$graph$celltyping$ids %in% 
-                                             .lm.obj$map$cl.ct.to.ign)] |>
-            as.character()) |>
+            as.character(x = .lm.obj$graph[[.split.by]]$ids) |> 
+            factor(levels = if(isTRUE(x = .order.ids)){
+              
+              .lm.obj$graph[[.split.by]]$pheatmap$tree_row$labels[
+                .lm.obj$graph[[.split.by]]$pheatmap$tree_row$order
+              ]
+            
+              } else {
+              
+              levels(x = .lm.obj$graph[[.split.by]]$ids)
+            
+                })
+        ) |> 
+        (\(x)
+         x[!(.lm.obj$graph[[.split.by]]$ids %in% 
+               .lm.obj$map$cl.ct.to.ign),]
+         )() |>
         droplevels()
       
     }
@@ -710,7 +718,6 @@ plotBeeswarm <-
                                  scales = .facet.scales)
            }
          } +
-         ggplot2::scale_y_discrete(limits = rev) +
          ggplot2::geom_point(position = ggplot2::position_jitter(width = 0,
                                                                  height = 0.25),
                              size = I(x = .point.size)) +
@@ -1081,6 +1088,7 @@ plotSamplePCA <-
 #' @param .row.space.scaler Numeric scaling for row height (default 0.2 inches per population).
 #' @param .col.space.scaler Numeric scaling for column width (default 0.5 inches per coefficient).
 #' @param .label.substr.rm Character substring to remove from labels (default "").
+#' @param .order.ids Logical whether to order IDs based on dendrogram order (default FALSE).
 #'   
 #' @return A \code{patchwork} object combining two plots: (1) a dot plot showing mean cell 
 #'   percentages per population, and (2) a heatmap showing log fold changes colored by magnitude 
@@ -1123,7 +1131,8 @@ plotTradStats <-
     .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.07,
-    .label.substr.rm = ""
+    .label.substr.rm = "",
+    .order.ids = FALSE
   ){
     
     sig.shape <- sig <- adj.p <- level <- pop <- term <- coef <- cell.perc <- NULL
@@ -1137,12 +1146,24 @@ plotTradStats <-
       data.frame(x = as.factor(x = 1),
                  pop = colnames(x = .lm.obj$map[[.split.by]]$cell.perc),
                  cell.perc = Matrix::colMeans(x = .lm.obj$map[[.split.by]]$cell.perc)) |>
+      dplyr::mutate(pop = factor(x = pop,
+                                 levels = if(isTRUE(x = .order.ids)){
+                                   
+                                   .lm.obj$graph[[.split.by]]$pheatmap$tree_row$labels[
+                                     .lm.obj$graph[[.split.by]]$pheatmap$tree_row$order
+                                   ]
+                                   
+                                 } else {
+                                   
+                                   pop
+                                   
+                                 })) |>
+      droplevels() |>
       (\(x)
        ggplot2::ggplot(data = x,
                        mapping = ggplot2::aes(x = x,
                                               y = pop,
                                               size = cell.perc)) +
-         ggplot2::scale_y_discrete(limits = rev) +
          ggplot2::theme_minimal() +
          ggplot2::theme(legend.margin = ggplot2::margin(t = -10, r = 0, b = 0, l = 0),
                         plot.title = ggplot2::element_text(hjust = 0.5),
@@ -1206,6 +1227,22 @@ plotTradStats <-
               levels = unique(x = x))
       )()
     
+    dat.df <-
+      dat.df |>
+      dplyr::mutate(pop = factor(x = pop,
+                                 levels = if(isTRUE(x = .order.ids)){
+                                   
+                                   .lm.obj$graph[[.split.by]]$pheatmap$tree_row$labels[
+                                     .lm.obj$graph[[.split.by]]$pheatmap$tree_row$order
+                                   ]
+                                   
+                                 } else {
+                                   
+                                   pop
+                                   
+                                 })) |>
+      droplevels()
+      
     other.plot <-
       ggplot2::ggplot(data = dat.df,
                       mapping = ggplot2::aes(x = term,
@@ -1219,7 +1256,6 @@ plotTradStats <-
                                                                        stroke = NA),
                                                    order = 2),
                       fill = ggplot2::guide_colorbar(order = 3)) +
-      ggplot2::scale_y_discrete(limits = rev) +
       ggplot2::theme_minimal() +
       ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
                      plot.subtitle = ggplot2::element_text(hjust = 0.5),

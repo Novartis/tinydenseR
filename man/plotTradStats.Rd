@@ -12,7 +12,8 @@ plotTradStats(
   .q = 0.1,
   .row.space.scaler = 0.2,
   .col.space.scaler = 0.07,
-  .label.substr.rm = ""
+  .label.substr.rm = "",
+  .order.ids = FALSE
 )
 }
 \arguments{
@@ -32,6 +33,8 @@ traditional model.}
 \item{.col.space.scaler}{Numeric scaling for column width (default 0.5 inches per coefficient).}
 
 \item{.label.substr.rm}{Character substring to remove from labels (default "").}
+
+\item{.order.ids}{Logical whether to order IDs based on dendrogram order (default FALSE).}
 }
 \value{
 A \code{patchwork} object combining two plots: (1) a dot plot showing mean cell
