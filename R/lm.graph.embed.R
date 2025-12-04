@@ -1068,12 +1068,12 @@ get.map <-
         )() |>
         unique()
       
-      .lm.obj$graph$celltyping$mean.exprs <-
+      .lm.obj$graph$celltyping$median.exprs <-
         (if(.lm.obj$assay.type == "RNA") .lm.obj$scaled.lm[,top] else .lm.obj$lm) |>
         dplyr::as_tibble() |>
         cbind(cell.pop = as.character(x = .lm.obj$graph$celltyping$ids)) |>
         dplyr::group_by(cell.pop) |>
-        dplyr::summarize_all(.funs = mean) |>
+        dplyr::summarize_all(.funs = stats::median) |>
         as.data.frame() |>
         (\(x)
          `rownames<-`(x = x[,colnames(x = x) != "cell.pop"],
@@ -1082,7 +1082,7 @@ get.map <-
         as.matrix()
       
       .lm.obj$graph$celltyping$pheatmap <-
-        pheatmap::pheatmap(mat = .lm.obj$graph$celltyping$mean.exprs,
+        pheatmap::pheatmap(mat = .lm.obj$graph$celltyping$median.exprs,
                            color = grDevices::colorRampPalette(
                              unname(obj =
                                       Color.Palette[1,c(1,6,2)]))(100),
@@ -1386,13 +1386,13 @@ lm.cluster <-
       
     }
     
-    # Compute mean expression per cluster
-    .lm.obj$graph$clustering$mean.exprs <-
+    # Compute median expression per cluster
+    .lm.obj$graph$clustering$median.exprs <-
       (if(.lm.obj$assay.type == "RNA") .lm.obj$scaled.lm[,top] else .lm.obj$lm) |>
       dplyr::as_tibble() |>
       cbind(cell.pop = as.character(x = .lm.obj$graph$clustering$ids)) |>
       dplyr::group_by(cell.pop) |>
-      dplyr::summarize_all(.funs = mean) |>
+      dplyr::summarize_all(.funs = stats::median) |>
       as.data.frame() |>
       (\(x)
        `rownames<-`(x = x[,colnames(x = x) != "cell.pop"],
@@ -1402,7 +1402,7 @@ lm.cluster <-
     
     # Generate heatmap of cluster profiles
     .lm.obj$graph$clustering$pheatmap <-
-      pheatmap::pheatmap(mat = .lm.obj$graph$clustering$mean.exprs,
+      pheatmap::pheatmap(mat = .lm.obj$graph$clustering$median.exprs,
                          color = grDevices::colorRampPalette(
                            unname(obj =
                                     Color.Palette[1,c(1,6,2)]))(100),
@@ -1411,7 +1411,7 @@ lm.cluster <-
                          border_color = NA,
                          scale = "none",
                          angle_col = 90,
-                         cluster_rows = if(nrow(x = .lm.obj$graph$clustering$mean.exprs) > 1) TRUE else FALSE,
+                         cluster_rows = if(nrow(x = .lm.obj$graph$clustering$median.exprs) > 1) TRUE else FALSE,
                          cluster_cols = TRUE,
                          cellwidth = 20,
                          cellheight = 20,

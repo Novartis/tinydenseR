@@ -2,7 +2,7 @@ citHeader("To cite tinydenseR in publications use:")
 
 citEntry(
   entry = "Manual",
-  title = "tinydenseR: Linking Cell-To-Cell Variation to Sample-to-Sample Variation",
+  title = "Sample-level modeling of single-cell data at scale with tinydenseR",
   author = c(
     person("Pedro", "Milanez-Almeida", email = "Pedro.Milanez@Novartis.com"),
     person("Daniela", "Schildknecht"),
@@ -24,11 +24,11 @@ citEntry(
   ),
   year = "2025",
   note = "R package version 0.0.1.0008",
-  url = "https://github.com/Novartis/tinydenseR",
+  url = "https://www.biorxiv.org/content/10.1101/2025.11.26.690752v1",
+  doi = "https://doi.org/10.1101/2025.11.26.690752",
   textVersion = paste(
     "Milanez-Almeida, P. et al. (2025).",
-    "tinydenseR: Linking Cell-To-Cell Variation to Sample-to-Sample Variation.",
-    "R package version 0.0.1.0008.",
-    "URL https://github.com/Novartis/tinydenseR"
+    "Sample-level modeling of single-cell data at scale with tinydenseR.",
+    "bioRxiv https://doi.org/10.1101/2025.11.26.690752"
   )
 )

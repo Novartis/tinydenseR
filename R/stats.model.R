@@ -308,7 +308,11 @@ get.stats <-
               }
               return(adjp)
               
-            })
+            }) |>
+      (\(x)
+       `dimnames<-`(x = x,
+                    value = dimnames(x = stats$fit$p.value))
+      )()
     
     if(isTRUE(x = .verbose)){
       message("\nretrieving PCA-weighted q-values")
@@ -387,6 +391,11 @@ get.stats <-
       apply(X = stats$fit$p.value,
             MARGIN = 2,
             FUN = function(pvalues){
+              
+              if((is.na(x = pvalues) |> mean()) == 1){
+                return(rep(x = NA_real_,
+                           length.out = length(x = pvalues)))
+              }
               
               if(length(x = pvalues) < 100){
                 

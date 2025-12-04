@@ -47,6 +47,8 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# RStudio Project
 tinydenseR.Rproj
 
 # macOS

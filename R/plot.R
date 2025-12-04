@@ -570,12 +570,7 @@ plotBeeswarm <-
                          y = "",
                          size = "%") +
            ggplot2::scale_x_discrete(labels = "mean % across\nall samples") +
-           {
-             if(isFALSE(x = .order.ids)){
-               ggplot2::scale_y_discrete(limits = rev)
-             }
-               
-           } +
+           ggplot2::scale_y_discrete(limits = rev) +
            ggplot2::scale_size_continuous(range = log2(x = x$cell.perc + 1) |>
                                             range() |>
                                             I()) +
@@ -736,12 +731,7 @@ plotBeeswarm <-
                                  scales = .facet.scales)
            }
          } +
-         {
-           if(isFALSE(x = .order.ids)){
-             ggplot2::scale_y_discrete(limits = rev)
-           }
-           
-         } +
+         ggplot2::scale_y_discrete(limits = rev) +
          ggplot2::geom_point(position = ggplot2::position_jitter(width = 0,
                                                                  height = 0.25),
                              size = I(x = .point.size)) +
@@ -898,7 +888,7 @@ plot2Markers <-
       
       dat.df <-
         (.lm.obj$lm[if(!is.null(x = .id)) .id else 1:nrow(x = .lm.obj$lm),
-                    colnames(x = .lm.obj$lm) %in% c(.x.feature,.y.feature)]/50) |>
+                    colnames(x = .lm.obj$lm) %in% c(.x.feature,.y.feature)]) |>
         as.data.frame()
       
     }
@@ -936,7 +926,7 @@ plot2Markers <-
       
       p <-
         p  +
-        ggplot2::stat_density_2d(data = as.data.frame(x = .lm.obj$lm / (if(.lm.obj$assay.type == "RNA") 1 else 50)),
+        ggplot2::stat_density_2d(data = as.data.frame(x = .lm.obj$lm),
                                  mapping = ggplot2::aes(fill = ggplot2::after_stat(x = log2(x = level))),
                                  geom = "polygon",
                                  bins = .density.bins) +
@@ -1197,12 +1187,7 @@ plotTradStats <-
                        y = "",
                        size = "%") +
          ggplot2::scale_x_discrete(labels = "mean % across\nall samples") +
-         {
-           if(isFALSE(x = .order.ids)){
-             ggplot2::scale_y_discrete(limits = rev)
-           }
-           
-         } +
+         ggplot2::scale_y_discrete(limits = rev) +
          ggplot2::scale_size_continuous(range = log2(x = x$cell.perc + 1) |>
                                           range()) +
          ggplot2::geom_point() +
@@ -1296,23 +1281,13 @@ plotTradStats <-
       ggplot2::scale_fill_gradient2(low = unname(obj = Color.Palette[1,1]),
                                     mid = unname(obj = Color.Palette[1,6]),
                                     high = unname(obj = Color.Palette[1,2]),
-                                    midpoint = 0#,
-                                    #labels = ~ ifelse(test = .x >= 0,
-                                    #                  yes = round(x = 2^.x,
-                                    #                              digits = 1),
-                                    #                  no = -round(x = 1 / 2^.x,
-                                    #                              digits = 1))
+                                    midpoint = 0
       ) +
       ggplot2::scale_size_continuous(labels = ~ formatC(x = 10^(-(.x)),
                                                         format = "g",
                                                         digits = 1),
                                      range = I(x = c(3,6))) +
-      {
-        if(isFALSE(x = .order.ids)){
-          ggplot2::scale_y_discrete(limits = rev)
-        }
-        
-      } +
+      ggplot2::scale_y_discrete(limits = rev) +
       ggplot2::geom_point(shape = 21,
                           mapping = ggplot2::aes(size = -log10(x = adj.p)),
                           color = "black",
@@ -1360,10 +1335,12 @@ plotTradStats <-
 #'
 #' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
 #' @param .x.split Character specifying metadata column for x-axis grouping. Defaults to first 
-#'   column (often "Condition").
+#'   column.
+#' @param .x.split.subset Optional character vector to subset \code{.x.split} categories. Default NULL.
 #' @param .pop Character vector of population names to plot. If NULL, plots all populations from 
 #'   \code{.pop.from}.
 #' @param .pop.from Character: "clustering" (default) or "celltyping" - which grouping to plot.
+#' @param .order.pop Logical whether to order populations based on dendrogram order (default FALSE).
 #' @param .line.by Character metadata column for connecting paired samples with lines (e.g., 
 #'   "Subject" for longitudinal data). Default NULL (no lines).
 #' @param .dodge.by Character metadata column for coloring/dodging points. Default NULL (all black).
@@ -1373,6 +1350,7 @@ plotTradStats <-
 #'   \code{Color.Palette[1,1:5]}).
 #' @param .seed Integer random seed for x-axis jitter (default 123).
 #' @param .orientation Character: "wide" (default, all populations in one row) or "square" (facet grid).
+#' @param .log2.y Logical whether to log2-transform y-axis percentages (default FALSE).
 #'   
 #' @return A \code{ggplot} object showing cell percentages with optional paired connections.
 #'   
@@ -1413,15 +1391,18 @@ plotTradPerc <-
   function(
     .lm.obj,
     .x.split = colnames(x = .lm.obj$metadata)[1],
+    .x.split.subset = NULL,
     .pop = NULL,
     .pop.from = "clustering",
+    .order.pop = FALSE,
     .line.by = NULL,
     .dodge.by = NULL,
     .x.space.scaler = 0.25,
     .height = 1.5,
     .cat.feature.color = Color.Palette[1,1:5],
     .seed = 123,
-    .orientation = "wide"
+    .orientation = "wide",
+    .log2.y = FALSE
   ){
     
     dodge <- value <- name <- color <- group <- x <- y <- NULL
@@ -1434,6 +1415,14 @@ plotTradPerc <-
       stop(paste0(".x.split must be one of the following: ",
                   paste(x = colnames(x = .lm.obj$metadata),
                         collapse = ", ")))
+    }
+    
+    if(!is.null(x = .x.split.subset)){
+      if(!all(.x.split.subset %in% .lm.obj$metadata[[.x.split]])){
+        stop(paste0(".x.split.subset must within the following: ",
+                    paste(x = unique(x = .lm.obj$metadata[[.x.split]]),
+                          collapse = ", ")))
+      }
     }
     
     if(!is.null(x = .dodge.by)){
@@ -1503,6 +1492,23 @@ plotTradPerc <-
       
       dat.df$value <-
         .lm.obj$map[[.pop.from]]$cell.perc[,.pop]
+      
+    }
+    
+    if(!is.null(x = .x.split.subset)){
+      
+      dat.df <- 
+        droplevels(x = dat.df[dat.df$x %in% .x.split.subset,])
+      
+    }
+    
+    if(isTRUE(x = .order.pop)){
+      
+      dat.df$name <-
+        as.character(x = dat.df$name) |>
+        factor(levels = .lm.obj$graph[[.pop.from]]$pheatmap$tree_row$labels[
+          .lm.obj$graph[[.pop.from]]$pheatmap$tree_row$order
+        ])
       
     }
     
@@ -1577,6 +1583,12 @@ plotTradPerc <-
                             position = ggplot2::position_jitter(width = 0.2,
                                                                 height = 0,
                                                                 seed = .seed))
+    }
+    
+    if(isTRUE(x = .log2.y)){
+      p <-
+        p +
+        ggplot2::scale_y_continuous(transform = "log2")
     }
     
     p

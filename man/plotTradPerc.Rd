@@ -7,27 +7,34 @@
 plotTradPerc(
   .lm.obj,
   .x.split = colnames(x = .lm.obj$metadata)[1],
+  .x.split.subset = NULL,
   .pop = NULL,
   .pop.from = "clustering",
+  .order.pop = FALSE,
   .line.by = NULL,
   .dodge.by = NULL,
   .x.space.scaler = 0.25,
   .height = 1.5,
   .cat.feature.color = Color.Palette[1, 1:5],
   .seed = 123,
-  .orientation = "wide"
+  .orientation = "wide",
+  .log2.y = FALSE
 )
 }
 \arguments{
 \item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
 
 \item{.x.split}{Character specifying metadata column for x-axis grouping. Defaults to first
-column (often "Condition").}
+column.}
+
+\item{.x.split.subset}{Optional character vector to subset \code{.x.split} categories. Default NULL.}
 
 \item{.pop}{Character vector of population names to plot. If NULL, plots all populations from
 \code{.pop.from}.}
 
 \item{.pop.from}{Character: "clustering" (default) or "celltyping" - which grouping to plot.}
+
+\item{.order.pop}{Logical whether to order populations based on dendrogram order (default FALSE).}
 
 \item{.line.by}{Character metadata column for connecting paired samples with lines (e.g.,
 "Subject" for longitudinal data). Default NULL (no lines).}
@@ -44,6 +51,8 @@ column (often "Condition").}
 \item{.seed}{Integer random seed for x-axis jitter (default 123).}
 
 \item{.orientation}{Character: "wide" (default, all populations in one row) or "square" (facet grid).}
+
+\item{.log2.y}{Logical whether to log2-transform y-axis percentages (default FALSE).}
 }
 \value{
 A \code{ggplot} object showing cell percentages with optional paired connections.
