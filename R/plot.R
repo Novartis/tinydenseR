@@ -1314,13 +1314,17 @@ plotTradStats <-
                              "all > ",
                              .q,
                              ")")} else "q") +
-      ggh4x::force_panelsizes(col = grid::unit(x = (as.character(x = dat.df$term) |> unique() |> nchar() |> max()) *
-                                                 (unique(x = dat.df$term) |> length()) *
-                                                 .col.space.scaler,
-                                               units = "in"),
-                              rows = grid::unit(x = pmax((unique(x = dat.df$pop) |> length()) * .row.space.scaler,
-                                                         3.5),
-                                                units = "in"))
+      ggh4x::force_panelsizes(
+        col = grid::unit(x = pmax(
+          (as.character(x = dat.df$term) |> unique() |> nchar() |> max(na.rm = TRUE)) *
+            (unique(x = dat.df$term) |> length()) *
+            .col.space.scaler,
+          0.5, 
+          na.rm = TRUE),
+          units = "in"),
+        rows = grid::unit(x = pmax((unique(x = dat.df$pop) |> length()) * .row.space.scaler,
+                                   3.5),
+                          units = "in"))
     
     patchwork::wrap_plots(perc.plot + other.plot, 
                           ncol = 2)
@@ -1805,7 +1809,8 @@ plotAbundance <-
 #'
 #' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
 #' @param .dea.obj Differential expression results from \code{get.dea()}.
-#' @param .coefs Character vector of coefficient names to plot.
+#' @param .coefs Character vector of coefficient names to plot. Defaults to all coefficients in 
+#'   \code{.dea.obj}.
 #' @param .order.by Character: "clustering" (default) or "celltyping" - order rows by mean expression 
 #'   in these groups.
 #' @param .markers Character vector of feature names (genes/proteins) to plot. Defaults to features 
@@ -1853,9 +1858,9 @@ plotDEA <-
   function(
     .lm.obj,
     .dea.obj,
-    .coefs,
+    .coefs = colnames(x = .dea.obj$coefficients),
     .order.by = "clustering",
-    .markers = colnames(x = .lm.obj$graph[[.order.by]]$mean.exprs),
+    .markers = colnames(x = .lm.obj$graph[[.order.by]]$median.exprs),
     .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.065,
@@ -1990,13 +1995,18 @@ plotDEA <-
                              "all > ",
                              .q,
                              ")")} else "adj.p") +
-      ggh4x::force_panelsizes(col = grid::unit(x = (as.character(x = dat.df$term) |> unique() |> nchar() |> max()) *
-                                                 (unique(x = dat.df$term) |> length()) *
-                                                 .col.space.scaler,
-                                               units = "in"),
-                              rows = grid::unit(x = pmax((unique(x = dat.df$marker) |> length()) * .row.space.scaler,
-                                                         3.5),
-                                                units = "in"))
+      ggh4x::force_panelsizes(
+        col = grid::unit(x = pmax(
+          (as.character(x = dat.df$term) |> unique() |> nchar() |> max(na.rm = TRUE)) *
+            (unique(x = dat.df$term) |> length()) *
+            .col.space.scaler,
+          0.5, 
+          na.rm = TRUE),
+          units = "in"),
+        rows = grid::unit(x = pmax((unique(x = dat.df$marker) |> length()) * .row.space.scaler,
+                                   3.5, 
+                                   na.rm = TRUE),
+                          units = "in"))
     
     return(other.plot)
     

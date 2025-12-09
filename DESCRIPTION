@@ -9,12 +9,17 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
+VignetteBuilder: knitr
 Depends: 
     R (>= 4.1)
 LazyData: true
 Suggests: 
     testthat (>= 3.0.0),
-    ggiraph
+    ggiraph,
+    rmarkdown,
+    ggpubr,
+    rstatix,
+    hexbin
 Config/testthat/edition: 3
 Imports: 
     curl,

@@ -7,9 +7,9 @@
 plotDEA(
   .lm.obj,
   .dea.obj,
-  .coefs,
+  .coefs = colnames(x = .dea.obj$coefficients),
   .order.by = "clustering",
-  .markers = colnames(x = .lm.obj$graph[[.order.by]]$mean.exprs),
+  .markers = colnames(x = .lm.obj$graph[[.order.by]]$median.exprs),
   .q = 0.1,
   .row.space.scaler = 0.2,
   .col.space.scaler = 0.065,
@@ -21,7 +21,8 @@ plotDEA(
 
 \item{.dea.obj}{Differential expression results from \code{get.dea()}.}
 
-\item{.coefs}{Character vector of coefficient names to plot.}
+\item{.coefs}{Character vector of coefficient names to plot. Defaults to all coefficients in
+\code{.dea.obj}.}
 
 \item{.order.by}{Character: "clustering" (default) or "celltyping" - order rows by mean expression
 in these groups.}

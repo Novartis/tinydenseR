@@ -8,3 +8,5 @@
 ^NOTICE$
 ^artwork$
 ^codecov\.yml$
+^doc$
+^Meta$

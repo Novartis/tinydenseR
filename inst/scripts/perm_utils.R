@@ -14,7 +14,7 @@ count_discoveries <-
     q_vals <- 
       stats_obj$fit$pca.weighted.q[, coef_name]
     
-    tibble::tibble(
+    dplyr::tibble(
       m_tests = length(x = q_vals),
       n_sig   = sum(q_vals <= alpha, 
                     na.rm = TRUE),

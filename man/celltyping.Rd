@@ -26,7 +26,7 @@ The \code{.lm.obj} with the following updated fields:
 \describe{
 \item{\code{$graph$celltyping$ids}}{Factor vector of cell type labels
 for each landmark}
-\item{\code{$graph$celltyping$mean.exprs}}{Matrix of mean expression
+\item{\code{$graph$celltyping$median.exprs}}{Matrix of mean expression
 values per cell type (rows) by features (columns). For RNA data,
 displays z-scored expression of top PC-loading genes. For cytometry
 data, shows z-scored marker intensities.}

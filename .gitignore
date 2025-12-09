@@ -53,3 +53,5 @@ tinydenseR.Rproj
 
 # macOS
 .DS_Store
+/doc/
+/Meta/

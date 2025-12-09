@@ -794,18 +794,14 @@ get.dea <-
           
         }
         
-        .id.idx <-
-          lapply(X = .lm.obj$map[[.id.from]]$ids,
-                 FUN = function(smpl){
-                   which(x = smpl %in% .id)
-                 })
-        
+        .lm.idx <-
+          which(x = .lm.obj$graph[[.id.from]]$ids %in% .id)
+
       } else {
         
-        .id.idx <-
-          lapply(X = .lm.obj$map$nearest.landmarks,
-                 FUN = nrow) |>
-          lapply(FUN = seq_len)
+        .lm.idx <-
+          nrow(x = .lm.obj$lm) |>
+          seq_len()
         
       }
     } else {
@@ -815,16 +811,18 @@ get.dea <-
                     nrow(x = .lm.obj$lm)))
       }
       
-      .id.idx <-
-        lapply(X = .lm.obj$map$nearest.landmarks,
-               FUN = function(smpl.knn)
-                 which(x = smpl.knn[,1] %in% .id.idx))
-      
+      .lm.idx <-
+        .id.idx 
+
     }
     
     # number of cells in each pseudobulk
     n.pseudo <-
-      lengths(x = .id.idx)
+      lapply(X = .lm.obj$map$nearest.landmarks,
+             FUN = function(smpl){
+               sum(smpl[,1,drop = TRUE] %in% .lm.idx)
+             }) |>
+      unlist()
     
     # remove outlier samples with too few cells
     smpl.outlier <-
@@ -839,9 +837,6 @@ get.dea <-
                              collapse = "\n")))
       }
       
-      .id.idx <-
-        .id.idx[!smpl.outlier]
-      
       counts <-
         stats::setNames(object = names(x = .lm.obj$cells)[!smpl.outlier],
                         nm = names(x = .lm.obj$cells)[!smpl.outlier]) |>
@@ -850,8 +845,11 @@ get.dea <-
           exprs.mat <-
             readRDS(file = .lm.obj$cells[[smpl]])
           
+          .idx <-
+            .lm.obj$map$nearest.landmarks[[smpl]][,1,drop = TRUE] %in% .lm.idx
+            
           res <-
-            Matrix::rowSums(x = exprs.mat[,.id.idx[[smpl]],drop = FALSE])
+            Matrix::rowSums(x = exprs.mat[,.idx,drop = FALSE])
           
           return(res)
           
@@ -1005,25 +1003,17 @@ get.dea <-
                         nm = names(x = .lm.obj$cells)) |>#[!smpl.outlier]) |>
         lapply(FUN = function(smpl){
           
-          if(isTRUE(x = .verbose)){
-            which(x = names(x = .lm.obj$cells) == smpl) |> 
-              (\(x)
-               paste0("progress: ",
-                      round(x = x * 100 / length(x = .lm.obj$cells),
-                            digits = 2),
-                      "%")
-              )()|> 
-              message()
-          }
-          
           exprs.mat <-
             readRDS(file = .lm.obj$cells[[smpl]])
           
           exprs.mat <-
             exprs.mat[,colnames(x = .lm.obj$lm)]
           
+          .idx <-
+            .lm.obj$map$nearest.landmarks[[smpl]][,1,drop = TRUE] %in% .lm.idx
+          
           res <-
-            matrixStats::colMedians(x = exprs.mat[.id.idx[[smpl]],,drop = FALSE])
+            matrixStats::colMedians(x = exprs.mat[.idx,,drop = FALSE])
           
           return(res)
           

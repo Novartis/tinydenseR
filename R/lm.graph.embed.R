@@ -370,7 +370,7 @@ fast.jaccard.r <-
 #'       \code{$vectors}, \code{$values}, \code{$converged}, \code{$nontriv} (non-trivial eigenvalue indices), 
 #'       \code{$elbow} (selected dimensionality), \code{$keep} (retained eigenvectors), and \code{$embed} 
 #'       (final normalized embedding). Used for clustering initialization only.
-#'     \item \code{clustering}: List containing \code{$ids} (factor of cluster assignments), \code{$mean.exprs} 
+#'     \item \code{clustering}: List containing \code{$ids} (factor of cluster assignments), \code{$median.exprs} 
 #'       (matrix of mean expression per cluster), and \code{$pheatmap} (heatmap object).
 #'   }
 #'   
@@ -646,7 +646,7 @@ get.graph <-
 #'       from statistics (NULL if none).
 #'   }
 #'   If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with list containing \code{$ids} 
-#'   (factor of cell type assignments for landmarks), \code{$mean.exprs} (matrix of mean expression 
+#'   (factor of cell type assignments for landmarks), \code{$median.exprs} (matrix of mean expression 
 #'   per cell type), and \code{$pheatmap} (heatmap object).
 #'   
 #' @details
@@ -1154,6 +1154,12 @@ get.map <-
       )() |>
       Matrix::t()
     
+    cell.fg <-
+      lapply(X = res,
+             FUN = function(smpl){
+               smpl$fgraph
+             })
+    
     cell.nlmn <-
       lapply(X = res,
              FUN = function(smpl){
@@ -1182,7 +1188,8 @@ get.map <-
       list(fdens = fdens,
            clustering = list(ids = cell.clustering),
            celltyping = list(ids = cell.celltyping),
-           nearest.landmarks = cell.nlmn)
+           nearest.landmarks = cell.nlmn,
+           connect.prob = cell.fg)
     
     .lm.obj$map$clustering$cell.count <-
       seq_along(along.with = .lm.obj$map$clustering$ids) |>
@@ -1283,7 +1290,7 @@ get.map <-
 #' @return Updated \code{.lm.obj} with \code{$graph$clustering} containing:
 #'   \itemize{
 #'     \item \code{ids}: Factor of cluster assignments for each landmark
-#'     \item \code{mean.exprs}: Matrix of mean expression per cluster. For RNA: top features 
+#'     \item \code{median.exprs}: Matrix of mean expression per cluster. For RNA: top features 
 #'       from PCA rotation (6 genes per PC: 3 highest, 3 lowest loadings). For cytometry: all markers.
 #'     \item \code{pheatmap}: Heatmap object showing cluster profiles
 #'   }

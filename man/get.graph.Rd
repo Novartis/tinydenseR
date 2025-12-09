@@ -57,7 +57,7 @@ Updated \code{.lm.obj} with \code{$graph} component containing:
 \code{$vectors}, \code{$values}, \code{$converged}, \code{$nontriv} (non-trivial eigenvalue indices),
 \code{$elbow} (selected dimensionality), \code{$keep} (retained eigenvectors), and \code{$embed}
 (final normalized embedding). Used for clustering initialization only.
-\item \code{clustering}: List containing \code{$ids} (factor of cluster assignments), \code{$mean.exprs}
+\item \code{clustering}: List containing \code{$ids} (factor of cluster assignments), \code{$median.exprs}
 (matrix of mean expression per cluster), and \code{$pheatmap} (heatmap object).
 }
 }

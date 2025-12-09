@@ -68,7 +68,7 @@
 #'   \describe{
 #'     \item{\code{$graph$celltyping$ids}}{Factor vector of cell type labels 
 #'       for each landmark}
-#'     \item{\code{$graph$celltyping$mean.exprs}}{Matrix of mean expression 
+#'     \item{\code{$graph$celltyping$median.exprs}}{Matrix of mean expression 
 #'       values per cell type (rows) by features (columns). For RNA data, 
 #'       displays z-scored expression of top PC-loading genes. For cytometry 
 #'       data, shows z-scored marker intensities.}
@@ -182,7 +182,7 @@ celltyping <-
       
     }
     
-    .lm.obj$graph$celltyping$mean.exprs <-
+    .lm.obj$graph$celltyping$median.exprs <-
       (if(.lm.obj$assay.type == "RNA") .lm.obj$scaled.lm[,top] else .lm.obj$lm) |>
       dplyr::as_tibble() |>
       cbind(cell.pop = as.character(x = .lm.obj$graph$celltyping$ids)) |>
@@ -196,7 +196,7 @@ celltyping <-
       as.matrix()
     
     .lm.obj$graph$celltyping$pheatmap <-
-      pheatmap::pheatmap(mat = .lm.obj$graph$celltyping$mean.exprs,
+      pheatmap::pheatmap(mat = .lm.obj$graph$celltyping$median.exprs,
                          color = grDevices::colorRampPalette(
                            unname(obj =
                                     Color.Palette[1,c(1,6,2)]))(100),

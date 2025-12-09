@@ -56,7 +56,7 @@ for all cells from UMAP transform.
 from statistics (NULL if none).
 }
 If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with list containing \code{$ids}
-(factor of cell type assignments for landmarks), \code{$mean.exprs} (matrix of mean expression
+(factor of cell type assignments for landmarks), \code{$median.exprs} (matrix of mean expression
 per cell type), and \code{$pheatmap} (heatmap object).
 }
 \description{

@@ -34,7 +34,7 @@ than this are merged into most connected neighbors.}
 Updated \code{.lm.obj} with \code{$graph$clustering} containing:
 \itemize{
 \item \code{ids}: Factor of cluster assignments for each landmark
-\item \code{mean.exprs}: Matrix of mean expression per cluster. For RNA: top features
+\item \code{median.exprs}: Matrix of mean expression per cluster. For RNA: top features
 from PCA rotation (6 genes per PC: 3 highest, 3 lowest loadings). For cytometry: all markers.
 \item \code{pheatmap}: Heatmap object showing cluster profiles
 }
