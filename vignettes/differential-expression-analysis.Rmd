@@ -1,0 +1,562 @@
+---
+title: "Differential Expression Analysis with tinydenseR"
+author: "Pedro Milanez-Almeida"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+vignette: >
+  %\VignetteIndexEntry{Differential Expression Analysis with tinydenseR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE,
+  dpi = 300,
+  out.width = "100%"
+)
+```
+
+## Introduction
+
+Differential expression (DE) analysis identifies changes in gene or protein expression that define differential cell states between experimental conditions.
+
+### What is Differential Expression Analysis?
+
+In single-cell experiments, we often want to know:
+
+- Which markers change expression in response to treatment within a specific cell type?
+- How do activation or differentiation states alter the molecular profile of cells?
+- Are these expression changes statistically significant after accounting for technical variation?
+
+Traditional approaches often treat **cells as biological replicates** rather than samples. This can be problematic because:
+
+1. **Pseudo-replication** - Individual cells within a sample are not independent observations
+2. **Inflated statistical power** - Treating thousands of cells as replicates leads to artificially small p-values
+3. **Exaggeration of noise in biological systems** - Sample-to-sample variation is the true measure of biological effect
+
+**Pseudo-bulking** (aggregating cells within samples) is considered the gold standard for addressing these issues, but requires appropriate grouping of cells into meaningful populations.
+
+### The tinydenseR Approach
+
+`tinydenseR` uses a landmark-based framework that:
+
+- Represents the cell population landscape with data-driven selection of landmark cells
+- Maps all cells to their nearest landmarks
+- Aggregates expression across landmark **using samples as biological replicates**
+- Tests for differential expression with proper statistical inference
+
+This approach is particularly powerful for:
+
+- scRNA-seq, flow, mass and spectral cytometry data
+- Detecting subtle expression shifts within cell populations
+- Accounting for batch effects and confounders
+- **Maintaining statistical rigor by respecting the true experimental design**
+
+## Simulating Data with Differential Expression
+
+For this tutorial, we'll simulate flow cytometry data where a target cell population shows increased Marker2 expression upon "Activation" compared to "Baseline". The target population remains at a fixed 5% proportion. We'll simulate three scenarios with different expression shifts (0.5, 1, and 2 standard deviations) to verify our simulation design, but **focus our analysis on the most challenging case: the 0.5 SD shift**. This demonstrates tinydenseR's ability to detect subtle expression changes.
+
+### Load Required Packages
+
+```{r load-packages}
+library(tinydenseR)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggpubr)
+library(rstatix)
+library(ggh4x)
+library(Matrix)
+
+set.seed(seed = 42)
+```
+
+### Simulation Parameters
+
+```{r sim-params}
+# Experimental design
+groups <- c("Baseline", "Activation")
+batches <- c("Batch1", "Batch2")
+sd_shifts <- c(0.5, 1, 2)  # SD differences in Marker2 for Activation
+samples_per_group <- 6
+mean_cells <- 50000
+sd_cells <- 500  # Noise in total cell count
+```
+
+### Generate Simulated Data
+
+We'll simulate 5 markers where:
+
+- **Marker1, Marker4, Marker5**: Define the target cell population (high expression, no change with activation)
+- **Marker2**: Shows differential expression in target cells upon activation
+- **Marker3**: Non-informative marker (same distribution across conditions)
+- **Batch effects**: Multiplicative noise added to Batch2 samples
+
+```{r simulate-data}
+# Initialize storage
+data_list_DE <- list()
+
+# Simulate data
+for (sd_shift in sd_shifts) {
+  for (group in groups) {
+    for (sample_id in 1:samples_per_group) {
+      batch <- if(sample_id %% 2 == 0) "Batch2" else "Batch1"
+      
+      total_cells <- base::round(x = stats::rnorm(n = 1, mean = mean_cells, sd = sd_cells))
+      total_cells <- base::max(total_cells, 1000)  # Ensure minimum cells
+      
+      # Fixed proportion of target cells (5%)
+      proportion <- 0.05
+      num_interest <- base::round(x = total_cells * proportion)
+      num_other <- total_cells - num_interest
+      cell_types <- base::sample(x = c(base::rep(x = "target", times = num_interest), 
+                                        base::rep(x = "other", times = num_other)))
+      
+      # Simulate expression data
+      marker1 <- base::numeric(length = total_cells)
+      marker2 <- base::numeric(length = total_cells)
+      marker3 <- stats::rlnorm(n = total_cells, meanlog = 0, sdlog = 2.5)
+      marker4 <- base::numeric(length = total_cells)  
+      marker5 <- base::numeric(length = total_cells)  
+      
+      # Assign marker expression based on cell type
+      # Marker1, 4, 5: Define target population (no treatment effect)
+      marker1[cell_types == "other"] <- stats::rlnorm(n = base::sum(cell_types == "other"), 
+                                                       meanlog = 0, sdlog = 2)
+      marker1[cell_types == "target"] <- stats::rlnorm(n = base::sum(cell_types == "target"), 
+                                                        meanlog = 5, sdlog = 2)
+      
+      marker4[cell_types == "other"] <- stats::rlnorm(n = base::sum(cell_types == "other"), 
+                                                       meanlog = 0, sdlog = 1.2)
+      marker4[cell_types == "target"] <- stats::rlnorm(n = base::sum(cell_types == "target"), 
+                                                        meanlog = 3, sdlog = 1.2)
+      
+      marker5[cell_types == "other"] <- stats::rlnorm(n = base::sum(cell_types == "other"), 
+                                                       meanlog = 0, sdlog = 1.8)
+      marker5[cell_types == "target"] <- stats::rlnorm(n = base::sum(cell_types == "target"), 
+                                                        meanlog = 7, sdlog = 1.8)
+      
+      # Marker2: Differential expression in target cells only
+      marker2[cell_types == "other"] <- stats::rlnorm(n = base::sum(cell_types == "other"), 
+                                                       meanlog = 0, sdlog = 1.5)
+      if (group == "Baseline") {
+        marker2[cell_types == "target"] <- stats::rlnorm(n = base::sum(cell_types == "target"), 
+                                                          meanlog = 0, sdlog = 1.5)
+      } else {
+        marker2[cell_types == "target"] <- stats::rlnorm(n = base::sum(cell_types == "target"), 
+                                                          meanlog = sd_shift, sdlog = 1.5)
+      }
+      
+      # Add batch effect
+      if (batch == "Batch2") {
+        marker1 <- marker1 * stats::rlnorm(n = total_cells, meanlog = 0.1, sdlog = 0.5)
+        marker2 <- marker2 * stats::rlnorm(n = total_cells, meanlog = 0.2, sdlog = 0.3)
+        marker3 <- marker3 * stats::rlnorm(n = total_cells, meanlog = 0.3, sdlog = 0.4)
+        marker4 <- marker4 * stats::rlnorm(n = total_cells, meanlog = 0.4, sdlog = 0.3)
+        marker5 <- marker5 * stats::rlnorm(n = total_cells, meanlog = 0.5, sdlog = 0.5)
+      }
+      
+      sample_name <- base::paste0(group, "_S", sample_id, "_Shift", sd_shift, "SD")
+      df <- base::data.frame(
+        Sample = sample_name,
+        Treatment = group,
+        Batch = batch,
+        SD_Shift = base::paste0(sd_shift, "SD"),
+        CellType = cell_types,
+        Marker1 = marker1,
+        Marker2 = marker2,
+        Marker3 = marker3,
+        Marker4 = marker4,
+        Marker5 = marker5
+      )
+      data_list_DE[[base::length(x = data_list_DE) + 1]] <- df
+    }
+  }
+}
+
+# Combine all samples
+final_data_DE <- base::do.call(what = rbind, args = data_list_DE) |>
+  dplyr::mutate(Treatment = base::factor(x = Treatment, levels = c("Baseline", "Activation")))
+```
+
+### Visualize Data Structure
+
+Let's take a look at the data structure. Note the marker expression profiles by cell type: the target population is defined by Marker1, Marker4, and Marker5, while Marker2 shows a very small activation-induced upregulation in target cells.
+
+```{r viz-markers}
+final_data_DE |>
+    dplyr::filter(SD_Shift == "0.5SD") |>
+    tidyr::pivot_longer(
+        cols = c(Marker1, Marker2, Marker3, Marker4, Marker5),
+        names_to = "Marker",
+        values_to = "value"
+    ) |>
+    dplyr::mutate(CellType = base::factor(x = CellType, levels = c("target", "other"))) |>
+    ggplot2::ggplot(mapping = ggplot2::aes(x = Marker, 
+                                           y = value,
+                                           fill = CellType)) +
+    ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(hjust = 0.5),
+        legend.position = "right",
+        axis.text.x = ggplot2::element_text(hjust = 1, vjust = 1, angle = 30)
+    ) +
+    ggplot2::labs(
+        title = "Marker Expression by Cell Type and Treatment",
+        x = "", 
+        y = "Expression Level"
+    ) +
+  ggplot2::geom_hline(yintercept = 1,
+                      linetype = "dashed",
+                      color = "red") +
+    ggplot2::scale_fill_manual(values = base::unname(obj = tinydenseR::Color.Palette[1, 1:2])) +
+    ggplot2::scale_y_continuous(transform = "log10",
+                                labels = scales::trans_format(trans = "log10", 
+                                                              format = scales::math_format(10^.x))) + 
+    ggplot2::annotation_logticks(sides = "l") +
+    ggplot2::geom_violin(color = "black",
+                         alpha = 0.5) +
+    ggh4x::force_panelsizes(cols = grid::unit(x = 2, units = "in"), 
+                            rows = grid::unit(x = 2, units = "in"))
+```
+
+### Verify Ground Truth Expression Change
+
+Let's confirm the Marker2 upregulation in target cells using ground truth cell label-based analysis:
+
+```{r ground-truth-expression}
+DE_res_DE <-
+  final_data_DE |>
+    dplyr::filter(SD_Shift == "0.5SD") |>
+    dplyr::group_by(Sample, Treatment, Batch, CellType) |>
+    dplyr::summarize(Marker2 = base::mean(x = base::log(x = Marker2)), .groups = "drop") |> 
+  (\(x)
+   split(x = x,
+         f = x$CellType)
+   )() |>
+  lapply(FUN = function(x) {
+        mod <- stats::lm(formula = Marker2 ~ Treatment + Batch, data = x)
+        base::data.frame(
+            Marker = "Marker2",
+            coef = base::unname(obj = stats::coef(object = mod)["TreatmentActivation"]),
+            CI_lower = stats::confint(object = mod)["TreatmentActivation", "2.5 %"],
+            CI_upper = stats::confint(object = mod)["TreatmentActivation", "97.5 %"]
+        )
+    }
+    ) |>
+  dplyr::bind_rows(.id = "CellType")
+
+ggplot2::ggplot(data = DE_res_DE, mapping = ggplot2::aes(x = coef, y = CellType)) +
+  ggplot2::theme_bw() +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                 plot.subtitle = ggplot2::element_text(hjust = 0.5)) +
+  ggplot2::geom_point(size = 2) +
+  ggplot2::geom_vline(xintercept = 0, linetype = "dotted", color = "blue") +
+  ggplot2::geom_vline(xintercept = 0.5, linetype = "dashed", color = "red", alpha = 0.5) +
+  ggplot2::geom_errorbar(mapping = ggplot2::aes(xmin = CI_lower, xmax = CI_upper), width = 0.2) +
+  ggplot2::labs(title = "Ground Truth Differential Expression",
+                x = "log Fold Change in Expression (Marker2)",
+                y = "") +
+  ggh4x::force_panelsizes(cols = grid::unit(x = 3, units = "in"), 
+                          rows = grid::unit(x = 2, units = "in"))
+```
+
+Our simulation worked: we see approximately 0.5 SD shift in Marker2 expression upon activation (red dashed line).
+
+## Differential Expression Analysis with tinydenseR
+
+Now let's analyze the data using `tinydenseR`, focusing on the **0.5 SD shift** - the most challenging scenario.
+
+### Prepare Data for tinydenseR
+
+tinydenseR requires two main inputs:
+
+1. **`.cells`**: A named list of file paths containing expression data per sample
+2. **`.meta`**: A data frame with sample-level metadata (one row per sample)
+
+```{r prepare-data}
+# Filter to 0.5SD setting
+.cells.DE.0.5 <-
+  final_data_DE |>
+  dplyr::filter(SD_Shift == "0.5SD") |>
+  dplyr::pull(var = Sample) |>
+  base::unique() |>
+  stats::setNames(nm = _) |>
+  base::lapply(X = _, FUN = function(sample.id) {
+    uri <- base::tempfile(fileext = ".RDS")
+    base::saveRDS(
+      object = final_data_DE[final_data_DE$Sample == sample.id,
+                             c("Marker1", "Marker2", "Marker3", "Marker4", "Marker5")] |>
+        base::as.matrix() |>
+        base::log(),
+      file = uri,
+      compress = FALSE
+    )
+    return(uri)
+  })
+
+.meta.DE.0.5 <-
+  final_data_DE |>
+  dplyr::filter(Sample %in% base::names(x = .cells.DE.0.5)) |>
+  dplyr::select(Sample, Treatment, Batch) |>
+  dplyr::distinct() |>
+  (\(x) `rownames<-`(
+    x[base::match(x = base::names(x = .cells.DE.0.5), table = x$Sample), 
+      c("Treatment", "Batch")],
+    base::names(x = .cells.DE.0.5)
+  ))()
+
+# View metadata structure
+utils::head(x = .meta.DE.0.5)
+```
+
+### Build the tinydenseR Landmark Object
+
+The core workflow involves four main steps:
+
+1. **`setup.lm.obj()`**: Initialize landmark object with data
+2. **`get.landmarks()`**: Select landmark cells and compute PCA
+3. **`get.graph()`**: Build nearest-neighbor graph and cluster landmarks
+4. **`get.map()`**: Map all cells to their nearest landmarks
+
+```{r build-landmark-object}
+set.seed(seed = 123)
+lm.cells.DE.0.5 <-
+  tinydenseR::setup.lm.obj(
+    .cells = .cells.DE.0.5,
+    .meta = .meta.DE.0.5,
+    .assay.type = "cyto"  # For flow/mass cytometry data
+  ) |>
+  tinydenseR::get.landmarks() |>
+  tinydenseR::get.graph(.cl.resolution.parameter = 0.5) |>
+  tinydenseR::get.map()
+```
+
+Let's visualize the landmark cells:
+
+```{r viz-clustering}
+tinydenseR::plotPCA(
+  .lm.obj = lm.cells.DE.0.5,
+  .feature = lm.cells.DE.0.5$graph$clustering$ids,
+  .plot.title = "Landmarks",
+  .point.size = 2,
+  .panel.size = 2
+) |> 
+  (\(x) x +
+    ggplot2::theme(plot.subtitle = ggplot2::element_blank()) +
+    ggplot2::geom_text(
+      data = x$data |>
+        dplyr::group_by(feature) |>
+        dplyr::summarize(PC1 = stats::median(x = PC1), 
+                         PC2 = stats::median(x = PC2), 
+                         .groups = "drop"),
+      mapping = ggplot2::aes(label = feature),
+      size = 4,
+      color = "black"
+    )
+  )()
+```
+
+### Abundance Analysis: Identifying Affected Subpopulations
+
+Before performing differential expression analysis, we first run `get.stats()` to identify which cell states might be affected by the experimental design. This guides us to the appropriate subpopulations for subsequent DE testing.
+
+```{r statistical-test-setup}
+# Create design matrix
+.design.0.5 <-
+  stats::model.matrix(object = ~ Treatment + Batch, data = .meta.DE.0.5) |> 
+  (\(x) `colnames<-`(
+    x = x, 
+    value = base::gsub(pattern = "^Treatment|^Batch", replacement = "", 
+                       x = base::colnames(x = x))
+  ))()
+
+# Run differential abundance testing
+Treatment.stats.0.5 <-
+  tinydenseR::get.stats(
+    .lm.obj = lm.cells.DE.0.5,
+    .design = .design.0.5
+  )
+```
+
+#### Visualize Abundance Changes
+
+Let's visualize abundance changes to identify regions that might show differential expression:
+
+```{r viz-abundance-fc}
+tinydenseR::plotPCA(
+  .lm.obj = lm.cells.DE.0.5,
+  .feature = Treatment.stats.0.5$fit$coefficients[, "Activation"],
+  .plot.title = "Activation vs Baseline",
+  .color.label = "Abundance\nlog2(+0.5) FC",
+  .panel.size = 2,
+  .point.size = 2,
+  .midpoint = 0
+) +
+  ggplot2::theme(plot.subtitle = ggplot2::element_blank())
+```
+
+Interestingly, we can clearly see which cell states are affected despite the small shift in expression that was simulated. Furthermore, the affected cell states seem to be contained within cluster 3, which we can use as target cell population for differential expression.
+
+Importanly, tinydenseR **does not depened** on clustering for differential expression. As a matter of fact, any cell state feature can be used to define the target population as shown further below.
+
+### Differential Expression Testing
+
+Now that we've identified cluster 3 as the target population, we can perform differential expression analysis within this cluster using `get.dea()`:
+
+```{r dea-cluster3}
+# Perform differential expression analysis for cluster 3 (target cells)
+.dea.0.5 <- tinydenseR::get.dea(
+  .lm.obj = lm.cells.DE.0.5,
+  .design = .design.0.5,
+  .id = "cluster.3"
+)
+```
+
+### Visualizing Differential Expression Results
+
+Let's examine the results:
+
+```{r dea-results-coefficients}
+# View coefficients
+.dea.0.5$coefficients["Marker2",]
+```
+
+```{r dea-results-pvalues}
+# View adjusted p-values
+.dea.0.5$adj.p["Marker2",]
+```
+
+```{r dea-res}
+# Visualize differential expression analysis for cluster 3 (target cells)
+tinydenseR::plotDEA(
+  .lm.obj = lm.cells.DE.0.5,
+  .dea.obj = .dea.0.5
+)
+```
+
+As expected, Marker2 shows the strongest signal for differential expression upon activation.
+
+#### Alternative Definition of Target Population
+
+As we saw in section **Visualize Abundance Changes**, the affected population separate well along PC1, which is primarily driven by Markers 1, 4 and 5.
+
+```{r PC1-markers}
+lm.cells.DE.0.5$pca$rotation[order(lm.cells.DE.0.5$pca$rotation[,"PC1"],
+                                   decreasing = TRUE),]
+```
+
+
+We can define our target population independently of cluster but based on marker expression:
+
+```{r dea-cluster-independent}
+# pseudo-colors
+pseudo.colors <-
+    grDevices::colorRampPalette(
+        colors = c(
+            "blue",
+            "green",
+            "yellow",
+            "red"
+        ))
+
+# Example: generate 256 colors
+pseudo.palette <-
+    pseudo.colors(n = 256)
+
+final_data_DE |>
+    dplyr::filter(Sample %in% c("Baseline_S1_Shift0.5SD", "Activation_S1_Shift0.5SD")) |>
+    ggplot2::ggplot(mapping = ggplot2::aes(x = Marker1,
+                                           y = Marker5)) +
+    ggplot2::facet_grid(cols = ggplot2::vars(Sample)) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5), 
+                   legend.position = "none") +
+    ggplot2::labs(title = "Example Marker Expression in Two Different Samples") +
+    ggplot2::geom_hline(yintercept = 100) +
+    ggplot2::geom_vline(xintercept = 10) +
+    ggplot2::scale_x_continuous(transform = "log10",
+                                labels = scales::trans_format(trans = "log10", 
+                                                              format = scales::math_format(10^.x))) + 
+    ggplot2::scale_y_continuous(transform = "log10",
+                                labels = scales::trans_format(trans = "log10", 
+                                                              format = scales::math_format(10^.x))) + 
+    ggplot2::annotation_logticks(sides = "lb") +
+    ggplot2::scale_fill_gradientn(colors = pseudo.palette,
+                                  transform = "log10") +
+    ggplot2::stat_bin_hex(bins = 64) + 
+    ggh4x::force_panelsizes(cols = grid::unit(x = 2, units = "in"), 
+                            rows = grid::unit(x = 2, units = "in"))
+
+
+# Perform differential expression analysis independently of clustering 3
+.cl.ind.dea.0.5 <- tinydenseR::get.dea(
+    .lm.obj = lm.cells.DE.0.5,
+    .design = .design.0.5,
+    .id.idx = which(x = (lm.cells.DE.0.5$lm[,"Marker1"] > log(x = 10)) &
+                        (lm.cells.DE.0.5$lm[,"Marker5"] > log(x = 100)))
+)
+```
+
+```{r}
+# View coefficients for all markers
+.cl.ind.dea.0.5$coefficients
+# View adjusted p-values for all markers
+.cl.ind.dea.0.5$adj.p
+# Visualize differential expression analysis independently of clustering
+tinydenseR::plotDEA(
+    .lm.obj = lm.cells.DE.0.5,
+    .dea.obj = .cl.ind.dea.0.5,
+    .coefs = c("Activation", "Batch2")
+)
+```
+
+## Why Focus on 0.5 SD?
+
+We chose to analyze the 0.5 SD shift in detail because:
+
+- **Most challenging scenario**: Detecting subtle expression changes requires high sensitivity
+- **Realistic use case**: Many biological responses involve modest gene expression changes
+- **Demonstrates sensitivity**: If tinydenseR works for 0.5 SD, it will work for larger shifts
+- **Clinical relevance**: Small expression changes can have significant functional impact
+
+## Summary
+
+In this vignette, we demonstrated how to:
+
+1. **Simulate realistic flow cytometry data** with differential expression and batch effects
+2. **Prepare data** in the tinydenseR format (`.cells` and `.meta` objects)
+3. **Build a landmark object** using the core tinydenseR workflow
+4. **Run differential expression tests** within specific cell populations
+5. **Visualize results** and verify no confounding abundance changes
+6. **Interpret findings** in the context of known ground truth
+
+### Key Advantages of tinydenseR for DE Analysis
+
+- **Sample-centric statistics**: Treats samples as biological replicates, not cells
+- **Avoids pseudo-replication**: Proper statistical inference with correct degrees of freedom
+- **Landmark-based aggregation**: Natural pseudo-bulking approach without arbitrary clustering
+- **Batch effect handling**: Natural integration into linear models
+- **Scalable**: Efficient for large datasets
+- **Continuous representation**: No hard boundaries splitting functionally related cells
+
+### Next Steps
+
+- See the **Differential Abundance Analysis** vignette for detecting proportion changes
+- See the **Trajectory Analysis** vignette for analyzing developmental or dynamic processes
+- Explore additional tinydenseR features in the function documentation
+
+## Session Information
+
+```{r session-info}
+utils::sessionInfo()
+```

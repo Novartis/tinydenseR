@@ -1,0 +1,648 @@
+---
+title: "Differential Abundance Analysis with tinydenseR"
+author: "Pedro Milanez-Almeida"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+vignette: >
+  %\VignetteIndexEntry{Differential Abundance Analysis with tinydenseR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE,
+  dpi = 300,
+  out.width = "100%"
+)
+```
+
+## Introduction
+
+Differential abundance (DA) analysis identifies cell populations whose proportions change between experimental conditions.
+
+### What is Differential Abundance Analysis?
+
+In single-cell experiments, we often want to know:
+
+- Which cell populations are depleted or enriched in treatment vs. control?
+- How do cell type proportions change across conditions?
+- Are these changes statistically significant after accounting for technical variation?
+
+Traditional approaches cluster cells first, then test for proportion differences. This can be problematic because:
+
+1. **Clustering is subjective** - resolution parameters strongly affect results
+2. **Biological variation is continuous** - hard boundaries between clusters may not reflect biology
+
+### The tinydenseR Approach
+
+`tinydenseR` uses a landmark-based framework that:
+
+- Represents the cell population landscape with data-driven selection of landmark cells
+- Maps all cells to their nearest landmarks
+- Models abundance at each landmark using **samples as biological replicates**
+- Detects regions of differential abundance without arbitrary clustering
+
+This approach is particularly powerful for:
+
+- scRNA-seq, flow, mass and spectral cytometry data
+- Detecting subtle population shifts
+- Accounting for batch effects and confounders
+- Maintaining statistical rigor at scale
+
+## Simulating Data with Differential Abundance
+
+For this tutorial, we'll simulate flow cytometry data where a target cell population is depleted 2-fold in the "Depletion" condition compared to "Baseline". We'll simulate three scenarios with different baseline proportions (0.5%, 5%, and 50%) to verify our simulation design, but **focus our analysis on the most challenging case: the rare 0.5% population**. This demonstrates tinydenseR's ability to detect subtle changes in rare cell populations.
+
+### Load Required Packages
+
+```{r load-packages}
+library(tinydenseR)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggpubr)
+library(rstatix)
+library(ggh4x)
+library(Matrix)
+
+set.seed(seed = 42)
+```
+
+### Simulation Parameters
+
+```{r sim-params}
+# Experimental design
+groups <- c("Baseline", "Depletion")
+batches <- c("Batch1", "Batch2")
+settings <- c(0.005, 0.05, 0.5)  # Target cell proportions for Baseline
+samples_per_group <- 6
+mean_cells <- 50000
+sd_cells <- 500  # Noise in total cell count
+```
+
+### Generate Simulated Data
+
+We'll simulate 5 markers where:
+
+- **Marker1, Marker4, Marker5**: Define the target cell population (high expression)
+- **Marker2, Marker3**: Non-informative markers (same distribution across cell types)
+- **Batch effects**: Multiplicative noise added to Batch2 samples
+
+```{r simulate-data}
+# Initialize storage
+data_list_DA <- list()
+
+# Simulate data
+for (setting in settings) {
+  for (group in groups) {
+    for (sample_id in 1:samples_per_group) {
+      batch <- if(sample_id %% 2 == 0) "Batch2" else "Batch1"
+      
+      total_cells <- base::round(x = stats::rnorm(n = 1, mean = mean_cells, sd = sd_cells))
+      total_cells <- base::max(total_cells, 1000)  # Ensure minimum cells
+      
+      # Two-fold difference in proportions
+      proportion <- if (group == "Baseline") setting else setting / 2
+      
+      num_interest <- base::round(x = total_cells * proportion)
+      num_other <- total_cells - num_interest
+      cell_types <- base::sample(x = c(base::rep(x = "target", times = num_interest), 
+                                        base::rep(x = "other", times = num_other)))
+      
+      # Simulate expression data
+      marker1 <- base::numeric(length = total_cells)
+      marker2 <- stats::rlnorm(n = total_cells, meanlog = 0, sdlog = 1.5)
+      marker3 <- stats::rlnorm(n = total_cells, meanlog = 0, sdlog = 2.5)
+      marker4 <- base::numeric(length = total_cells)  
+      marker5 <- base::numeric(length = total_cells)  
+      
+      # Assign marker expression based on cell type
+      marker1[cell_types == "other"] <- stats::rlnorm(n = base::sum(cell_types == "other"), 
+                                                       meanlog = 0, sdlog = 2)
+      marker1[cell_types == "target"] <- stats::rlnorm(n = base::sum(cell_types == "target"), 
+                                                        meanlog = 5, sdlog = 2)
+      
+      marker4[cell_types == "other"] <- stats::rlnorm(n = base::sum(cell_types == "other"), 
+                                                       meanlog = 0, sdlog = 1.2)
+      marker4[cell_types == "target"] <- stats::rlnorm(n = base::sum(cell_types == "target"), 
+                                                        meanlog = 3, sdlog = 1.2)
+      
+      marker5[cell_types == "other"] <- stats::rlnorm(n = base::sum(cell_types == "other"), 
+                                                       meanlog = 0, sdlog = 1.8)
+      marker5[cell_types == "target"] <- stats::rlnorm(n = base::sum(cell_types == "target"), 
+                                                        meanlog = 7, sdlog = 1.8)
+      
+      # Add batch effect
+      if (batch == "Batch2") {
+        marker1 <- marker1 * stats::rlnorm(n = total_cells, meanlog = 0.1, sdlog = 0.5)
+        marker2 <- marker2 * stats::rlnorm(n = total_cells, meanlog = 0.2, sdlog = 0.3)
+        marker3 <- marker3 * stats::rlnorm(n = total_cells, meanlog = 0.3, sdlog = 0.4)
+        marker4 <- marker4 * stats::rlnorm(n = total_cells, meanlog = 0.4, sdlog = 0.3)
+        marker5 <- marker5 * stats::rlnorm(n = total_cells, meanlog = 0.5, sdlog = 0.5)
+      }
+      
+      sample_name <- base::paste0(group, "_S", sample_id, "_Set", setting * 100)
+      df <- base::data.frame(
+        Sample = sample_name,
+        Treatment = group,
+        Batch = batch,
+        Setting = base::paste0(setting * 100, "%"),
+        CellType = cell_types,
+        Marker1 = marker1,
+        Marker2 = marker2,
+        Marker3 = marker3,
+        Marker4 = marker4,
+        Marker5 = marker5
+      )
+      data_list_DA[[base::length(x = data_list_DA) + 1]] <- df
+    }
+  }
+}
+
+# Combine all samples
+final_data_DA <- base::do.call(what = rbind, args = data_list_DA)
+```
+
+### Visualize Data Structure
+
+Let's take a look at the data structure. Please note marker expression profiles by cell type showing target population is defined by Marker1, Marker4, and Marker5.
+
+```{r viz-markers}
+final_data_DA |>
+    dplyr::filter(Setting == "0.5%") |>
+    tidyr::pivot_longer(
+        cols = c(Marker1, Marker2, Marker3, Marker4, Marker5),
+        names_to = "Marker",
+        values_to = "value"
+    ) |>
+    ggplot2::ggplot(mapping = ggplot2::aes(x = Marker, 
+                                           y = value)) +
+    ggplot2::facet_grid(cols = ggplot2::vars(CellType)) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+        plot.title = ggplot2::element_text(hjust = 0.5),
+        legend.position = "right",
+        axis.text.x = ggplot2::element_text(hjust = 1, vjust = 1, angle = 30)
+    ) +
+    ggplot2::labs(
+        title = "Marker Expression by Cell Type",
+        x = "", 
+        y = "Expression Level"
+    ) +
+  ggplot2::geom_hline(yintercept = 1,
+                      linetype = "dashed",
+                      color = "red") +
+    ggplot2::scale_y_continuous(transform = "log10",
+                                labels = scales::trans_format(trans = "log10", 
+                                                              format = scales::math_format(10^.x))) + 
+    ggplot2::annotation_logticks(sides = "l") +
+    ggplot2::geom_violin(color = "black",
+                         alpha = 0,
+                         draw_quantiles = 0.5) +
+    ggh4x::force_panelsizes(cols = grid::unit(x = 2, units = "in"), 
+                            rows = grid::unit(x = 2, units = "in"))
+```
+
+```{r viz-ground-truth}
+# pseudo-colors
+pseudo.colors <-
+    grDevices::colorRampPalette(
+        colors = c(
+            "blue",
+            "green",
+            "yellow",
+            "red"
+        ))
+
+# Example: generate 256 colors
+pseudo.palette <-
+  pseudo.colors(n = 256)
+
+# Example
+final_data_DA |>
+    dplyr::filter(Sample %in% c("Baseline_S1_Set0.5", "Depletion_S1_Set0.5")) |>
+    ggplot2::ggplot(mapping = ggplot2::aes(x = Marker1,
+                                           y = Marker5)) +
+    ggplot2::facet_grid(cols = ggplot2::vars(Sample)) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5), 
+                   legend.position = "none") +
+    ggplot2::labs(title = "Example Marker Expression in Two Different Samples") +
+    ggplot2::scale_x_continuous(transform = "log10",
+                                labels = scales::trans_format(trans = "log10", 
+                                                              format = scales::math_format(10^.x))) + 
+    ggplot2::scale_y_continuous(transform = "log10",
+                                labels = scales::trans_format(trans = "log10", 
+                                                              format = scales::math_format(10^.x))) + 
+    ggplot2::annotation_logticks(sides = "lb") +
+    ggplot2::scale_fill_gradientn(colors = pseudo.palette,
+                                  transform = "log10") +
+    ggplot2::stat_bin_hex(bins = 64) + 
+    ggh4x::force_panelsizes(cols = grid::unit(x = 2, units = "in"), 
+                            rows = grid::unit(x = 2, units = "in"))
+```
+
+Below, target cells (shown in purple) form a distinct subpopulation with high Marker1 and Marker5 expression, while other cells (shown in yellow) are low for expression of the same markers.
+```{r viz-ground-truth-celltype}
+# Example
+final_data_DA |>
+    dplyr::filter(Sample %in% c("Baseline_S1_Set0.5", "Depletion_S1_Set0.5")) |>
+    dplyr::mutate(CellType = factor(x = CellType,
+                                    levels = c("target",
+                                               "other"))) |>
+    ggplot2::ggplot(mapping = ggplot2::aes(x = Marker1,
+                                           y = Marker5,
+                                           color = CellType)) +
+    ggplot2::facet_grid(cols = ggplot2::vars(Sample)) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5), 
+                   legend.position = "none") +
+    ggplot2::labs(title = "Example Marker Expression in Two Different Samples") +
+    ggplot2::scale_x_continuous(transform = "log10",
+                                labels = scales::trans_format(trans = "log10", 
+                                                              format = scales::math_format(10^.x))) + 
+    ggplot2::scale_y_continuous(transform = "log10",
+                                labels = scales::trans_format(trans = "log10", 
+                                                              format = scales::math_format(10^.x))) + 
+    ggplot2::annotation_logticks(sides = "lb") +
+    ggplot2::scale_color_viridis_d() +
+    scattermore::geom_scattermore(pointsize = 3) + 
+    ggh4x::force_panelsizes(cols = grid::unit(x = 2, units = "in"), 
+                            rows = grid::unit(x = 2, units = "in"))
+```
+
+### Verify Ground Truth Depletion
+
+Let's confirm the 2-fold depletion using ground truth cell label-based proportion analysis:
+
+```{r ground-truth-proportions}
+DA_res_DA <-
+  final_data_DA |>
+    dplyr::filter(Setting == "0.5%") |>
+    dplyr::group_by(Sample, Treatment, Batch, CellType) |>
+    dplyr::summarize(n = dplyr::n(), .groups = "drop") |> 
+    dplyr::group_by(Sample) |>
+    dplyr::mutate(prop = n / base::sum(n)) |> 
+    base::split(f = ~CellType) |>
+    base::lapply(X = _, FUN = function(x) {
+        mod <- stats::lm(formula = log2(x = prop) ~ Treatment + Batch, data = x)
+        base::c(coef = base::unname(obj = stats::coef(object = mod)["TreatmentDepletion"]),
+                stats::confint(object = mod)["TreatmentDepletion",])
+    }) |>
+    dplyr::bind_rows(.id = "id")
+
+ggplot2::ggplot(data = DA_res_DA, mapping = ggplot2::aes(x = coef, y = id)) +
+  ggplot2::theme_bw() +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                 plot.subtitle = ggplot2::element_text(hjust = 0.5)) +
+  ggplot2::geom_point(size = 1) +
+  ggplot2::geom_vline(xintercept = 0, linetype = "dotted", color = "blue") +
+  ggplot2::geom_vline(xintercept = -1, linetype = "dashed", color = "red", alpha = 0.5) +
+  ggplot2::geom_errorbar(mapping = ggplot2::aes(xmin = `2.5 %`, xmax = `97.5 %`), width = 0.2) +
+  ggplot2::labs(title = "Ground Truth Differential Abundance",
+                x = "log2 Fold Change in Proportion",
+                y = "CellType") +
+  ggplot2::scale_y_discrete(limits = rev) +
+  ggh4x::force_panelsizes(cols = grid::unit(x = 3, units = "in"), 
+                          rows = grid::unit(x = 2, units = "in"))
+```
+
+Our simulation worked: we see approximately 2-fold depletion (log2FC ≈ -1) from baseline abundance.
+
+## Differential Abundance Analysis with tinydenseR
+
+Now let's analyze the data using `tinydenseR`, focusing on the **0.5% setting** - the most challenging scenario where the target population represents only 0.5% of cells at baseline.
+
+### Prepare Data for tinydenseR
+
+tinydenseR requires two main inputs:
+
+1. **`.cells`**: A named list of file paths containing expression data per sample
+2. **`.meta`**: A data frame with sample-level metadata (one row per sample)
+
+```{r prepare-data}
+# Filter to 0.5% setting
+.cells.DA.0.5 <-
+  final_data_DA |>
+  dplyr::filter(Setting == "0.5%") |>
+  dplyr::pull(var = Sample) |>
+  base::unique() |>
+  stats::setNames(nm = _) |>
+  base::lapply(X = _, FUN = function(sample.id) {
+    uri <- base::tempfile(fileext = ".RDS")
+    base::saveRDS(
+      object = final_data_DA[final_data_DA$Sample == sample.id,
+                             c("Marker1", "Marker2", "Marker3", "Marker4", "Marker5")] |>
+        base::as.matrix() |>
+        base::log(),
+      file = uri,
+      compress = FALSE
+    )
+    return(uri)
+  })
+
+.meta.DA.0.5 <-
+  final_data_DA |>
+  dplyr::filter(Sample %in% base::names(x = .cells.DA.0.5)) |>
+  dplyr::select(Sample, Treatment, Batch) |>
+  dplyr::distinct() |>
+  (\(x) `rownames<-`(
+    x[base::match(x = base::names(x = .cells.DA.0.5), table = x$Sample), 
+      c("Treatment", "Batch")],
+    base::names(x = .cells.DA.0.5)
+  ))()
+
+# View metadata structure
+utils::head(x = .meta.DA.0.5)
+```
+
+### Build the tinydenseR Landmark Object
+
+The core workflow involves three main steps:
+
+1. **`setup.lm.obj()`**: Initialize landmark object with data
+2. **`get.landmarks()`**: Select landmark cells and compute PCA
+3. **`get.graph()`**: Build nearest-neighbor graph and cluster landmarks
+4. **`get.map()`**: Map all cells to their nearest landmarks
+
+```{r build-landmark-object}
+set.seed(seed = 123)
+lm.cells.DA.0.5 <-
+  tinydenseR::setup.lm.obj(
+    .cells = .cells.DA.0.5,
+    .meta = .meta.DA.0.5,
+    .assay.type = "cyto"  # For flow/mass cytometry data
+  ) |>
+  tinydenseR::get.landmarks() |>
+  tinydenseR::get.graph(.cl.resolution.parameter = 0.5) |>
+  tinydenseR::get.map()
+```
+
+Before testing for differential abundance, let's re-examine the data structure by projecting cells from two representative samples using the PCA computed on landmark cells:
+
+```{r viz-ground-truth-pca}
+# Compute PCA projection for all cells
+base::lapply(X = .cells.DA.0.5[c("Baseline_S1_Set0.5",
+                                 "Depletion_S1_Set0.5")], 
+             FUN = base::readRDS) |>
+  base::do.call(what = rbind, args = _) |>
+  (\(x) {
+    ((base::t(x = x[, lm.cells.DA.0.5$pca$HVG]) - lm.cells.DA.0.5$pca$center) /
+       lm.cells.DA.0.5$pca$scale) |> base::t()
+  })() %*% lm.cells.DA.0.5$pca$rotation |>
+  base::as.matrix() |>
+  base::as.data.frame() |>
+  dplyr::mutate(Sample = final_data_DA |>
+                  dplyr::filter(Sample %in% base::names(x = .cells.DA.0.5[c("Baseline_S1_Set0.5",
+                                                                            "Depletion_S1_Set0.5")])) |>
+                  dplyr::pull(var = Sample)) |>
+  ggplot2::ggplot(mapping = ggplot2::aes(x = PC1, y = PC2)) +
+    ggplot2::facet_grid(cols = ggplot2::vars(Sample)) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5), 
+                   legend.position = "none") +
+    ggplot2::labs(title = "Cell Distribution in Two Representative Samples") +
+    ggplot2::stat_bin_hex(bins = 128) + 
+    ggplot2::scale_fill_viridis_c(trans = "log") +
+    ggh4x::force_panelsizes(cols = grid::unit(x = 2, units = "in"), 
+                            rows = grid::unit(x = 2, units = "in"))
+```
+
+#### Clustering
+
+The landmark cells are automatically clustered for visualization and traditional proportion analysis (described at the end of this vignette). Below we visualize the clustering results:
+
+```{r viz-clustering}
+tinydenseR::plotPCA(
+  .lm.obj = lm.cells.DA.0.5,
+  .feature = lm.cells.DA.0.5$graph$clustering$ids,,
+  .plot.title = "Landmarks",
+  .point.size = 2,
+  .panel.size = 2
+) |> 
+  (\(x) x +
+    ggplot2::theme(plot.subtitle = ggplot2::element_blank()) +
+    ggplot2::geom_text(
+      data = x$data |>
+        dplyr::group_by(feature) |>
+        dplyr::summarize(PC1 = stats::median(x = PC1), 
+                         PC2 = stats::median(x = PC2), 
+                         .groups = "drop"),
+      mapping = ggplot2::aes(label = feature),
+      size = 4,
+      color = "black"
+    )
+  )()
+```
+
+#### Landmark-level visualizations
+
+Below we visualize the landmark cells colored by batch:
+
+```{r viz-landmarks}
+tinydenseR::plotPCA(
+  .lm.obj = lm.cells.DA.0.5,
+  .feature = lm.cells.DA.0.5$metada$Batch[lm.cells.DA.0.5$key],
+  .cat.feature.color = tinydenseR::Color.Palette[1, 1:2],
+  .panel.size = 2,
+  .point.size = 2,
+  .color.label = "Batch",
+  .plot.title = "Landmarks"
+)
+```
+
+### Statistical Testing
+
+Now we set up a design matrix and run clustering-independent statistical test:
+
+```{r statistical-test}
+# Create design matrix
+.design.0.5 <-
+  stats::model.matrix(object = ~ Treatment + Batch, data = .meta.DA.0.5) |> 
+  (\(x) `colnames<-`(
+    x = x, 
+    value = base::gsub(pattern = "^Treatment|^Batch", replacement = "", 
+                       x = base::colnames(x = x))
+  ))()
+
+# Run differential abundance testing
+Treatment.stats.0.5 <-
+  tinydenseR::get.stats(
+    .lm.obj = lm.cells.DA.0.5,
+    .design = .design.0.5
+  )
+```
+
+### Visualizing Differential Abundance Results
+
+#### Abundance fold changes
+
+We can visualize the log2 fold changes in abundance at each landmark between Depletion and Baseline conditions:
+
+```{r viz-abundance-fc}
+tinydenseR::plotPCA(
+  .lm.obj = lm.cells.DA.0.5,
+  .feature = Treatment.stats.0.5$fit$coefficients[, "Depletion"],
+  .plot.title = "Depletion vs Baseline",
+  .color.label = "Abundance\nlog2(+0.5) FC",
+  .panel.size = 2,
+  .point.size = 2,
+  .midpoint = 0
+) +
+  ggplot2::theme(plot.subtitle = ggplot2::element_blank())
+```
+
+#### Hypothesis testing results
+
+We can also visualize regions of statistically significant abundance change:
+
+```{r viz-hypothesis}
+tinydenseR::plotPCA(
+  .lm.obj = lm.cells.DA.0.5,
+  .feature = base::ifelse(
+    test = Treatment.stats.0.5$fit$coefficients[, "Depletion"] < 0,
+    yes = "less abundant",
+    no = "more abundant"
+  ) |>
+  base::ifelse(
+    test = Treatment.stats.0.5$fit$pca.weighted.q[, "Depletion"] < 0.1,
+    yes = _, no = "not sig."
+  ) |>
+  base::factor(x = _, levels = c("less abundant", "not sig.", "more abundant")),
+  .plot.title = "Depletion vs Baseline",
+  .color.label = "q < 0.1",
+  .cat.feature.color = tinydenseR::Color.Palette[1, c(1, 6, 2)],
+  .point.size = 2,
+  .panel.size = 2
+) +
+  ggplot2::labs(subtitle = "Hypothesis Testing")
+```
+
+### Marker Expression
+
+A scatter plot provides flexibility to explore different types of visualizations. Here we show abundance log2FC across landmarks across the distributions of Marker1 and Marker5:
+
+```{r scatter}
+tinydenseR::scatterPlot(
+  .x.feature = lm.cells.DA.0.5$lm[,"Marker1"],
+  .x.label = "Marker1",
+  .y.feature = lm.cells.DA.0.5$lm[,"Marker5"],
+  .y.label = "Marker5",
+  .color.feature = Treatment.stats.0.5$fit$coefficients[, "Depletion"],
+  .color.label = "Abundance\nlog2(+0.5) FC",
+  .plot.title = "Depletion vs Baseline",
+  .panel.size = c(3,3),
+  .point.size = 2
+)
+```
+
+### Beeswarm Plot
+
+A beeswarm plot provides a comprehensive view of abundance changes across clusters:
+
+```{r beeswarm}
+tinydenseR::plotBeeswarm(
+  .lm.obj = lm.cells.DA.0.5,
+  .stats.obj = Treatment.stats.0.5,
+  .coefs = "Depletion",
+  .swarm.title = "Depletion vs Baseline",
+  .row.space.scaler = 0.5,
+  .perc.plot = FALSE
+) +
+  ggplot2::geom_vline(xintercept = -1, color = "red", linetype = "dashed")
+```
+
+Please note that the log2FC in density approaches -1 (marked by a dashed red line). The use of a pseudo-count (0.5), which is applied to handle zeros and extreme fold changes, introduces a slight bias towards underestimating differences for rare cell states.
+
+### Cluster-based Comparisons
+
+In addition to the high resolution analysis described above, tinydenseR can also provide cluster-based results as follows:
+
+```{r cluster-stats}
+tinydenseR::plotTradStats(.lm.obj = lm.cells.DA.0.5, .stats.obj = Treatment.stats.0.5)
+```
+
+```{r cluster-percentages, fig.height=5}
+# Prepare statistical test results
+stat.test.percentages.DA.0.5 <-
+  lm.cells.DA.0.5$map$clustering$cell.perc |>
+  dplyr::as_tibble() |>
+  dplyr::mutate(treatment = lm.cells.DA.0.5$metadata$Treatment) |>
+  tidyr::pivot_longer(cols = tidyr::starts_with(match = "cluster.")) |>
+  dplyr::group_by(name) |>
+  rstatix::t_test(formula = value ~ treatment) |>
+  dplyr::mutate(
+    p = Treatment.stats.0.5$trad$clustering$fit$adj.p[name, "Depletion"],
+    p.adj = Treatment.stats.0.5$trad$clustering$fit$adj.p[name, "Depletion"]
+  ) |>
+  rstatix::add_significance() |>
+  dplyr::mutate(p.adj = base::ifelse(
+    test = p.adj < 0.01,
+    yes = base::formatC(x = p.adj, digits = 0, format = "e"),
+    no = base::formatC(x = p.adj, digits = 2, format = "f")
+  )) |>
+  rstatix::add_xy_position(x = "treatment")
+
+tinydenseR::plotTradPerc(
+  .lm.obj = lm.cells.DA.0.5,
+  .x.split = "Treatment",
+  .x.space.scaler = 0.3
+) + 
+  ggplot2::labs(title = "Cluster Proportions") + 
+  ggpubr::stat_pvalue_manual(
+    data = stat.test.percentages.DA.0.5, 
+    label = "p.adj",
+    label.size = 3
+  ) +
+  ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.15)))
+```
+
+## Why Focus on 0.5%?
+
+We chose to analyze the 0.5% setting in detail because:
+
+- **Most challenging scenario**: Detecting changes in rare populations (<1%) is difficult
+- **Realistic use case**: Many biologically important cell types are rare (e.g., regulatory T cells, stem cells)
+- **Demonstrates sensitivity**: If tinydenseR works for 0.5%, it will work for more abundant populations
+- **Clinical relevance**: Small population shifts can have significant biological impact
+
+The ground truth analysis confirms that all three settings (0.5%, 5%, 50%) show the expected 2-fold depletion, validating our simulation design.
+
+## Summary
+
+In this vignette, we demonstrated how to:
+
+1. **Simulate realistic flow cytometry data** with differential abundance and batch effects
+2. **Prepare data** in the tinydenseR format (`.cells` and `.meta` objects)
+3. **Build a landmark object** using the core tinydenseR workflow
+4. **Run statistical tests** for differential abundance with proper sample-level replication
+5. **Visualize results** using landmark-based and cluster-based approaches
+6. **Interpret findings** in the context of known ground truth
+
+### Key Advantages of tinydenseR
+
+- **Sample-centric statistics**: Proper biological replication
+- **Clustering-independent**: No arbitrary resolution parameters
+- **Batch effect handling**: Natural integration into linear models
+- **Scalable**: Efficient for large datasets
+- **Comprehensive visualization**: Multiple complementary views of results
+
+### Next Steps
+
+- See the **Differential Expression Analysis** vignette for detecting state changes within populations
+- See the **Trajectory Analysis** vignette for analyzing developmental or dynamic processes
+- Explore additional tinydenseR features in the function documentation
+
+## Session Information
+
+```{r session-info}
+utils::sessionInfo()
+```
