@@ -326,7 +326,7 @@ library(tidyverse)
 #> ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
 
 # Check package version
-if(utils::packageVersion(pkg = "tinydenseR") < "0.0.1.0011") {
+if(utils::packageVersion(pkg = "tinydenseR") < "0.0.1.0013") {
   stop("please update the installation of tinydenseR")
 }
 
@@ -726,8 +726,7 @@ We welcome contributions to `tinydenseR`! Here’s how you can help:
 
 If you use `tinydenseR` in your research, please cite:
 
-    Milanez-Almeida, P. et al. (2025). tinydenseR: Linking Cell-To-Cell Variation to 
-    Sample-to-Sample Variation. R package version 1.0.0.
+    Milanez-Almeida, P. et al. (2025). Sample-level modeling of single-cell data at scale with tinydenseR. bioRxviv https://doi.org/10.1101/2025.11.26.690752.
 
 ## License
 

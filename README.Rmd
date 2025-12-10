@@ -532,8 +532,7 @@ We welcome contributions to `tinydenseR`! Here's how you can help:
 If you use `tinydenseR` in your research, please cite:
 
 ```
-Milanez-Almeida, P. et al. (2025). tinydenseR: Linking Cell-To-Cell Variation to 
-Sample-to-Sample Variation. R package version 1.0.0.
+Milanez-Almeida, P. et al. (2025). Sample-level modeling of single-cell data at scale with tinydenseR. bioRxviv https://doi.org/10.1101/2025.11.26.690752.
 ```
 
 ## License
