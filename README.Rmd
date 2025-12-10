@@ -283,7 +283,7 @@ library(tinydenseR)
 library(tidyverse)
 
 # Check package version
-if(utils::packageVersion(pkg = "tinydenseR") < "0.0.1.0011") {
+if(utils::packageVersion(pkg = "tinydenseR") < "0.0.1.0013") {
   stop("please update the installation of tinydenseR")
 }
 

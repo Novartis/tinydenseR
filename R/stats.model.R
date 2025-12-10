@@ -845,12 +845,17 @@ get.dea <-
           exprs.mat <-
             readRDS(file = .lm.obj$cells[[smpl]])
           
-          .idx <-
-            .lm.obj$map$nearest.landmarks[[smpl]][,1,drop = TRUE] %in% .lm.idx
-            
-          res <-
-            Matrix::rowSums(x = exprs.mat[,.idx,drop = FALSE])
+          wcl <- 
+            .lm.obj$map$connect.prob[[smpl]][,.lm.idx,drop = FALSE]
           
+          # get weighted sum
+          wsum <-
+            exprs.mat %*% wcl
+          
+          # get weighted mean using sum of weights and scale by number of cells
+          res <-
+            (Matrix::rowSums(x = wsum) / sum(wcl)) * (sum(Matrix::rowSums(x = wcl) > 0))
+
           return(res)
           
         }) |>
@@ -1009,11 +1014,16 @@ get.dea <-
           exprs.mat <-
             exprs.mat[,colnames(x = .lm.obj$lm)]
           
-          .idx <-
-            .lm.obj$map$nearest.landmarks[[smpl]][,1,drop = TRUE] %in% .lm.idx
+          wcl <- 
+            .lm.obj$map$connect.prob[[smpl]][,.lm.idx,drop=FALSE]
           
+          # get weighted sum
+          wsum <-
+            (Matrix::t(x = exprs.mat) %*% wcl)
+          
+          # get weighted mean using sum of weights
           res <-
-            matrixStats::colMedians(x = exprs.mat[.idx,,drop = FALSE])
+            Matrix::rowSums(x = wsum) / sum(wcl)
           
           return(res)
           

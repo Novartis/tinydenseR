@@ -428,12 +428,12 @@ Let's examine the results:
 
 ```{r dea-results-coefficients}
 # View coefficients
-.dea.0.5$coefficients["Marker2",]
+.dea.0.5$coefficients
 ```
 
 ```{r dea-results-pvalues}
 # View adjusted p-values
-.dea.0.5$adj.p["Marker2",]
+.dea.0.5$adj.p
 ```
 
 ```{r dea-res}
