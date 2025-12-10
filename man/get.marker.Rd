@@ -10,7 +10,7 @@ get.marker(
   .id1.idx = NULL,
   .id2.idx = NULL,
   .id1 = NULL,
-  .id2 = "..all.other.subsets..",
+  .id2 = "..all.other.landmarks..",
   .id.from = "clustering"
 )
 }
@@ -30,7 +30,7 @@ provided, only cells with these landmarks as nearest neighbors are included.}
 \code{.id1.idx} not provided.}
 
 \item{.id2}{Character vector of cluster/celltype IDs for group 2 (reference group). Default
-\code{"..all.other.subsets.."} compares group 1 to all other cells. Can specify specific IDs
+\code{"..all.other.landmarks.."} compares group 1 to all other cells. Can specify specific IDs
 for pairwise comparisons.}
 
 \item{.id.from}{Character: "clustering" (default) or "celltyping". Source of IDs in \code{.id1}
@@ -75,7 +75,7 @@ The marker identification workflow:
 
 \strong{Common use cases:}
 \itemize{
-\item \strong{One-vs-all}: Default \code{.id2 = "..all.other.subsets.."} finds markers that
+\item \strong{One-vs-all}: Default \code{.id2 = "..all.other.landmarks.."} finds markers that
 uniquely identify a cluster
 \item \strong{Pairwise}: Specify both \code{.id1} and \code{.id2} to compare two specific
 populations (e.g., CD4 vs CD8 T cells)

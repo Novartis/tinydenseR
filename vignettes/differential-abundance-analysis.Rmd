@@ -526,25 +526,7 @@ tinydenseR::plotPCA(
   ggplot2::labs(subtitle = "Hypothesis Testing")
 ```
 
-### Marker Expression
-
-A scatter plot provides flexibility to explore different types of visualizations. Here we show abundance log2FC across landmarks across the distributions of Marker1 and Marker5:
-
-```{r scatter}
-tinydenseR::scatterPlot(
-  .x.feature = lm.cells.DA.0.5$lm[,"Marker1"],
-  .x.label = "Marker1",
-  .y.feature = lm.cells.DA.0.5$lm[,"Marker5"],
-  .y.label = "Marker5",
-  .color.feature = Treatment.stats.0.5$fit$coefficients[, "Depletion"],
-  .color.label = "Abundance\nlog2(+0.5) FC",
-  .plot.title = "Depletion vs Baseline",
-  .panel.size = c(3,3),
-  .point.size = 2
-)
-```
-
-### Beeswarm Plot
+#### Beeswarm Plot
 
 A beeswarm plot provides a comprehensive view of abundance changes across clusters:
 
@@ -562,7 +544,66 @@ tinydenseR::plotBeeswarm(
 
 Please note that the log2FC in density approaches -1 (marked by a dashed red line). The use of a pseudo-count (0.5), which is applied to handle zeros and extreme fold changes, introduces a slight bias towards underestimating differences for rare cell states.
 
-### Cluster-based Comparisons
+## Identifying Markers of Cells in Differential States
+
+While differential abundance analysis reveals which populations change in proportion, we can also examine the **marker expression profiles** that define these populations. This helps us understand the biological identity of the affected cell types.
+
+Above we identified differential cell states within cluster 4. Let's use `get.marker()` to identify which markers define this cluster compared to all other cells:
+
+```{r marker-identification}
+# Identify markers for cluster 4
+.marker.0.5 <-
+  tinydenseR::get.marker(
+    .lm.obj = lm.cells.DA.0.5,
+    .id1 = "cluster.4"
+  )
+```
+
+We can visualize how markers are expressed in cluster 4 versus the rest of the population:
+
+```{r marker-visualization, fig.height=6}
+# Visualize marker expression: Intercept shows overall expression, .id1 shows cluster-specific enrichment
+tinydenseR::plotDEA(
+    .lm.obj = lm.cells.DA.0.5,
+    .dea.obj = .marker.0.5,
+    .coefs = c("(Intercept)", ".id1")
+  )
+```
+
+Let's look at the statistical results:
+
+```{r marker-coefficients}
+# Coefficients: (Intercept) = mean expression across all cells
+#               .id1 = difference in cluster 4 vs rest
+.marker.0.5$coefficients[, c("(Intercept)", ".id1")]
+```
+
+```{r marker-pvalues}
+# Adjusted p-values for marker enrichment
+.marker.0.5$adj.p[, c("(Intercept)", ".id1")]
+```
+
+As expected, **Marker1, Marker4, and Marker5** show strong positive coefficients for `.id1`, indicating they are highly expressed in cluster 4 compared to other populations. This confirms our simulation design where these markers define the target cell population. Markers 2 and 3, on the other hand, show much less strong expression differences as expected.
+
+### Additional Visualization of Marker Expression
+
+A scatter plot provides flexibility to explore different types of visualizations. Here we show abundance log2FC across landmarks across the distributions of **Marker1 and Marker5**:
+
+```{r scatter}
+tinydenseR::scatterPlot(
+  .x.feature = lm.cells.DA.0.5$lm[,"Marker1"],
+  .x.label = "Marker1",
+  .y.feature = lm.cells.DA.0.5$lm[,"Marker5"],
+  .y.label = "Marker5",
+  .color.feature = Treatment.stats.0.5$fit$coefficients[, "Depletion"],
+  .color.label = "Abundance\nlog2(+0.5) FC",
+  .plot.title = "Depletion vs Baseline",
+  .panel.size = c(3,3),
+  .point.size = 2
+)
+```
+
+### Traditional Cluster-based Comparisons
 
 In addition to the high resolution analysis described above, tinydenseR can also provide cluster-based results as follows:
 

@@ -1126,7 +1126,7 @@ get.dea <-
 #' @param .id1 Character vector of cluster/celltype IDs for group 1 (test group). Required if 
 #'   \code{.id1.idx} not provided.
 #' @param .id2 Character vector of cluster/celltype IDs for group 2 (reference group). Default 
-#'   \code{"..all.other.subsets.."} compares group 1 to all other cells. Can specify specific IDs 
+#'   \code{"..all.other.landmarks.."} compares group 1 to all other cells. Can specify specific IDs 
 #'   for pairwise comparisons.
 #' @param .id.from Character: "clustering" (default) or "celltyping". Source of IDs in \code{.id1} 
 #'   and \code{.id2}.
@@ -1163,7 +1163,7 @@ get.dea <-
 #' 
 #' \strong{Common use cases:}
 #' \itemize{
-#'   \item \strong{One-vs-all}: Default \code{.id2 = "..all.other.subsets.."} finds markers that 
+#'   \item \strong{One-vs-all}: Default \code{.id2 = "..all.other.landmarks.."} finds markers that 
 #'     uniquely identify a cluster
 #'   \item \strong{Pairwise}: Specify both \code{.id1} and \code{.id2} to compare two specific 
 #'     populations (e.g., CD4 vs CD8 T cells)
@@ -1229,7 +1229,7 @@ get.marker <-
     .id1.idx = NULL,
     .id2.idx = NULL,
     .id1 = NULL,
-    .id2 = "..all.other.subsets..",
+    .id2 = "..all.other.landmarks..",
     .id.from = "clustering"
   ) {
     
@@ -1268,11 +1268,11 @@ get.marker <-
     }
     
     if(is.null(x = .id2.idx)){
-      if(!all(.id2 %in% c("..all.other.subsets..",
+      if(!all(.id2 %in% c("..all.other.landmarks..",
                           unique(x = .lm.obj$graph[[.id.from]]$ids) |>
                           as.character()))){
         
-        stop(paste0(paste0(.id2[!(.id2 %in% c("..all.other.subsets..",
+        stop(paste0(paste0(.id2[!(.id2 %in% c("..all.other.landmarks..",
                                               unique(x = .lm.obj$graph[[.id.from]]$ids) |>
                                                 as.character()))],
                            collapse = ", "),
@@ -1284,11 +1284,8 @@ get.marker <-
     
     if(is.null(x = .id1.idx)){
       
-      .id1.idx <-
-        lapply(X = .lm.obj$map[[.id.from]]$ids,
-               FUN = function(smpl){
-                 which(x = smpl %in% .id1)
-               })
+      .lm1.idx <-
+        which(x = .lm.obj$graph[[.id.from]]$ids %in% .id1)
       
     } else {
       
@@ -1297,36 +1294,26 @@ get.marker <-
                     nrow(x = .lm.obj$lm)))
       }
       
-      .id1.idx <-
-        lapply(X = .lm.obj$map$nearest.landmarks,
-               FUN = function(smpl.knn)
-                 which(x = smpl.knn[,1] %in% .id1.idx))
+      .lm1.idx <-
+        .id1.idx
       
     }
     
-    if("..all.other.subsets.." %in% .id2){
+    if("..all.other.landmarks.." %in% .id2){
       
-      message("using `..all.other.subsets..` for .id2")
+      message("using `..all.other.landmarks..` for .id2")
       
-      .id2 <- "..all.other.subsets.."
+      .id2 <- "..all.other.landmarks.."
       
-      .id2.idx <-
-        names(x = .lm.obj$map$nearest.landmarks) |>
-        stats::setNames(nm = names(x = .lm.obj$map$nearest.landmarks)) |>
-        lapply(FUN = function(smpl.nm){
-          (nrow(x = .lm.obj$map$nearest.landmarks[[smpl.nm]]) |>
-             seq_len())[-.id1.idx[[smpl.nm]]]
-        })
+      .lm2.idx <-
+        which(x = !(.lm.obj$graph[[.id.from]]$ids %in% .id1))
       
     } else {
       
       if(is.null(x = .id2.idx)){
         
-        .id2.idx <-
-          lapply(X = .lm.obj$map[[.id.from]]$ids,
-                 FUN = function(smpl){
-                   which(x = smpl %in% .id2)
-                 })
+        .lm2.idx <-
+          which(x = .lm.obj$graph[[.id.from]]$ids %in% .id2)
         
       } else {
         
@@ -1335,10 +1322,8 @@ get.marker <-
                       nrow(x = .lm.obj$lm)))
         }
         
-        .id2.idx <-
-          lapply(X = .lm.obj$map$nearest.landmarks,
-                 FUN = function(smpl.knn)
-                   which(x = smpl.knn[,1] %in% .id2.idx))
+        .lm2.idx <-
+          .id2.idx
         
       }
       
@@ -1346,10 +1331,18 @@ get.marker <-
     
     # number of cells in each .id1 and .id2 pseudobulks
     n.pseudo1 <-
-      lengths(x = .id1.idx)
+      lapply(X = .lm.obj$map$nearest.landmarks,
+             FUN = function(smpl){
+               sum(smpl[,1,drop = TRUE] %in% .lm1.idx)
+             }) |>
+      unlist()
     
     n.pseudo2 <-
-      lengths(x = .id2.idx)
+      lapply(X = .lm.obj$map$nearest.landmarks,
+             FUN = function(smpl){
+               sum(smpl[,1,drop = TRUE] %in% .lm2.idx)
+             }) |>
+      unlist()
     
     # warn if outlier samples with too few cells are detected
     smpl.outlier.1 <-
@@ -1369,23 +1362,17 @@ get.marker <-
         warning(paste0("The following samples were removed from .id1 since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
                        paste(names(x = smpl.outlier.1)[smpl.outlier.1],
                              collapse = "\n")))
-        .id1.idx <-
-          .id1.idx[!smpl.outlier.1]
-        
       }
       
       if(any(smpl.outlier.2)){
         warning(paste0("The following samples were removed from .id2 since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
                        paste(names(x = smpl.outlier.2)[smpl.outlier.2],
                              collapse = "\n")))
-        .id2.idx <-
-          .id2.idx[!smpl.outlier.2]
-        
       }
       
       counts1 <-
-        names(x = .id1.idx) |>
-        stats::setNames(nm = names(x = .id1.idx)) |>
+        stats::setNames(object = names(x = .lm.obj$cells)[!smpl.outlier.1],
+                        nm = names(x = .lm.obj$cells)[!smpl.outlier.1]) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
@@ -1395,7 +1382,18 @@ get.marker <-
             tryCatch(
               expr = {
                 
-                Matrix::rowSums(x = exprs.mat[,.id1.idx[[smpl]],drop = FALSE])
+                wcl <- 
+                  .lm.obj$map$connect.prob[[smpl]][,.lm1.idx,drop = FALSE]
+                
+                # get weighted sum
+                wsum <-
+                  exprs.mat %*% wcl
+                
+                # get weighted mean using sum of weights and scale by number of cells
+                tmp.res <-
+                  (Matrix::rowSums(x = wsum) / sum(wcl)) * (sum(Matrix::rowSums(x = wcl) > 0))
+                
+                return(tmp.res)
                 
               },
               error = function(e) {
@@ -1417,8 +1415,8 @@ get.marker <-
         )()
       
       counts2 <-
-        names(x = .id2.idx) |>
-        stats::setNames(nm = names(x = .id2.idx)) |>
+        stats::setNames(object = names(x = .lm.obj$cells)[!smpl.outlier.2],
+                        nm = names(x = .lm.obj$cells)[!smpl.outlier.2]) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
@@ -1428,7 +1426,18 @@ get.marker <-
             tryCatch(
               expr = {
                 
-                Matrix::rowSums(x = exprs.mat[,.id2.idx[[smpl]],drop = FALSE])
+                wcl <- 
+                  .lm.obj$map$connect.prob[[smpl]][,.lm2.idx,drop = FALSE]
+                
+                # get weighted sum
+                wsum <-
+                  exprs.mat %*% wcl
+                
+                # get weighted mean using sum of weights and scale by number of cells
+                res <-
+                  (Matrix::rowSums(x = wsum) / sum(wcl)) * (sum(Matrix::rowSums(x = wcl) > 0))
+                
+                #Matrix::rowSums(x = exprs.mat[,.id1.idx[[smpl]],drop = FALSE])
                 
               },
               error = function(e) {
@@ -1552,8 +1561,8 @@ get.marker <-
     } else {
       
       counts1 <-
-        names(x = .lm.obj$cells) |>
-        stats::setNames(nm = names(x = .lm.obj$cells)) |>
+        stats::setNames(object = names(x = .lm.obj$cells),
+                        nm = names(x = .lm.obj$cells)) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
@@ -1566,7 +1575,18 @@ get.marker <-
             tryCatch(
               expr = {
                 
-                matrixStats::colMedians(x = exprs.mat[.id1.idx[[smpl]],,drop = FALSE])
+                wcl <- 
+                  .lm.obj$map$connect.prob[[smpl]][,.lm1.idx,drop = FALSE]
+                
+                # get weighted sum
+                wsum <-
+                  (Matrix::t(x = exprs.mat) %*% wcl)
+                
+                # get weighted mean using sum of weights
+                tmp.res <-
+                  Matrix::rowSums(x = wsum) / sum(wcl)
+                
+                return(tmp.res)
                 
               },
               error = function(e) {
@@ -1588,8 +1608,8 @@ get.marker <-
         )()
       
       counts2 <-
-        names(x = .lm.obj$cells) |>
-        stats::setNames(nm = names(x = .lm.obj$cells)) |>
+        stats::setNames(object = names(x = .lm.obj$cells),
+                        nm = names(x = .lm.obj$cells)) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
@@ -1602,7 +1622,18 @@ get.marker <-
             tryCatch(
               expr = {
                 
-                matrixStats::colMedians(x = exprs.mat[.id2.idx[[smpl]],,drop = FALSE])
+                wcl <- 
+                  .lm.obj$map$connect.prob[[smpl]][,.lm2.idx,drop = FALSE]
+                
+                # get weighted sum
+                wsum <-
+                  (Matrix::t(x = exprs.mat) %*% wcl)
+                
+                # get weighted mean using sum of weights
+                tmp.res <-
+                  Matrix::rowSums(x = wsum) / sum(wcl)
+                
+                return(tmp.res)
                 
               },
               error = function(e) {

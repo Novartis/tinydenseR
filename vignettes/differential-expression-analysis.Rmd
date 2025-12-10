@@ -407,7 +407,46 @@ tinydenseR::plotPCA(
 
 Interestingly, we can clearly see which cell states are affected despite the small shift in expression that was simulated. Furthermore, the affected cell states seem to be contained within cluster 3, which we can use as target cell population for differential expression.
 
-Importanly, tinydenseR **does not depened** on clustering for differential expression. As a matter of fact, any cell state feature can be used to define the target population as shown further below.
+#### Hypothesis testing results
+
+We can also visualize regions of statistically significant abundance change:
+
+```{r viz-hypothesis}
+tinydenseR::plotPCA(
+  .lm.obj = lm.cells.DE.0.5,
+  .feature = base::ifelse(
+    test = Treatment.stats.0.5$fit$coefficients[, "Activation"] < 0,
+    yes = "less abundant",
+    no = "more abundant"
+  ) |>
+  base::ifelse(
+    test = Treatment.stats.0.5$fit$pca.weighted.q[, "Activation"] < 0.1,
+    yes = _, no = "not sig."
+  ) |>
+  base::factor(x = _, levels = c("less abundant", "not sig.", "more abundant")),
+  .plot.title = "Activation vs Baseline",
+  .color.label = "q < 0.1",
+  .cat.feature.color = tinydenseR::Color.Palette[1, c(1, 6, 2)],
+  .point.size = 2,
+  .panel.size = 2
+) +
+  ggplot2::labs(subtitle = "Hypothesis Testing")
+```
+
+#### Beeswarm Plot
+
+A beeswarm plot provides a comprehensive view of abundance changes across clusters:
+
+```{r beeswarm}
+tinydenseR::plotBeeswarm(
+  .lm.obj = lm.cells.DE.0.5,
+  .stats.obj = Treatment.stats.0.5,
+  .coefs = "Activation",
+  .swarm.title = "Activation vs Baseline",
+  .row.space.scaler = 0.5,
+  .perc.plot = FALSE
+)
+```
 
 ### Differential Expression Testing
 
@@ -421,6 +460,8 @@ Now that we've identified cluster 3 as the target population, we can perform dif
   .id = "cluster.3"
 )
 ```
+
+Importantly, tinydenseR **does not depend** on clustering for differential expression. As a matter of fact, any cell state feature can be used to define the target population as shown further below.
 
 ### Visualizing Differential Expression Results
 
@@ -507,7 +548,7 @@ final_data_DE |>
 )
 ```
 
-```{r}
+```{r dea-cluster-independent-res}
 # View coefficients for all markers
 .cl.ind.dea.0.5$coefficients
 # View adjusted p-values for all markers
@@ -515,11 +556,114 @@ final_data_DE |>
 # Visualize differential expression analysis independently of clustering
 tinydenseR::plotDEA(
     .lm.obj = lm.cells.DE.0.5,
-    .dea.obj = .cl.ind.dea.0.5,
-    .coefs = c("Activation", "Batch2")
+    .dea.obj = .cl.ind.dea.0.5
 )
 ```
 
+## Identifying Markers of Cells in Differential States
+
+Now we can also examine the **marker expression profiles** that define these populations. This helps us understand the biological identity of the affected cell types.
+
+Above we identified differential cell states within cluster 3. Let's use `get.marker()` to identify which markers define this cluster compared to all other cells:
+
+```{r marker-identification}
+# Identify markers for cluster 3
+.marker.0.5 <-
+  tinydenseR::get.marker(
+    .lm.obj = lm.cells.DE.0.5,
+    .id1 = "cluster.3"
+  )
+```
+
+We can visualize how markers are expressed in cluster 3 versus the rest of the population:
+
+```{r marker-visualization, fig.height=6}
+# Visualize marker expression: Intercept shows overall expression, .id1 shows cluster-specific enrichment
+tinydenseR::plotDEA(
+    .lm.obj = lm.cells.DE.0.5,
+    .dea.obj = .marker.0.5,
+    .coefs = c("(Intercept)", ".id1")
+  )
+```
+
+Let's look at the statistical results:
+
+```{r marker-coefficients}
+# Coefficients: (Intercept) = mean expression across all cells
+#               .id1 = difference in cluster 3 vs rest
+.marker.0.5$coefficients[, c("(Intercept)", ".id1")]
+```
+
+```{r marker-pvalues}
+# Adjusted p-values for marker enrichment
+.marker.0.5$adj.p[, c("(Intercept)", ".id1")]
+```
+
+As expected, **Marker1, Marker4, and Marker5** show strong positive coefficients for `.id1`, indicating they are highly expressed in cluster 3 compared to other populations. This confirms our simulation design where these markers define the target cell population. Markers 2 and 3, on the other hand, show much less strong expression differences as expected.
+
+### Additional Visualization of Marker Expression
+
+A scatter plot provides flexibility to explore different types of visualizations. Here we plot the distributions of **Marker2 and Marker5** and color the landmarks by abundance log2FC:
+
+```{r scatter}
+tinydenseR::scatterPlot(
+  .x.feature = lm.cells.DE.0.5$lm[,"Marker2"],
+  .x.label = "Marker2",
+  .y.feature = lm.cells.DE.0.5$lm[,"Marker5"],
+  .y.label = "Marker5",
+  .color.feature = Treatment.stats.0.5$fit$coefficients[, "Activation"],
+  .color.label = "Abundance\nlog2(+0.5) FC",
+  .plot.title = "Activation vs Baseline",
+  .panel.size = c(3,3),
+  .point.size = 2
+)
+```
+
+### Traditional Cluster-based Comparisons
+
+In addition to the high resolution analysis described above, tinydenseR can also provide cluster-based results as follows.
+
+```{r cluster-stats}
+tinydenseR::plotTradStats(.lm.obj = lm.cells.DE.0.5, .stats.obj = Treatment.stats.0.5)
+```
+
+```{r cluster-percentages, fig.height=5}
+# Prepare statistical test results
+stat.test.percentages.DE.0.5 <-
+  lm.cells.DE.0.5$map$clustering$cell.perc |>
+  dplyr::as_tibble() |>
+  dplyr::mutate(treatment = lm.cells.DE.0.5$metadata$Treatment) |>
+  tidyr::pivot_longer(cols = tidyr::starts_with(match = "cluster.")) |>
+  dplyr::group_by(name) |>
+  rstatix::t_test(formula = value ~ treatment) |>
+  dplyr::mutate(
+    p = Treatment.stats.0.5$trad$clustering$fit$adj.p[name, "Activation"],
+    p.adj = Treatment.stats.0.5$trad$clustering$fit$adj.p[name, "Activation"]
+  ) |>
+  rstatix::add_significance() |>
+  dplyr::mutate(p.adj = base::ifelse(
+    test = p.adj < 0.01,
+    yes = base::formatC(x = p.adj, digits = 0, format = "e"),
+    no = base::formatC(x = p.adj, digits = 2, format = "f")
+  )) |>
+  rstatix::add_xy_position(x = "treatment")
+
+tinydenseR::plotTradPerc(
+  .lm.obj = lm.cells.DE.0.5,
+  .x.split = "Treatment",
+  .x.space.scaler = 0.3
+) + 
+  ggplot2::labs(title = "Cluster Proportions") + 
+  ggpubr::stat_pvalue_manual(
+    data = stat.test.percentages.DE.0.5, 
+    label = "p.adj",
+    label.size = 3
+  ) +
+  ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.15)))
+```
+
+However, as shown below, the traditional cluster-based approach fails to identify the differential states.
+ 
 ## Why Focus on 0.5 SD?
 
 We chose to analyze the 0.5 SD shift in detail because:
