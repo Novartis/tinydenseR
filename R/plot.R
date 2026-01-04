@@ -1087,6 +1087,268 @@ plotSamplePCA <-
   }
 
 
+#' Plot Sample Embedding from get.embedding
+#'
+#' Visualizes the sample-level embedding computed by \code{\link{get.embedding}}, which
+#' represents the projection of samples onto the effect-associated subspace identified
+#' via FWL decomposition or nested model comparison.
+#'
+#' @param .lm.obj A tinydenseR object with metadata.
+#' @param .stats.obj Statistical results from \code{get.stats()} with embedding computed
+#'   via \code{get.embedding()}.
+#' @param .embedding.slot Character string specifying which embedding to plot. Must match
+#'   a name in \code{.stats.obj$embedding}. For FWL method, this is the contrast name;
+#'   for nested model method, this is the term of interest (metadata column name).
+#' @param .color.by Character string specifying which metadata column to use for coloring
+#'   points. Defaults to \code{.embedding.slot} if it exists in metadata, otherwise
+#'   uses the first metadata column.
+#' @param .pc.x Integer specifying which PC to plot on x-axis (default 1).
+#' @param .pc.y Integer specifying which PC to plot on y-axis (default 2).
+#' @param .cat.feature.color Character vector of colors for categorical features.
+#'   Defaults to first 5 colors from \code{Color.Palette} row 1.
+#' @param .point.size Numeric point size (default 1).
+#' @param .panel.size Numeric panel size in inches (default 2).
+#' @param .midpoint Numeric midpoint for continuous color scale.
+#'   Defaults to median of \code{.color.by} column.
+#'
+#' @return A \code{ggplot} object showing the sample embedding colored by the
+#'   metadata variable specified by \code{.color.by}.
+#'
+#' @details
+#' This function plots the sample coordinates from an embedding computed by
+#' \code{\link{get.embedding}}. The embedding captures the variation in landmark
+#' densities attributable to a specific contrast or set of covariates.
+#'
+#' When using the FWL method (contrast-based), the embedding slot is named after the
+#' contrast (e.g., "TrtVsCtrl"), so you should specify \code{.color.by} to indicate
+#' which metadata column to use for coloring (e.g., "Group").
+#'
+#' For embeddings with rank > 1 (e.g., from nested model comparison with multiple
+#' covariates), you can plot different PC combinations using \code{.pc.x} and \code{.pc.y}.
+#'
+#' When the embedding has only 1 PC (e.g., from a single contrast), the function
+#' automatically creates a boxplot with the covariate on the x-axis and PC1 on the y-axis,
+#' with individual points overlaid.
+#'
+#' @seealso \code{\link{get.embedding}} for computing embeddings,
+#'   \code{\link{plotSamplePCA}} for PCA on raw densities
+#'
+#' @examples
+#' \dontrun{
+#' # FWL method: embedding slot named after contrast
+#' stats <- get.embedding(
+#'     .lm.obj = lm.obj,
+#'     .stats.obj = stats,
+#'     .contrast.of.interest = "TrtVsCtrl"
+#' )
+#'
+#' # Plot the embedding (specify .color.by for metadata column)
+#' plotSampleEmbedding(lm.obj, stats, 
+#'                     .embedding.slot = "TrtVsCtrl", 
+#'                     .color.by = "Group")
+#'
+#' # Nested model method: embedding slot named after term of interest
+#' stats <- get.embedding(
+#'     .lm.obj = lm.obj,
+#'     .stats.obj = stats,
+#'     .term.of.interest = "disease",
+#'     .red.stats.obj = red.stats
+#' )
+#'
+#' # Plot (no .color.by needed, uses .embedding.slot)
+#' plotSampleEmbedding(lm.obj, stats, .embedding.slot = "disease")
+#' }
+#'
+#' @export
+#'
+plotSampleEmbedding <-
+  function(
+    .lm.obj,
+    .stats.obj,
+    .embedding.slot,
+    .color.by = NULL,
+    .pc.x = 1,
+    .pc.y = 2,
+    .cat.feature.color = Color.Palette[1,1:5],
+    .point.size = 1,
+    .panel.size = 2,
+    .midpoint = NULL
+  ){
+    
+    PC_x <- PC_y <- PC1 <- covariate <- labels.from <- NULL
+    
+    # -------------------------------------------------------------------------
+    # Input validation
+    # -------------------------------------------------------------------------
+    
+    if(missing(.embedding.slot) || !is.character(.embedding.slot) || length(.embedding.slot) != 1){
+      stop("'.embedding.slot' must be a single character string")
+    }
+    
+    if(is.null(x = .stats.obj$embedding)){
+      stop("No embeddings found in '.stats.obj'. Run get.embedding() first.")
+    }
+    
+    if(!(.embedding.slot %in% names(x = .stats.obj$embedding))){
+      stop(paste0("'", .embedding.slot, "' not found in embeddings. Available: ",
+                  paste(names(.stats.obj$embedding), collapse = ", ")))
+    }
+    
+    # Determine color.by: use provided value, fall back to .embedding.slot if in metadata, else first column
+    if(is.null(x = .color.by)){
+      if(.embedding.slot %in% colnames(x = .lm.obj$metadata)){
+        .color.by <- .embedding.slot
+      } else {
+        .color.by <- colnames(x = .lm.obj$metadata)[1]
+        message("'.embedding.slot' not in metadata. Coloring by '", .color.by, "'")
+      }
+    }
+    
+    if(!(.color.by %in% colnames(x = .lm.obj$metadata))){
+      stop(paste0("'.color.by' = '", .color.by, "' not found in metadata columns: ",
+                  paste(colnames(.lm.obj$metadata), collapse = ", ")))
+    }
+    
+    # Set midpoint default
+    if(is.null(x = .midpoint) && is.numeric(x = .lm.obj$metadata[[.color.by]])){
+      .midpoint <- stats::median(x = .lm.obj$metadata[[.color.by]])
+    }
+    
+    # -------------------------------------------------------------------------
+    # Extract embedding coordinates
+    # -------------------------------------------------------------------------
+    
+    embed <- .stats.obj$embedding[[.embedding.slot]]
+    
+    if(is.null(x = embed$coord)){
+      stop("Embedding does not contain coordinates. Check get.embedding() output.")
+    }
+    
+    n.pcs <- ncol(embed$coord)
+    
+    # -------------------------------------------------------------------------
+    # Handle single PC case: boxplot with covariate on x-axis
+    # -------------------------------------------------------------------------
+    
+    if(n.pcs == 1){
+      
+      plot.data <-
+        data.frame(
+          PC1 = embed$coord[, 1],
+          covariate = .lm.obj$metadata[[.color.by]]
+        )
+      
+      p <-
+        ggplot2::ggplot(data = plot.data,
+                        mapping = ggplot2::aes(x = covariate,
+                                               y = PC1)) +
+        ggplot2::theme_bw() +
+        ggplot2::geom_boxplot(outliers = FALSE) +
+        ggplot2::geom_point(mapping = ggplot2::aes(color = covariate),
+                            size = I(x = .point.size),
+                            position = ggplot2::position_jitter(height = 0,
+                                                                width = 0.2,
+                                                                seed = 123)) +
+        ggplot2::labs(
+          x = .color.by,
+          y = paste0("partial-effect PC1 projection"),
+          color = .color.by
+        ) +
+        ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
+                                                  units = "in"),
+                                col = grid::unit(x = .panel.size,
+                                                 units = "in"))
+      
+      # Apply color scale for points
+      if(is.numeric(x = plot.data$covariate)){
+        p <-
+          p +
+          ggplot2::scale_color_gradient2(low = unname(obj = Color.Palette[1,1]),
+                                         mid = unname(obj = Color.Palette[1,6]),
+                                         high = unname(obj = Color.Palette[1,2]),
+                                         midpoint = .midpoint)
+      } else {
+        p <-
+          p +
+          ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5))) +
+          ggplot2::scale_color_manual(
+            values = grDevices::colorRampPalette(
+              colors = unname(
+                obj = .cat.feature.color)
+            )(length(x = unique(x = plot.data$covariate))))
+      }
+      
+      return(p)
+      
+    }
+    
+    # -------------------------------------------------------------------------
+    # Multi-PC case: validate requested PCs
+    # -------------------------------------------------------------------------
+    
+    if(.pc.x > n.pcs || .pc.y > n.pcs){
+      stop(paste0("Requested PC (", max(.pc.x, .pc.y), ") exceeds available PCs (", n.pcs, ")"))
+    }
+    
+    # -------------------------------------------------------------------------
+    # Build plot data
+    # -------------------------------------------------------------------------
+    
+    plot.data <-
+      data.frame(
+        PC_x = embed$coord[, .pc.x],
+        PC_y = embed$coord[, .pc.y],
+        labels.from = .lm.obj$metadata[[.color.by]]
+      )
+    
+    # -------------------------------------------------------------------------
+    # Create plot
+    # -------------------------------------------------------------------------
+    
+    p <-
+      ggplot2::ggplot(data = plot.data,
+                      mapping = ggplot2::aes(x = PC_x,
+                                             y = PC_y,
+                                             color = labels.from)) +
+      ggplot2::theme_bw() +
+      ggplot2::geom_point(size = I(x = .point.size)) +
+      ggplot2::labs(
+        x = paste0("partial-effect PC", .pc.x, " projection"),
+        y = paste0("partial-effect PC", .pc.y, " projection"),
+        color = .color.by
+      ) +
+      ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
+                                                units = "in"),
+                              col = grid::unit(x = .panel.size,
+                                               units = "in"))
+    
+    # -------------------------------------------------------------------------
+    # Apply color scale
+    # -------------------------------------------------------------------------
+    
+    if(is.numeric(x = plot.data$labels.from)){
+      p <-
+        p +
+        ggplot2::scale_color_gradient2(low = unname(obj = Color.Palette[1,1]),
+                                       mid = unname(obj = Color.Palette[1,6]),
+                                       high = unname(obj = Color.Palette[1,2]),
+                                       midpoint = .midpoint)
+    } else {
+      p <-
+        p +
+        ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5))) +
+        ggplot2::scale_color_manual(
+          values = grDevices::colorRampPalette(
+            colors = unname(
+              obj = .cat.feature.color)
+          )(length(x = unique(x = plot.data$labels.from))))
+    }
+    
+    return(p)
+    
+  }
+
+
 #' Plot Traditional Statistics
 #'
 #' Visualizes results from traditional cluster/cell type-level differential abundance testing. 

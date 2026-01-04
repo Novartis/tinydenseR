@@ -565,7 +565,7 @@ lm.cells$map$fdens |>
 ``` r
 # Set up design matrix for statistical testing
 .design <- model.matrix(object = ~ Condition + Replicate,
-                       data = .meta)
+                       data = lm.cells$metadata)
 
 # Test for differential abundance between conditions
 condition.stats <- tinydenseR::get.stats(
@@ -585,7 +585,9 @@ condition.stats <- tinydenseR::get.stats(
 )
 ```
 
-### Visualization
+### Visualizations
+
+Landmarks with differential density:
 
 ``` r
 # Show density fold changes between conditions
@@ -619,6 +621,52 @@ tinydenseR::plotPCA(
 <a href="man/figures/README-unnamed-chunk-8-1.png"><img src="man/figures/README-unnamed-chunk-8-1.png" align="center" height="300" /></a>
 
 <a href="man/figures/README-unnamed-chunk-8-2.png"><img src="man/figures/README-unnamed-chunk-8-2.png" align="center" height="300" /></a>
+
+Samples quantitatively embedded along the Condition axis:
+
+``` r
+# Create reduced model to embed samples quantitatively along the Condition axis
+red.design <- model.matrix(object = ~ Replicate,
+                       data = lm.cells$metadata)
+
+red.stats <- tinydenseR::get.stats(
+    .lm.obj = lm.cells,
+    .design = red.design,
+    .verbose = FALSE 
+)
+#> Warning in tinydenseR::get.stats(.lm.obj = lm.cells, .design = red.design, :
+#> q-value estimation is not recommended for fewer than 100 tests. Using BH
+#> instead.
+
+# update stats results to get sample embedding
+condition.stats <-
+  tinydenseR::get.embedding(
+    .lm.obj = lm.cells,
+    .stats.obj = condition.stats,
+    .term.of.interest = "Condition",
+    .red.stats.obj = red.stats,
+    .verbose = FALSE 
+)
+```
+
+``` r
+# Embed samples based on differences along Condition
+tinydenseR::plotSampleEmbedding(
+    .lm.obj = lm.cells,
+    .stats.obj = condition.stats, 
+    .embedding.slot = "Condition",
+    .color.by = "Condition",
+    .cat.feature.color = tinydenseR::Color.Palette[1,c(1,2)],
+    .panel.size = 1.5,
+    .point.size = 2
+) +
+  ggplot2::labs(title = "Quantitative Sample Embedding",
+                subtitle = "in relation to Condition") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                 plot.subtitle = ggplot2::element_text(hjust = 0.5))
+```
+
+<a href="man/figures/README-unnamed-chunk-10-1.png"><img src="man/figures/README-unnamed-chunk-10-1.png" align="center" height="300" /></a>
 
 ### Explore Individual Genes
 

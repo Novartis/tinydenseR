@@ -396,7 +396,7 @@ get.cells.Seurat5 <-
       cat("Successfully created .cells object with", length(x = .cells), "samples\n")
     }
     
-    return(.cells)
+    return(.cells[rownames(x = .meta)])
     
   }
 
@@ -606,7 +606,7 @@ get.cells.Seurat <-
       cat("Successfully created .cells object with", length(x = .cells), "samples\n")
     }
     
-    return(.cells)
+    return(.cells[rownames(x = .meta)])
     
   }
 
@@ -802,7 +802,7 @@ get.cells.SCE <-
       cat("Successfully created .cells object with", length(x = .cells), "samples\n")
     }
     
-    return(.cells)
+    return(.cells[rownames(x = .meta)])
     
   }
 

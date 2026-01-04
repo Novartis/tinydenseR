@@ -44,9 +44,9 @@ only cells with these landmarks as nearest neighbors are aggregated. Useful for 
 List containing DE analysis results:
 \describe{
 \item{\code{fit}}{limma MArrayLM fit object with moderated statistics}
-\item{\code{coefficients}}{Log fold change matrix (features × coefficients)}
-\item{\code{p.value}}{P-values (features × coefficients)}
-\item{\code{adj.p}}{FDR-adjusted p-values (features × coefficients)}
+\item{\code{coefficients}}{Log fold change matrix (features x coefficients)}
+\item{\code{p.value}}{P-values (features x coefficients)}
+\item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
 \item{\code{smpl.outlier}}{Logical vector indicating which samples were excluded as outliers}
 \item{\code{id.idx}}{List of integer vectors showing which cells were included per sample}
 \item{\code{n.pseudo}}{Integer vector of pseudobulk cell counts per sample}

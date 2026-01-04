@@ -33,12 +33,12 @@ contrast. Create with \code{limma::makeContrasts()}. If NULL, tests all coeffici
 \value{
 List containing differential abundance results:
 \describe{
-\item{\code{y}}{log2(fuzzy density + 0.5) matrix: landmarks × samples}
+\item{\code{y}}{log2(fuzzy density + 0.5) matrix: landmarks x samples}
 \item{\code{fit}}{limma MArrayLM object after eBayes with moderated statistics, containing:}
-\item{\code{fit$coefficients}}{Log fold changes (landmarks × coefficients), nested in fit}
-\item{\code{fit$p.value}}{P-values (landmarks × coefficients), nested in fit}
-\item{\code{fit$density.weighted.bh.fdr}}{Density-weighted BH FDR adjustment (landmarks × coefficients)}
-\item{\code{fit$pca.weighted.q}}{PCA-weighted q-values (landmarks × coefficients)}
+\item{\code{fit$coefficients}}{Log fold changes (landmarks x coefficients), nested in fit}
+\item{\code{fit$p.value}}{P-values (landmarks x coefficients), nested in fit}
+\item{\code{fit$density.weighted.bh.fdr}}{Density-weighted BH FDR adjustment (landmarks x coefficients)}
+\item{\code{fit$pca.weighted.q}}{PCA-weighted q-values (landmarks x coefficients)}
 \item{\code{trad}}{List with traditional cluster-level DA results}
 \item{\code{trad$clustering$fit}}{limma fit for cluster percentages with \code{$adj.p} slot}
 \item{\code{trad$celltyping$fit}}{limma fit for celltype percentages with \code{$adj.p} slot (if celltyping exists)}
@@ -86,10 +86,10 @@ the cell state space. To account for this:
 \enumerate{
 \item \strong{Residualize PCs}: Regress out design matrix from landmark PCA embeddings to
 obtain covariates independent of experimental factors
-\item \strong{Estimate π₀}: Use \code{swfdr::lm_pi0} to estimate the proportion of true
+\item \strong{Estimate pi0}: Use \code{swfdr::lm_pi0} to estimate the proportion of true
 nulls conditional on PC coordinates. Landmarks in similar cell states have correlated
 p-values; PCA captures this spatial structure
-\item \strong{Conservative safeguard}: If global π₀ < 0.6, apply π₀ floor of 0.6 to prevent
+\item \strong{Conservative safeguard}: If global pi0 < 0.6, apply pi0 floor of 0.6 to prevent
 anti-conservative estimates in high-signal regimes
 \item \strong{Compute q-values}: Use \code{swfdr::lm_qvalue} to calculate spatially-weighted
 FDR that properly accounts for landmark correlation structure

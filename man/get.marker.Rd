@@ -39,9 +39,9 @@ and \code{.id2}.}
 \value{
 limma MArrayLM fit object with moderated statistics and additional slots:
 \describe{
-\item{\code{coefficients}}{Log fold changes (features × coefficients), nested in fit}
-\item{\code{p.value}}{P-values (features × coefficients), nested in fit}
-\item{\code{adj.p}}{FDR-adjusted p-values (features × coefficients)}
+\item{\code{coefficients}}{Log fold changes (features x coefficients), nested in fit}
+\item{\code{p.value}}{P-values (features x coefficients), nested in fit}
+\item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
 \item{\code{smpl.outlier.1}}{Logical vector: samples excluded from group 1}
 \item{\code{smpl.outlier.2}}{Logical vector: samples excluded from group 2}
 \item{\code{id1.idx}}{List of integer vectors: cells included per sample for group 1}
