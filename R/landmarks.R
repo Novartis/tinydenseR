@@ -174,9 +174,9 @@ setup.lm.obj <-
     
     .lm.obj.nm <-
       c("cells",
-        "lm",
-        "scaled.lm",
-        "raw.lm",
+        "landmarks",
+        "scaled.landmarks",
+        "raw.landmarks",
         "metadata",
         "key",
         "pca",
@@ -391,14 +391,14 @@ setup.lm.obj <-
 #' 
 #' @return Updated \code{.lm.obj} with populated fields:
 #'   \describe{
-#'     \item{\code{$raw.lm}}{Raw counts matrix for landmarks (landmarks × features)}
-#'     \item{\code{$lm}}{Processed landmark expression on selected features (landmarks × features):
+#'     \item{\code{$raw.landmarks}}{Raw counts matrix for landmarks (landmarks × features)}
+#'     \item{\code{$landmarks}}{Processed landmark expression on selected features (landmarks × features):
 #'       \itemize{
 #'         \item RNA: PCA-reconstructed denoised expression (log2-scale after library size normalization)
 #'         \item Cytometry: Original marker values on selected markers
 #'       }
 #'     }
-#'     \item{\code{$scaled.lm}}{Z-scored landmark expression (landmarks × features, for visualization/heatmaps)}
+#'     \item{\code{$scaled.landmarks}}{Z-scored landmark expression (landmarks × features, for visualization/heatmaps)}
 #'     \item{\code{$pca}}{List containing PCA results:
 #'       \itemize{
 #'         \item \code{$embed} - PC coordinates for landmarks (landmarks × PCs)
@@ -449,9 +449,9 @@ get.landmarks <-
     if(!identical(
       x = names(x = .lm.obj), 
       y = c("cells",
-            "lm",
-            "scaled.lm",
-            "raw.lm",
+            "landmarks",
+            "scaled.landmarks",
+            "raw.landmarks",
             "metadata",
             "key",
             "pca",
@@ -476,7 +476,7 @@ get.landmarks <-
     
     # PASS 1: Sample-wise landmark selection using local PCA
     # For each sample independently, compute PCA and select landmarks via leverage scores
-    .lm.obj$raw.lm <-
+    .lm.obj$raw.landmarks <-
       seq_along(along.with = .lm.obj$cells) |>
       stats::setNames(nm = names(x = .lm.obj$cells)) |>
       lapply(FUN = function(.cells.idx){
@@ -610,8 +610,8 @@ get.landmarks <-
     
     if(.lm.obj$assay.type == "RNA"){
       
-      .lm.obj$raw.lm <-
-        methods::as(object = .lm.obj$raw.lm,
+      .lm.obj$raw.landmarks <-
+        methods::as(object = .lm.obj$raw.landmarks,
                    Class = "CsparseMatrix")
       
     }
@@ -627,7 +627,7 @@ get.landmarks <-
         
         vdj.mito.ribo <-
           grep(pattern = "^TR[AB][VDJ]\\d+|^IG[KHL][VDJ]\\d+|^RP|^MT-",
-               x = colnames(x = .lm.obj$raw.lm),
+               x = colnames(x = .lm.obj$raw.landmarks),
                fixed = FALSE,
                value = TRUE,
                ignore.case = TRUE)
@@ -642,10 +642,10 @@ get.landmarks <-
       if(!is.null(x = .force.in)){
         if(inherits(x = .force.in,
                     what = "character")){
-          if(any(!.force.in %in% colnames(x = .lm.obj$raw.lm))){
+          if(any(!.force.in %in% colnames(x = .lm.obj$raw.landmarks))){
             
             warning("Genes not found in expression data: ",
-                    paste(.force.in[!(.force.in %in% colnames(x = .lm.obj$raw.lm))],
+                    paste(.force.in[!(.force.in %in% colnames(x = .lm.obj$raw.landmarks))],
                           collapse = ", "))
             
           }
@@ -656,7 +656,7 @@ get.landmarks <-
           
           # Get indices of forced-in genes for later merging with HVGs
           .force.in.idx <-
-            which(x = colnames(x = .lm.obj$raw.lm)[!colnames(x = .lm.obj$raw.lm) %in% vdj.mito.ribo] %in% .force.in)
+            which(x = colnames(x = .lm.obj$raw.landmarks)[!colnames(x = .lm.obj$raw.landmarks) %in% vdj.mito.ribo] %in% .force.in)
           
         } else {
           stop(".force.in must be either NULL or a character vector")
@@ -668,18 +668,18 @@ get.landmarks <-
       }
       
       # Normalize and log-transform pooled landmarks
-      .lm.obj$lm <-
-        .lm.obj$raw.lm /
-        (Matrix::rowSums(x = .lm.obj$raw.lm) /
-           mean(x = Matrix::rowSums(x = .lm.obj$raw.lm)))
+      .lm.obj$landmarks <-
+        .lm.obj$raw.landmarks /
+        (Matrix::rowSums(x = .lm.obj$raw.landmarks) /
+           mean(x = Matrix::rowSums(x = .lm.obj$raw.landmarks)))
       
-      .lm.obj$lm@x <-
-        log2(x = .lm.obj$lm@x + 1)
+      .lm.obj$landmarks@x <-
+        log2(x = .lm.obj$landmarks@x + 1)
       
       # Select HVGs across all pooled landmarks, merge with forced-in genes
       HVG <-
         sparseMatrixStats::colVars(
-          x = .lm.obj$lm[,!colnames(x = .lm.obj$lm) %in% vdj.mito.ribo]) |>
+          x = .lm.obj$landmarks[,!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo]) |>
         order(decreasing = TRUE) |>
         utils::head(n = .nHVG) |>
         (\(x)
@@ -689,42 +689,42 @@ get.landmarks <-
         )() |>
         (\(x)
          `names<-`(x = x,
-                   value = colnames(x = .lm.obj$lm)[!colnames(x = .lm.obj$lm) %in% vdj.mito.ribo][x])
+                   value = colnames(x = .lm.obj$landmarks)[!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo][x])
         )()
       
     } else {
       
-      .lm.obj$lm <-
-        .lm.obj$raw.lm
+      .lm.obj$landmarks <-
+        .lm.obj$raw.landmarks
       
       HVG <-
-        ncol(x = .lm.obj$lm) |>
+        ncol(x = .lm.obj$landmarks) |>
         seq_len() |>
         (\(x)
          `names<-`(x = x,
-                   value = colnames(x = .lm.obj$lm)[x])
+                   value = colnames(x = .lm.obj$landmarks)[x])
         )()
       
     }
     
-    .lm.obj$lm <-
+    .lm.obj$landmarks <-
       if(.lm.obj$assay.type == "RNA") {
-        .lm.obj$lm[,colnames(x = .lm.obj$lm)[!colnames(x = .lm.obj$lm) %in% vdj.mito.ribo][HVG]]
+        .lm.obj$landmarks[,colnames(x = .lm.obj$landmarks)[!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo][HVG]]
       } else {
-        .lm.obj$lm[,HVG]
+        .lm.obj$landmarks[,HVG]
       }
     
     .lm.obj$pca$center <-
-      Matrix::colMeans(x = .lm.obj$lm)
+      Matrix::colMeans(x = .lm.obj$landmarks)
     
     .lm.obj$pca$scale <-
-      sparseMatrixStats::colSds(x = .lm.obj$lm)
+      sparseMatrixStats::colSds(x = .lm.obj$landmarks)
     
     if(.lm.obj$assay.type == "RNA"){
       
       pca_res <-
         irlba::irlba(
-          A = .lm.obj$lm,
+          A = .lm.obj$landmarks,
           nv = .nPC,
           center = .lm.obj$pca$center,
           scale = .lm.obj$pca$scale)
@@ -732,7 +732,7 @@ get.landmarks <-
     } else {
       
       pca_res <-
-        Matrix::t(x = .lm.obj$lm) |>
+        Matrix::t(x = .lm.obj$landmarks) |>
         (\(x)
          (x - .lm.obj$pca$center) /
            .lm.obj$pca$scale
@@ -747,10 +747,10 @@ get.landmarks <-
              seq_along(along.with = pca_res$d))
     
     rownames(x = pca_res$u) <-
-      rownames(x = .lm.obj$lm)
+      rownames(x = .lm.obj$landmarks)
     
     rownames(x = pca_res$v) <-
-      colnames(x = .lm.obj$lm)
+      colnames(x = .lm.obj$landmarks)
     
     pca_res$embed <-
       pca_res$u %*%
@@ -787,7 +787,7 @@ get.landmarks <-
           metadata = .lm.obj$metadata[.lm.obj$key,],
           vargenes_means_sds =
             dplyr::tibble(
-              symbol = colnames(x = .lm.obj$lm),
+              symbol = colnames(x = .lm.obj$landmarks),
               mean = .lm.obj$pca$center,
               stddev = .lm.obj$pca$scale
             ),
@@ -806,7 +806,7 @@ get.landmarks <-
         Matrix::t(x = .lm.obj$harmony.obj$Z_corr) |> 
         (\(x)
          `rownames<-`(x = x,
-                      value = rownames(x = .lm.obj$lm))
+                      value = rownames(x = .lm.obj$landmarks))
          )()
       
     }
@@ -814,7 +814,7 @@ get.landmarks <-
     # PASS 2: Refine landmark selection using dataset-wide PCA
     # Now that we have initial landmarks from all samples, compute global PCA
     # and reselect landmarks based on leverage scores in this shared space
-    .lm.obj$raw.lm <-
+    .lm.obj$raw.landmarks <-
       seq_along(along.with = .lm.obj$cells) |>
       stats::setNames(nm = names(x = .lm.obj$cells)) |> 
       lapply(FUN = function(.cells.idx){
@@ -832,7 +832,7 @@ get.landmarks <-
              # size factor normalization, taking into consideration size factor of landmarks
              (x / (Matrix::rowSums(x = x) /
                      mean(x = Matrix::rowSums(x = x)))) * 
-               (mean(x = Matrix::rowSums(x = x)) / mean(x = Matrix::rowSums(x = .lm.obj$raw.lm)))
+               (mean(x = Matrix::rowSums(x = x)) / mean(x = Matrix::rowSums(x = .lm.obj$raw.landmarks)))
             )()
           
           mat@x <-
@@ -845,7 +845,7 @@ get.landmarks <-
           
           # Map cells to Harmony-corrected space using Symphony
           corr_embed <-
-            symphony::mapQuery(exp_query = Matrix::t(x = mat[,colnames(x = .lm.obj$lm)]),
+            symphony::mapQuery(exp_query = Matrix::t(x = mat[,colnames(x = .lm.obj$landmarks)]),
                                metadata_query = matrix(data = 1,
                                                        nrow = nrow(x = mat),
                                                        ncol = 2),
@@ -857,7 +857,7 @@ get.landmarks <-
           
           # Standardize features for SVD
           Y <-
-            Matrix::t(x = mat[,colnames(x = .lm.obj$lm)]) |>
+            Matrix::t(x = mat[,colnames(x = .lm.obj$landmarks)]) |>
             (\(x)
              (x - .lm.obj$pca$center) /
                .lm.obj$pca$scale
@@ -876,7 +876,7 @@ get.landmarks <-
                       nv = nrow(x = corr_embed))
           
           dimnames(x = res$v) <-
-            list(colnames(x = .lm.obj$lm),
+            list(colnames(x = .lm.obj$landmarks),
                  rownames(x = corr_embed))
           
           #res$v <-
@@ -898,7 +898,7 @@ get.landmarks <-
           
           # Without Harmony: project cells onto global PCA and compute leverage scores
           lev.score <-
-            (((((Matrix::t(x = mat[,colnames(x = .lm.obj$lm)]) - .lm.obj$pca$center) /
+            (((((Matrix::t(x = mat[,colnames(x = .lm.obj$landmarks)]) - .lm.obj$pca$center) /
                   .lm.obj$pca$scale) |>
                  Matrix::t()) %*%
                 .lm.obj$pca$v) %*%
@@ -954,17 +954,17 @@ get.landmarks <-
     # Recompute PCA on refined Pass 2 landmarks (final feature set and embedding)
     if(.lm.obj$assay.type == "RNA"){
       
-      .lm.obj$lm <-
-        .lm.obj$raw.lm /
-        (Matrix::rowSums(x = .lm.obj$raw.lm) /
-           mean(x = Matrix::rowSums(x = .lm.obj$raw.lm)))
+      .lm.obj$landmarks <-
+        .lm.obj$raw.landmarks /
+        (Matrix::rowSums(x = .lm.obj$raw.landmarks) /
+           mean(x = Matrix::rowSums(x = .lm.obj$raw.landmarks)))
       
-      .lm.obj$lm@x <-
-        log2(x = .lm.obj$lm@x + 1)
+      .lm.obj$landmarks@x <-
+        log2(x = .lm.obj$landmarks@x + 1)
       
       HVG <-
         sparseMatrixStats::colVars(
-          x = .lm.obj$lm[,!colnames(x = .lm.obj$lm) %in% vdj.mito.ribo]) |>
+          x = .lm.obj$landmarks[,!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo]) |>
         order(decreasing = TRUE) |>
         utils::head(n = .nHVG) |>
         (\(x)
@@ -974,42 +974,42 @@ get.landmarks <-
         )() |>
         (\(x)
          `names<-`(x = x,
-                   value = colnames(x = .lm.obj$lm)[!colnames(x = .lm.obj$lm) %in% vdj.mito.ribo][x])
+                   value = colnames(x = .lm.obj$landmarks)[!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo][x])
         )()
       
     } else {
       
-      .lm.obj$lm <-
-        .lm.obj$raw.lm
+      .lm.obj$landmarks <-
+        .lm.obj$raw.landmarks
       
       HVG <-
-        ncol(x = .lm.obj$lm) |>
+        ncol(x = .lm.obj$landmarks) |>
         seq_len() |>
         (\(x)
          `names<-`(x = x,
-                   value = colnames(x = .lm.obj$lm)[x])
+                   value = colnames(x = .lm.obj$landmarks)[x])
         )()
       
     }
     
-    .lm.obj$lm <-
+    .lm.obj$landmarks <-
       if(.lm.obj$assay.type == "RNA") {
-        .lm.obj$lm[,colnames(x = .lm.obj$lm)[!colnames(x = .lm.obj$lm) %in% vdj.mito.ribo][HVG]]
+        .lm.obj$landmarks[,colnames(x = .lm.obj$landmarks)[!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo][HVG]]
       } else {
-        .lm.obj$lm[,HVG]
+        .lm.obj$landmarks[,HVG]
       }
     
     .lm.obj$pca$center <-
-      Matrix::colMeans(x = .lm.obj$lm)
+      Matrix::colMeans(x = .lm.obj$landmarks)
     
     .lm.obj$pca$scale <-
-      sparseMatrixStats::colSds(x = .lm.obj$lm)
+      sparseMatrixStats::colSds(x = .lm.obj$landmarks)
     
     if(.lm.obj$assay.type == "RNA"){
       
       pca_res <-
         irlba::irlba(
-          A = .lm.obj$lm,
+          A = .lm.obj$landmarks,
           nv = .nPC,
           center = .lm.obj$pca$center,
           scale = .lm.obj$pca$scale)
@@ -1017,7 +1017,7 @@ get.landmarks <-
     } else {
       
       pca_res <-
-        Matrix::t(x = .lm.obj$lm) |>
+        Matrix::t(x = .lm.obj$landmarks) |>
         (\(x)
          (x - .lm.obj$pca$center) /
            .lm.obj$pca$scale
@@ -1032,7 +1032,7 @@ get.landmarks <-
         .lm.obj$pca)
     
     dimnames(x = .lm.obj$pca$u) <-
-      list(rownames(x = .lm.obj$lm),
+      list(rownames(x = .lm.obj$landmarks),
            paste0("PC",
                   seq_along(along.with = .lm.obj$pca$d)))
     
@@ -1041,7 +1041,7 @@ get.landmarks <-
              seq_along(along.with = .lm.obj$pca$d))
     
     dimnames(x = .lm.obj$pca$v) <-
-      list(colnames(x = .lm.obj$lm),
+      list(colnames(x = .lm.obj$landmarks),
            paste0("PC",
                   seq_along(along.with = .lm.obj$pca$d)))
     
@@ -1056,7 +1056,7 @@ get.landmarks <-
     
     .lm.obj$pca$sdev <-
       .lm.obj$pca$d /
-      sqrt(x = max(1, nrow(x = .lm.obj$lm) - 1))
+      sqrt(x = max(1, nrow(x = .lm.obj$landmarks) - 1))
     
     .lm.obj$pca$rotation <-
       .lm.obj$pca$v
@@ -1071,7 +1071,7 @@ get.landmarks <-
     if(.lm.obj$assay.type == "RNA"){
       
       # Z-scored version: for visualization/heatmaps
-      .lm.obj$scaled.lm <-
+      .lm.obj$scaled.landmarks <-
         (.lm.obj$pca$embed %*% Matrix::t(x = .lm.obj$pca$rotation)) |>
         Matrix::t() |>
         (\(x)
@@ -1081,12 +1081,12 @@ get.landmarks <-
         Matrix::t() |>
         (\(x)
          `dimnames<-`(x = x,
-                      value = list(rownames(x = .lm.obj$lm),
-                                   colnames(x = .lm.obj$lm)))
+                      value = list(rownames(x = .lm.obj$landmarks),
+                                   colnames(x = .lm.obj$landmarks)))
         )()
       
       # Log-normalized version: back-transformed from PCA, de-noised
-      .lm.obj$lm <-
+      .lm.obj$landmarks <-
         (.lm.obj$pca$embed %*% Matrix::t(x = .lm.obj$pca$rotation)) |>
         Matrix::t() |>
         (\(x)
@@ -1095,14 +1095,14 @@ get.landmarks <-
         Matrix::t() |>
         (\(x)
          `dimnames<-`(x = x,
-                      value = list(rownames(x = .lm.obj$lm),
-                                   colnames(x = .lm.obj$lm)))
+                      value = list(rownames(x = .lm.obj$landmarks),
+                                   colnames(x = .lm.obj$landmarks)))
         )()
       
     } else {
       
-      .lm.obj$scaled.lm <-
-        Matrix::t(x = .lm.obj$lm) |>
+      .lm.obj$scaled.landmarks <-
+        Matrix::t(x = .lm.obj$landmarks) |>
         (\(x)
          (x - Matrix::rowMeans(x = x)) /
            matrixStats::rowSds(x = x)
@@ -1132,7 +1132,7 @@ get.landmarks <-
           metadata = .lm.obj$metadata[.lm.obj$key,],
           vargenes_means_sds =
             dplyr::tibble(
-              symbol = colnames(x = .lm.obj$lm),
+              symbol = colnames(x = .lm.obj$landmarks),
               mean = .lm.obj$pca$center,
               stddev = .lm.obj$pca$scale
             ),
@@ -1151,7 +1151,7 @@ get.landmarks <-
         Matrix::t(x = .lm.obj$harmony.obj$Z_corr)  |> 
         (\(x)
          `rownames<-`(x = x,
-                      value = rownames(x = .lm.obj$lm))
+                      value = rownames(x = .lm.obj$landmarks))
         )()
       
       if(isTRUE(x = .verbose)){
@@ -1171,10 +1171,10 @@ get.landmarks <-
                                                     .lm.obj$harmony.var,
                                                     drop = FALSE])
       
-      # Residualize each column in .lm.obj$lm (unfortunately best can do is linear)
+      # Residualize each column in .lm.obj$landmarks (unfortunately best can do is linear)
       Y.resid <- 
         stats::lm.fit(x = Z, # fast base R linear model fit
-                      y = as.matrix(x = .lm.obj$lm)) |>  
+                      y = as.matrix(x = .lm.obj$landmarks)) |>  
         stats::residuals()  # same shape as Y
       
       # Scale by stored stddev
@@ -1196,7 +1196,7 @@ get.landmarks <-
                   nv = nrow(x = .lm.obj$harmony.obj$Z_corr))
       
       dimnames(x = res$v) <-
-        list(colnames(x = .lm.obj$lm),
+        list(colnames(x = .lm.obj$landmarks),
              rownames(x = .lm.obj$harmony.obj$Z_corr))
       
       res$v <-

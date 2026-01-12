@@ -433,7 +433,7 @@ get.graph <-
            .seed = 123,
            .cl.method = "snn",
            .cl.resolution.parameter = 0.8,
-           .small.size = floor(x = nrow(x = .lm.obj$lm) / 200)){
+           .small.size = floor(x = nrow(x = .lm.obj$landmarks) / 200)){
     
     # Validate clustering method
     .cl.method <-
@@ -443,7 +443,7 @@ get.graph <-
     # Compute UMAP embedding with k-NN graph
     set.seed(seed = .seed)
     .lm.obj$graph$uwot <-
-      uwot::umap(X = if(!is.null(x = .lm.obj$harmony.obj) || .lm.obj$assay.type == "RNA") .lm.obj$pca$embed else .lm.obj$lm,
+      uwot::umap(X = if(!is.null(x = .lm.obj$harmony.obj) || .lm.obj$assay.type == "RNA") .lm.obj$pca$embed else .lm.obj$landmarks,
                  n_neighbors = .k,
                  n_components = 2,           # 2D for visualization
                  n_epochs = 500,             # Training iterations
@@ -473,8 +473,8 @@ get.graph <-
                      .prune = 1/15) |>
       (\(x)
        `dimnames<-`(x = x,
-                    value = list(rownames(x = .lm.obj$lm),
-                                 rownames(x = .lm.obj$lm)))
+                    value = list(rownames(x = .lm.obj$landmarks),
+                                 rownames(x = .lm.obj$landmarks)))
       )()
     
     if(isTRUE(x = .verbose)){
@@ -831,7 +831,7 @@ get.map <-
              # size factor normalization, taking into consideration size factor of landmarks
              (x / (Matrix::rowSums(x = x) /
                      mean(x = Matrix::rowSums(x = x)))) * 
-               (mean(x = Matrix::rowSums(x = x)) / mean(x = Matrix::rowSums(x = .lm.obj$raw.lm)))
+               (mean(x = Matrix::rowSums(x = x)) / mean(x = Matrix::rowSums(x = .lm.obj$raw.landmarks)))
             )()
           
           mat.exprs@x <-
@@ -853,7 +853,7 @@ get.map <-
         }
         
         cells.of.interest <-
-          !(temp.cell.names %in% rownames(x = .lm.obj$lm))
+          !(temp.cell.names %in% rownames(x = .lm.obj$landmarks))
         
         if(!is.null(x = .lm.obj$harmony.obj)){
           
@@ -1046,7 +1046,7 @@ get.map <-
       
       .lm.obj$graph$celltyping$ids <-
         .lm.obj$graph$celltyping$ids[
-          rownames(x = .lm.obj$lm)
+          rownames(x = .lm.obj$landmarks)
         ] |>
         as.factor()
       
@@ -1072,7 +1072,7 @@ get.map <-
         unique()
       
       .lm.obj$graph$celltyping$median.exprs <-
-        (if(.lm.obj$assay.type == "RNA") .lm.obj$scaled.lm[,top] else .lm.obj$lm) |>
+        (if(.lm.obj$assay.type == "RNA") .lm.obj$scaled.landmarks[,top] else .lm.obj$landmarks) |>
         dplyr::as_tibble() |>
         cbind(cell.pop = as.character(x = .lm.obj$graph$celltyping$ids)) |>
         dplyr::group_by(cell.pop) |>
@@ -1109,7 +1109,7 @@ get.map <-
       stats::setNames(nm = names(x = res)) |>
       lapply(FUN = function(smpl.idx){
         
-        if(ncol(x = res[[smpl.idx]]$fgraph) == nrow(x = .lm.obj$lm)){ # NOT IDEAL! This if/else usage was only introduced to avoid bug in uwot reported in https://github.com/jlmelville/uwot/issues/129
+        if(ncol(x = res[[smpl.idx]]$fgraph) == nrow(x = .lm.obj$landmarks)){ # NOT IDEAL! This if/else usage was only introduced to avoid bug in uwot reported in https://github.com/jlmelville/uwot/issues/129
           Matrix::colSums(x = res[[smpl.idx]]$fgraph[
             if(length(x = .cl.to.keep) !=
                (levels(x = .lm.obj$graph$clustering$ids) |>
@@ -1141,7 +1141,7 @@ get.map <-
       do.call(what = cbind) |>
       (\(x)
        `rownames<-`(x = x,
-                    value = rownames(x = .lm.obj$lm))
+                    value = rownames(x = .lm.obj$landmarks))
       )() |>
       Matrix::t() |>
       (\(x)
@@ -1404,7 +1404,7 @@ lm.cluster <-
     
     # Compute median expression per cluster
     .lm.obj$graph$clustering$median.exprs <-
-      (if(.lm.obj$assay.type == "RNA") .lm.obj$scaled.lm[,top] else .lm.obj$lm) |>
+      (if(.lm.obj$assay.type == "RNA") .lm.obj$scaled.landmarks[,top] else .lm.obj$landmarks) |>
       dplyr::as_tibble() |>
       cbind(cell.pop = as.character(x = .lm.obj$graph$clustering$ids)) |>
       dplyr::group_by(cell.pop) |>
@@ -1530,9 +1530,9 @@ get.lm.features.stats <-
     
     # Build result list: one data frame per landmark
     res <-
-      nrow(x = .lm.obj$lm) |>
+      nrow(x = .lm.obj$landmarks) |>
       seq_len() |>
-      stats::setNames(nm = rownames(x = .lm.obj$lm)) |>
+      stats::setNames(nm = rownames(x = .lm.obj$landmarks)) |>
       lapply(FUN = function(lm.idx){
         
         coefs[hits$row[hits$col == lm.idx],            # Features for this landmark

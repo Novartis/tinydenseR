@@ -546,8 +546,8 @@ final_data_DE |>
 .cl.ind.dea.0.5 <- tinydenseR::get.dea(
     .lm.obj = lm.cells.DE.0.5,
     .design = .design.0.5,
-    .id.idx = which(x = (lm.cells.DE.0.5$lm[,"Marker1"] > log(x = 10)) &
-                        (lm.cells.DE.0.5$lm[,"Marker5"] > log(x = 100)))
+    .id.idx = which(x = (lm.cells.DE.0.5$landmarks[,"Marker1"] > log(x = 10)) &
+                        (lm.cells.DE.0.5$landmarks[,"Marker5"] > log(x = 100)))
 )
 ```
 
@@ -610,9 +610,9 @@ A scatter plot provides flexibility to explore different types of visualizations
 
 ```{r scatter}
 tinydenseR::scatterPlot(
-  .x.feature = lm.cells.DE.0.5$lm[,"Marker2"],
+  .x.feature = lm.cells.DE.0.5$landmarks[,"Marker2"],
   .x.label = "Marker2",
-  .y.feature = lm.cells.DE.0.5$lm[,"Marker5"],
+  .y.feature = lm.cells.DE.0.5$landmarks[,"Marker5"],
   .y.label = "Marker5",
   .color.feature = lm.cells.DE.0.5$map$lm[["default"]]$fit$coefficients[, "Activation"],
   .color.label = "Abundance\nlog2(+0.5) FC",

@@ -183,7 +183,7 @@ celltyping <-
     }
     
     .lm.obj$graph$celltyping$median.exprs <-
-      (if(.lm.obj$assay.type == "RNA") .lm.obj$scaled.lm[,top] else .lm.obj$lm) |>
+      (if(.lm.obj$assay.type == "RNA") .lm.obj$scaled.landmarks[,top] else .lm.obj$landmarks) |>
       dplyr::as_tibble() |>
       cbind(cell.pop = as.character(x = .lm.obj$graph$celltyping$ids)) |>
       dplyr::group_by(cell.pop) |>

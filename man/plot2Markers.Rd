@@ -26,9 +26,9 @@ plot2Markers(
 
 \item{.id.from}{Character: "clustering" (default) or "celltyping". Source of \code{.id}.}
 
-\item{.x.feature}{Character: column name from \code{.lm.obj$lm} for x-axis (default "CD3").}
+\item{.x.feature}{Character: column name from \code{.lm.obj$landmarks} for x-axis (default "CD3").}
 
-\item{.y.feature}{Character: column name from \code{.lm.obj$lm} for y-axis (default "CD20").}
+\item{.y.feature}{Character: column name from \code{.lm.obj$landmarks} for y-axis (default "CD20").}
 
 \item{.bins}{Integer: number of hexagonal bins for main plot (default 128). Higher values = finer resolution.}
 

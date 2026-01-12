@@ -51,7 +51,7 @@ test_that("full pipeline is reproducible with fixed seed", {
   result2 <- run_full_pipeline(test_data, seed = 123, verbose = FALSE)
   
   # Assert bit-identical results
-  expect_identical(rownames(result1$lm), rownames(result2$lm))  # Same landmarks
+  expect_identical(rownames(result1$landmarks), rownames(result2$landmarks))  # Same landmarks
   expect_equal(result1$graph$uwot$embedding, result2$graph$uwot$embedding)  # Same UMAP
   expect_identical(as.character(result1$graph$clustering$ids), 
                    as.character(result2$graph$clustering$ids))  # Same clusters
@@ -147,7 +147,7 @@ test_that("pipeline is robust to small perturbations", {
   result2 <- run_full_pipeline(test_data_pert, seed = 789, verbose = FALSE)
   
   # Compute Jaccard similarity of landmark sets
-  jaccard_lm <- jaccard_similarity(rownames(result1$lm), rownames(result2$lm))
+  jaccard_lm <- jaccard_similarity(rownames(result1$landmarks), rownames(result2$landmarks))
   
   # Should be highly stable (>85% overlap for landmarks)
   expect_gt(jaccard_lm, 0.85)
@@ -298,7 +298,7 @@ test_that("pipeline handles extreme marker values", {
         get.graph(.k = 3, .verbose = FALSE)
       
       # Verify no NaN/Inf in results
-      expect_true(all(is.finite(result$lm)))
+      expect_true(all(is.finite(result$landmarks)))
       expect_true(all(is.finite(result$graph$uwot$embedding)))
     },
     NA

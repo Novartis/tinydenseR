@@ -22,7 +22,7 @@ library(tinydenseR)
 test_that("goi.summary validates gene names correctly", {
   # Mock lm.obj with minimal structure
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 5,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 5,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3", "Gene4", "Gene5"))),
     assay.type = "RNA",
     map = list(clustering = list(ids = list(sample1 = c("1", "2", "3"))))
@@ -37,13 +37,13 @@ test_that("goi.summary validates gene names correctly", {
   # Error should suggest checking available genes
   expect_error(
     object = goi.summary(.lm.obj = .lm.obj, .goi = "NonExistentGene"),
-    regexp = "colnames\\(\\.lm\\.obj\\$raw\\.lm\\)"
+    regexp = "colnames\\(\\.lm\\.obj\\$raw\\.landmarks\\)"
   )
 })
 
 test_that("goi.summary requires RNA assay type", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Marker1", "Marker2", "Marker3"))),
     assay.type = "cyto",
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
@@ -57,7 +57,7 @@ test_that("goi.summary requires RNA assay type", {
 
 test_that("goi.summary requires cell mapping", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     assay.type = "RNA",
     map = NULL
@@ -71,7 +71,7 @@ test_that("goi.summary requires cell mapping", {
 
 test_that("goi.summary validates .id parameter", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     assay.type = "RNA",
     map = list(
@@ -93,7 +93,7 @@ test_that("goi.summary validates .id parameter", {
 
 test_that("goi.summary validates .id.from parameter", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     assay.type = "RNA",
     map = list(
@@ -115,7 +115,7 @@ test_that("goi.summary validates .id.from parameter", {
 
 test_that("goi.summary handles case-sensitive gene names", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     assay.type = "RNA",
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
@@ -130,7 +130,7 @@ test_that("goi.summary handles case-sensitive gene names", {
 
 test_that("goi.summary accepts multiple genes", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 5,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 5,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3", "Gene4", "Gene5"))),
     assay.type = "RNA",
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
@@ -145,7 +145,7 @@ test_that("goi.summary accepts multiple genes", {
 
 test_that("goi.summary error messages are informative", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     assay.type = "RNA",
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
@@ -154,13 +154,13 @@ test_that("goi.summary error messages are informative", {
   # Gene not found error should suggest checking available genes
   expect_error(
     object = goi.summary(.lm.obj = .lm.obj, .goi = "MissingGene"),
-    regexp = "use colnames\\(\\.lm\\.obj\\$raw\\.lm\\)"
+    regexp = "use colnames\\(\\.lm\\.obj\\$raw\\.landmarks\\)"
   )
 })
 
 test_that("goi.summary handles cytometry assay type correctly", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("CD4", "CD8", "CD19"))),
     assay.type = "cyto",
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
@@ -174,7 +174,7 @@ test_that("goi.summary handles cytometry assay type correctly", {
 
 test_that("goi.summary validates .id.idx parameter type", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     assay.type = "RNA",
     map = list(
@@ -199,7 +199,7 @@ test_that("goi.summary returns structure with clustering, celltyping, and all", 
   
   # Create minimal mock that would pass validation
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     assay.type = "RNA",
     map = list(
@@ -228,7 +228,7 @@ test_that("goi.summary handles .verbose parameter", {
 
 test_that("goi.summary handles empty gene vector", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     assay.type = "RNA",
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
@@ -255,9 +255,9 @@ test_that("goi.summary pos/neg prefix logic would work correctly", {
   expect_true(object = all(prefixes %in% c("pos", "neg")))
 })
 
-test_that("goi.summary validates that genes exist in raw.lm colnames", {
+test_that("goi.summary validates that genes exist in raw.landmarks colnames", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 5,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 5,
                     dimnames = list(NULL, c("ACTB", "GAPDH", "CD3D", "CD19", "MS4A1"))),
     assay.type = "RNA",
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
@@ -272,7 +272,7 @@ test_that("goi.summary validates that genes exist in raw.lm colnames", {
 
 test_that("goi.summary ID validation works for celltyping", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     assay.type = "RNA",
     map = list(
@@ -297,7 +297,7 @@ test_that("goi.summary ID validation works for celltyping", {
 
 test_that("goi.summary suggestion message includes available genes", {
   .lm.obj <- list(
-    raw.lm = matrix(data = 0, nrow = 10, ncol = 3,
+    raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     assay.type = "RNA",
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
@@ -306,6 +306,6 @@ test_that("goi.summary suggestion message includes available genes", {
   # Error message should guide user to check available genes
   expect_error(
     object = goi.summary(.lm.obj = .lm.obj, .goi = "WrongGene"),
-    regexp = "use colnames\\(\\.lm\\.obj\\$raw\\.lm\\) to see available genes"
+    regexp = "use colnames\\(\\.lm\\.obj\\$raw\\.landmarks\\) to see available genes"
   )
 })

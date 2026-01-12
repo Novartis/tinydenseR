@@ -22,7 +22,7 @@ plotUMAP(
 \arguments{
 \item{.lm.obj}{A tinydenseR object with UMAP computed via \code{get.graph()}.}
 
-\item{.feature}{Numeric vector or factor of length \code{nrow(.lm.obj$lm)} to color points by.
+\item{.feature}{Numeric vector or factor of length \code{nrow(.lm.obj$landmarks)} to color points by.
 Defaults to cluster IDs from \code{$graph$clustering$ids}. Can be:
 \itemize{
 \item Numeric: gene expression, fold changes, statistics (uses diverging color scale)
@@ -78,7 +78,7 @@ lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
 plotUMAP(lm.cells, .point.size = 1)
 
 # Color by gene expression
-plotUMAP(lm.cells, .feature = lm.cells$lm[,"CD4"], .color.label = "CD4")
+plotUMAP(lm.cells, .feature = lm.cells$landmarks[,"CD4"], .color.label = "CD4")
 
 # Color by fold change from get.lm()
 condition.stats <- get.lm(lm.cells, .design = design)

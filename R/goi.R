@@ -40,7 +40,7 @@
 #' @param .lm.obj A list object initialized with \code{setup.lm.obj} and processed 
 #'   with \code{get.graph} and \code{get.map}. Must contain RNA assay data.
 #' @param .goi Character vector of gene names to summarize. All genes must exist 
-#'   in \code{.lm.obj$raw.lm} column names.
+#'   in \code{.lm.obj$raw.landmarks} column names.
 #' @param .id.idx Integer index of a specific landmark to analyze. If NULL (default), 
 #'   uses \code{.id} parameter or all cells. Rarely used directly.
 #' @param .id Character vector of cluster or cell type IDs to filter analysis. 
@@ -94,11 +94,11 @@ goi.summary <-
     .verbose = TRUE
   ){
     
-    if(!all(.goi %in% colnames(x = .lm.obj$raw.lm))){
+    if(!all(.goi %in% colnames(x = .lm.obj$raw.landmarks))){
       stop("Gene(s) not found in data: ",
-           paste(.goi[!(.goi %in% colnames(x = .lm.obj$raw.lm))],
+           paste(.goi[!(.goi %in% colnames(x = .lm.obj$raw.landmarks))],
                  collapse = ", "),
-           "\nCheck gene names (case-sensitive) or use colnames(.lm.obj$raw.lm) to see available genes.")
+           "\nCheck gene names (case-sensitive) or use colnames(.lm.obj$raw.landmarks) to see available genes.")
     }
     
     if(.lm.obj$assay.type != "RNA"){

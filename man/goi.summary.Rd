@@ -18,7 +18,7 @@ goi.summary(
 with \code{get.graph} and \code{get.map}. Must contain RNA assay data.}
 
 \item{.goi}{Character vector of gene names to summarize. All genes must exist
-in \code{.lm.obj$raw.lm} column names.}
+in \code{.lm.obj$raw.landmarks} column names.}
 
 \item{.id.idx}{Integer index of a specific landmark to analyze. If NULL (default),
 uses \code{.id} parameter or all cells. Rarely used directly.}

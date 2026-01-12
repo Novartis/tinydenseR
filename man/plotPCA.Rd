@@ -27,7 +27,7 @@ plotPCA(
 
 \item{.PC.y}{Integer specifying y-axis principal component (default 2).}
 
-\item{.feature}{Numeric vector or factor of length \code{nrow(.lm.obj$lm)} to color points by.
+\item{.feature}{Numeric vector or factor of length \code{nrow(.lm.obj$landmarks)} to color points by.
 Defaults to cluster IDs from \code{$graph$clustering$ids}. Can be:
 \itemize{
 \item Numeric: gene expression, fold changes, statistics (uses diverging color scale)

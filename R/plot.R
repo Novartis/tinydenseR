@@ -28,7 +28,7 @@
 #' @param .lm.obj A tinydenseR object with PCA computed via \code{get.landmarks()}.
 #' @param .PC.x Integer specifying x-axis principal component (default 1).
 #' @param .PC.y Integer specifying y-axis principal component (default 2).
-#' @param .feature Numeric vector or factor of length \code{nrow(.lm.obj$lm)} to color points by. 
+#' @param .feature Numeric vector or factor of length \code{nrow(.lm.obj$landmarks)} to color points by. 
 #'   Defaults to cluster IDs from \code{$graph$clustering$ids}. Can be:
 #'   \itemize{
 #'     \item Numeric: gene expression, fold changes, statistics (uses diverging color scale)
@@ -244,7 +244,7 @@ plotPCA <-
 #' Identical interface to \code{plotPCA()} for easy comparison.
 #'
 #' @param .lm.obj A tinydenseR object with UMAP computed via \code{get.graph()}.
-#' @param .feature Numeric vector or factor of length \code{nrow(.lm.obj$lm)} to color points by. 
+#' @param .feature Numeric vector or factor of length \code{nrow(.lm.obj$landmarks)} to color points by. 
 #'   Defaults to cluster IDs from \code{$graph$clustering$ids}. Can be:
 #'   \itemize{
 #'     \item Numeric: gene expression, fold changes, statistics (uses diverging color scale)
@@ -286,7 +286,7 @@ plotPCA <-
 #' plotUMAP(lm.cells, .point.size = 1)
 #' 
 #' # Color by gene expression
-#' plotUMAP(lm.cells, .feature = lm.cells$lm[,"CD4"], .color.label = "CD4")
+#' plotUMAP(lm.cells, .feature = lm.cells$landmarks[,"CD4"], .color.label = "CD4")
 #' 
 #' # Color by fold change from get.lm()
 #' condition.stats <- get.lm(lm.cells, .design = design)
@@ -797,8 +797,8 @@ plotBeeswarm <-
 #' @param .lm.obj A tinydenseR object processed through \code{get.landmarks()} and \code{get.graph()}.
 #' @param .id Optional character: cluster or celltype ID to highlight. If NULL (default), plots all landmarks.
 #' @param .id.from Character: "clustering" (default) or "celltyping". Source of \code{.id}.
-#' @param .x.feature Character: column name from \code{.lm.obj$lm} for x-axis (default "CD3").
-#' @param .y.feature Character: column name from \code{.lm.obj$lm} for y-axis (default "CD20").
+#' @param .x.feature Character: column name from \code{.lm.obj$landmarks} for x-axis (default "CD3").
+#' @param .y.feature Character: column name from \code{.lm.obj$landmarks} for y-axis (default "CD20").
 #' @param .bins Integer: number of hexagonal bins for main plot (default 128). Higher values = finer resolution.
 #' @param .legend.position Character: "right" (default), "left", "top", "bottom", or "none".
 #' @param .plot.title Character: plot title (default "").
@@ -889,16 +889,16 @@ plot2Markers <-
     if(.lm.obj$assay.type == "RNA"){
       
       dat.df <-
-        (.lm.obj$lm[if(!is.null(x = .id)) .id else 1:nrow(x = .lm.obj$lm),
-                    colnames(x = .lm.obj$lm) %in% c(.x.feature,.y.feature)]) |>
+        (.lm.obj$landmarks[if(!is.null(x = .id)) .id else 1:nrow(x = .lm.obj$landmarks),
+                    colnames(x = .lm.obj$landmarks) %in% c(.x.feature,.y.feature)]) |>
         as.data.frame()
       
       
     } else {
       
       dat.df <-
-        (.lm.obj$lm[if(!is.null(x = .id)) .id else 1:nrow(x = .lm.obj$lm),
-                    colnames(x = .lm.obj$lm) %in% c(.x.feature,.y.feature)]) |>
+        (.lm.obj$landmarks[if(!is.null(x = .id)) .id else 1:nrow(x = .lm.obj$landmarks),
+                    colnames(x = .lm.obj$landmarks) %in% c(.x.feature,.y.feature)]) |>
         as.data.frame()
       
     }
@@ -916,13 +916,13 @@ plot2Markers <-
       
       p <-
         p +
-        ggplot2::scale_x_continuous(limits = (.lm.obj$lm[,colnames(x = .lm.obj$lm) %in%
+        ggplot2::scale_x_continuous(limits = (.lm.obj$landmarks[,colnames(x = .lm.obj$landmarks) %in%
                                                            .x.feature, drop = TRUE]) |>
                                       (\(x)
                                        range(x[!((x > (mean(x = x) + .sd.range[2]*stats::sd(x = x))) |
                                                    (x < (mean(x = x) + .sd.range[1]*stats::sd(x = x))))])
                                       )()) +
-        ggplot2::scale_y_continuous(limits = (.lm.obj$lm[,colnames(x = .lm.obj$lm) %in%
+        ggplot2::scale_y_continuous(limits = (.lm.obj$landmarks[,colnames(x = .lm.obj$landmarks) %in%
                                                            .y.feature, drop = TRUE]) |>
                                       (\(x)
                                        range(x[!((x > (mean(x = x) + .sd.range[2]*stats::sd(x = x))) |
@@ -936,7 +936,7 @@ plot2Markers <-
       
       p <-
         p  +
-        ggplot2::stat_density_2d(data = as.data.frame(x = .lm.obj$lm),
+        ggplot2::stat_density_2d(data = as.data.frame(x = .lm.obj$landmarks),
                                  mapping = ggplot2::aes(fill = ggplot2::after_stat(x = log2(x = level))),
                                  geom = "polygon",
                                  bins = .density.bins) +
@@ -2353,7 +2353,7 @@ plotDEA <-
 #' Useful for exploring relationships between any features in the tinydenseR object (scaled expression, 
 #' PCA coordinates, graph embeddings, cluster IDs, metadata, etc.).
 #'
-#' @param .x.feature Numeric vector for x-axis values (e.g., \code{.lm.obj$scaled.lm[,"CD3"]} or 
+#' @param .x.feature Numeric vector for x-axis values (e.g., \code{.lm.obj$scaled.landmarks[,"CD3"]} or 
 #'   \code{.lm.obj$pca$embed[,"PC1"]}).
 #' @param .y.feature Numeric vector for y-axis values.
 #' @param .color.feature Optional vector for point colors. Can be numeric (continuous coloring with 
@@ -2409,8 +2409,8 @@ plotDEA <-
 #'             .color.label = "Cluster")
 #' 
 #' # Marker expression relationship
-#' scatterPlot(.x.feature = lm.cells$scaled.lm[,"CD4"],
-#'             .y.feature = lm.cells$scaled.lm[,"CD8A"],
+#' scatterPlot(.x.feature = lm.cells$scaled.landmarks[,"CD4"],
+#'             .y.feature = lm.cells$scaled.landmarks[,"CD8A"],
 #'             .color.feature = .meta$Condition,
 #'             .x.label = "CD4", .y.label = "CD8A",
 #'             .color.label = "Condition")

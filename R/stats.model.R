@@ -203,10 +203,10 @@ get.lm <-
       .lm.obj$map$Y
     
     #if(nrow(x = Y) !=
-    #   nrow(x = .lm.obj$lm)){
+    #   nrow(x = .lm.obj$landmarks)){
     #  
     #  stats$y <-
-    #    stats$y[match(x = rownames(x = .lm.obj$lm),
+    #    stats$y[match(x = rownames(x = .lm.obj$landmarks),
     #                  table = rownames(x = stats$y)),]
     #  
     #  stats$y[
@@ -215,7 +215,7 @@ get.lm <-
     #           na.rm = TRUE)
     #  
     #  rownames(x = stats$y) <-
-    #    rownames(x = .lm.obj$lm)
+    #    rownames(x = .lm.obj$landmarks)
     #  
     #}
     
@@ -810,15 +810,15 @@ get.dea <-
       } else {
         
         .lm.idx <-
-          nrow(x = .lm.obj$lm) |>
+          nrow(x = .lm.obj$landmarks) |>
           seq_len()
         
       }
     } else {
       
-      if(!all(.id.idx %in% (nrow(x = .lm.obj$lm) |> seq_len()))) {
+      if(!all(.id.idx %in% (nrow(x = .lm.obj$landmarks) |> seq_len()))) {
         stop(paste0(".id.idx must be a list of integer vectors from  1 to ",
-                    nrow(x = .lm.obj$lm)))
+                    nrow(x = .lm.obj$landmarks)))
       }
       
       .lm.idx <-
@@ -1022,7 +1022,7 @@ get.dea <-
             readRDS(file = .lm.obj$cells[[smpl]])
           
           exprs.mat <-
-            exprs.mat[,colnames(x = .lm.obj$lm)]
+            exprs.mat[,colnames(x = .lm.obj$landmarks)]
           
           wcl <- 
             .lm.obj$map$connect.prob[[smpl]][,.lm.idx,drop=FALSE]
@@ -1299,9 +1299,9 @@ get.marker <-
       
     } else {
       
-      if(!all(.id1.idx %in% (nrow(x = .lm.obj$lm) |> seq_len()))) {
+      if(!all(.id1.idx %in% (nrow(x = .lm.obj$landmarks) |> seq_len()))) {
         stop(paste0(".id1.idx must be a list of integer vectors from  1 to ",
-                    nrow(x = .lm.obj$lm)))
+                    nrow(x = .lm.obj$landmarks)))
       }
       
       .lm1.idx <-
@@ -1327,9 +1327,9 @@ get.marker <-
         
       } else {
         
-        if(!all(.id2.idx %in% (nrow(x = .lm.obj$lm) |> seq_len()))) {
+        if(!all(.id2.idx %in% (nrow(x = .lm.obj$landmarks) |> seq_len()))) {
           stop(paste0(".id2.idx must be a list of integer vectors from  1 to ",
-                      nrow(x = .lm.obj$lm)))
+                      nrow(x = .lm.obj$landmarks)))
         }
         
         .lm2.idx <-
@@ -1579,7 +1579,7 @@ get.marker <-
             readRDS(file = .lm.obj$cells[[smpl]])
           
           exprs.mat <-
-            exprs.mat[,colnames(x = .lm.obj$lm)]
+            exprs.mat[,colnames(x = .lm.obj$landmarks)]
           
           res <-
             tryCatch(
@@ -1626,7 +1626,7 @@ get.marker <-
             readRDS(file = .lm.obj$cells[[smpl]])
           
           exprs.mat <-
-            exprs.mat[,colnames(x = .lm.obj$lm)]
+            exprs.mat[,colnames(x = .lm.obj$landmarks)]
           
           res <-
             tryCatch(

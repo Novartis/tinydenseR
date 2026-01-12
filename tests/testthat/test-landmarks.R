@@ -56,9 +56,9 @@ test_that("setup.lm.obj returns a list with correct names", {
                          .verbose = FALSE)
   expect_type(object = result, type = "list")
   expect_true(all(c("cells",
-                    "lm",
-                    "scaled.lm",
-                    "raw.lm",
+                    "landmarks",
+                    "scaled.landmarks",
+                    "raw.landmarks",
                     "metadata",
                     "key",
                     "pca",

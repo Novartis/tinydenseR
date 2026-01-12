@@ -293,7 +293,7 @@ sort(x = .dea$coefficients[,"ConditionB"],
   names() |> 
   (\(x)
    tinydenseR::plotPCA(.lm.obj = lm.cells,
-                       .feature = lm.cells$lm[,x],
+                       .feature = lm.cells$landmarks[,x],
                        .plot.title = "Top Gene Up in B vs A",
                        .panel.size = 2,
                        .point.size = 1,
@@ -306,7 +306,7 @@ sort(x = .dea$coefficients[,"ConditionB"],
   names() |> 
   (\(x)
    tinydenseR::plotPCA(.lm.obj = lm.cells,
-                       .feature = lm.cells$lm[,x],
+                       .feature = lm.cells$landmarks[,x],
                        .plot.title = "Top Gene Down in B vs A",
                        .panel.size = 2,
                        .point.size = 1,

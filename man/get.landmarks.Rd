@@ -39,14 +39,14 @@ regardless of variance (RNA only). Useful for known markers. Default NULL.}
 \value{
 Updated \code{.lm.obj} with populated fields:
 \describe{
-\item{\code{$raw.lm}}{Raw counts matrix for landmarks (landmarks × features)}
-\item{\code{$lm}}{Processed landmark expression on selected features (landmarks × features):
+\item{\code{$raw.landmarks}}{Raw counts matrix for landmarks (landmarks × features)}
+\item{\code{$landmarks}}{Processed landmark expression on selected features (landmarks × features):
 \itemize{
 \item RNA: PCA-reconstructed denoised expression (log2-scale after library size normalization)
 \item Cytometry: Original marker values on selected markers
 }
 }
-\item{\code{$scaled.lm}}{Z-scored landmark expression (landmarks × features, for visualization/heatmaps)}
+\item{\code{$scaled.landmarks}}{Z-scored landmark expression (landmarks × features, for visualization/heatmaps)}
 \item{\code{$pca}}{List containing PCA results:
 \itemize{
 \item \code{$embed} - PC coordinates for landmarks (landmarks × PCs)

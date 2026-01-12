@@ -21,7 +21,7 @@ scatterPlot(
 )
 }
 \arguments{
-\item{.x.feature}{Numeric vector for x-axis values (e.g., \code{.lm.obj$scaled.lm[,"CD3"]} or
+\item{.x.feature}{Numeric vector for x-axis values (e.g., \code{.lm.obj$scaled.landmarks[,"CD3"]} or
 \code{.lm.obj$pca$embed[,"PC1"]}).}
 
 \item{.y.feature}{Numeric vector for y-axis values.}
@@ -93,8 +93,8 @@ scatterPlot(.x.feature = lm.cells$pca$embed[,"PC1"],
             .color.label = "Cluster")
 
 # Marker expression relationship
-scatterPlot(.x.feature = lm.cells$scaled.lm[,"CD4"],
-            .y.feature = lm.cells$scaled.lm[,"CD8A"],
+scatterPlot(.x.feature = lm.cells$scaled.landmarks[,"CD4"],
+            .y.feature = lm.cells$scaled.landmarks[,"CD8A"],
             .color.feature = .meta$Condition,
             .x.label = "CD4", .y.label = "CD8A",
             .color.label = "Condition")
