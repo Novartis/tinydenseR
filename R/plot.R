@@ -69,8 +69,8 @@
 #' 
 #' plotPCA(lm.cells, .point.size = 1, .panel.size = 1.5)
 #' 
-#' # Color by fold change from get.stats()
-#' condition.stats <- get.stats(lm.cells, .design = design)
+#' # Color by fold change from get.lm()
+#' condition.stats <- get.lm(lm.cells, .design = design)
 #' plotPCA(lm.cells, 
 #'         .feature = condition.stats$fit$coefficients[,"ConditionB"],
 #'         .color.label = "log2 FC", 
@@ -288,8 +288,8 @@ plotPCA <-
 #' # Color by gene expression
 #' plotUMAP(lm.cells, .feature = lm.cells$lm[,"CD4"], .color.label = "CD4")
 #' 
-#' # Color by fold change from get.stats()
-#' condition.stats <- get.stats(lm.cells, .design = design)
+#' # Color by fold change from get.lm()
+#' condition.stats <- get.lm(lm.cells, .design = design)
 #' plotUMAP(lm.cells, 
 #'          .feature = condition.stats$fit$coefficients[,"ConditionB"],
 #'          .color.label = "log2 FC", 
@@ -438,14 +438,16 @@ plotUMAP <-
 #' testing, with points colored by significance. Optionally splits results by cluster or cell type 
 #' and displays mean cell percentages alongside for biological context.
 #'
-#' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
-#' @param .stats.obj Statistical results from \code{get.stats()}.
+#' @param .lm.obj A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
+#'   Statistical results should be stored in \code{.lm.obj$map$lm}.
+#' @param .model.name Character string naming which model fit to use from \code{.lm.obj$map$lm}
+#'   (default "default"). Must match a name used in \code{get.lm(.model.name = ...)}.
 #' @param .coefs Character vector of coefficient names from the design matrix to plot. Must match 
-#'   column names in \code{.stats.obj$fit$coefficients}. Can plot single or multiple coefficients.
+#'   column names in the model fit's coefficients. Can plot single or multiple coefficients.
 #' @param .q Numeric q-value threshold for significance coloring (default 0.1). Points with 
 #'   q < threshold are colored by direction (red/blue), otherwise gray.
 #' @param .q.from Character specifying q-value source: "pca.weighted.q" (default, PCA-variance weighted) 
-#'   or "density.weighted.bh.fdr" (density weighted). See \code{get.stats()} for details.
+#'   or "density.weighted.bh.fdr" (density weighted). See \code{get.lm()} for details.
 #' @param .split.by Character controlling plot faceting: "none" (default if multiple coefficients), 
 #'   "clustering" (split by clusters), or "celltyping" (split by cell types). Default "clustering" 
 #'   for single coefficient.
@@ -475,33 +477,34 @@ plotUMAP <-
 #' When split by clustering/celltyping, the percentage plot shows mean cell type abundances across 
 #' samples, helping interpret whether changes occur in rare or common populations.
 #' 
-#' @seealso \code{\link{get.stats}}, \code{\link{plotAbundance}}
+#' @seealso \code{\link{get.lm}}, \code{\link{plotAbundance}}
 #' 
 #' @examples
 #' \dontrun{
 #' # After statistical testing
-#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#' lm.obj <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks() |>
 #'   get.graph() |>
 #'   get.map()
 #' 
 #' design <- model.matrix(~ Condition + Replicate, data = .meta)
-#' stats <- get.stats(lm.cells, .design = design)
+#' lm.obj <- get.lm(lm.obj, .design = design)
 #' 
 #' # Basic beeswarm split by clusters
-#' plotBeeswarm(lm.cells, stats, .coefs = "ConditionB")
+#' plotBeeswarm(lm.obj, .coefs = "ConditionB")
 #' 
 #' # Multiple coefficients without splitting
-#' plotBeeswarm(lm.cells, stats, 
-#'              .coefs = c("ConditionB", "ConditionC"),
-#'              .split.by = "none")
+#' plotBeeswarm(lm.obj, .coefs = c("ConditionB", "ConditionC"), .split.by = "none")
+#' 
+#' # Using a different model fit
+#' plotBeeswarm(lm.obj, .model.name = "full", .coefs = "ConditionB")
 #' }
 #' 
 #' @export
 plotBeeswarm <-
   function(
     .lm.obj,
-    .stats.obj,
+    .model.name = "default",
     .coefs,
     .q = 0.1,
     .q.from = "pca.weighted.q",
@@ -518,6 +521,13 @@ plotBeeswarm <-
     .order.ids = FALSE) {
     
     sig <- adj.p <- facets <- pos.t <- neg.t <- q.bars <- dat.df <- value <- split.by <- .coef <- cell.perc <- pop <- NULL
+    
+    # Validate model exists
+    if(is.null(x = .lm.obj$map$lm[[.model.name]])){
+      stop(paste0("Model '", .model.name, "' not found in .lm.obj$map$lm. ",
+                  "Available models: ", paste(names(.lm.obj$map$lm), collapse = ", ")))
+    }
+    .stats.obj <- .lm.obj$map$lm[[.model.name]]
     
     .split.by <-
       match.arg(arg = .split.by,
@@ -953,58 +963,24 @@ plot2Markers <-
     
   }
 
-#' Plot Sample PCA
+#' Plot Sample PCA (Deprecated)
 #'
-#' Visualizes samples in PCA space based on their landmark density profiles. This "reverse PCA" 
-#' treats samples as observations and landmark densities as features, revealing sample-level 
-#' patterns and clustering. Useful for quality control and identifying batch effects.
+#' @description
+#' `r lifecycle::badge("deprecated")`
+#' 
+#' This function is deprecated. Please use \code{\link{plotSampleEmbedding}} with 
+#' \code{.embedding = "pca"} instead.
 #'
-#' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
-#' @param .labels.from Character specifying metadata column for coloring points. Defaults to 
-#'   first column of \code{.lm.obj$metadata} (often "Condition" or "Sample").
-#' @param .cat.feature.color Character vector of colors for categorical labels (default 
-#'   \code{Color.Palette[1,1:5]}).
+#' @param .lm.obj A tinydenseR object processed through \code{get.map()} and \code{get.embedding()}.
+#' @param .labels.from Character specifying metadata column for coloring points.
+#' @param .cat.feature.color Character vector of colors for categorical labels.
 #' @param .point.size Numeric point size (default 1).
 #' @param .panel.size Numeric panel width/height in inches (default 2).
-#' @param .midpoint Numeric midpoint for diverging color scale (continuous labels only). 
-#'   Defaults to median of \code{.labels.from} column.
-#' @param .seed Integer random seed (default 123).
+#' @param .midpoint Numeric midpoint for diverging color scale (continuous labels only).
 #'   
 #' @return A \code{ggplot} object showing PC1 vs PC2 of sample-level density profiles.
-#'   
-#' @details
-#' This function performs PCA on log2-transformed landmark densities (samples × landmarks matrix). 
-#' Samples with similar cellular composition will cluster together in PC space. The analysis:
-#' \itemize{
-#'   \item Log-transforms densities: log2(density + 0.5) for variance stabilization
-#'   \item Filters zero-variance landmarks
-#'   \item Centers and scales features before PCA
-#'   \item Computes top 2 PCs using truncated SVD
-#' }
-#' 
-#' Useful for identifying:
-#' \itemize{
-#'   \item Batch effects (samples clustering by technical rather than biological factors)
-#'   \item Outlier samples with aberrant cellular profiles
-#'   \item Main axes of variation in cellular composition
-#' }
-#' 
-#' @seealso \code{\link{get.map}}, \code{\link{plotPCA}}
-#' 
-#' @examples
-#' \dontrun{
-#' # After mapping
-#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
-#'   get.landmarks() |>
-#'   get.graph() |>
-#'   get.map()
-#' 
-#' # Color by condition
-#' plotSamplePCA(lm.cells, .labels.from = "Condition")
-#' 
-#' # Color by replicate to check for batch effects
-#' plotSamplePCA(lm.cells, .labels.from = "Replicate")
-#' }
+#'
+#' @seealso \code{\link{plotSampleEmbedding}} for the recommended replacement
 #' 
 #' @export
 #'
@@ -1015,95 +991,55 @@ plotSamplePCA <-
     .cat.feature.color = Color.Palette[1,1:5],
     .point.size = 1,
     .panel.size = 2,
-    .midpoint = if(is.numeric(x = .lm.obj$metadata[[.labels.from]])) stats::median(x = .lm.obj$metadata[[.labels.from]]) else NA,
-    .seed = 123){
+    .midpoint = if(is.numeric(x = .lm.obj$metadata[[.labels.from]])) stats::median(x = .lm.obj$metadata[[.labels.from]]) else NA
+  ){
     
-    harmony_1 <- harmony_2 <- PC1 <- PC2 <- labels.from <- NULL
+    .Deprecated(new = "plotSampleEmbedding", 
+                msg = "plotSamplePCA is deprecated. Use plotSampleEmbedding(.embedding = 'pca') instead.")
     
-    if(length(x = .labels.from) != 1){
-      stop(".labels.from must be length 1")
-    }
-    
-    if(!(.labels.from %in% colnames(x = .lm.obj$metadata))){
-      stop(paste0(".labels.from must be one of the following: ",
-                  paste(x = colnames(x = .lm.obj$metadata),
-                        collapse = ", ")))
-    }
-    
-    if(is.null(x = .lm.obj$map$fdens)){
-      stop("run get.map first.")
-    }
-    
-    set.seed(seed = .seed)
-    y.pca <-
-      log2(x = .lm.obj$map$fdens + 0.5) |> 
-      (\(x)
-       x[matrixStats::rowVars(x = x) > 0,]
-      )() |>
-      Matrix::t() |>
-      (\(x)
-       irlba::prcomp_irlba(x = x,
-                           center = Matrix::colMeans(x = x),
-                           scale. = matrixStats::colSds(x = x),
-                           rank. = 2))() |>
-      (\(x)
-       as.data.frame(x = x$x)
-      )() |>
-      cbind(labels.from = .lm.obj$metadata[[.labels.from]])
-    
-    p <-
-      ggplot2::ggplot(data = y.pca,
-                      mapping = ggplot2::aes(x = PC1,
-                                             y = PC2,
-                                             color = labels.from)) +
-      ggplot2::theme_bw() +
-      ggplot2::geom_point(size = I(x = .point.size)) +
-      ggplot2::labs(color = .labels.from) +
-      ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
-                                                units = "in"),
-                              col = grid::unit(x = .panel.size,
-                                               units = "in"))
-    
-    if(is.numeric(x = y.pca$labels.from)){
-      p <-
-        p +
-        ggplot2::scale_color_gradient2(low = unname(obj = Color.Palette[1,1]),
-                                       mid = unname(obj = Color.Palette[1,6]),
-                                       high = unname(obj = Color.Palette[1,2]),
-                                       midpoint = .midpoint)
-    } else {
-      p <-
-        p  +
-        ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5))) +
-        ggplot2::scale_color_manual(
-          values = grDevices::colorRampPalette(
-            colors = unname(
-              obj = .cat.feature.color)
-          )(length(x = unique(x = y.pca$labels.from))))
-    }
-    
-    return(p)
+    plotSampleEmbedding(
+      .lm.obj = .lm.obj,
+      .embedding = "pca",
+      .color.by = .labels.from,
+      .cat.feature.color = .cat.feature.color,
+      .point.size = .point.size,
+      .panel.size = .panel.size,
+      .midpoint = .midpoint
+    )
     
   }
 
 
 #' Plot Sample Embedding from get.embedding
 #'
-#' Visualizes the sample-level embedding computed by \code{\link{get.embedding}}, which
-#' represents the projection of samples onto the effect-associated subspace identified
-#' via FWL decomposition or nested model comparison.
+#' Visualizes sample-level embeddings computed by \code{\link{get.embedding}}. Supports
+#' three embedding types: supervised partial-effect PCA (pePC), unsupervised PCA on
+#' landmark densities (pca), and diffusion map trajectory (traj).
 #'
-#' @param .lm.obj A tinydenseR object with metadata.
-#' @param .stats.obj Statistical results from \code{get.stats()} with embedding computed
-#'   via \code{get.embedding()}.
-#' @param .embedding.slot Character string specifying which embedding to plot. Must match
-#'   a name in \code{.stats.obj$embedding}. For FWL method, this is the contrast name;
-#'   for nested model method, this is the term of interest (metadata column name).
+#' @param .lm.obj A tinydenseR object processed through \code{get.map()} and 
+#'   \code{get.embedding()}. All embeddings are stored in \code{.lm.obj$map$embedding}:
+#'   unsupervised (\code{pca}, \code{traj}) and supervised (\code{pePC$<name>}).
+#' @param .embedding Character string specifying which embedding type to plot. One of:
+#'   \describe{
+#'     \item{"pePC"}{(default) Supervised partial-effect PCA. Requires \code{.sup.embed.slot}.}
+#'     \item{"pca"}{Unsupervised PCA on log-transformed landmark densities. Uses \code{.lm.obj$map$embedding$pca}.}
+#'     \item{"traj"}{Diffusion map trajectory embedding. Uses \code{.lm.obj$map$embedding$traj}.}
+#'   }
+#' @param .sup.embed.slot Character string specifying which supervised embedding to plot.
+#'   Only used when \code{.embedding = "pePC"}. Must match a name in 
+#'   \code{.lm.obj$map$embedding$pePC} (contrast name for FWL method, term name for nested model).
+#'   Ignored (with warning) when \code{.embedding} is "pca" or "traj".
 #' @param .color.by Character string specifying which metadata column to use for coloring
-#'   points. Defaults to \code{.embedding.slot} if it exists in metadata, otherwise
-#'   uses the first metadata column.
-#' @param .pc.x Integer specifying which PC to plot on x-axis (default 1).
-#' @param .pc.y Integer specifying which PC to plot on y-axis (default 2).
+#'   points. Defaults to \code{.sup.embed.slot} if it exists in metadata (for pePC),
+#'   otherwise uses the first metadata column.
+#' @param .x.by Character string specifying which metadata column to use for the x-axis
+#'   in single-PC embeddings. Defaults to \code{NULL}, which uses \code{.sup.embed.slot}
+#'   if it exists in metadata. Required when \code{.sup.embed.slot} is not a metadata
+#'   column (e.g., FWL contrast names).
+#' @param .pc.x Integer specifying which PC/DC to plot on x-axis (default 1). Only used
+#'   when embedding has more than 1 dimension.
+#' @param .pc.y Integer specifying which PC/DC to plot on y-axis (default 2). Only used
+#'   when embedding has more than 1 dimension.
 #' @param .cat.feature.color Character vector of colors for categorical features.
 #'   Defaults to first 5 colors from \code{Color.Palette} row 1.
 #' @param .point.size Numeric point size (default 1).
@@ -1115,48 +1051,47 @@ plotSamplePCA <-
 #'   metadata variable specified by \code{.color.by}.
 #'
 #' @details
-#' This function plots the sample coordinates from an embedding computed by
-#' \code{\link{get.embedding}}. The embedding captures the variation in landmark
-#' densities attributable to a specific contrast or set of covariates.
+#' This function plots the sample coordinates from embeddings computed by
+#' \code{\link{get.embedding}}:
 #'
-#' When using the FWL method (contrast-based), the embedding slot is named after the
-#' contrast (e.g., "TrtVsCtrl"), so you should specify \code{.color.by} to indicate
-#' which metadata column to use for coloring (e.g., "Group").
+#' \describe{
+#'   \item{pePC (supervised)}{Partial-effect PCA isolating variation attributable to a
+#'     specific contrast or set of covariates. Requires running \code{get.embedding()} with
+#'     \code{.contrast.of.interest} or \code{.red.model}. Stored in \code{.lm.obj$map$embedding$pePC$<name>}.}
+#'   \item{pca (unsupervised)}{Standard PCA on log-transformed landmark densities. Good for
+#'     exploratory visualization and QC. Stored in \code{.lm.obj$map$embedding$pca}.}
+#'   \item{traj (unsupervised)}{Diffusion map trajectory capturing continuous variation.
+#'     Useful for developmental or temporal trajectories. Stored in \code{.lm.obj$map$embedding$traj}.}
+#' }
 #'
-#' For embeddings with rank > 1 (e.g., from nested model comparison with multiple
+#' For pePC embeddings with rank > 1 (e.g., from nested model comparison with multiple
 #' covariates), you can plot different PC combinations using \code{.pc.x} and \code{.pc.y}.
 #'
-#' When the embedding has only 1 PC (e.g., from a single contrast), the function
-#' automatically creates a boxplot with the covariate on the x-axis and PC1 on the y-axis,
-#' with individual points overlaid.
+#' When pePC embedding has only 1 PC (e.g., from a single contrast), the function
+#' creates either a scatter plot (for continuous x-axis variable) or a boxplot 
+#' (for categorical x-axis variable), with the x-axis determined by \code{.x.by}
+#' or \code{.sup.embed.slot}.
 #'
 #' @seealso \code{\link{get.embedding}} for computing embeddings,
-#'   \code{\link{plotSamplePCA}} for PCA on raw densities
+#'   \code{\link{plotSamplePCA}} for legacy PCA visualization
 #'
 #' @examples
 #' \dontrun{
-#' # FWL method: embedding slot named after contrast
-#' stats <- get.embedding(
-#'     .lm.obj = lm.obj,
-#'     .stats.obj = stats,
-#'     .contrast.of.interest = "TrtVsCtrl"
-#' )
+#' # Compute unsupervised embeddings
+#' lm.obj <- get.embedding(.lm.obj = lm.obj)
 #'
-#' # Plot the embedding (specify .color.by for metadata column)
-#' plotSampleEmbedding(lm.obj, stats, 
-#'                     .embedding.slot = "TrtVsCtrl", 
-#'                     .color.by = "Group")
+#' # Plot unsupervised PCA
+#' plotSampleEmbedding(lm.obj, .embedding = "pca", .color.by = "Condition")
 #'
-#' # Nested model method: embedding slot named after term of interest
-#' stats <- get.embedding(
-#'     .lm.obj = lm.obj,
-#'     .stats.obj = stats,
-#'     .term.of.interest = "disease",
-#'     .red.stats.obj = red.stats
-#' )
+#' # Plot diffusion map trajectory
+#' plotSampleEmbedding(lm.obj, .embedding = "traj", .color.by = "Timepoint")
 #'
-#' # Plot (no .color.by needed, uses .embedding.slot)
-#' plotSampleEmbedding(lm.obj, stats, .embedding.slot = "disease")
+#' # Compute supervised embedding
+#' lm.obj <- get.embedding(lm.obj, .contrast.of.interest = "TrtVsCtrl")
+#'
+#' # Plot supervised pePC embedding
+#' plotSampleEmbedding(lm.obj, .embedding = "pePC",
+#'                     .sup.embed.slot = "TrtVsCtrl", .color.by = "Group")
 #' }
 #'
 #' @export
@@ -1164,9 +1099,10 @@ plotSamplePCA <-
 plotSampleEmbedding <-
   function(
     .lm.obj,
-    .stats.obj,
-    .embedding.slot,
+    .embedding = "pePC",
+    .sup.embed.slot = NULL,
     .color.by = NULL,
+    .x.by = NULL,
     .pc.x = 1,
     .pc.y = 2,
     .cat.feature.color = Color.Palette[1,1:5],
@@ -1175,32 +1111,59 @@ plotSampleEmbedding <-
     .midpoint = NULL
   ){
     
-    PC_x <- PC_y <- PC1 <- covariate <- labels.from <- NULL
+    PC_x <- PC_y <- PC1 <- x.var <- color.var <- labels.from <- NULL
     
     # -------------------------------------------------------------------------
     # Input validation
     # -------------------------------------------------------------------------
     
-    if(missing(.embedding.slot) || !is.character(.embedding.slot) || length(.embedding.slot) != 1){
-      stop("'.embedding.slot' must be a single character string")
+    .embedding <- 
+      match.arg(arg = .embedding,
+                choices = c("pePC", "pca", "traj"))
+    
+    # For pePC, require .sup.embed.slot to exist in .lm.obj$map$embedding$pePC
+    if(.embedding == "pePC"){
+      
+      if(is.null(x = .sup.embed.slot) || 
+         !is.character(x = .sup.embed.slot) || 
+         length(x = .sup.embed.slot) != 1){
+        stop("'.sup.embed.slot' must be a single character string when .embedding = 'pePC'")
+      }
+      
+      if(is.null(x = .lm.obj$map$embedding$pePC[[.sup.embed.slot]])){
+        available <- if(!is.null(.lm.obj$map$embedding$pePC)) names(.lm.obj$map$embedding$pePC) else "none"
+        stop(paste0("'", .sup.embed.slot, "' not found in .lm.obj$map$embedding$pePC. ",
+                    "Run get.embedding() with .contrast.of.interest or .red.model first. ",
+                    "Available: ", paste(available, collapse = ", ")))
+      }
+      
+    } else {
+      
+      # For pca/traj, .sup.embed.slot should not be provided
+      if(!is.null(x = .sup.embed.slot)){
+        warning("'.sup.embed.slot' is ignored when .embedding = '", .embedding, 
+                "'. It is only used for supervised (pePC) embeddings.",
+                call. = FALSE)
+      }
+      
+      # Validate the corresponding slot exists in .lm.obj$map$embedding
+      if(is.null(x = .lm.obj$map$embedding[[.embedding]])){
+        stop(paste0("'", .embedding, "' embedding not found in .lm.obj$map$embedding. Run get.embedding() first."))
+      }
+      
     }
     
-    if(is.null(x = .stats.obj$embedding)){
-      stop("No embeddings found in '.stats.obj'. Run get.embedding() first.")
-    }
-    
-    if(!(.embedding.slot %in% names(x = .stats.obj$embedding))){
-      stop(paste0("'", .embedding.slot, "' not found in embeddings. Available: ",
-                  paste(names(.stats.obj$embedding), collapse = ", ")))
-    }
-    
-    # Determine color.by: use provided value, fall back to .embedding.slot if in metadata, else first column
+    # Determine color.by: use provided value, fall back to .sup.embed.slot if in metadata (for pePC), else first column
     if(is.null(x = .color.by)){
-      if(.embedding.slot %in% colnames(x = .lm.obj$metadata)){
-        .color.by <- .embedding.slot
+      if(.embedding == "pePC" && 
+         !is.null(x = .sup.embed.slot) && 
+         .sup.embed.slot %in% colnames(x = .lm.obj$metadata)){
+        .color.by <- .sup.embed.slot
       } else {
         .color.by <- colnames(x = .lm.obj$metadata)[1]
-        message("'.embedding.slot' not in metadata. Coloring by '", .color.by, "'")
+        if(.embedding == "pePC"){
+          message("'.sup.embed.slot' not in metadata. Coloring by '", .color.by, "'")
+        }
       }
     }
     
@@ -1209,58 +1172,141 @@ plotSampleEmbedding <-
                   paste(colnames(.lm.obj$metadata), collapse = ", ")))
     }
     
+    # Validate .x.by if provided
+    if(!is.null(x = .x.by)){
+      if(!(.x.by %in% colnames(x = .lm.obj$metadata))){
+        stop(paste0("'.x.by' = '", .x.by, "' not found in metadata columns: ",
+                    paste(colnames(.lm.obj$metadata), collapse = ", ")))
+      }
+    }
+    
     # Set midpoint default
     if(is.null(x = .midpoint) && is.numeric(x = .lm.obj$metadata[[.color.by]])){
       .midpoint <- stats::median(x = .lm.obj$metadata[[.color.by]])
     }
     
     # -------------------------------------------------------------------------
-    # Extract embedding coordinates
+    # Extract embedding coordinates based on .embedding type
     # -------------------------------------------------------------------------
     
-    embed <- .stats.obj$embedding[[.embedding.slot]]
+    var.explained <- NULL
+    
+    if(.embedding == "pePC"){
+      # Supervised embeddings are now in .lm.obj$map$embedding$pePC[[.sup.embed.slot]]
+      embed <- .lm.obj$map$embedding$pePC[[.sup.embed.slot]]
+      axis.prefix <- "pePC"
+      # pePC stores perc.tot.var.exp directly
+      if(!is.null(x = embed$perc.tot.var.exp)){
+        var.explained <- embed$perc.tot.var.exp
+      }
+    } else if(.embedding == "pca"){
+      # Unsupervised embeddings are in .lm.obj$map$embedding
+      embed <- .lm.obj$map$embedding$pca
+      axis.prefix <- "PC"
+      # PCA stores sdev, compute variance explained as proportion of TOTAL variance
+      # (not sum of truncated sdev^2, since we use truncated PCA)
+      if(!is.null(x = embed$sdev)){
+        total.var <- matrixStats::rowVars(x = .lm.obj$map$Y) |> sum()
+        var.explained <- 100 * embed$sdev^2 / total.var
+        names(x = var.explained) <- paste0("PC", seq_along(along.with = var.explained))
+      }
+    } else { # traj
+      embed <- .lm.obj$map$embedding$traj
+      axis.prefix <- "DC"
+      # Diffusion map eigenvalues don't represent variance explained in same way
+    }
     
     if(is.null(x = embed$coord)){
       stop("Embedding does not contain coordinates. Check get.embedding() output.")
     }
     
-    n.pcs <- ncol(embed$coord)
+    n.pcs <- ncol(x = embed$coord)
     
     # -------------------------------------------------------------------------
-    # Handle single PC case: boxplot with covariate on x-axis
+    # Handle single PC case: scatter for continuous x, boxplot for categorical x
+    # (only applies to pePC embeddings)
     # -------------------------------------------------------------------------
     
-    if(n.pcs == 1){
+    if(n.pcs == 1 && .embedding == "pePC"){
+      
+      # Determine x-axis variable
+      if(!is.null(x = .x.by)){
+        x.by.col <- .x.by
+      } else if(!is.null(x = .sup.embed.slot) && 
+                .sup.embed.slot %in% colnames(x = .lm.obj$metadata)){
+        x.by.col <- .sup.embed.slot
+      } else {
+        stop(paste0("'.sup.embed.slot' = '", .sup.embed.slot, 
+                    "' is not a metadata column. Please specify '.x.by' as one of: ",
+                    paste(colnames(.lm.obj$metadata), collapse = ", ")))
+      }
       
       plot.data <-
         data.frame(
           PC1 = embed$coord[, 1],
-          covariate = .lm.obj$metadata[[.color.by]]
+          x.var = .lm.obj$metadata[[x.by.col]],
+          color.var = .lm.obj$metadata[[.color.by]]
         )
       
-      p <-
-        ggplot2::ggplot(data = plot.data,
-                        mapping = ggplot2::aes(x = covariate,
-                                               y = PC1)) +
-        ggplot2::theme_bw() +
-        ggplot2::geom_boxplot(outliers = FALSE) +
-        ggplot2::geom_point(mapping = ggplot2::aes(color = covariate),
-                            size = I(x = .point.size),
-                            position = ggplot2::position_jitter(height = 0,
-                                                                width = 0.2,
-                                                                seed = 123)) +
-        ggplot2::labs(
-          x = .color.by,
-          y = paste0("partial-effect PC1 projection"),
-          color = .color.by
-        ) +
-        ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
-                                                  units = "in"),
-                                col = grid::unit(x = .panel.size,
-                                                 units = "in"))
+      # Build y-axis label with variance explained if available
+      y.label <- "pePC1"
+      if(!is.null(x = var.explained) && length(x = var.explained) >= 1){
+        y.label <- paste0("pePC1 (", round(x = var.explained[1], digits = 1), "%)")
+      }
+      
+      # Set midpoint for color scale if x.by differs from color.by
+      if(is.null(x = .midpoint) && is.numeric(x = plot.data$color.var)){
+        .midpoint <- stats::median(x = plot.data$color.var)
+      }
+      
+      if(is.numeric(x = plot.data$x.var)){
+        
+        # ----- Scatter plot for continuous x-axis -----
+        p <-
+          ggplot2::ggplot(data = plot.data,
+                          mapping = ggplot2::aes(x = x.var,
+                                                 y = PC1,
+                                                 color = color.var)) +
+          ggplot2::theme_bw() +
+          ggplot2::geom_point(size = I(x = .point.size)) +
+          ggplot2::labs(
+            x = x.by.col,
+            y = y.label,
+            color = .color.by
+          ) +
+          ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
+                                                    units = "in"),
+                                  col = grid::unit(x = .panel.size,
+                                                   units = "in"))
+        
+      } else {
+        
+        # ----- Boxplot for categorical x-axis -----
+        p <-
+          ggplot2::ggplot(data = plot.data,
+                          mapping = ggplot2::aes(x = x.var,
+                                                 y = PC1)) +
+          ggplot2::theme_bw() +
+          ggplot2::geom_boxplot(outliers = FALSE) +
+          ggplot2::geom_point(mapping = ggplot2::aes(color = color.var),
+                              size = I(x = .point.size),
+                              position = ggplot2::position_jitter(height = 0,
+                                                                  width = 0.2,
+                                                                  seed = 123)) +
+          ggplot2::labs(
+            x = x.by.col,
+            y = y.label,
+            color = .color.by
+          ) +
+          ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
+                                                    units = "in"),
+                                  col = grid::unit(x = .panel.size,
+                                                   units = "in"))
+        
+      }
       
       # Apply color scale for points
-      if(is.numeric(x = plot.data$covariate)){
+      if(is.numeric(x = plot.data$color.var)){
         p <-
           p +
           ggplot2::scale_color_gradient2(low = unname(obj = Color.Palette[1,1]),
@@ -1275,7 +1321,7 @@ plotSampleEmbedding <-
             values = grDevices::colorRampPalette(
               colors = unname(
                 obj = .cat.feature.color)
-            )(length(x = unique(x = plot.data$covariate))))
+            )(length(x = unique(x = plot.data$color.var))))
       }
       
       return(p)
@@ -1283,11 +1329,24 @@ plotSampleEmbedding <-
     }
     
     # -------------------------------------------------------------------------
-    # Multi-PC case: validate requested PCs
+    # Multi-PC/DC case: validate requested components
     # -------------------------------------------------------------------------
     
     if(.pc.x > n.pcs || .pc.y > n.pcs){
-      stop(paste0("Requested PC (", max(.pc.x, .pc.y), ") exceeds available PCs (", n.pcs, ")"))
+      stop(paste0("Requested component (", max(.pc.x, .pc.y), ") exceeds available (", n.pcs, ")"))
+    }
+    
+    # -------------------------------------------------------------------------
+    # Build axis labels with variance explained if available
+    # -------------------------------------------------------------------------
+    
+    if(!is.null(x = var.explained) && 
+       length(x = var.explained) >= max(.pc.x, .pc.y)){
+      x.label <- paste0(axis.prefix, .pc.x, " (", round(x = var.explained[.pc.x], digits = 1), "%)")
+      y.label <- paste0(axis.prefix, .pc.y, " (", round(x = var.explained[.pc.y], digits = 1), "%)")
+    } else {
+      x.label <- paste0(axis.prefix, .pc.x)
+      y.label <- paste0(axis.prefix, .pc.y)
     }
     
     # -------------------------------------------------------------------------
@@ -1313,8 +1372,8 @@ plotSampleEmbedding <-
       ggplot2::theme_bw() +
       ggplot2::geom_point(size = I(x = .point.size)) +
       ggplot2::labs(
-        x = paste0("partial-effect PC", .pc.x, " projection"),
-        y = paste0("partial-effect PC", .pc.y, " projection"),
+        x = x.label,
+        y = y.label,
         color = .color.by
       ) +
       ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
@@ -1355,11 +1414,13 @@ plotSampleEmbedding <-
 #' Shows effect sizes as heatmap with significance markers, providing a complementary view to 
 #' landmark-based analysis for easier interpretation at the population level.
 #'
-#' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
-#' @param .stats.obj Statistical results from \code{get.stats()} (must include traditional analysis).
+#' @param .lm.obj A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
+#'   Statistical results should be stored in \code{.lm.obj$map$lm}.
+#' @param .model.name Character string naming which model fit to use from \code{.lm.obj$map$lm}
+#'   (default "default"). Must match a name used in \code{get.lm(.model.name = ...)}.
+#' @param .split.by Character: "clustering" (default) or "celltyping" - which population grouping to use.
 #' @param .coefs Character vector of coefficient names to plot. Defaults to all coefficients from 
 #'   traditional model.
-#' @param .split.by Character: "clustering" (default) or "celltyping" - which population grouping to use.
 #' @param .q Numeric q-value threshold for significance stars (default 0.1).
 #' @param .row.space.scaler Numeric scaling for row height (default 0.2 inches per population).
 #' @param .col.space.scaler Numeric scaling for column width (default 0.5 inches per coefficient).
@@ -1382,18 +1443,18 @@ plotSampleEmbedding <-
 #' Note: Traditional analysis is less sensitive to subtle within-cluster variation that 
 #' landmark-based methods can detect.
 #' 
-#' @seealso \code{\link{get.stats}}, \code{\link{plotTradPerc}}, \code{\link{plotBeeswarm}}
+#' @seealso \code{\link{get.lm}}, \code{\link{plotTradPerc}}, \code{\link{plotBeeswarm}}
 #' 
 #' @examples
 #' \dontrun{
-#' # After get.stats with traditional analysis
-#' stats <- get.stats(lm.cells, .design = design)
+#' # After get.lm with traditional analysis
+#' lm.obj <- get.lm(lm.obj, .design = design)
 #' 
 #' # Heatmap of cluster-level changes
-#' plotTradStats(lm.cells, stats, .split.by = "clustering")
+#' plotTradStats(lm.obj, .split.by = "clustering")
 #' 
-#' # Cell type-level changes
-#' plotTradStats(lm.cells, stats, .split.by = "celltyping")
+#' # Cell type-level changes (using a different model)
+#' plotTradStats(lm.obj, .model.name = "full", .split.by = "celltyping")
 #' }
 #' 
 #' @export
@@ -1401,9 +1462,9 @@ plotSampleEmbedding <-
 plotTradStats <-
   function(
     .lm.obj,
-    .stats.obj,
+    .model.name = "default",
     .split.by = "clustering",
-    .coefs = colnames(x = .stats.obj$trad[[.split.by]]$fit$coefficients),
+    .coefs = NULL,
     .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.07,
@@ -1413,10 +1474,22 @@ plotTradStats <-
     
     sig.shape <- sig <- adj.p <- level <- pop <- term <- coef <- cell.perc <- NULL
     
+    # Validate model exists
+    if(is.null(x = .lm.obj$map$lm[[.model.name]])){
+      stop(paste0("Model '", .model.name, "' not found in .lm.obj$map$lm. ",
+                  "Available models: ", paste(names(.lm.obj$map$lm), collapse = ", ")))
+    }
+    .stats.obj <- .lm.obj$map$lm[[.model.name]]
+    
     .split.by <-
       match.arg(arg = .split.by,
                 choices = c("clustering",
                             "celltyping"))
+    
+    # Default .coefs to all coefficients if not provided
+    if(is.null(x = .coefs)){
+      .coefs <- colnames(x = .stats.obj$trad[[.split.by]]$fit$coefficients)
+    }
     
     perc.plot <-
       data.frame(x = as.factor(x = 1),
@@ -1631,7 +1704,7 @@ plotTradStats <-
 #'   \item Confirming significant results have biological meaning
 #' }
 #' 
-#' @seealso \code{\link{plotTradStats}}, \code{\link{get.stats}}
+#' @seealso \code{\link{plotTradStats}}, \code{\link{get.lm}}
 #' 
 #' @examples
 #' \dontrun{

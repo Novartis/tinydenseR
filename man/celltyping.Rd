@@ -52,7 +52,7 @@ Manual cell type annotation is useful when:
 Cell type labels assigned here will be used in downstream analyses:
 \itemize{
 \item \code{\link{get.map}} propagates labels to all cells via nearest landmarks
-\item \code{\link{get.stats}} enables cell-type-level differential abundance testing in traditional analysis
+\item \code{\link{get.lm}} enables cell-type-level differential abundance testing in traditional analysis
 \item \code{\link{get.dea}} enables cell-type-specific differential expression analysis
 }
 }

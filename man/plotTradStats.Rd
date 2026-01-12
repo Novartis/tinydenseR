@@ -6,9 +6,9 @@
 \usage{
 plotTradStats(
   .lm.obj,
-  .stats.obj,
+  .model.name = "default",
   .split.by = "clustering",
-  .coefs = colnames(x = .stats.obj$trad[[.split.by]]$fit$coefficients),
+  .coefs = NULL,
   .q = 0.1,
   .row.space.scaler = 0.2,
   .col.space.scaler = 0.07,
@@ -17,9 +17,11 @@ plotTradStats(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
+Statistical results should be stored in \code{.lm.obj$map$lm}.}
 
-\item{.stats.obj}{Statistical results from \code{get.stats()} (must include traditional analysis).}
+\item{.model.name}{Character string naming which model fit to use from \code{.lm.obj$map$lm}
+(default "default"). Must match a name used in \code{get.lm(.model.name = ...)}.}
 
 \item{.split.by}{Character: "clustering" (default) or "celltyping" - which population grouping to use.}
 
@@ -60,17 +62,17 @@ landmark-based methods can detect.
 }
 \examples{
 \dontrun{
-# After get.stats with traditional analysis
-stats <- get.stats(lm.cells, .design = design)
+# After get.lm with traditional analysis
+lm.obj <- get.lm(lm.obj, .design = design)
 
 # Heatmap of cluster-level changes
-plotTradStats(lm.cells, stats, .split.by = "clustering")
+plotTradStats(lm.obj, .split.by = "clustering")
 
-# Cell type-level changes
-plotTradStats(lm.cells, stats, .split.by = "celltyping")
+# Cell type-level changes (using a different model)
+plotTradStats(lm.obj, .model.name = "full", .split.by = "celltyping")
 }
 
 }
 \seealso{
-\code{\link{get.stats}}, \code{\link{plotTradPerc}}, \code{\link{plotBeeswarm}}
+\code{\link{get.lm}}, \code{\link{plotTradPerc}}, \code{\link{plotBeeswarm}}
 }

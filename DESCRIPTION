@@ -1,6 +1,6 @@
 Package: tinydenseR
 Title: Linking Cell-To-Cell Variation to Sample-to-Sample Variation
-Version: 0.0.1.0013
+Version: 0.0.2.0001
 Authors@R: 
     person("Pedro", "Milanez-Almeida", , "pedro.milanez@novartis.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-8285-957X"))
@@ -23,6 +23,7 @@ Suggests:
 Config/testthat/edition: 3
 Imports: 
     curl,
+    destiny,
     dplyr,
     edgeR,
     ggh4x,

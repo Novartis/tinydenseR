@@ -38,6 +38,9 @@ Updated \code{.lm.obj} with \code{$map} component containing:
 \item \code{fdens}: Matrix of fuzzy graph densities (landmarks × samples). Each entry is
 the sum of cell-landmark edge weights for that sample, normalized by sample size and
 excluding ignored populations.
+\item \code{Y}: Matrix of log2-transformed densities (landmarks × samples):
+\code{log2(fdens + 0.5)}. Used by \code{get.lm()} for linear modeling and
+\code{get.embedding()} for unsupervised embeddings.
 \item \code{clustering$ids}: List of named character vectors (one per sample) with cluster
 assignments for all cells.
 \item \code{clustering$cell.count}: Matrix (samples × clusters) of cell counts per cluster
@@ -89,7 +92,7 @@ When \code{.ref.obj} is provided:
 
 The \code{fdens} matrix quantifies how strongly each landmark is connected to cells in each
 sample. High values indicate the landmark's neighborhood is enriched in that sample. This
-forms the basis for differential abundance testing in \code{get.stats}.
+forms the basis for differential abundance testing in \code{get.lm}.
 }
 \examples{
 \dontrun{
@@ -111,5 +114,5 @@ lm.cells <- get.map(lm.cells,
 
 }
 \seealso{
-\code{\link{get.graph}}, \code{\link{get.stats}}, \code{\link{celltyping}}
+\code{\link{get.graph}}, \code{\link{get.lm}}, \code{\link{celltyping}}
 }

@@ -27,8 +27,8 @@ test_that("functions handle empty inputs gracefully", {
   expect_error(setup.lm.obj(.cells = empty_cells, .meta = empty_meta),
                "Sample names mismatch between .cells and .meta")
   
-  # Test get.stats with invalid inputs
-  expect_error(get.stats(.lm.obj = list()))
+  # Test get.lm with invalid inputs
+  expect_error(get.lm(.lm.obj = list()))
 })
 
 test_that("functions handle large datasets", {
@@ -94,7 +94,7 @@ test_that("plotting functions handle different data sizes", {
 
 test_that("functions handle edge cases", {
   # Test with invalid data types
-  expect_error(get.stats(.lm.obj = "not_a_list"))
+  expect_error(get.lm(.lm.obj = "not_a_list"))
   expect_error(get.dea(.lm.obj = NULL))
   
   # Test plotting functions with minimal valid data

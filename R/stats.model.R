@@ -30,12 +30,16 @@
 #'   \code{.design}.
 #' @param .block Optional character: column name in \code{.lm.obj$metadata} for blocking factor 
 #'   (e.g., "Donor", "Batch"). Accounts for within-block correlation using \code{duplicateCorrelation}.
+#' @param .model.name Character string naming this model fit (default "default"). Results are stored 
+#'   in \code{.lm.obj$map$lm[[.model.name]]}. Use different names to store multiple model fits 
+#'   (e.g., full vs reduced models for nested model comparisons).
+#' @param .force.recalc Logical: if TRUE, overwrite existing results in the specified slot 
+#'   (default FALSE). If FALSE and slot already exists, an error is thrown.
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #' @param .seed Integer: random seed for reproducibility in blocking correlation estimation. Default 123.
 #'   
-#' @return List containing differential abundance results:
+#' @return The modified \code{.lm.obj} with results stored in \code{.lm.obj$map$lm[[.model.name]]}:
 #'   \describe{
-#'     \item{\code{y}}{log2(fuzzy density + 0.5) matrix: landmarks x samples}
 #'     \item{\code{fit}}{limma MArrayLM object after eBayes with moderated statistics, containing:}
 #'     \item{\code{fit$coefficients}}{Log fold changes (landmarks x coefficients), nested in fit}
 #'     \item{\code{fit$p.value}}{P-values (landmarks x coefficients), nested in fit}
@@ -100,15 +104,15 @@
 #' @examples
 #' \dontrun{
 #' # After mapping
-#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#' lm.obj <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks() |> get.graph() |> get.map()
 #' 
-#' # Simple two-group comparison
+#' # Simple two-group comparison (results stored in lm.obj$map$lm$default)
 #' design <- model.matrix(~ Condition, data = .meta)
-#' stats <- get.stats(lm.cells, .design = design)
+#' lm.obj <- get.lm(lm.obj, .design = design)
 #' 
 #' # Visualize results
-#' plotBeeswarm(lm.cells, stats, .coefs = "ConditionB")
+#' plotBeeswarm(lm.obj, .coefs = "ConditionB")
 #' 
 #' # Complex design with contrasts
 #' design <- model.matrix(~ 0 + Group, data = .meta)
@@ -117,23 +121,44 @@
 #'   T1vsT2 = GroupTreatment1 - GroupTreatment2,
 #'   levels = design
 #' )
-#' stats <- get.stats(lm.cells, .design = design, .contrasts = contrasts)
+#' lm.obj <- get.lm(lm.obj, .design = design, .contrasts = contrasts,
+#'                     .model.name = "full", .force.recalc = TRUE)
 #' 
 #' # With blocking for paired samples
 #' design <- model.matrix(~ Timepoint, data = .meta)
-#' stats <- get.stats(lm.cells, .design = design, .block = "Subject")
+#' lm.obj <- get.lm(lm.obj, .design = design, .block = "Subject",
+#'                     .model.name = "timepoint")
+#' 
+#' # Nested model comparison: fit reduced model
+#' red.design <- model.matrix(~ 1, data = .meta)  # intercept only
+#' lm.obj <- get.lm(lm.obj, .design = red.design, .model.name = "reduced")
+#' 
+#' # Access results by model name
+#' lm.obj$map$lm$full$fit$coefficients
+#' lm.obj$map$lm$reduced$fit$coefficients
 #' }
 #' 
 #' @export
 #'
-get.stats <-
+get.lm <-
   function(
     .lm.obj,
     .design,
     .contrasts = NULL,
     .block = NULL,
+    .model.name = "default",
+    .force.recalc = FALSE,
     .verbose = TRUE,
     .seed = 123){
+    
+    # -------------------------------------------------------------------------
+    # Check if slot already exists
+    # -------------------------------------------------------------------------
+    
+    if(!is.null(x = .lm.obj$map$lm[[.model.name]]) && !isTRUE(x = .force.recalc)){
+      stop(paste0("Model '", .model.name, "' already exists in .lm.obj$map$lm. ",
+                  "Use a different .model.name or set .force.recalc = TRUE to overwrite."))
+    }
     
     if(nrow(x = .design) != length(x = .lm.obj$cells)){
       stop("Number of rows in design matrix must be equal to the number of samples")
@@ -172,58 +197,27 @@ get.stats <-
     stats <-
       vector(mode = "list",
              length = 0)
+        
+    # Use pre-computed Y from get.map
+    Y <-
+      .lm.obj$map$Y
     
-    #stats$counts <-
-    #  seq_along(along.with = .lm.obj$map$nearest.landmarks) |>
-    #  stats::setNames(nm = names(x = .lm.obj$map$nearest.landmarks)) |>
-    #  lapply(FUN = function(smpl.idx){
-    #    
-    #    res <-
-    #      table(.lm.obj$map$nearest.landmarks[[smpl.idx]][,1]) |>
-    #      (\(x)
-    #       stats::setNames(object = as.vector(x = x),
-    #                       nm = rownames(x = .lm.obj$lm)[names(x = x) |>
-    #                                                       as.integer()])
-    #      )() |>
-    #      (\(x)
-    #       x[match(x = rownames(x = .lm.obj$lm),
-    #               table = names(x = x))]
-    #      )()
-    #    
-    #    res[is.na(x = res)] <- 0
-    #    
-    #    names(x = res) <-
-    #      rownames(x = .lm.obj$lm)
-    #    
-    #    return(res)
-    #    
-    #  }) |>
-    #  dplyr::bind_cols() |>
-    #  as.matrix() |>
-    #  (\(x)
-    #   `rownames<-`(x = x,
-    #                value = rownames(x = .lm.obj$lm))
-    #  )()
-    
-    stats$y <-
-      log2(x = .lm.obj$map$fdens + 0.5)
-    
-    if(nrow(x = stats$y) !=
-       nrow(x = .lm.obj$lm)){
-      
-      stats$y <-
-        stats$y[match(x = rownames(x = .lm.obj$lm),
-                      table = rownames(x = stats$y)),]
-      
-      stats$y[
-        is.na(x = stats$y)
-      ] <- min(stats$y,
-               na.rm = TRUE)
-      
-      rownames(x = stats$y) <-
-        rownames(x = .lm.obj$lm)
-      
-    }
+    #if(nrow(x = Y) !=
+    #   nrow(x = .lm.obj$lm)){
+    #  
+    #  stats$y <-
+    #    stats$y[match(x = rownames(x = .lm.obj$lm),
+    #                  table = rownames(x = stats$y)),]
+    #  
+    #  stats$y[
+    #    is.na(x = stats$y)
+    #  ] <- min(stats$y,
+    #           na.rm = TRUE)
+    #  
+    #  rownames(x = stats$y) <-
+    #    rownames(x = .lm.obj$lm)
+    #  
+    #}
     
     if(!(is.null(x = .block))){
       
@@ -244,7 +238,7 @@ get.stats <-
       # you want to compare across blocking levels, e.g., comparing diseased
       # and healthy donors when each donor also contributes before/after treatment samples.
       dupcor <- 
-        limma::duplicateCorrelation(object = stats$y,
+        limma::duplicateCorrelation(object = Y,
                                     design = .design,
                                     block = .lm.obj$metadata[[.block]])
     }
@@ -254,7 +248,7 @@ get.stats <-
     }
     
     stats$fit <-
-      limma::lmFit(object = stats$y,
+      limma::lmFit(object = Y,
                    design = .design,
                    block = if(exists(x = "dupcor")) .lm.obj$metadata[[.block]] else  NULL,
                    correlation = if(exists(x = "dupcor")) dupcor$consensus else NULL)
@@ -621,7 +615,23 @@ get.stats <-
       
     }
     
-    return(stats)
+    # -------------------------------------------------------------------------
+    # Store results and return modified .lm.obj
+    # -------------------------------------------------------------------------
+    
+    # Initialize stats slot if needed
+    if(is.null(x = .lm.obj$map$lm)){
+      .lm.obj$map$lm <- list()
+    }
+    
+    # Store results under the model name
+    .lm.obj$map$lm[[.model.name]] <- stats
+    
+    if(isTRUE(x = .verbose)){
+      message("\nResults stored in: .lm.obj$map$lm$", .model.name)
+    }
+    
+    return(.lm.obj)
     
   }
 
@@ -1730,56 +1740,218 @@ get.marker <-
     
   }
 
+# =============================================================================
+# Helper function: Compute unsupervised embeddings (pca and traj)
+# =============================================================================
+
+#' @noRd
+#' @keywords internal
+.compute.unsupervised.embeddings <-
+  function(
+    .lm.obj,
+    .n.eigs = 20,
+    .n.pcs = 20,
+    .dist.metric = "cosine",
+    .verbose = TRUE
+  ){
+    
+    # Initialize embedding slot if not present
+    if(is.null(x = .lm.obj$map$embedding)){
+      .lm.obj$map$embedding <- list()
+    }
+    
+    # -------------------------------------------------------------------------
+    # Compute PCA if not already present
+    # -------------------------------------------------------------------------
+    
+    if(is.null(x = .lm.obj$map$embedding$pca)){
+      
+      if(isTRUE(x = .verbose)){
+        message("\nComputing sample-level PCA on landmark densities")
+      }
+      
+      # Compute PCA via irlba (samples as rows, using .lm.obj$map$Y)
+      pca.res <-
+        Matrix::t(x = .lm.obj$map$Y) |>
+        (\(x)
+         irlba::prcomp_irlba(
+           x = x,
+           center = Matrix::colMeans(x = x),
+           scale. = FALSE,
+           n = min(c(.n.pcs, nrow(x = x) - 1, ncol(x = x)))
+         )
+        )()
+      
+      # Store in format consistent with get.landmarks():
+      # coord = embedding coordinates (samples x PCs), 
+      # rotation = loadings (landmarks x PCs),
+      # center, scale, sdev
+      .lm.obj$map$embedding$pca <- list(
+        coord = pca.res$x,
+        rotation = pca.res$rotation,
+        center = pca.res$center,
+        scale = pca.res$scale,
+        sdev = pca.res$sdev
+      )
+      
+      # Set column names for coord
+      colnames(x = .lm.obj$map$embedding$pca$coord) <- 
+        paste0("PC", seq_len(length.out = ncol(x = .lm.obj$map$embedding$pca$coord)))
+      
+      if(isTRUE(x = .verbose)){
+        var.explained <- round(100 * pca.res$sdev^2 / sum(pca.res$sdev^2), 1)
+        message("  PCA variance explained: ", 
+                paste(paste0("PC", seq_along(var.explained), "=", var.explained, "%"), collapse = ", "))
+      }
+      
+    } else {
+      
+      if(isTRUE(x = .verbose)){
+        message("\nPCA embedding already exists; skipping recomputation")
+      }
+      
+    }
+    
+    # -------------------------------------------------------------------------
+    # Compute diffusion map trajectory (traj) if not already present
+    # -------------------------------------------------------------------------
+    
+    if(is.null(x = .lm.obj$map$embedding$traj)){
+      
+      if(isTRUE(x = .verbose)){
+        message("\nComputing diffusion map trajectory embedding")
+      }
+      
+      # Check if destiny is available
+      if(!requireNamespace("destiny", quietly = TRUE)){
+        warning("Package 'destiny' is required for trajectory embedding. ",
+                "Install with BiocManager::install('destiny'). ",
+                "Skipping trajectory computation.",
+                call. = FALSE)
+        return(.lm.obj)
+      }
+      
+      # Compute diffusion map on transposed Y (samples as rows)
+      traj.res <- 
+        Matrix::t(x = .lm.obj$map$Y) |>
+        (\(x)
+        destiny::DiffusionMap(
+          data = x,
+          n_eigs = min(c(.n.eigs, nrow(x = x) - 2, ncol(x = x))), 
+          n_pcs = NA, # suppress PCA inside destiny
+          distance = .dist.metric
+        )
+        )()
+      # Extract eigenvalues and compute cell embeddings
+      stdev <- traj.res@eigenvalues
+      stdev[stdev < 0] <- 0
+      
+      D <- 
+        abs(x = stdev) |>
+        sqrt() |>
+        diag()
+      
+      traj.coord <- 
+        traj.res@eigenvectors %*% D
+      
+      # Set column names
+      colnames(x = traj.coord) <- 
+        paste0("DC", seq_len(length.out = ncol(x = traj.coord)))
+      
+      rownames(x = traj.coord) <- 
+        rownames(x = .lm.obj$metadata)
+      
+      # Store in format similar to pca slot
+      .lm.obj$map$embedding$traj <- list(
+        coord = traj.coord,
+        eigenvalues = traj.res@eigenvalues,
+        eigenvectors = traj.res@eigenvectors,
+        sdev = abs(x = stdev) |> sqrt()
+      )
+      
+      if(isTRUE(x = .verbose)){
+        message("  Diffusion map computed with ", ncol(x = traj.coord), " components")
+      }
+      
+    } else {
+      
+      if(isTRUE(x = .verbose)){
+        message("\nTrajectory embedding already exists; skipping recomputation")
+      }
+      
+    }
+    
+    return(.lm.obj)
+    
+  }
+
 #' Compute Sample Embedding from Partial Fitted Values
 #'
-#' Computes a low-dimensional sample embedding by learning PCA axes from the partial 
-#' fitted component \eqn{\Delta\hat{Y} = (H_{full} - H_{red})Y}, then projecting
-#' nuisance-residualized samples onto those axes. This isolates variation attributable 
-#' to an effect of interest (e.g., a contrast or additional covariates) while preserving
-#' residual scatter. Exact for OLS; if duplicateCorrelation/blocking is used, the 
-#' decomposition is approximate.
+#' Computes embeddings for sample-level visualization. When called without supervised
+#' arguments, computes unsupervised embeddings (PCA and diffusion map trajectory) on
+#' landmark densities stored in \code{.lm.obj$map$Y}. When called with supervised arguments 
+#' (\code{.contrast.of.interest} or \code{.red.model}), additionally computes a 
+#' partial-effect PCA (pePC) that isolates variation attributable to a specific effect. 
+#' Exact for OLS; if duplicateCorrelation/blocking is used, the decomposition is approximate.
 #'
-#' @param .lm.obj The tinydenseR object for accessing metadata and blocking information.
-#' @param .stats.obj A stats object from \code{get.stats()} containing the full model fit.
-#'   Returns a modified copy of .stats.obj with the embedding added.
+#' @param .lm.obj The tinydenseR object processed through \code{get.map()}. Contains
+#'   \code{$map$Y} (log2-transformed densities) used for unsupervised embeddings. Statistical
+#'   model fits should be stored in \code{$map$lm} via \code{get.lm()}.
+#' @param .full.model Character string naming the full model in \code{.lm.obj$map$lm}
+#'   (default "default"). Required only when computing supervised embeddings (pePC).
 #' @param .term.of.interest Character string: the covariate/term being isolated when using the 
-#'   nested model method (\code{.red.stats.obj}). Must match a column name in 
+#'   nested model method (\code{.red.model}). Must match a column name in 
 #'   \code{.lm.obj$metadata}. Ignored when using \code{.contrast.of.interest}.
-#' @param .red.stats.obj Optional: A stats object from \code{get.stats()} containing a 
-#'   reduced model fit (without the effect of interest). If provided, computes 
+#' @param .red.model Optional character string naming the reduced model in \code{.lm.obj$map$lm}
+#'   (without the effect of interest). If provided, computes 
 #'   \eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}} directly.
 #' @param .contrast.of.interest Optional: Character string naming the contrast to extract.
-#'   Must match a column name in \code{.stats.obj$fit$contrasts}. When specified, uses
+#'   Must match a column name in the full model's contrasts. When specified, uses
 #'   the Frisch-Waugh-Lovell (FWL) theorem to compute the true partial fitted component.
-#'   The embedding will be stored in \code{.stats.obj$embedding[[.contrast.of.interest]]}.
+#' @param .n.eigs Integer: number of eigenvectors for diffusion map (default 20).
+#' @param .n.pcs Integer: number of PCs for unsupervised PCA and diffusion map (default 20).
+#' @param .dist.metric Character: distance metric for diffusion map (default "cosine").
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #'
-#' @return The modified \code{.stats.obj} with new embedding slot. For FWL method, the slot
-#'   is named after the contrast; for nested model method, the slot is named after
-#'   \code{.term.of.interest}. Each embedding is a flat list with:
+#' @return Modified \code{.lm.obj} with embeddings stored in \code{.lm.obj$map$embedding}:
 #'   \describe{
-#'     \item{\code{sdev}}{Standard deviations of PCs learned from \eqn{\Delta\hat{Y}^\top}}
-#'     \item{\code{rotation}}{Loadings matrix (landmarks x PCs): the PCA basis \eqn{V} 
-#'       learned from \eqn{\Delta\hat{Y}^\top}}
-#'     \item{\code{center}}{Centering vector: column means of \eqn{\Delta\hat{Y}^\top}}
-#'     \item{\code{scale}}{Scaling vector (FALSE since scale. = FALSE)}
-#'     \item{\code{x}}{PCA scores on \eqn{\Delta\hat{Y}^\top} (samples x PCs): the partial-effect 
-#'       embedding from prcomp}
-#'     \item{\code{coord}}{Nuisance-residualized projection (samples x PCs): 
-#'       \eqn{(E_{red}^\top - center) V} where \eqn{E_{red} = Y - \hat{Y}_{red}}.
-#'       This is the main embedding for visualization--samples spread along PCs by their 
-#'       alignment with the effect direction, plus residual scatter.}
-#'     \item{\code{effect.resid.cor}}{Numeric vector: per-PC correlation between \code{x} 
-#'       (partial-effect scores) and \code{coord} (residualized projection). High values 
-#'       (>0.8) indicate residuals align well with the effect direction; low values suggest
-#'       strong nuisance removal or weak signal.}
-#'     \item{\code{delta.Yhat}}{Matrix (landmarks x samples) of partial fitted values
-#'       \eqn{\Delta\hat{Y} = (H_{full} - H_{red})Y}}
-#'     \item{\code{method}}{Character: "fwl_contrast" or "nested_models"}
+#'     \item{\code{pca}}{Unsupervised PCA on log-transformed landmark densities:
+#'       \itemize{
+#'         \item \code{coord}: Sample coordinates (samples x PCs)
+#'         \item \code{rotation}: Loadings (landmarks x PCs)
+#'         \item \code{center}, \code{scale}, \code{sdev}: Centering, scaling, and standard deviations
+#'       }}
+#'     \item{\code{traj}}{Diffusion map trajectory embedding:
+#'       \itemize{
+#'         \item \code{coord}: Sample coordinates (samples x DCs)
+#'         \item \code{eigenvalues}, \code{eigenvectors}: Raw diffusion map components
+#'         \item \code{sdev}: sqrt(abs(eigenvalues))
+#'       }}
+#'     \item{\code{pePC}}{Supervised partial-effect embeddings (when pePC args provided):
+#'       \itemize{
+#'         \item \code{<contrast>} or \code{<term>}: Named list containing:
+#'           \itemize{
+#'             \item \code{coord}: Nuisance-residualized projection (samples x pePCs)
+#'             \item \code{x}: PCA scores on partial fitted values
+#'             \item \code{rotation}: Landmark loadings from partial-effect PCA
+#'             \item \code{effect.resid.cor}: Per-PC correlation diagnostic
+#'             \item \code{delta.Yhat}: Partial fitted values matrix
+#'             \item \code{method}: "fwl_contrast" or "nested_models"
+#'           }
+#'       }}
 #'   }
 #'
 #' @details
-#' \strong{Two Methods for Computing \eqn{\Delta\hat{Y}}:}
+#' \strong{Unsupervised Embeddings (always computed):}
+#'
+#' \code{pca}: Standard PCA on log2-transformed landmark densities (log2(fdens + 0.5)),
+
+#' filtered to remove zero-variance landmarks, centered and scaled.
+#'
+#' \code{traj}: Diffusion map trajectory computed via \code{destiny::DiffusionMap} on
+#' the raw landmark density matrix. Useful for visualizing continuous trajectories.
+#'
+#' \strong{Supervised Embedding (pePC, when .contrast.of.interest or .red.model provided):}
 #'
 #' \strong{Method 1: FWL-based contrast extraction} (when \code{.contrast.of.interest} is provided)
 #'
@@ -1792,7 +1964,7 @@ get.marker <-
 #'   \item Form \eqn{\Delta\hat{Y} = \gamma_g \otimes x_{c,\perp}}
 #' }
 #'
-#' \strong{Method 2: Nested model comparison} (when \code{.red.stats.obj} is provided)
+#' \strong{Method 2: Nested model comparison} (when \code{.red.model} is provided)
 #'
 #' Direct computation: \eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}}
 #'
@@ -1820,45 +1992,52 @@ get.marker <-
 #' Scatter along PCs reflects residual alignment with the effect; scatter orthogonal 
 #' to PCs is residual-only noise.
 #'
-#' @seealso \code{\link{get.stats}} for model fitting, \code{\link{plotSampleEmbedding}} for
+#' @seealso \code{\link{get.lm}} for model fitting, \code{\link{plotSampleEmbedding}} for
 #'   visualizing the embedding
 #'
 #' @examples
 #' \dontrun{
 #' # ===========================================================================
+#' # Example 0: Unsupervised embeddings only (before get.lm)
+#' # ===========================================================================
+#' 
+#' # After get.map, compute unsupervised embeddings
+#' lm.obj <- get.embedding(.lm.obj = lm.obj)
+#' 
+#' # Access unsupervised embeddings
+#' lm.obj$map$embedding$pca$coord   # sample PCA coordinates
+#' lm.obj$map$embedding$traj$coord  # sample diffusion map coordinates
+#' 
+#' # Plot unsupervised embeddings
+#' plotSampleEmbedding(lm.obj, .embedding = "pca", .color.by = "Condition")
+#' plotSampleEmbedding(lm.obj, .embedding = "traj", .color.by = "Timepoint")
+#' 
+#' # ===========================================================================
 #' # Example 1: Nested model comparison (no contrasts)
 #' # ===========================================================================
 #' 
-#' # Fit full model with disease effect
+#' # Fit full model with disease effect (stored as "full")
 #' .design <- model.matrix(object = ~ disease + sex + age,
 #'                         data = lm.obj$metadata)
+#' lm.obj <- get.lm(.lm.obj = lm.obj, .design = .design, 
+#'                     .model.name = "full")
 #' 
-#' stats.res <- tinydenseR::get.stats(
-#'     .lm.obj = lm.obj,
-#'     .design = .design,
-#'     .verbose = TRUE
-#' )
-#' 
-#' # Fit reduced model without disease
+#' # Fit reduced model without disease (stored as "reduced")
 #' .red.design <- model.matrix(object = ~ sex + age,
 #'                             data = lm.obj$metadata)
+#' lm.obj <- get.lm(.lm.obj = lm.obj, .design = .red.design, 
+#'                     .model.name = "reduced")
 #' 
-#' red.stats.res <- tinydenseR::get.stats(
+#' # Extract disease effect embedding (all stored in lm.obj)
+#' lm.obj <- get.embedding(
 #'     .lm.obj = lm.obj,
-#'     .design = .red.design,
-#'     .verbose = TRUE
-#' )
-#' 
-#' # Extract disease effect embedding (slot named "disease")
-#' stats.res <- get.embedding(
-#'     .lm.obj = lm.obj,
-#'     .stats.obj = stats.res,
+#'     .full.model = "full",
 #'     .term.of.interest = "disease",
-#'     .red.stats.obj = red.stats.res
+#'     .red.model = "reduced"
 #' )
 #' 
 #' # Plot the embedding (colored by disease)
-#' plotSampleEmbedding(lm.obj, stats.res, .embedding.slot = "disease")
+#' plotSampleEmbedding(lm.obj, .embedding = "pePC", .sup.embed.slot = "disease")
 #' 
 #' # ===========================================================================
 #' # Example 2: FWL-based contrast extraction (cell-means model)
@@ -1871,34 +2050,26 @@ get.marker <-
 #'     KO_TrtVsCtrl = GroupKO_Trt - GroupKO_Ctrl,
 #'     levels = design
 #' )
-#' stats <- get.stats(lm.obj, .design = design, .contrasts = contrasts)
+#' lm.obj <- get.lm(lm.obj, .design = design, .contrasts = contrasts)
 #'
-#' # Extract each contrast embedding (slot named after contrast)
-#' stats <- get.embedding(
-#'     .lm.obj = lm.obj,
-#'     .stats.obj = stats, 
-#'     .contrast.of.interest = "TrtVsCtrl"
-#' )
-#'
-#' stats <- get.embedding(
-#'     .lm.obj = lm.obj,
-#'     .stats.obj = stats, 
-#'     .contrast.of.interest = "KO_TrtVsCtrl"
-#' )
+#' # Extract each contrast embedding
+#' lm.obj <- get.embedding(lm.obj, .contrast.of.interest = "TrtVsCtrl")
+#' lm.obj <- get.embedding(lm.obj, .contrast.of.interest = "KO_TrtVsCtrl")
 #'
 #' # Plot the embedding (specify .color.by for metadata column)
-#' plotSampleEmbedding(lm.obj, stats, 
-#'                     .embedding.slot = "TrtVsCtrl", 
-#'                     .color.by = "Group")
+#' plotSampleEmbedding(lm.obj, .embedding = "pePC",
+#'                     .sup.embed.slot = "TrtVsCtrl", .color.by = "Group")
 #'
-#' # Access the embedding components (slot named after contrast)
-#' stats$embedding$TrtVsCtrl$coord      # sample coordinates
-#' stats$embedding$TrtVsCtrl$sdev       # PC standard deviations
-#' stats$embedding$TrtVsCtrl$rotation   # landmark loadings
-#' stats$embedding$TrtVsCtrl$delta.Yhat # partial fitted values
+#' # Access the embedding components (all in lm.obj$map$embedding)
+#' lm.obj$map$embedding$pca$coord              # sample PCA coordinates
+#' lm.obj$map$embedding$traj$coord             # sample trajectory coordinates
+#' lm.obj$map$embedding$pePC$TrtVsCtrl$coord   # sample pePC coordinates
+#' lm.obj$map$embedding$pePC$TrtVsCtrl$rotation # landmark loadings
+#' lm.obj$map$embedding$pePC$TrtVsCtrl$delta.Yhat # partial fitted values
 #'
-#' # Multiple contrasts stored separately
-#' names(stats$embedding)  # c("TrtVsCtrl", "KO_TrtVsCtrl")
+#' # Multiple embeddings stored together
+#' names(lm.obj$map$embedding)       # c("pca", "traj", "pePC")
+#' names(lm.obj$map$embedding$pePC)  # c("TrtVsCtrl", "KO_TrtVsCtrl")
 #' }
 #'
 #' @export
@@ -1906,10 +2077,13 @@ get.marker <-
 get.embedding <-
   function(
     .lm.obj,
-    .stats.obj,
+    .full.model = "default",
     .term.of.interest = NULL,
-    .red.stats.obj = NULL,
+    .red.model = NULL,
     .contrast.of.interest = NULL,
+    .n.eigs = 20,
+    .n.pcs = 20,
+    .dist.metric = "cosine",
     .verbose = TRUE
   ){
     
@@ -1917,19 +2091,63 @@ get.embedding <-
     # Input validation
     # -------------------------------------------------------------------------
     
-    if(is.null(x = .red.stats.obj) &&
-       is.null(x = .contrast.of.interest)){
+    # Check that .lm.obj has map$Y
+    if(is.null(x = .lm.obj$map$Y)){
+      stop("'.lm.obj$map$Y' not found. Run get.map() first.")
+    }
+    
+    # Determine if this is unsupervised-only mode (no pePC args provided)
+    unsupervised.only <- 
+      is.null(x = .red.model) && is.null(x = .contrast.of.interest)
+    
+    # If supervised args provided, require the full model to exist
+    if(!unsupervised.only){
       
-      stop("Please provide either '.red.stats.obj' or '.contrast.of.interest'")
+      if(is.null(x = .lm.obj$map$lm[[.full.model]])){
+        stop(paste0("Model '", .full.model, "' not found in .lm.obj$map$lm. ",
+                    "Run get.lm() first, or omit '.contrast.of.interest'/'.red.model' for unsupervised-only."))
+      }
       
     }
     
-    if(!is.null(x = .red.stats.obj) &&
+    if(!unsupervised.only &&
+       !is.null(x = .red.model) &&
        !is.null(x = .contrast.of.interest)){
       
-      warning("Both '.red.stats.obj' and '.contrast.of.interest' provided. Using '.contrast.of.interest' (FWL method).")
+      warning("Both '.red.model' and '.contrast.of.interest' provided. Using '.contrast.of.interest' (FWL method).")
       
     }
+    
+    # Reference the stats object for convenience
+    .stats.obj <- .lm.obj$map$lm[[.full.model]]
+    
+    # -------------------------------------------------------------------------
+    # Compute unsupervised embeddings (pca, traj) - stored in .lm.obj$map$embedding
+    # -------------------------------------------------------------------------
+    
+    .lm.obj <- 
+      .compute.unsupervised.embeddings(
+        .lm.obj = .lm.obj,
+        .n.eigs = .n.eigs,
+        .n.pcs = .n.pcs,
+        .dist.metric = .dist.metric,
+        .verbose = .verbose
+      )
+    
+    # If no supervised args provided, return .lm.obj with unsupervised embeddings
+    if(unsupervised.only){
+      
+      if(isTRUE(x = .verbose)){
+        message("\nNo supervised embedding args provided. Returning .lm.obj with unsupervised embeddings.")
+      }
+      
+      return(.lm.obj)
+      
+    }
+    
+    # -------------------------------------------------------------------------
+    # Determine slot name for supervised embedding
+    # -------------------------------------------------------------------------
     
     # Determine slot name based on method
     if(!is.null(x = .contrast.of.interest)){
@@ -1957,15 +2175,6 @@ get.embedding <-
       
     }
     
-    # Initialize embedding slot if it doesn't exist
-    if(is.null(x = .stats.obj$embedding)){
-      
-      .stats.obj$embedding <- 
-        vector(mode = "list",
-               length = 0)
-      
-    }
-    
     # -------------------------------------------------------------------------
     # METHOD 1: FWL-based contrast extraction
     # -------------------------------------------------------------------------
@@ -1973,7 +2182,7 @@ get.embedding <-
     if(!is.null(x = .contrast.of.interest)){
       
       if(is.null(x = .stats.obj$fit$contrasts)){
-        stop("No contrasts found in '.stats.obj'. Run get.stats() with .contrasts argument.")
+        stop("No contrasts found in '.stats.obj'. Run get.lm() with .contrasts argument.")
       }
       
       if(!(.contrast.of.interest %in% 
@@ -2029,9 +2238,9 @@ get.embedding <-
         }
       }
       
-      # Get the expression matrix Y (landmarks x samples)
+      # Get the expression matrix Y (landmarks x samples) from .lm.obj$map$Y
       Y <- 
-        .stats.obj$y
+        .lm.obj$map$Y
       
       G <- 
         nrow(x = Y)
@@ -2191,26 +2400,38 @@ get.embedding <-
       # -----------------------------------------------------------------------
       
       if(!is.null(x = .stats.obj$fit$contrasts)){
-        stop("Contrasts found in '.stats.obj'. That means, coefficients are 're-oriented' via contrasts.fit. Use '.contrast.of.interest' instead.")
+        stop("Contrasts found in full model '", .full.model, "'. That means, coefficients are 're-oriented' via contrasts.fit. Use '.contrast.of.interest' instead.")
       }
+      
+      # Validate reduced model exists
+      if(is.null(x = .lm.obj$map$lm[[.red.model]])){
+        stop(paste0("Reduced model '", .red.model, "' not found in .lm.obj$map$lm. ",
+                    "Run get.lm() with .model.name = '", .red.model, "' first."))
+      }
+      
+      .red.stats.obj <- .lm.obj$map$lm[[.red.model]]
       
       if(isTRUE(x = .verbose)){
         message("\nComputing embedding via nested model comparison")
         message("  Slot name: ", slot.name)
-        message("  Full model columns: ", paste(colnames(.stats.obj$fit$design), collapse = ", "))
-        message("  Reduced model columns: ", paste(colnames(.red.stats.obj$fit$design), collapse = ", "))
+        message("  Full model ('", .full.model, "') columns: ", paste(colnames(.stats.obj$fit$design), collapse = ", "))
+        message("  Reduced model ('", .red.model, "') columns: ", paste(colnames(.red.stats.obj$fit$design), collapse = ", "))
       }
       
-      # Validate dimensions
-      if(nrow(.stats.obj$y) != nrow(.red.stats.obj$y)){
-        stop("Number of landmarks differs between full and reduced models")
-      }
-      if(ncol(.stats.obj$y) != ncol(.red.stats.obj$y)){
-        stop("Number of samples differs between full and reduced models")
-      }
+      # Get Y from .lm.obj$map$Y for dimension validation
+      Y <- .lm.obj$map$Y
       
-      if(!identical(colnames(.stats.obj$y), colnames(.red.stats.obj$y))){
-        warning("Sample names differ between models. Assuming same order.")
+      # Validate dimensions against model fits
+      if(nrow(x = .stats.obj$fit$coefficients) != nrow(x = Y)){
+        stop("Number of landmarks in full model does not match .lm.obj$map$Y")
+      }
+      if(nrow(x = .red.stats.obj$fit$coefficients) != nrow(x = Y)){
+        stop("Number of landmarks in reduced model does not match .lm.obj$map$Y")
+      }
+      if(ncol(x = .stats.obj$fit$design) != ncol(x = .red.stats.obj$fit$design) ||
+         nrow(x = .stats.obj$fit$design) != nrow(x = .red.stats.obj$fit$design)){
+        # Different sample counts is ok if designs have different # of samples
+        # But same samples should have same design row count
       }
       
       # Compute fitted values for each model
@@ -2227,10 +2448,10 @@ get.embedding <-
         Yhat.full - Yhat.red
       
       rownames(x = delta.Yhat) <- 
-        rownames(x = .stats.obj$y)
+        rownames(x = Y)
       
       colnames(x = delta.Yhat) <- 
-        colnames(x = .stats.obj$y)
+        colnames(x = Y)
       
       method <- "nested_models"
       
@@ -2281,8 +2502,19 @@ get.embedding <-
     
     # project E.red.t using delta.Yhat.t's V
     pca$coord <-
-      Matrix::t(x = (.stats.obj$y - Yhat.red) - pca$center) %*%
+      Matrix::t(x = (.lm.obj$map$Y - Yhat.red) - pca$center) %*%
       pca$rotation
+    
+    colnames(x = pca$coord) <- 
+      paste0("pePC", 
+             seq_len(length.out = ncol(x = pca$coord)))
+    
+    # partial-effect principal component variance as a fraction of TOTAL variance
+    perc.tot.var.exp <-
+      (100 * ((pca$sdev[1:ncol(x = pca$coord)])^2) /
+         (matrixStats::rowVars(x = .lm.obj$map$Y) |>
+            sum())) |>
+      stats::setNames(nm = colnames(x = pca$coord))
     
     # -------------------------------------------------------------------------
     # Compute per-PC correlation: effect scores (x) vs residualized projection (coord)
@@ -2307,24 +2539,28 @@ get.embedding <-
     }
     
     # -------------------------------------------------------------------------
-    # Store results in .stats.obj$embedding[[slot.name]]
+    # Store results in .lm.obj$map$embedding$pePC[[slot.name]]
     # -------------------------------------------------------------------------
     
-    # Flatten PCA result into shallow list
-    #pca$coord <- pca$x
-    #pca$x <- NULL
+    # Initialize pePC list if needed
+    if(is.null(x = .lm.obj$map$embedding$pePC)){
+      .lm.obj$map$embedding$pePC <- list()
+    }
     
-    .stats.obj$embedding[[slot.name]] <- 
+    .lm.obj$map$embedding$pePC[[slot.name]] <- 
       c(pca,
-        list(effect.resid.cor = effect.resid.cor,
+        list(perc.tot.var.exp = perc.tot.var.exp,
+             effect.resid.cor = effect.resid.cor,
              delta.Yhat = as.matrix(x = delta.Yhat),
              method = method)
       )
     
     if(isTRUE(x = .verbose)){
-      message("\nEmbedding stored in: .stats.obj$embedding$", slot.name)
+      message("\nSupervised embedding stored in: .lm.obj$map$embedding$pePC$", slot.name)
+      message("Unsupervised embeddings stored in: .lm.obj$map$embedding$pca, .lm.obj$map$embedding$traj")
     }
     
-    return(.stats.obj)
+    # Return .lm.obj with all embeddings
+    return(.lm.obj)
     
   }

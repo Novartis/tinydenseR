@@ -315,7 +315,7 @@ lm.cells.DE.0.5 <-
   )()
 
 Treatment.stats.0.5 <-
-  tinydenseR::get.stats(
+  tinydenseR::get.lm(
     .lm.obj = lm.cells.DE.0.5,
     .design = .design.0.5)
 
@@ -655,7 +655,7 @@ lm.cells.DE.1 <-
   )()
 
 Treatment.stats.1 <-
-  tinydenseR::get.stats(
+  tinydenseR::get.lm(
     .lm.obj = lm.cells.DE.1,
     .design = .design.1)
 
@@ -993,7 +993,7 @@ lm.cells.DE.2 <-
   )()
 
 Treatment.stats.2 <-
-  tinydenseR::get.stats(
+  tinydenseR::get.lm(
     .lm.obj = lm.cells.DE.2,
     .design = .design.2)
 

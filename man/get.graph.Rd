@@ -95,7 +95,7 @@ embedding is currently used only for warm-start initialization in clustering.
 Applies Leiden algorithm to identify communities for visualization and interpretation. Uses SNN
 graph (Jaccard similarity) or UMAP fuzzy graph depending on \code{.cl.method}. Small "straggler"
 clusters are absorbed into neighbors. While useful for exploration, clustering is not required
-for downstream statistical analysis, unless traditional analysis is requested later in \code{get.stats}.
+for downstream statistical analysis, unless traditional analysis is requested later in \code{get.lm}.
 }
 \examples{
 \dontrun{

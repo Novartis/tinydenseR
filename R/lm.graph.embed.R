@@ -402,7 +402,7 @@ fast.jaccard.r <-
 #' Applies Leiden algorithm to identify communities for visualization and interpretation. Uses SNN 
 #' graph (Jaccard similarity) or UMAP fuzzy graph depending on \code{.cl.method}. Small "straggler" 
 #' clusters are absorbed into neighbors. While useful for exploration, clustering is not required 
-#' for downstream statistical analysis, unless traditional analysis is requested later in \code{get.stats}.
+#' for downstream statistical analysis, unless traditional analysis is requested later in \code{get.lm}.
 #' 
 #' @seealso \code{\link{setup.lm.obj}}, \code{\link{get.landmarks}}, \code{\link{lm.cluster}}
 #' 
@@ -628,6 +628,9 @@ get.graph <-
 #'     \item \code{fdens}: Matrix of fuzzy graph densities (landmarks × samples). Each entry is 
 #'       the sum of cell-landmark edge weights for that sample, normalized by sample size and 
 #'       excluding ignored populations.
+#'     \item \code{Y}: Matrix of log2-transformed densities (landmarks × samples): 
+#'       \code{log2(fdens + 0.5)}. Used by \code{get.lm()} for linear modeling and 
+#'       \code{get.embedding()} for unsupervised embeddings.
 #'     \item \code{clustering$ids}: List of named character vectors (one per sample) with cluster 
 #'       assignments for all cells.
 #'     \item \code{clustering$cell.count}: Matrix (samples × clusters) of cell counts per cluster 
@@ -671,9 +674,9 @@ get.graph <-
 #' 
 #' The \code{fdens} matrix quantifies how strongly each landmark is connected to cells in each 
 #' sample. High values indicate the landmark's neighborhood is enriched in that sample. This 
-#' forms the basis for differential abundance testing in \code{get.stats}.
+#' forms the basis for differential abundance testing in \code{get.lm}.
 #' 
-#' @seealso \code{\link{get.graph}}, \code{\link{get.stats}}, \code{\link{celltyping}}
+#' @seealso \code{\link{get.graph}}, \code{\link{get.lm}}, \code{\link{celltyping}}
 #' 
 #' @examples
 #' \dontrun{
@@ -1154,6 +1157,11 @@ get.map <-
       )() |>
       Matrix::t()
     
+    # Compute log2-transformed landmark densities for statistical modeling
+    # Store as uppercase Y to distinguish from downstream modeling uses
+    Y <-
+      log2(x = fdens + 0.5)
+    
     cell.fg <-
       lapply(X = res,
              FUN = function(smpl){
@@ -1186,6 +1194,7 @@ get.map <-
     
     .lm.obj$map <-
       list(fdens = fdens,
+           Y = Y,
            clustering = list(ids = cell.clustering),
            celltyping = list(ids = cell.celltyping),
            nearest.landmarks = cell.nlmn,

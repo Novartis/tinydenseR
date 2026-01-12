@@ -6,7 +6,7 @@
 \usage{
 plotBeeswarm(
   .lm.obj,
-  .stats.obj,
+  .model.name = "default",
   .coefs,
   .q = 0.1,
   .q.from = "pca.weighted.q",
@@ -24,18 +24,20 @@ plotBeeswarm(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
+Statistical results should be stored in \code{.lm.obj$map$lm}.}
 
-\item{.stats.obj}{Statistical results from \code{get.stats()}.}
+\item{.model.name}{Character string naming which model fit to use from \code{.lm.obj$map$lm}
+(default "default"). Must match a name used in \code{get.lm(.model.name = ...)}.}
 
 \item{.coefs}{Character vector of coefficient names from the design matrix to plot. Must match
-column names in \code{.stats.obj$fit$coefficients}. Can plot single or multiple coefficients.}
+column names in the model fit's coefficients. Can plot single or multiple coefficients.}
 
 \item{.q}{Numeric q-value threshold for significance coloring (default 0.1). Points with
 q < threshold are colored by direction (red/blue), otherwise gray.}
 
 \item{.q.from}{Character specifying q-value source: "pca.weighted.q" (default, PCA-variance weighted)
-or "density.weighted.bh.fdr" (density weighted). See \code{get.stats()} for details.}
+or "density.weighted.bh.fdr" (density weighted). See \code{get.lm()} for details.}
 
 \item{.split.by}{Character controlling plot faceting: "none" (default if multiple coefficients),
 "clustering" (split by clusters), or "celltyping" (split by cell types). Default "clustering"
@@ -85,24 +87,25 @@ samples, helping interpret whether changes occur in rare or common populations.
 \examples{
 \dontrun{
 # After statistical testing
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.obj <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |>
   get.graph() |>
   get.map()
 
 design <- model.matrix(~ Condition + Replicate, data = .meta)
-stats <- get.stats(lm.cells, .design = design)
+lm.obj <- get.lm(lm.obj, .design = design)
 
 # Basic beeswarm split by clusters
-plotBeeswarm(lm.cells, stats, .coefs = "ConditionB")
+plotBeeswarm(lm.obj, .coefs = "ConditionB")
 
 # Multiple coefficients without splitting
-plotBeeswarm(lm.cells, stats, 
-             .coefs = c("ConditionB", "ConditionC"),
-             .split.by = "none")
+plotBeeswarm(lm.obj, .coefs = c("ConditionB", "ConditionC"), .split.by = "none")
+
+# Using a different model fit
+plotBeeswarm(lm.obj, .model.name = "full", .coefs = "ConditionB")
 }
 
 }
 \seealso{
-\code{\link{get.stats}}, \code{\link{plotAbundance}}
+\code{\link{get.lm}}, \code{\link{plotAbundance}}
 }

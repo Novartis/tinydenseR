@@ -48,6 +48,9 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 
+# Local analysis scripts
+inst/analysis/
+
 # RStudio Project
 tinydenseR.Rproj
 

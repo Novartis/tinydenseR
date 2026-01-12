@@ -326,7 +326,7 @@ library(tidyverse)
 #> ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
 
 # Check package version
-if(utils::packageVersion(pkg = "tinydenseR") < "0.0.1.0013") {
+if(utils::packageVersion(pkg = "tinydenseR") < "0.0.2.0001") {
   stop("please update the installation of tinydenseR")
 }
 
@@ -568,14 +568,15 @@ lm.cells$map$fdens |>
                        data = lm.cells$metadata)
 
 # Test for differential abundance between conditions
-condition.stats <- tinydenseR::get.stats(
+# Results stored in lm.cells$map$lm[["default"]]
+lm.cells <- tinydenseR::get.lm(
     .lm.obj = lm.cells,
     .design = .design,
     .verbose = FALSE 
 )
-#> Warning in tinydenseR::get.stats(.lm.obj = lm.cells, .design = .design, :
-#> q-value estimation is not recommended for fewer than 100 tests. Using BH
-#> instead.
+#> Warning in tinydenseR::get.lm(.lm.obj = lm.cells, .design = .design, .verbose =
+#> FALSE): q-value estimation is not recommended for fewer than 100 tests. Using
+#> BH instead.
 
 # Perform differential expression analysis
 .dea <- tinydenseR::get.dea(
@@ -593,7 +594,7 @@ Landmarks with differential density:
 # Show density fold changes between conditions
 tinydenseR::plotPCA(
     .lm.obj = lm.cells,
-    .feature = condition.stats$fit$coefficients[,"ConditionB"],
+    .feature = lm.cells$map$lm[["default"]]$fit$coefficients[,"ConditionB"],
     .panel.size = 1.5,
     .point.size = 1,
     .color.label = "estimated density\nlog2 fold change",
@@ -604,11 +605,11 @@ tinydenseR::plotPCA(
 tinydenseR::plotPCA(
     .lm.obj = lm.cells,
     .feature = ifelse(
-        test = condition.stats$fit$coefficients[,"ConditionB"] < 0,
+        test = lm.cells$map$lm[["default"]]$fit$coefficients[,"ConditionB"] < 0,
         yes = "less abundant",
         no = "more abundant") |>
         ifelse(
-            test = condition.stats$fit$pca.weighted.q[,"ConditionB"] < 0.1,
+            test = lm.cells$map$lm[["default"]]$fit$pca.weighted.q[,"ConditionB"] < 0.1,
             no = "not sig.") |>
         factor(levels = c("less abundant", "not sig.", "more abundant")),
     .cat.feature.color = Color.Palette[1,c(1,6,2)],
@@ -629,32 +630,41 @@ Samples quantitatively embedded along the Condition axis:
 red.design <- model.matrix(object = ~ Replicate,
                        data = lm.cells$metadata)
 
-red.stats <- tinydenseR::get.stats(
+# Fit reduced model (stored in lm.cells$map$lm[["reduced"]])
+lm.cells <- tinydenseR::get.lm(
     .lm.obj = lm.cells,
     .design = red.design,
+    .model.name = "reduced",
     .verbose = FALSE 
 )
-#> Warning in tinydenseR::get.stats(.lm.obj = lm.cells, .design = red.design, :
+#> Warning in tinydenseR::get.lm(.lm.obj = lm.cells, .design = red.design, :
 #> q-value estimation is not recommended for fewer than 100 tests. Using BH
 #> instead.
 
-# update stats results to get sample embedding
-condition.stats <-
+# Compute sample embedding using full vs reduced model comparison
+# Embedding stored in lm.cells$map$embedding$pePC[["Condition"]]
+lm.cells <-
   tinydenseR::get.embedding(
     .lm.obj = lm.cells,
-    .stats.obj = condition.stats,
+    .full.model = "default",
     .term.of.interest = "Condition",
-    .red.stats.obj = red.stats,
+    .red.model = "reduced",
     .verbose = FALSE 
 )
+#> Warning in (function (A, nv = 5, nu = nv, maxit = 1000, work = nv + 7, reorth =
+#> TRUE, : You're computing too large a percentage of total singular values, use a
+#> standard svd instead.
+#> 'as(<dsCMatrix>, "dgTMatrix")' is deprecated.
+#> Use 'as(as(., "generalMatrix"), "TsparseMatrix")' instead.
+#> See help("Deprecated") and help("Matrix-deprecated").
 ```
 
 ``` r
 # Embed samples based on differences along Condition
 tinydenseR::plotSampleEmbedding(
     .lm.obj = lm.cells,
-    .stats.obj = condition.stats, 
-    .embedding.slot = "Condition",
+    .embedding = "pePC",
+    .sup.embed.slot = "Condition",
     .color.by = "Condition",
     .cat.feature.color = tinydenseR::Color.Palette[1,c(1,2)],
     .panel.size = 1.5,

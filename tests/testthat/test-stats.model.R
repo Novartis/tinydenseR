@@ -17,9 +17,9 @@
 library(testthat)
 library(tinydenseR)
 
-# Test for get.stats
+# Test for get.lm
 
-test_that("get.stats validates input correctly", {
+test_that("get.lm validates input correctly", {
   # Test error when design matrix doesn't match cells
   .lm.obj <- list(
     cells = list(sample1 = "path1", sample2 = "path2"),
@@ -27,15 +27,15 @@ test_that("get.stats validates input correctly", {
   )
   .design <- matrix(1, nrow = 3, ncol = 1)  # Wrong number of rows
   
-  expect_error(get.stats(.lm.obj = .lm.obj, .design = .design),
+  expect_error(get.lm(.lm.obj = .lm.obj, .design = .design),
                "Number of rows in design matrix must be equal to the number of samples")
 })
 
-test_that("get.stats requires map", {
+test_that("get.lm requires map", {
   .lm.obj <- list(cells = list(sample1 = "path1"))
   .design <- matrix(1, nrow = 1, ncol = 1)
   
-  expect_error(get.stats(.lm.obj = .lm.obj, .design = .design),
+  expect_error(get.lm(.lm.obj = .lm.obj, .design = .design),
                "First run get.map")
 })
 

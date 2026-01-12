@@ -93,5 +93,5 @@ plotTradPerc(lm.cells,
 
 }
 \seealso{
-\code{\link{plotTradStats}}, \code{\link{get.stats}}
+\code{\link{plotTradStats}}, \code{\link{get.lm}}
 }

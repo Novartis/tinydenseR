@@ -6,69 +6,91 @@
 \usage{
 get.embedding(
   .lm.obj,
-  .stats.obj,
+  .full.model = "default",
   .term.of.interest = NULL,
-  .red.stats.obj = NULL,
+  .red.model = NULL,
   .contrast.of.interest = NULL,
+  .n.eigs = 20,
+  .n.pcs = 20,
+  .dist.metric = "cosine",
   .verbose = TRUE
 )
 }
 \arguments{
-\item{.lm.obj}{The tinydenseR object for accessing metadata and blocking information.}
+\item{.lm.obj}{The tinydenseR object processed through \code{get.map()}. Contains
+\code{$map$Y} (log2-transformed densities) used for unsupervised embeddings. Statistical
+model fits should be stored in \code{$map$lm} via \code{get.lm()}.}
 
-\item{.stats.obj}{A stats object from \code{get.stats()} containing the full model fit.
-Returns a modified copy of .stats.obj with the embedding added.}
+\item{.full.model}{Character string naming the full model in \code{.lm.obj$map$lm}
+(default "default"). Required only when computing supervised embeddings (pePC).}
 
 \item{.term.of.interest}{Character string: the covariate/term being isolated when using the
-nested model method (\code{.red.stats.obj}). Must match a column name in
+nested model method (\code{.red.model}). Must match a column name in
 \code{.lm.obj$metadata}. Ignored when using \code{.contrast.of.interest}.}
 
-\item{.red.stats.obj}{Optional: A stats object from \code{get.stats()} containing a
-reduced model fit (without the effect of interest). If provided, computes
+\item{.red.model}{Optional character string naming the reduced model in \code{.lm.obj$map$lm}
+(without the effect of interest). If provided, computes
 \eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}} directly.}
 
 \item{.contrast.of.interest}{Optional: Character string naming the contrast to extract.
-Must match a column name in \code{.stats.obj$fit$contrasts}. When specified, uses
-the Frisch-Waugh-Lovell (FWL) theorem to compute the true partial fitted component.
-The embedding will be stored in \code{.stats.obj$embedding[[.contrast.of.interest]]}.}
+Must match a column name in the full model's contrasts. When specified, uses
+the Frisch-Waugh-Lovell (FWL) theorem to compute the true partial fitted component.}
+
+\item{.n.eigs}{Integer: number of eigenvectors for diffusion map (default 20).}
+
+\item{.n.pcs}{Integer: number of PCs for unsupervised PCA and diffusion map (default 20).}
+
+\item{.dist.metric}{Character: distance metric for diffusion map (default "cosine").}
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
-The modified \code{.stats.obj} with new embedding slot. For FWL method, the slot
-is named after the contrast; for nested model method, the slot is named after
-\code{.term.of.interest}. Each embedding is a flat list with:
+Modified \code{.lm.obj} with embeddings stored in \code{.lm.obj$map$embedding}:
 \describe{
-\item{\code{sdev}}{Standard deviations of PCs learned from \eqn{\Delta\hat{Y}^\top}}
-\item{\code{rotation}}{Loadings matrix (landmarks x PCs): the PCA basis \eqn{V}
-learned from \eqn{\Delta\hat{Y}^\top}}
-\item{\code{center}}{Centering vector: column means of \eqn{\Delta\hat{Y}^\top}}
-\item{\code{scale}}{Scaling vector (FALSE since scale. = FALSE)}
-\item{\code{x}}{PCA scores on \eqn{\Delta\hat{Y}^\top} (samples x PCs): the partial-effect
-embedding from prcomp}
-\item{\code{coord}}{Nuisance-residualized projection (samples x PCs):
-\eqn{(E_{red}^\top - center) V} where \eqn{E_{red} = Y - \hat{Y}_{red}}.
-This is the main embedding for visualization--samples spread along PCs by their
-alignment with the effect direction, plus residual scatter.}
-\item{\code{effect.resid.cor}}{Numeric vector: per-PC correlation between \code{x}
-(partial-effect scores) and \code{coord} (residualized projection). High values
-(>0.8) indicate residuals align well with the effect direction; low values suggest
-strong nuisance removal or weak signal.}
-\item{\code{delta.Yhat}}{Matrix (landmarks x samples) of partial fitted values
-\eqn{\Delta\hat{Y} = (H_{full} - H_{red})Y}}
-\item{\code{method}}{Character: "fwl_contrast" or "nested_models"}
+\item{\code{pca}}{Unsupervised PCA on log-transformed landmark densities:
+\itemize{
+\item \code{coord}: Sample coordinates (samples x PCs)
+\item \code{rotation}: Loadings (landmarks x PCs)
+\item \code{center}, \code{scale}, \code{sdev}: Centering, scaling, and standard deviations
+}}
+\item{\code{traj}}{Diffusion map trajectory embedding:
+\itemize{
+\item \code{coord}: Sample coordinates (samples x DCs)
+\item \code{eigenvalues}, \code{eigenvectors}: Raw diffusion map components
+\item \code{sdev}: sqrt(abs(eigenvalues))
+}}
+\item{\code{pePC}}{Supervised partial-effect embeddings (when pePC args provided):
+\itemize{
+\item \code{<contrast>} or \code{<term>}: Named list containing:
+\itemize{
+\item \code{coord}: Nuisance-residualized projection (samples x pePCs)
+\item \code{x}: PCA scores on partial fitted values
+\item \code{rotation}: Landmark loadings from partial-effect PCA
+\item \code{effect.resid.cor}: Per-PC correlation diagnostic
+\item \code{delta.Yhat}: Partial fitted values matrix
+\item \code{method}: "fwl_contrast" or "nested_models"
+}
+}}
 }
 }
 \description{
-Computes a low-dimensional sample embedding by learning PCA axes from the partial
-fitted component \eqn{\Delta\hat{Y} = (H_{full} - H_{red})Y}, then projecting
-nuisance-residualized samples onto those axes. This isolates variation attributable
-to an effect of interest (e.g., a contrast or additional covariates) while preserving
-residual scatter. Exact for OLS; if duplicateCorrelation/blocking is used, the
-decomposition is approximate.
+Computes embeddings for sample-level visualization. When called without supervised
+arguments, computes unsupervised embeddings (PCA and diffusion map trajectory) on
+landmark densities stored in \code{.lm.obj$map$Y}. When called with supervised arguments
+(\code{.contrast.of.interest} or \code{.red.model}), additionally computes a
+partial-effect PCA (pePC) that isolates variation attributable to a specific effect.
+Exact for OLS; if duplicateCorrelation/blocking is used, the decomposition is approximate.
 }
 \details{
-\strong{Two Methods for Computing \eqn{\Delta\hat{Y}}:}
+\strong{Unsupervised Embeddings (always computed):}
+
+\code{pca}: Standard PCA on log2-transformed landmark densities (log2(fdens + 0.5)),
+filtered to remove zero-variance landmarks, centered and scaled.
+
+\code{traj}: Diffusion map trajectory computed via \code{destiny::DiffusionMap} on
+the raw landmark density matrix. Useful for visualizing continuous trajectories.
+
+\strong{Supervised Embedding (pePC, when .contrast.of.interest or .red.model provided):}
 
 \strong{Method 1: FWL-based contrast extraction} (when \code{.contrast.of.interest} is provided)
 
@@ -81,7 +103,7 @@ For a cell-means model with nuisance covariates, uses the Frisch-Waugh-Lovell th
 \item Form \eqn{\Delta\hat{Y} = \gamma_g \otimes x_{c,\perp}}
 }
 
-\strong{Method 2: Nested model comparison} (when \code{.red.stats.obj} is provided)
+\strong{Method 2: Nested model comparison} (when \code{.red.model} is provided)
 
 Direct computation: \eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}}
 
@@ -112,39 +134,46 @@ to PCs is residual-only noise.
 \examples{
 \dontrun{
 # ===========================================================================
+# Example 0: Unsupervised embeddings only (before get.lm)
+# ===========================================================================
+
+# After get.map, compute unsupervised embeddings
+lm.obj <- get.embedding(.lm.obj = lm.obj)
+
+# Access unsupervised embeddings
+lm.obj$map$embedding$pca$coord   # sample PCA coordinates
+lm.obj$map$embedding$traj$coord  # sample diffusion map coordinates
+
+# Plot unsupervised embeddings
+plotSampleEmbedding(lm.obj, .embedding = "pca", .color.by = "Condition")
+plotSampleEmbedding(lm.obj, .embedding = "traj", .color.by = "Timepoint")
+
+# ===========================================================================
 # Example 1: Nested model comparison (no contrasts)
 # ===========================================================================
 
-# Fit full model with disease effect
+# Fit full model with disease effect (stored as "full")
 .design <- model.matrix(object = ~ disease + sex + age,
                         data = lm.obj$metadata)
+lm.obj <- get.lm(.lm.obj = lm.obj, .design = .design, 
+                    .model.name = "full")
 
-stats.res <- tinydenseR::get.stats(
-    .lm.obj = lm.obj,
-    .design = .design,
-    .verbose = TRUE
-)
-
-# Fit reduced model without disease
+# Fit reduced model without disease (stored as "reduced")
 .red.design <- model.matrix(object = ~ sex + age,
                             data = lm.obj$metadata)
+lm.obj <- get.lm(.lm.obj = lm.obj, .design = .red.design, 
+                    .model.name = "reduced")
 
-red.stats.res <- tinydenseR::get.stats(
+# Extract disease effect embedding (all stored in lm.obj)
+lm.obj <- get.embedding(
     .lm.obj = lm.obj,
-    .design = .red.design,
-    .verbose = TRUE
-)
-
-# Extract disease effect embedding (slot named "disease")
-stats.res <- get.embedding(
-    .lm.obj = lm.obj,
-    .stats.obj = stats.res,
+    .full.model = "full",
     .term.of.interest = "disease",
-    .red.stats.obj = red.stats.res
+    .red.model = "reduced"
 )
 
 # Plot the embedding (colored by disease)
-plotSampleEmbedding(lm.obj, stats.res, .embedding.slot = "disease")
+plotSampleEmbedding(lm.obj, .embedding = "pePC", .sup.embed.slot = "disease")
 
 # ===========================================================================
 # Example 2: FWL-based contrast extraction (cell-means model)
@@ -157,38 +186,30 @@ contrasts <- limma::makeContrasts(
     KO_TrtVsCtrl = GroupKO_Trt - GroupKO_Ctrl,
     levels = design
 )
-stats <- get.stats(lm.obj, .design = design, .contrasts = contrasts)
+lm.obj <- get.lm(lm.obj, .design = design, .contrasts = contrasts)
 
-# Extract each contrast embedding (slot named after contrast)
-stats <- get.embedding(
-    .lm.obj = lm.obj,
-    .stats.obj = stats, 
-    .contrast.of.interest = "TrtVsCtrl"
-)
-
-stats <- get.embedding(
-    .lm.obj = lm.obj,
-    .stats.obj = stats, 
-    .contrast.of.interest = "KO_TrtVsCtrl"
-)
+# Extract each contrast embedding
+lm.obj <- get.embedding(lm.obj, .contrast.of.interest = "TrtVsCtrl")
+lm.obj <- get.embedding(lm.obj, .contrast.of.interest = "KO_TrtVsCtrl")
 
 # Plot the embedding (specify .color.by for metadata column)
-plotSampleEmbedding(lm.obj, stats, 
-                    .embedding.slot = "TrtVsCtrl", 
-                    .color.by = "Group")
+plotSampleEmbedding(lm.obj, .embedding = "pePC",
+                    .sup.embed.slot = "TrtVsCtrl", .color.by = "Group")
 
-# Access the embedding components (slot named after contrast)
-stats$embedding$TrtVsCtrl$coord      # sample coordinates
-stats$embedding$TrtVsCtrl$sdev       # PC standard deviations
-stats$embedding$TrtVsCtrl$rotation   # landmark loadings
-stats$embedding$TrtVsCtrl$delta.Yhat # partial fitted values
+# Access the embedding components (all in lm.obj$map$embedding)
+lm.obj$map$embedding$pca$coord              # sample PCA coordinates
+lm.obj$map$embedding$traj$coord             # sample trajectory coordinates
+lm.obj$map$embedding$pePC$TrtVsCtrl$coord   # sample pePC coordinates
+lm.obj$map$embedding$pePC$TrtVsCtrl$rotation # landmark loadings
+lm.obj$map$embedding$pePC$TrtVsCtrl$delta.Yhat # partial fitted values
 
-# Multiple contrasts stored separately
-names(stats$embedding)  # c("TrtVsCtrl", "KO_TrtVsCtrl")
+# Multiple embeddings stored together
+names(lm.obj$map$embedding)       # c("pca", "traj", "pePC")
+names(lm.obj$map$embedding$pePC)  # c("TrtVsCtrl", "KO_TrtVsCtrl")
 }
 
 }
 \seealso{
-\code{\link{get.stats}} for model fitting, \code{\link{plotSampleEmbedding}} for
+\code{\link{get.lm}} for model fitting, \code{\link{plotSampleEmbedding}} for
 visualizing the embedding
 }

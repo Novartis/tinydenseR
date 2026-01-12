@@ -6,9 +6,10 @@
 \usage{
 plotSampleEmbedding(
   .lm.obj,
-  .stats.obj,
-  .embedding.slot,
+  .embedding = "pePC",
+  .sup.embed.slot = NULL,
   .color.by = NULL,
+  .x.by = NULL,
   .pc.x = 1,
   .pc.y = 2,
   .cat.feature.color = Color.Palette[1, 1:5],
@@ -18,22 +19,36 @@ plotSampleEmbedding(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object with metadata.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()} and
+\code{get.embedding()}. All embeddings are stored in \code{.lm.obj$map$embedding}:
+unsupervised (\code{pca}, \code{traj}) and supervised (\code{pePC$<name>}).}
 
-\item{.stats.obj}{Statistical results from \code{get.stats()} with embedding computed
-via \code{get.embedding()}.}
+\item{.embedding}{Character string specifying which embedding type to plot. One of:
+\describe{
+\item{"pePC"}{(default) Supervised partial-effect PCA. Requires \code{.sup.embed.slot}.}
+\item{"pca"}{Unsupervised PCA on log-transformed landmark densities. Uses \code{.lm.obj$map$embedding$pca}.}
+\item{"traj"}{Diffusion map trajectory embedding. Uses \code{.lm.obj$map$embedding$traj}.}
+}}
 
-\item{.embedding.slot}{Character string specifying which embedding to plot. Must match
-a name in \code{.stats.obj$embedding}. For FWL method, this is the contrast name;
-for nested model method, this is the term of interest (metadata column name).}
+\item{.sup.embed.slot}{Character string specifying which supervised embedding to plot.
+Only used when \code{.embedding = "pePC"}. Must match a name in
+\code{.lm.obj$map$embedding$pePC} (contrast name for FWL method, term name for nested model).
+Ignored (with warning) when \code{.embedding} is "pca" or "traj".}
 
 \item{.color.by}{Character string specifying which metadata column to use for coloring
-points. Defaults to \code{.embedding.slot} if it exists in metadata, otherwise
-uses the first metadata column.}
+points. Defaults to \code{.sup.embed.slot} if it exists in metadata (for pePC),
+otherwise uses the first metadata column.}
 
-\item{.pc.x}{Integer specifying which PC to plot on x-axis (default 1).}
+\item{.x.by}{Character string specifying which metadata column to use for the x-axis
+in single-PC embeddings. Defaults to \code{NULL}, which uses \code{.sup.embed.slot}
+if it exists in metadata. Required when \code{.sup.embed.slot} is not a metadata
+column (e.g., FWL contrast names).}
 
-\item{.pc.y}{Integer specifying which PC to plot on y-axis (default 2).}
+\item{.pc.x}{Integer specifying which PC/DC to plot on x-axis (default 1). Only used
+when embedding has more than 1 dimension.}
+
+\item{.pc.y}{Integer specifying which PC/DC to plot on y-axis (default 2). Only used
+when embedding has more than 1 dimension.}
 
 \item{.cat.feature.color}{Character vector of colors for categorical features.
 Defaults to first 5 colors from \code{Color.Palette} row 1.}
@@ -50,54 +65,53 @@ A \code{ggplot} object showing the sample embedding colored by the
 metadata variable specified by \code{.color.by}.
 }
 \description{
-Visualizes the sample-level embedding computed by \code{\link{get.embedding}}, which
-represents the projection of samples onto the effect-associated subspace identified
-via FWL decomposition or nested model comparison.
+Visualizes sample-level embeddings computed by \code{\link{get.embedding}}. Supports
+three embedding types: supervised partial-effect PCA (pePC), unsupervised PCA on
+landmark densities (pca), and diffusion map trajectory (traj).
 }
 \details{
-This function plots the sample coordinates from an embedding computed by
-\code{\link{get.embedding}}. The embedding captures the variation in landmark
-densities attributable to a specific contrast or set of covariates.
+This function plots the sample coordinates from embeddings computed by
+\code{\link{get.embedding}}:
 
-When using the FWL method (contrast-based), the embedding slot is named after the
-contrast (e.g., "TrtVsCtrl"), so you should specify \code{.color.by} to indicate
-which metadata column to use for coloring (e.g., "Group").
+\describe{
+\item{pePC (supervised)}{Partial-effect PCA isolating variation attributable to a
+specific contrast or set of covariates. Requires running \code{get.embedding()} with
+\code{.contrast.of.interest} or \code{.red.model}. Stored in \code{.lm.obj$map$embedding$pePC$<name>}.}
+\item{pca (unsupervised)}{Standard PCA on log-transformed landmark densities. Good for
+exploratory visualization and QC. Stored in \code{.lm.obj$map$embedding$pca}.}
+\item{traj (unsupervised)}{Diffusion map trajectory capturing continuous variation.
+Useful for developmental or temporal trajectories. Stored in \code{.lm.obj$map$embedding$traj}.}
+}
 
-For embeddings with rank > 1 (e.g., from nested model comparison with multiple
+For pePC embeddings with rank > 1 (e.g., from nested model comparison with multiple
 covariates), you can plot different PC combinations using \code{.pc.x} and \code{.pc.y}.
 
-When the embedding has only 1 PC (e.g., from a single contrast), the function
-automatically creates a boxplot with the covariate on the x-axis and PC1 on the y-axis,
-with individual points overlaid.
+When pePC embedding has only 1 PC (e.g., from a single contrast), the function
+creates either a scatter plot (for continuous x-axis variable) or a boxplot
+(for categorical x-axis variable), with the x-axis determined by \code{.x.by}
+or \code{.sup.embed.slot}.
 }
 \examples{
 \dontrun{
-# FWL method: embedding slot named after contrast
-stats <- get.embedding(
-    .lm.obj = lm.obj,
-    .stats.obj = stats,
-    .contrast.of.interest = "TrtVsCtrl"
-)
+# Compute unsupervised embeddings
+lm.obj <- get.embedding(.lm.obj = lm.obj)
 
-# Plot the embedding (specify .color.by for metadata column)
-plotSampleEmbedding(lm.obj, stats, 
-                    .embedding.slot = "TrtVsCtrl", 
-                    .color.by = "Group")
+# Plot unsupervised PCA
+plotSampleEmbedding(lm.obj, .embedding = "pca", .color.by = "Condition")
 
-# Nested model method: embedding slot named after term of interest
-stats <- get.embedding(
-    .lm.obj = lm.obj,
-    .stats.obj = stats,
-    .term.of.interest = "disease",
-    .red.stats.obj = red.stats
-)
+# Plot diffusion map trajectory
+plotSampleEmbedding(lm.obj, .embedding = "traj", .color.by = "Timepoint")
 
-# Plot (no .color.by needed, uses .embedding.slot)
-plotSampleEmbedding(lm.obj, stats, .embedding.slot = "disease")
+# Compute supervised embedding
+lm.obj <- get.embedding(lm.obj, .contrast.of.interest = "TrtVsCtrl")
+
+# Plot supervised pePC embedding
+plotSampleEmbedding(lm.obj, .embedding = "pePC",
+                    .sup.embed.slot = "TrtVsCtrl", .color.by = "Group")
 }
 
 }
 \seealso{
 \code{\link{get.embedding}} for computing embeddings,
-\code{\link{plotSamplePCA}} for PCA on raw densities
+\code{\link{plotSamplePCA}} for legacy PCA visualization
 }

@@ -61,7 +61,7 @@ lm.cells <-
                data = .meta)
 
 condition.stats <-
-  tinydenseR::get.stats(
+  tinydenseR::get.lm(
     .lm.obj = lm.cells,
     .design = .design)
 

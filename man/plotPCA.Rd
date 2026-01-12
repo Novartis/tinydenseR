@@ -81,8 +81,8 @@ lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
 
 plotPCA(lm.cells, .point.size = 1, .panel.size = 1.5)
 
-# Color by fold change from get.stats()
-condition.stats <- get.stats(lm.cells, .design = design)
+# Color by fold change from get.lm()
+condition.stats <- get.lm(lm.cells, .design = design)
 plotPCA(lm.cells, 
         .feature = condition.stats$fit$coefficients[,"ConditionB"],
         .color.label = "log2 FC", 

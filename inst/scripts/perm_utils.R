@@ -6,7 +6,7 @@ count_discoveries <-
            alpha = 0.10) {
     
     stats_obj <-
-      tinydenseR::get.stats(
+      tinydenseR::get.lm(
         .lm.obj = lm_obj, 
         .design = design_mat, 
         .verbose = FALSE)

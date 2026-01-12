@@ -474,11 +474,14 @@ Now we set up a design matrix and run clustering-independent statistical test:
   ))()
 
 # Run differential abundance testing
-Treatment.stats.0.5 <-
-  tinydenseR::get.stats(
+# get.lm() returns the updated .lm.obj with results in $map$lm[[.model.name]]
+lm.cells.DA.0.5 <-
+  tinydenseR::get.lm(
     .lm.obj = lm.cells.DA.0.5,
     .design = .design.0.5
   )
+
+# Access results via lm.cells.DA.0.5$map$lm[["default"]]
 ```
 
 ### Visualizing Differential Abundance Results
@@ -490,7 +493,7 @@ We can visualize the log2 fold changes in abundance at each landmark between Dep
 ```{r viz-abundance-fc}
 tinydenseR::plotPCA(
   .lm.obj = lm.cells.DA.0.5,
-  .feature = Treatment.stats.0.5$fit$coefficients[, "Depletion"],
+  .feature = lm.cells.DA.0.5$map$lm[["default"]]$fit$coefficients[, "Depletion"],
   .plot.title = "Depletion vs Baseline",
   .color.label = "Abundance\nlog2(+0.5) FC",
   .panel.size = 2,
@@ -508,12 +511,12 @@ We can also visualize regions of statistically significant abundance change:
 tinydenseR::plotPCA(
   .lm.obj = lm.cells.DA.0.5,
   .feature = base::ifelse(
-    test = Treatment.stats.0.5$fit$coefficients[, "Depletion"] < 0,
+    test = lm.cells.DA.0.5$map$lm[["default"]]$fit$coefficients[, "Depletion"] < 0,
     yes = "less abundant",
     no = "more abundant"
   ) |>
   base::ifelse(
-    test = Treatment.stats.0.5$fit$pca.weighted.q[, "Depletion"] < 0.1,
+    test = lm.cells.DA.0.5$map$lm[["default"]]$fit$pca.weighted.q[, "Depletion"] < 0.1,
     yes = _, no = "not sig."
   ) |>
   base::factor(x = _, levels = c("less abundant", "not sig.", "more abundant")),
@@ -533,7 +536,7 @@ A beeswarm plot provides a comprehensive view of abundance changes across cluste
 ```{r beeswarm}
 tinydenseR::plotBeeswarm(
   .lm.obj = lm.cells.DA.0.5,
-  .stats.obj = Treatment.stats.0.5,
+  .model.name = "default",
   .coefs = "Depletion",
   .swarm.title = "Depletion vs Baseline",
   .row.space.scaler = 0.5,
@@ -595,7 +598,7 @@ tinydenseR::scatterPlot(
   .x.label = "Marker1",
   .y.feature = lm.cells.DA.0.5$lm[,"Marker5"],
   .y.label = "Marker5",
-  .color.feature = Treatment.stats.0.5$fit$coefficients[, "Depletion"],
+  .color.feature = lm.cells.DA.0.5$map$lm[["default"]]$fit$coefficients[, "Depletion"],
   .color.label = "Abundance\nlog2(+0.5) FC",
   .plot.title = "Depletion vs Baseline",
   .panel.size = c(3,3),
@@ -608,7 +611,7 @@ tinydenseR::scatterPlot(
 In addition to the high resolution analysis described above, tinydenseR can also provide cluster-based results as follows:
 
 ```{r cluster-stats}
-tinydenseR::plotTradStats(.lm.obj = lm.cells.DA.0.5, .stats.obj = Treatment.stats.0.5)
+tinydenseR::plotTradStats(.lm.obj = lm.cells.DA.0.5, .model.name = "default")
 ```
 
 ```{r cluster-percentages, fig.height=5}
@@ -621,8 +624,8 @@ stat.test.percentages.DA.0.5 <-
   dplyr::group_by(name) |>
   rstatix::t_test(formula = value ~ treatment) |>
   dplyr::mutate(
-    p = Treatment.stats.0.5$trad$clustering$fit$adj.p[name, "Depletion"],
-    p.adj = Treatment.stats.0.5$trad$clustering$fit$adj.p[name, "Depletion"]
+    p = lm.cells.DA.0.5$map$lm[["default"]]$trad$clustering$fit$adj.p[name, "Depletion"],
+    p.adj = lm.cells.DA.0.5$map$lm[["default"]]$trad$clustering$fit$adj.p[name, "Depletion"]
   ) |>
   rstatix::add_significance() |>
   dplyr::mutate(p.adj = base::ifelse(

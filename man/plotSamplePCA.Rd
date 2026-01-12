@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{plotSamplePCA}
 \alias{plotSamplePCA}
-\title{Plot Sample PCA}
+\title{Plot Sample PCA (Deprecated)}
 \usage{
 plotSamplePCA(
   .lm.obj,
@@ -11,69 +11,31 @@ plotSamplePCA(
   .point.size = 1,
   .panel.size = 2,
   .midpoint = if (is.numeric(x = .lm.obj$metadata[[.labels.from]])) stats::median(x =
-    .lm.obj$metadata[[.labels.from]]) else NA,
-  .seed = 123
+    .lm.obj$metadata[[.labels.from]]) else NA
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{.lm.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.embedding()}.}
 
-\item{.labels.from}{Character specifying metadata column for coloring points. Defaults to
-first column of \code{.lm.obj$metadata} (often "Condition" or "Sample").}
+\item{.labels.from}{Character specifying metadata column for coloring points.}
 
-\item{.cat.feature.color}{Character vector of colors for categorical labels (default
-\code{Color.Palette[1,1:5]}).}
+\item{.cat.feature.color}{Character vector of colors for categorical labels.}
 
 \item{.point.size}{Numeric point size (default 1).}
 
 \item{.panel.size}{Numeric panel width/height in inches (default 2).}
 
-\item{.midpoint}{Numeric midpoint for diverging color scale (continuous labels only).
-Defaults to median of \code{.labels.from} column.}
-
-\item{.seed}{Integer random seed (default 123).}
+\item{.midpoint}{Numeric midpoint for diverging color scale (continuous labels only).}
 }
 \value{
 A \code{ggplot} object showing PC1 vs PC2 of sample-level density profiles.
 }
 \description{
-Visualizes samples in PCA space based on their landmark density profiles. This "reverse PCA"
-treats samples as observations and landmark densities as features, revealing sample-level
-patterns and clustering. Useful for quality control and identifying batch effects.
-}
-\details{
-This function performs PCA on log2-transformed landmark densities (samples × landmarks matrix).
-Samples with similar cellular composition will cluster together in PC space. The analysis:
-\itemize{
-\item Log-transforms densities: log2(density + 0.5) for variance stabilization
-\item Filters zero-variance landmarks
-\item Centers and scales features before PCA
-\item Computes top 2 PCs using truncated SVD
-}
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}}
 
-Useful for identifying:
-\itemize{
-\item Batch effects (samples clustering by technical rather than biological factors)
-\item Outlier samples with aberrant cellular profiles
-\item Main axes of variation in cellular composition
-}
-}
-\examples{
-\dontrun{
-# After mapping
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
-  get.landmarks() |>
-  get.graph() |>
-  get.map()
-
-# Color by condition
-plotSamplePCA(lm.cells, .labels.from = "Condition")
-
-# Color by replicate to check for batch effects
-plotSamplePCA(lm.cells, .labels.from = "Replicate")
-}
-
+This function is deprecated. Please use \code{\link{plotSampleEmbedding}} with
+\code{.embedding = "pca"} instead.
 }
 \seealso{
-\code{\link{get.map}}, \code{\link{plotPCA}}
+\code{\link{plotSampleEmbedding}} for the recommended replacement
 }

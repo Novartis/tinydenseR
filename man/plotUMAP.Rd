@@ -80,8 +80,8 @@ plotUMAP(lm.cells, .point.size = 1)
 # Color by gene expression
 plotUMAP(lm.cells, .feature = lm.cells$lm[,"CD4"], .color.label = "CD4")
 
-# Color by fold change from get.stats()
-condition.stats <- get.stats(lm.cells, .design = design)
+# Color by fold change from get.lm()
+condition.stats <- get.lm(lm.cells, .design = design)
 plotUMAP(lm.cells, 
          .feature = condition.stats$fit$coefficients[,"ConditionB"],
          .color.label = "log2 FC", 

@@ -558,7 +558,7 @@ disease.covid.contrasts <-
 
 # get stats
 disease.covid.stats.res <-
-  tinydenseR::get.stats(
+  tinydenseR::get.lm(
     .lm.obj = covid.lm.cells,
     .design = disease.covid.design,
     .contrasts = disease.covid.contrasts
