@@ -160,6 +160,11 @@ goi.summary <-
     }
     
     # Process each sample: extract expression, label cells as pos./neg. for each gene
+    if(isTRUE(x = .verbose)){
+      message("-> Processing ", length(.lm.obj$cells), " samples for GOI summary...")
+      .goi_start <- Sys.time()
+    }
+    
     goi <-
       seq_along(along.with = .lm.obj$cells) |>
       stats::setNames(nm = names(x = .lm.obj$cells)) |>
@@ -223,12 +228,10 @@ goi.summary <-
         }
         
         if(isTRUE(x = .verbose)){
-          message(
-            paste0("progress: ",
-                   round(x = cells.elem * 100 / length(x = .lm.obj$cells),
-                         digits = 2),
-                   "%")
-          )
+          .show_progress(current = cells.elem, 
+                         total = length(.lm.obj$cells),
+                         item_label = names(x = .lm.obj$cells)[cells.elem],
+                         start_time = .goi_start)
         }
         
         return(

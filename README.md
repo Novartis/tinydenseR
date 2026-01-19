@@ -686,7 +686,7 @@ most_down_gene <- sort(.dea$coefficients[,"ConditionB"])[1] |> names()
 
 tinydenseR::plotPCA(
     .lm.obj = lm.cells,
-    .feature = lm.cells$lm[,most_down_gene],
+    .feature = lm.cells$landmarks[,most_down_gene],
     .panel.size = 1.5,
     .point.size = 1,
     .color.label = most_down_gene
@@ -697,7 +697,7 @@ most_up_gene <- sort(.dea$coefficients[,"ConditionB"], decreasing = TRUE)[1] |> 
 
 tinydenseR::plotPCA(
     .lm.obj = lm.cells,
-    .feature = lm.cells$lm[,most_up_gene],
+    .feature = lm.cells$landmarks[,most_up_gene],
     .panel.size = 1.5,
     .point.size = 1,
     .color.label = most_up_gene

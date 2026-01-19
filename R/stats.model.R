@@ -1904,7 +1904,8 @@ get.marker <-
 #'   \code{.lm.obj$metadata}. Ignored when using \code{.contrast.of.interest}.
 #' @param .red.model Optional character string naming the reduced model in \code{.lm.obj$map$lm}
 #'   (without the effect of interest). If provided, computes 
-#'   \eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}} directly.
+#'   \eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}} directly. Make sure to construct
+#'   nested models by “dropping terms” (so reduced is a strict subset of full)!
 #' @param .contrast.of.interest Optional: Character string naming the contrast to extract.
 #'   Must match a column name in the full model's contrasts. When specified, uses
 #'   the Frisch-Waugh-Lovell (FWL) theorem to compute the true partial fitted component.
@@ -2469,14 +2470,22 @@ get.embedding <-
     delta.Yhat.t <- 
       Matrix::t(x = delta.Yhat)
     
-    embed.rank <-
-      (Matrix::qr(x = delta.Yhat.t)$rank) |> 
-      (\(x)
-       max(1, 
-           min(x, 
-               nrow(x = delta.Yhat.t)-1, 
-               ncol(x = delta.Yhat.t)))
-      )()
+    # Compute rank analytically (O(1)) instead of expensive QR decomposition
+    if(method == "fwl_contrast"){
+      # Contrasts are rank-1 by construction (outer product gamma_g ⊗ x_c_perp)
+      embed.rank <- 1L
+    } else {
+      # Nested models: rank = df_full - df_red, capped at matrix dimensions
+      embed.rank <- 
+      min(
+        ncol(x = .stats.obj$fit$design) - ncol(x = .red.stats.obj$fit$design),
+        nrow(x = delta.Yhat.t) - 1L,
+        ncol(x = delta.Yhat.t)
+      )
+    }
+    embed.rank <- 
+    max(1L,
+    embed.rank)
     
     
     if(isTRUE(x = .verbose)){

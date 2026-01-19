@@ -813,6 +813,11 @@ get.map <-
     set.seed(seed = .seed)
     
     # Process each sample: load data, normalize, project to UMAP, assign labels
+    if(isTRUE(x = .verbose)){
+      message("-> Mapping ", length(.lm.obj$cells), " samples to landmark space...")
+      .map_start <- Sys.time()
+    }
+    
     res <-
       seq_along(along.with = .lm.obj$cells) |>
       stats::setNames(nm = names(x = .lm.obj$cells)) |> #_[1:2] |>
@@ -1012,10 +1017,10 @@ get.map <-
         }
         
         if(isTRUE(x = .verbose)){
-          message(paste0("mapping progress: ",
-                         round(x = cells.idx * 100 / length(x = .lm.obj$cells),
-                               digits = 2),
-                         "%"))
+          .show_progress(current = cells.idx, 
+                         total = length(.lm.obj$cells),
+                         item_label = names(x = .lm.obj$cells)[cells.idx],
+                         start_time = .map_start)
         }
         
         return(res2)

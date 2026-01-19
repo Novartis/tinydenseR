@@ -30,7 +30,8 @@ nested model method (\code{.red.model}). Must match a column name in
 
 \item{.red.model}{Optional character string naming the reduced model in \code{.lm.obj$map$lm}
 (without the effect of interest). If provided, computes
-\eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}} directly.}
+\eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}} directly. Make sure to construct
+nested models by “dropping terms” (so reduced is a strict subset of full)!}
 
 \item{.contrast.of.interest}{Optional: Character string naming the contrast to extract.
 Must match a column name in the full model's contrasts. When specified, uses

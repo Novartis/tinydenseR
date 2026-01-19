@@ -14,6 +14,49 @@
 # limitations under the License.
 #####
 
+# Internal helper for progress display (not exported)
+# Combines single-line overwriting progress bar with stage headers
+.show_progress <- function(current, total, stage_label = NULL, item_label = NULL, 
+
+                           start_time = NULL, width = 30) {
+  pct <- current / total
+  filled <- floor(pct * width)
+  bar <- paste0("[", strrep("=", filled), 
+                if(filled < width) ">" else "", 
+                strrep(" ", max(0, width - filled - 1)), "]")
+  
+  # Build progress line
+  line <- sprintf("\r%s %5.1f%% (%d/%d)", bar, pct * 100, current, total)
+  
+
+  # Add item label if provided (truncate if too long)
+  if(!is.null(item_label)) {
+    max_label <- 40
+    if(nchar(item_label) > max_label) {
+      item_label <- paste0(substr(item_label, 1, max_label - 3), "...")
+    }
+    line <- paste0(line, " ", item_label)
+  }
+  
+  # Pad to clear previous content
+  line <- sprintf("%-80s", line)
+  
+  cat(line)
+  utils::flush.console()
+  
+  # Print completion with timing
+  if(current == total) {
+    if(!is.null(start_time)) {
+      elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+      cat(sprintf("\r%s 100.0%% (%d/%d) done in %.1fs%s\n", 
+                  paste0("[", strrep("=", width), "]"),
+                  total, total, elapsed, strrep(" ", 30)))
+    } else {
+      cat("\n")
+    }
+  }
+}
+
 #' Initialize tinydenseR object for landmark-based analysis
 #'
 #' Creates and validates the main tinydenseR object structure that will hold
@@ -206,23 +249,24 @@ setup.lm.obj <-
        unlist() |>
        all()){
       
+      if(isTRUE(x = .verbose)){
+        message("-> Reading ", length(.cells), " expression matrices...")
+        .read_start <- Sys.time()
+      }
+      
       n.cells <-
         seq_along(along.with = .cells) |>
         stats::setNames(nm = names(x = .cells)) |>
         lapply(FUN = function(cell_elem){
           
-          if(isTRUE(x = .verbose)){
-            paste0("reading expression matrix: ",
-                   names(x = .cells)[cell_elem],
-                   "\n",
-                   "progress: ",
-                   round(x = cell_elem * 100 / length(x = .cells),
-                         digits = 2),
-                   "%") |>
-              message()
-          }
-          
           .cell <- readRDS(file = .cells[[cell_elem]])
+          
+          if(isTRUE(x = .verbose)){
+            .show_progress(current = cell_elem, 
+                           total = length(.cells),
+                           item_label = names(x = .cells)[cell_elem],
+                           start_time = .read_start)
+          }
           
           if(!is.null(x = .markers)){
             if(!all(.markers %in% colnames(x = .cell))){
@@ -256,14 +300,6 @@ setup.lm.obj <-
             
           }
           
-          if(isTRUE(x = .verbose)){
-            paste0("progress: ",
-                   round(x = cell_elem * 100 / length(x = .cells),
-                         digits = 2),
-                   "%") |>
-              message()
-          }
-          
           
         }) |>
         unlist()
@@ -284,7 +320,7 @@ setup.lm.obj <-
       
       warning("Sample size imbalance detected: largest/smallest ratio > 10.\n",
               "Smallest sample has ", min(.lm.obj$spec$n.cells), " cells.\n",
-              "Consider removing low-quality samples or downsampling large samples for more balanced representation.")
+              "Consider removing low-quality samples.")
       
       if(any(.lm.obj$spec$n.cells < 1000)){
         warning("Large variation in sample sizes detected. For cytometry, samples with <1000 cells may be unreliable.")
@@ -476,6 +512,11 @@ get.landmarks <-
     
     # PASS 1: Sample-wise landmark selection using local PCA
     # For each sample independently, compute PCA and select landmarks via leverage scores
+    if(isTRUE(x = .verbose)){
+      message("-> Pass 1: Selecting landmarks from ", length(.lm.obj$cells), " samples...")
+      .pass1_start <- Sys.time()
+    }
+    
     .lm.obj$raw.landmarks <-
       seq_along(along.with = .lm.obj$cells) |>
       stats::setNames(nm = names(x = .lm.obj$cells)) |>
@@ -596,11 +637,10 @@ get.landmarks <-
           }
         
         if(isTRUE(x = .verbose)){
-          paste0("progress: ",
-                 round(x = .cells.idx * 100 / length(x = .lm.obj$cells),
-                       digits = 2),
-                 "%") |>
-            message()
+          .show_progress(current = .cells.idx, 
+                         total = length(.lm.obj$cells),
+                         item_label = names(x = .lm.obj$cells)[.cells.idx],
+                         start_time = .pass1_start)
         }
         
         return(landmarks)
@@ -617,7 +657,7 @@ get.landmarks <-
     }
     
     if(isTRUE(x = .verbose)){
-      message("getting landmark pca")
+      message("-> Computing landmark PCA...")
     }
     
     # Compute dataset-wide HVG selection and PCA on pooled Pass 1 landmarks
@@ -814,6 +854,11 @@ get.landmarks <-
     # PASS 2: Refine landmark selection using dataset-wide PCA
     # Now that we have initial landmarks from all samples, compute global PCA
     # and reselect landmarks based on leverage scores in this shared space
+    if(isTRUE(x = .verbose)){
+      message("-> Pass 2: Refining landmarks from ", length(.lm.obj$cells), " samples...")
+      .pass2_start <- Sys.time()
+    }
+    
     .lm.obj$raw.landmarks <-
       seq_along(along.with = .lm.obj$cells) |>
       stats::setNames(nm = names(x = .lm.obj$cells)) |> 
@@ -935,11 +980,10 @@ get.landmarks <-
           }
         
         if(isTRUE(x = .verbose)){
-          paste0("progress: ",
-                 round(x = .cells.idx * 100 / length(x = .lm.obj$cells),
-                       digits = 2),
-                 "%") |>
-            message()
+          .show_progress(current = .cells.idx, 
+                         total = length(.lm.obj$cells),
+                         item_label = names(x = .lm.obj$cells)[.cells.idx],
+                         start_time = .pass2_start)
         }
         
         return(landmarks)
@@ -948,7 +992,7 @@ get.landmarks <-
       do.call(what = rbind)
     
     if(isTRUE(x = .verbose)){
-      message("getting landmark pca")
+      message("-> Recomputing landmark PCA...")
     }
     
     # Recompute PCA on refined Pass 2 landmarks (final feature set and embedding)
