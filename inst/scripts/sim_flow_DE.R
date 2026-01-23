@@ -293,7 +293,7 @@ final_data_DE |>
 
 set.seed(seed = 123)
 lm.cells.DE.0.5 <-
-  tinydenseR::setup.lm.obj(
+  tinydenseR::setup.tdr.obj(
     .cells = .cells.DE.0.5,
     .meta = .meta.DE.0.5,
     .assay.type = "cyto") |>
@@ -301,7 +301,7 @@ lm.cells.DE.0.5 <-
   tinydenseR::get.graph(.cl.resolution.parameter = 0.5)
 
 lm.cells.DE.0.5 <-
-  tinydenseR::get.map(.lm.obj = lm.cells.DE.0.5)
+  tinydenseR::get.map(.tdr.obj = lm.cells.DE.0.5)
 
 .design.0.5 <-
   model.matrix(object = ~ Treatment + Batch,
@@ -314,9 +314,10 @@ lm.cells.DE.0.5 <-
                        fixed = FALSE))
   )()
 
-Treatment.stats.0.5 <-
+# New API: get.lm() returns updated .tdr.obj with results in $map$lm[[.model.name]]
+lm.cells.DE.0.5 <-
   tinydenseR::get.lm(
-    .lm.obj = lm.cells.DE.0.5,
+    .tdr.obj = lm.cells.DE.0.5,
     .design = .design.0.5)
 
 lapply(X = .cells.DE.0.5,
@@ -446,15 +447,15 @@ lapply(X = .cells.DE.0.5,
                                                units = "in"))
   )()
 
-tinydenseR::plotPCA(.lm.obj = lm.cells.DE.0.5,
+tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.0.5,
                     .feature = lm.cells.DE.0.5$metada$Treatment[lm.cells.DE.0.5$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,
                     .color.label = "Treatment")
 
-(tinydenseR::plotPCA(.lm.obj = lm.cells.DE.0.5,
-                     .feature = Treatment.stats.0.5$fit$coefficients[,"Activation"],
+(tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.0.5,
+                     .feature = lm.cells.DE.0.5$map$lm$default$fit$coefficients[,"Activation"],
                      .plot.title = "Activation vs Baseline",
                      .color.label = "abundance\nlog2(+0.5)FC",
                      .panel.size = 2,
@@ -463,14 +464,14 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.0.5,
     ggplot2::theme(plot.subtitle = ggplot2::element_blank()))
 
 (tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .feature =
     ifelse(
-      test = Treatment.stats.0.5$fit$coefficients[,"Activation"] < 0,
+      test = lm.cells.DE.0.5$map$lm$default$fit$coefficients[,"Activation"] < 0,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.0.5$fit$pca.weighted.q[,"Activation"] < 0.1,
+      test = lm.cells.DE.0.5$map$lm$default$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
@@ -483,7 +484,7 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.0.5,
     ggplot2::labs(subtitle = "hypothesis testing"))
 
 tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .feature = lm.cells.DE.0.5$graph$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
@@ -502,8 +503,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-    .lm.obj = lm.cells.DE.0.5,
-    .stats.obj = Treatment.stats.0.5)
+    .tdr.obj = lm.cells.DE.0.5,
+    .model.name = "default")
 
 stat.test.percentages.DE.0.5 <-
   lm.cells.DE.0.5$map$clustering$cell.perc |>
@@ -512,8 +513,8 @@ stat.test.percentages.DE.0.5 <-
   tidyr::pivot_longer(cols = dplyr::starts_with(match = "cluster.")) |>
   dplyr::group_by(name) |>
   rstatix::t_test(formula = value ~ treatment) |>
-  dplyr::mutate(p = Treatment.stats.0.5$trad$clustering$fit$adj.p[name,"Activation"],
-                p.adj = Treatment.stats.0.5$trad$clustering$fit$adj.p[name,"Activation"]) |>
+  dplyr::mutate(p = lm.cells.DE.0.5$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"],
+                p.adj = lm.cells.DE.0.5$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"]) |>
   rstatix::add_significance() |>
   dplyr::mutate(p.adj = ifelse(test = p.adj < 0.01,
                                yes = formatC(x = p.adj,
@@ -526,7 +527,7 @@ stat.test.percentages.DE.0.5 <-
 
 
 (tinydenseR::plotTradPerc(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
@@ -538,15 +539,15 @@ stat.test.percentages.DE.0.5 <-
   gridExtra::grid.arrange()
 
 (tinydenseR::plotAbundance(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
     ggplot2::labs(title = "within-cluster abundance"))
 
 tinydenseR::plotBeeswarm(
-  .lm.obj = lm.cells.DE.0.5,
-  .stats.obj = Treatment.stats.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
+  .model.name = "default",
   .coefs = "Activation",
   .swarm.title = "Activation vs Baseline",
   .row.space.scaler = 0.5,
@@ -554,13 +555,13 @@ tinydenseR::plotBeeswarm(
 
 .dea.0.5 <-
   tinydenseR::get.dea(
-    .lm.obj = lm.cells.DE.0.5,
+    .tdr.obj = lm.cells.DE.0.5,
     .design = .design.0.5,
     .id = "cluster.4"
   )
 
 (tinydenseR::plotDEA(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .dea.obj = .dea.0.5, 
   .coefs = c("Activation", "Batch2"),
   .col.space.scaler = 0.15) +
@@ -581,12 +582,12 @@ tinydenseR::plotBeeswarm(
 
 .subset.dea.0.5 <-
   tinydenseR::get.marker(
-    .lm.obj = lm.cells.DE.0.5,
+    .tdr.obj = lm.cells.DE.0.5,
     .id1 = "cluster.4"
   )
 
 tinydenseR::plotDEA(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .dea.obj = .subset.dea.0.5, 
   .coefs = ".id1") |>
   gridExtra::grid.arrange()
@@ -633,7 +634,7 @@ tinydenseR::plotDEA(
 
 set.seed(seed = 123)
 lm.cells.DE.1 <-
-  tinydenseR::setup.lm.obj(
+  tinydenseR::setup.tdr.obj(
     .cells = .cells.DE.1,
     .meta = .meta.DE.1,
     .assay.type = "cyto") |>
@@ -641,7 +642,7 @@ lm.cells.DE.1 <-
   tinydenseR::get.graph(.cl.resolution.parameter = 0.5)
 
 lm.cells.DE.1 <-
-  tinydenseR::get.map(.lm.obj = lm.cells.DE.1)
+  tinydenseR::get.map(.tdr.obj = lm.cells.DE.1)
 
 .design.1 <-
   model.matrix(object = ~ Treatment + Batch,
@@ -654,9 +655,10 @@ lm.cells.DE.1 <-
                        fixed = FALSE))
   )()
 
-Treatment.stats.1 <-
+# New API: get.lm() returns updated .tdr.obj with results in $map$lm[[.model.name]]
+lm.cells.DE.1 <-
   tinydenseR::get.lm(
-    .lm.obj = lm.cells.DE.1,
+    .tdr.obj = lm.cells.DE.1,
     .design = .design.1)
 
 lapply(X = .cells.DE.1,
@@ -786,15 +788,15 @@ lapply(X = .cells.DE.1,
                                                units = "in"))
   )()
 
-tinydenseR::plotPCA(.lm.obj = lm.cells.DE.1,
+tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.1,
                     .feature = lm.cells.DE.1$metada$Treatment[lm.cells.DE.1$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,
                     .color.label = "Treatment")
 
-(tinydenseR::plotPCA(.lm.obj = lm.cells.DE.1,
-                     .feature = Treatment.stats.1$fit$coefficients[,"Activation"],
+(tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.1,
+                     .feature = lm.cells.DE.1$map$lm$default$fit$coefficients[,"Activation"],
                      .plot.title = "Activation vs Baseline",
                      .color.label = "abundance\nlog2(+0.5)FC",
                      .panel.size = 2,
@@ -803,14 +805,14 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.1,
     ggplot2::theme(plot.subtitle = ggplot2::element_blank()))
 
 (tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.1,
+  .tdr.obj = lm.cells.DE.1,
   .feature =
     ifelse(
-      test = Treatment.stats.1$fit$coefficients[,"Activation"] < 0,
+      test = lm.cells.DE.1$map$lm$default$fit$coefficients[,"Activation"] < 0,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.1$fit$pca.weighted.q[,"Activation"] < 0.1,
+      test = lm.cells.DE.1$map$lm$default$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
@@ -823,7 +825,7 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.1,
     ggplot2::labs(subtitle = "hypothesis testing"))
 
 tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.1,
+  .tdr.obj = lm.cells.DE.1,
   .feature = lm.cells.DE.1$graph$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
@@ -842,8 +844,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-    .lm.obj = lm.cells.DE.1,
-    .stats.obj = Treatment.stats.1)
+    .tdr.obj = lm.cells.DE.1,
+    .model.name = "default")
 
 stat.test.percentages.DE.1 <-
   lm.cells.DE.1$map$clustering$cell.perc |>
@@ -852,8 +854,8 @@ stat.test.percentages.DE.1 <-
   tidyr::pivot_longer(cols = dplyr::starts_with(match = "cluster.")) |>
   dplyr::group_by(name) |>
   rstatix::t_test(formula = value ~ treatment) |>
-  dplyr::mutate(p = Treatment.stats.1$trad$clustering$fit$adj.p[name,"Activation"],
-                p.adj = Treatment.stats.1$trad$clustering$fit$adj.p[name,"Activation"]) |>
+  dplyr::mutate(p = lm.cells.DE.1$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"],
+                p.adj = lm.cells.DE.1$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"]) |>
   rstatix::add_significance() |>
   dplyr::mutate(p.adj = ifelse(test = p.adj < 0.01,
                                yes = formatC(x = p.adj,
@@ -866,7 +868,7 @@ stat.test.percentages.DE.1 <-
 
 
 (tinydenseR::plotTradPerc(
-  .lm.obj = lm.cells.DE.1,
+  .tdr.obj = lm.cells.DE.1,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
@@ -877,15 +879,15 @@ stat.test.percentages.DE.1 <-
     ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))))
 
 (tinydenseR::plotAbundance(
-  .lm.obj = lm.cells.DE.1,
+  .tdr.obj = lm.cells.DE.1,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
     ggplot2::labs(title = "within-cluster abundance"))
 
 tinydenseR::plotBeeswarm(
-  .lm.obj = lm.cells.DE.1,
-  .stats.obj = Treatment.stats.1,
+  .tdr.obj = lm.cells.DE.1,
+  .model.name = "default",
   .coefs = "Activation",
   .swarm.title = "Activation vs Baseline",
   .row.space.scaler = 0.5,
@@ -893,13 +895,13 @@ tinydenseR::plotBeeswarm(
 
 .dea.1 <-
   tinydenseR::get.dea(
-    .lm.obj = lm.cells.DE.1,
+    .tdr.obj = lm.cells.DE.1,
     .design = .design.1,
     .id = "cluster.3"
   )
 
 (tinydenseR::plotDEA(
-  .lm.obj = lm.cells.DE.1,
+  .tdr.obj = lm.cells.DE.1,
   .dea.obj = .dea.1, 
   .coefs = c("Activation", "Batch2"),
   .col.space.scaler = 0.15) +
@@ -920,12 +922,12 @@ tinydenseR::plotBeeswarm(
 
 .subset.dea.1 <-
   tinydenseR::get.marker(
-    .lm.obj = lm.cells.DE.1,
+    .tdr.obj = lm.cells.DE.1,
     .id1 = "cluster.3"
   )
 
 tinydenseR::plotDEA(
-  .lm.obj = lm.cells.DE.1,
+  .tdr.obj = lm.cells.DE.1,
   .dea.obj = .subset.dea.1, 
   .coefs = ".id1")
 
@@ -971,7 +973,7 @@ tinydenseR::plotDEA(
 
 set.seed(seed = 123)
 lm.cells.DE.2 <-
-  tinydenseR::setup.lm.obj(
+  tinydenseR::setup.tdr.obj(
     .cells = .cells.DE.2,
     .meta = .meta.DE.2,
     .assay.type = "cyto") |>
@@ -979,7 +981,7 @@ lm.cells.DE.2 <-
   tinydenseR::get.graph(.cl.resolution.parameter = 0.5)
 
 lm.cells.DE.2 <-
-  tinydenseR::get.map(.lm.obj = lm.cells.DE.2)
+  tinydenseR::get.map(.tdr.obj = lm.cells.DE.2)
 
 .design.2 <-
   model.matrix(object = ~ Treatment + Batch,
@@ -992,9 +994,10 @@ lm.cells.DE.2 <-
                        fixed = FALSE))
   )()
 
-Treatment.stats.2 <-
+# New API: get.lm() returns updated .tdr.obj with results in $map$lm[[.model.name]]
+lm.cells.DE.2 <-
   tinydenseR::get.lm(
-    .lm.obj = lm.cells.DE.2,
+    .tdr.obj = lm.cells.DE.2,
     .design = .design.2)
 
 lapply(X = .cells.DE.2,
@@ -1124,15 +1127,15 @@ lapply(X = .cells.DE.2,
                                                units = "in"))
   )()
 
-tinydenseR::plotPCA(.lm.obj = lm.cells.DE.2,
+tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.2,
                     .feature = lm.cells.DE.2$metada$Treatment[lm.cells.DE.2$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,
                     .color.label = "Treatment")
 
-(tinydenseR::plotPCA(.lm.obj = lm.cells.DE.2,
-                     .feature = Treatment.stats.2$fit$coefficients[,"Activation"],
+(tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.2,
+                     .feature = lm.cells.DE.2$map$lm$default$fit$coefficients[,"Activation"],
                      .plot.title = "Activation vs Baseline",
                      .color.label = "abundance\nlog2(+0.5)FC",
                      .panel.size = 2,
@@ -1141,14 +1144,14 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.2,
     ggplot2::theme(plot.subtitle = ggplot2::element_blank()))
 
 (tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.2,
+  .tdr.obj = lm.cells.DE.2,
   .feature =
     ifelse(
-      test = Treatment.stats.2$fit$coefficients[,"Activation"] < 0,
+      test = lm.cells.DE.2$map$lm$default$fit$coefficients[,"Activation"] < 0,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = Treatment.stats.2$fit$pca.weighted.q[,"Activation"] < 0.1,
+      test = lm.cells.DE.2$map$lm$default$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
@@ -1161,7 +1164,7 @@ tinydenseR::plotPCA(.lm.obj = lm.cells.DE.2,
     ggplot2::labs(subtitle = "hypothesis testing"))
 
 tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.2,
+  .tdr.obj = lm.cells.DE.2,
   .feature = lm.cells.DE.2$graph$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
@@ -1180,8 +1183,8 @@ tinydenseR::plotPCA(
   )()
 
 tinydenseR::plotTradStats(
-    .lm.obj = lm.cells.DE.2,
-    .stats.obj = Treatment.stats.2)
+    .tdr.obj = lm.cells.DE.2,
+    .model.name = "default")
 
 stat.test.percentages.DE.2 <-
   lm.cells.DE.2$map$clustering$cell.perc |>
@@ -1190,8 +1193,8 @@ stat.test.percentages.DE.2 <-
   tidyr::pivot_longer(cols = dplyr::starts_with(match = "cluster.")) |>
   dplyr::group_by(name) |>
   rstatix::t_test(formula = value ~ treatment) |>
-  dplyr::mutate(p = Treatment.stats.2$trad$clustering$fit$adj.p[name,"Activation"],
-                p.adj = Treatment.stats.2$trad$clustering$fit$adj.p[name,"Activation"]) |>
+  dplyr::mutate(p = lm.cells.DE.2$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"],
+                p.adj = lm.cells.DE.2$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"]) |>
   rstatix::add_significance() |>
   dplyr::mutate(p.adj = ifelse(test = p.adj < 0.01,
                                yes = formatC(x = p.adj,
@@ -1204,7 +1207,7 @@ stat.test.percentages.DE.2 <-
 
 
 (tinydenseR::plotTradPerc(
-  .lm.obj = lm.cells.DE.2,
+  .tdr.obj = lm.cells.DE.2,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
@@ -1215,15 +1218,15 @@ stat.test.percentages.DE.2 <-
     ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.25))))
 
 (tinydenseR::plotAbundance(
-  .lm.obj = lm.cells.DE.2,
+  .tdr.obj = lm.cells.DE.2,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
     ggplot2::labs(title = "within-cluster abundance"))
 
 tinydenseR::plotBeeswarm(
-    .lm.obj = lm.cells.DE.2,
-    .stats.obj = Treatment.stats.2,
+    .tdr.obj = lm.cells.DE.2,
+    .model.name = "default",
     .coefs = "Activation",
     .swarm.title = "Activation vs Baseline",
     .row.space.scaler = 0.5,
@@ -1231,13 +1234,13 @@ tinydenseR::plotBeeswarm(
 
 .dea.2 <-
   tinydenseR::get.dea(
-    .lm.obj = lm.cells.DE.2,
+    .tdr.obj = lm.cells.DE.2,
     .design = .design.2,
     .id = "cluster.4"
   )
 
 (tinydenseR::plotDEA(
-  .lm.obj = lm.cells.DE.2,
+  .tdr.obj = lm.cells.DE.2,
   .dea.obj = .dea.2, 
   .coefs = c("Activation", "Batch2"),
   .col.space.scaler = 0.15) +
@@ -1258,12 +1261,12 @@ tinydenseR::plotBeeswarm(
 
 .subset.dea.2 <-
   tinydenseR::get.marker(
-    .lm.obj = lm.cells.DE.2,
+    .tdr.obj = lm.cells.DE.2,
     .id1 = "cluster.4"
   )
 
 tinydenseR::plotDEA(
-  .lm.obj = lm.cells.DE.2,
+  .tdr.obj = lm.cells.DE.2,
   .dea.obj = .subset.dea.2, 
   .coefs = ".id1")
 

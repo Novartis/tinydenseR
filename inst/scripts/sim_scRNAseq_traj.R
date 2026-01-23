@@ -43,7 +43,7 @@ sim_trajectory <- trajectory_data$SCE
 
 set.seed(seed = 123)
 lm.cells <-
-  tinydenseR::setup.lm.obj(
+  tinydenseR::setup.tdr.obj(
     .cells = .cells,
     .meta = .meta,
     .assay.type = "RNA",
@@ -54,15 +54,15 @@ lm.cells <-
                         .k = 10)
 
 lm.cells <-
-  tinydenseR::get.map(.lm.obj = lm.cells)
+  tinydenseR::get.map(.tdr.obj = lm.cells)
 
 .design <-
   model.matrix(object = ~ Condition,
                data = .meta)
 
-condition.stats <-
+lm.cells <-
   tinydenseR::get.lm(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .design = .design)
 
 # Extract count matrices from SCE object for plotting
@@ -160,7 +160,7 @@ count_matrices |>
   )()
 
 
-(tinydenseR::plotPCA(.lm.obj = lm.cells,
+(tinydenseR::plotPCA(.tdr.obj = lm.cells,
                      .feature = "black",
                      .cat.feature.color = "black",
                      .plot.title = "landmarks",
@@ -172,15 +172,15 @@ count_matrices |>
     ggplot2::xlim(c(-21,21)) +
     ggplot2::ylim(c(-7,20)))
 
-tinydenseR::plotPCA(.lm.obj = lm.cells,
+tinydenseR::plotPCA(.tdr.obj = lm.cells,
                     .feature = lm.cells$metadata$Condition[lm.cells$key],
                     .cat.feature.color = Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,
                     .color.label = "Condition")
 
-(tinydenseR::plotPCA(.lm.obj = lm.cells,
-                     .feature = condition.stats$fit$coefficients[,"ConditionB"],
+(tinydenseR::plotPCA(.tdr.obj = lm.cells,
+                     .feature = lm.cells$map$lm$default$fit$coefficients[,"ConditionB"],
                      .panel.size = 2,
                      .point.size = 1,
                      .plot.title = "estimated abundance\nlog2(+0.5) fold change",
@@ -191,14 +191,14 @@ tinydenseR::plotPCA(.lm.obj = lm.cells,
     ggplot2::ylim(c(-7,20)))
 
 (tinydenseR::plotPCA(
-  .lm.obj = lm.cells,
+  .tdr.obj = lm.cells,
   .feature =
     ifelse(
-      test = condition.stats$fit$coefficients[,"ConditionB"] < 0,
+      test = lm.cells$map$lm$default$fit$coefficients[,"ConditionB"] < 0,
       yes = "abundance down",
       no = "abundance up") |>
     ifelse(
-      test = condition.stats$fit$density.weighted.bh.fdr[,"ConditionB"] < 0.1,
+      test = lm.cells$map$lm$default$fit$density.weighted.bh.fdr[,"ConditionB"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("abundance down",
                       "not sig.",
@@ -213,7 +213,7 @@ tinydenseR::plotPCA(.lm.obj = lm.cells,
     ggplot2::ylim(c(-7,20)))
 
 tinydenseR::plotPCA(
-  .lm.obj = lm.cells,
+  .tdr.obj = lm.cells,
   .feature = lm.cells$graph$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
@@ -240,8 +240,8 @@ stat.test.percentages <-
   tidyr::pivot_longer(cols = dplyr::starts_with(match = "cluster.")) |>
   dplyr::group_by(name) |>
   rstatix::t_test(formula = value ~ condition) |>
-  dplyr::mutate(p = condition.stats$trad$clustering$fit$adj.p[name,"ConditionB"],
-                p.adj = condition.stats$trad$clustering$fit$adj.p[name,"ConditionB"]) |>
+  dplyr::mutate(p = lm.cells$map$lm$default$trad$clustering$fit$adj.p[name,"ConditionB"],
+                p.adj = lm.cells$map$lm$default$trad$clustering$fit$adj.p[name,"ConditionB"]) |>
   rstatix::add_significance() |>
   dplyr::mutate(p.adj = ifelse(test = p.adj < 0.01,
                                yes = formatC(x = p.adj,
@@ -253,7 +253,7 @@ stat.test.percentages <-
   rstatix::add_xy_position(x = "condition")
 
 (tinydenseR::plotTradPerc(
-  .lm.obj = lm.cells,
+  .tdr.obj = lm.cells,
   .x.split = "Condition",
   .x.space.scaler = 0.3
 ) + 
@@ -266,7 +266,7 @@ stat.test.percentages <-
     ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.15)))) 
 
 (tinydenseR::plotAbundance(
-  .lm.obj = lm.cells,
+  .tdr.obj = lm.cells,
   .x.split = "Condition",
   .x.space.scaler = 0.3
 ) + 
@@ -275,8 +275,7 @@ stat.test.percentages <-
     ggplot2::labs(title = "within-cluster abundance"))
 
 tinydenseR::plotBeeswarm(
-  .lm.obj = lm.cells,
-  .stats.obj = condition.stats,
+  .tdr.obj = lm.cells,
   .coefs = "ConditionB",
   .row.space.scaler = 0.3,
   .perc.plot = FALSE,
@@ -284,7 +283,7 @@ tinydenseR::plotBeeswarm(
 
 .dea <-
   tinydenseR::get.dea(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .design = .design,
   )
 
@@ -292,7 +291,7 @@ sort(x = .dea$coefficients[,"ConditionB"],
      decreasing = TRUE)[1] |>
   names() |> 
   (\(x)
-   tinydenseR::plotPCA(.lm.obj = lm.cells,
+   tinydenseR::plotPCA(.tdr.obj = lm.cells,
                        .feature = lm.cells$landmarks[,x],
                        .plot.title = "Top Gene Up in B vs A",
                        .panel.size = 2,
@@ -305,7 +304,7 @@ sort(x = .dea$coefficients[,"ConditionB"],
      decreasing = FALSE)[1] |>
   names() |> 
   (\(x)
-   tinydenseR::plotPCA(.lm.obj = lm.cells,
+   tinydenseR::plotPCA(.tdr.obj = lm.cells,
                        .feature = lm.cells$landmarks[,x],
                        .plot.title = "Top Gene Down in B vs A",
                        .panel.size = 2,

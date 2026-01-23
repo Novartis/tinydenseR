@@ -17,9 +17,9 @@
 library(testthat)
 library(tinydenseR)
 
-# Test for setup.lm.obj
+# Test for setup.tdr.obj
 
-test_that("setup.lm.obj returns a list with correct names", {
+test_that("setup.tdr.obj returns a list with correct names", {
   .cells <- list(sample1 = matrix(data = runif(n = 30), 
                                   nrow = 10, 
                                   ncol = 3, 
@@ -49,7 +49,7 @@ test_that("setup.lm.obj returns a list with correct names", {
     })
   .meta <- data.frame(row.names = c("sample1", "sample2"),
                       group = c("A", "B"))
-  result <- setup.lm.obj(.cells = .cells,
+  result <- setup.tdr.obj(.cells = .cells,
                          .meta = .meta,
                          .markers = c("CD3", "CD4", "CD8"),
                          .assay.type = "cyto",
@@ -73,48 +73,48 @@ test_that("setup.lm.obj returns a list with correct names", {
                     "harmony.obj") %in% names(x = result)))
 })
 
-# Test error conditions for setup.lm.obj
+# Test error conditions for setup.tdr.obj
 
-test_that("setup.lm.obj throws error when .cells names don't match .meta rownames", {
+test_that("setup.tdr.obj throws error when .cells names don't match .meta rownames", {
   .cells <- list(wrong_name = tempfile())
   .meta <- data.frame(row.names = "sample1", group = "A")
-  expect_error(setup.lm.obj(.cells = .cells, .meta = .meta),
+  expect_error(setup.tdr.obj(.cells = .cells, .meta = .meta),
                "Sample names mismatch between .cells and .meta")
 })
 
-test_that("setup.lm.obj throws error when .harmony.var not in metadata", {
+test_that("setup.tdr.obj throws error when .harmony.var not in metadata", {
   .cells <- list(sample1 = tempfile())
   .meta <- data.frame(row.names = "sample1", group = "A")
-  expect_error(setup.lm.obj(.cells = .cells, .meta = .meta, .harmony.var = "missing_var"),
+  expect_error(setup.tdr.obj(.cells = .cells, .meta = .meta, .harmony.var = "missing_var"),
                "Variables not found in metadata")
 })
 
-test_that("setup.lm.obj throws error when .markers insufficient for cyto", {
+test_that("setup.tdr.obj throws error when .markers insufficient for cyto", {
   .cells <- list(sample1 = tempfile())
   .meta <- data.frame(row.names = "sample1", group = "A")
-  expect_error(setup.lm.obj(.cells = .cells, .meta = .meta, .markers = c("CD3"), .assay.type = "cyto"),
+  expect_error(setup.tdr.obj(.cells = .cells, .meta = .meta, .markers = c("CD3"), .assay.type = "cyto"),
                ".markers must contain at least 3 markers for meaningful dimensionality reduction")
 })
 
-test_that("setup.lm.obj throws error when .markers used with RNA", {
+test_that("setup.tdr.obj throws error when .markers used with RNA", {
   .cells <- list(sample1 = tempfile())
   .meta <- data.frame(row.names = "sample1", group = "A")
-  expect_error(setup.lm.obj(.cells = .cells, .meta = .meta, .markers = c("CD3"), .assay.type = "RNA"),
+  expect_error(setup.tdr.obj(.cells = .cells, .meta = .meta, .markers = c("CD3"), .assay.type = "RNA"),
                ".markers argument only applies to cytometry data")
 })
 
 # Test for get.landmarks
 
 test_that("get.landmarks validates input properly", {
-  # Test that get.landmarks expects a proper .lm.obj structure
-  expect_error(get.landmarks(.lm.obj = list()),
-               "Invalid .lm.obj: missing structure")  # Should error due to missing required fields
+  # Test that get.landmarks expects a proper .tdr.obj structure
+  expect_error(get.landmarks(.tdr.obj = list()),
+               "Invalid .tdr.obj: missing structure")  # Should error due to missing required fields
   
   # Test with incomplete object
   incomplete_obj <- list(
     assay.type = "RNA",
     cells = list()
   )
-  expect_error(get.landmarks(.lm.obj = incomplete_obj),
-               "Invalid .lm.obj structure")  # Should error due to missing required fields
+  expect_error(get.landmarks(.tdr.obj = incomplete_obj),
+               "Invalid .tdr.obj structure")  # Should error due to missing required fields
 })

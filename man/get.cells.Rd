@@ -85,5 +85,5 @@ cells <- get.cells(.exprs = sce.obj,
 }
 \seealso{
 \code{\link{get.cells.list.mat}}, \code{\link{get.cells.Seurat}},
-\code{\link{get.cells.Seurat5}}, \code{\link{get.cells.SCE}}, \code{\link{setup.lm.obj}}
+\code{\link{get.cells.Seurat5}}, \code{\link{get.cells.SCE}}, \code{\link{setup.tdr.obj}}
 }

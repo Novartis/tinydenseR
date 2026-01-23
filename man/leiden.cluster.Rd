@@ -5,7 +5,7 @@
 \title{Leiden clustering with straggler absorption}
 \usage{
 leiden.cluster(
-  .lm.obj = NULL,
+  .tdr.obj = NULL,
   .sim.matrix,
   .resolution.parameter,
   .small.size = floor(nrow(.sim.matrix)/200),
@@ -14,7 +14,7 @@ leiden.cluster(
 )
 }
 \arguments{
-\item{.lm.obj}{Optional tinydenseR object from \code{get.landmarks()} and
+\item{.tdr.obj}{Optional tinydenseR object from \code{get.landmarks()} and
 \code{get.graph()}. If provided, uses Laplacian Eigenmap embedding for
 initialization (if computed successfully), otherwise falls back to PCA embedding.
 If NULL, computes 3D embedding from \code{.sim.matrix} via truncated SVD.}
@@ -55,9 +55,9 @@ neighbors. This improves cluster quality by preventing tiny, isolated groups.
 }
 
 \strong{Initialization strategy:}
-Uses Laplacian Eigenmap embedding (if computed and available in \code{.lm.obj$graph$LE$embed}),
+Uses Laplacian Eigenmap embedding (if computed and available in \code{.tdr.obj$graph$LE$embed}),
 otherwise PCA embedding (up to first 3 components), or computes 3D embedding from
-similarity matrix via truncated SVD (\code{irlba}) when \code{.lm.obj} is NULL.
+similarity matrix via truncated SVD (\code{irlba}) when \code{.tdr.obj} is NULL.
 K-means initialization helps Leiden start from reasonable communities rather than
 singleton nodes, improving stability.
 
@@ -72,7 +72,7 @@ submatrix size to properly account for implicit zeros.
 \dontrun{
 # After building similarity matrix
 clusters <- leiden.cluster(
-  .lm.obj = lm.obj,
+  .tdr.obj = lm.obj,
   .sim.matrix = jaccard_sim,
   .resolution.parameter = 0.001,
   .small.size = 10  # Merge clusters < 10 cells

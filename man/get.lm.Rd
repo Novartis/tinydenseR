@@ -5,7 +5,7 @@
 \title{Differential Abundance Testing}
 \usage{
 get.lm(
-  .lm.obj,
+  .tdr.obj,
   .design,
   .contrasts = NULL,
   .block = NULL,
@@ -16,20 +16,20 @@ get.lm(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
 
 \item{.design}{Design matrix specifying the experimental design. Rows correspond to samples
-(matching \code{.lm.obj$cells}), columns to coefficients. Create with \code{model.matrix()}.}
+(matching \code{.tdr.obj$cells}), columns to coefficients. Create with \code{model.matrix()}.}
 
 \item{.contrasts}{Optional contrast matrix for specific comparisons. Each column defines one
 contrast. Create with \code{limma::makeContrasts()}. If NULL, tests all coefficients in
 \code{.design}.}
 
-\item{.block}{Optional character: column name in \code{.lm.obj$metadata} for blocking factor
+\item{.block}{Optional character: column name in \code{.tdr.obj$metadata} for blocking factor
 (e.g., "Donor", "Batch"). Accounts for within-block correlation using \code{duplicateCorrelation}.}
 
 \item{.model.name}{Character string naming this model fit (default "default"). Results are stored
-in \code{.lm.obj$map$lm[[.model.name]]}. Use different names to store multiple model fits
+in \code{.tdr.obj$map$lm[[.model.name]]}. Use different names to store multiple model fits
 (e.g., full vs reduced models for nested model comparisons).}
 
 \item{.force.recalc}{Logical: if TRUE, overwrite existing results in the specified slot
@@ -40,7 +40,7 @@ in \code{.lm.obj$map$lm[[.model.name]]}. Use different names to store multiple m
 \item{.seed}{Integer: random seed for reproducibility in blocking correlation estimation. Default 123.}
 }
 \value{
-The modified \code{.lm.obj} with results stored in \code{.lm.obj$map$lm[[.model.name]]}:
+The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$map$lm[[.model.name]]}:
 \describe{
 \item{\code{fit}}{limma MArrayLM object after eBayes with moderated statistics, containing:}
 \item{\code{fit$coefficients}}{Log fold changes (landmarks x coefficients), nested in fit}
@@ -110,7 +110,7 @@ or BH for small test sets (<1000 landmarks).
 \examples{
 \dontrun{
 # After mapping
-lm.obj <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.obj <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |> get.graph() |> get.map()
 
 # Simple two-group comparison (results stored in lm.obj$map$lm$default)

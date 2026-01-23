@@ -21,7 +21,7 @@ Rownames are sample IDs from \code{.sample.var}.
 Extracts sample-wise metadata from a SingleCellExperiment object by identifying which colData
 columns have consistent values within each sample. Identical logic to Seurat metadata extraction
 but adapted for SCE's \code{colData} structure. Returns a data frame suitable for
-\code{setup.lm.obj(.meta = ...)}.
+\code{setup.tdr.obj(.meta = ...)}.
 }
 \details{
 SingleCellExperiment stores cell-level metadata in \code{colData}. This function:

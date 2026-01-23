@@ -16,7 +16,7 @@
 
 # Helper functions for testing
 
-#' Create a minimal .lm.obj for testing
+#' Create a minimal .tdr.obj for testing
 #' @param n_cells Number of cells per sample
 #' @param n_markers Number of markers
 #' @param n_samples Number of samples
@@ -46,7 +46,7 @@ create_test_lm_obj <- function(n_cells = 10, n_markers = 3, n_samples = 2) {
   return(list(cells = .cells, meta = .meta))
 }
 
-#' Create a mock .lm.obj with graph data for plotting tests
+#' Create a mock .tdr.obj with graph data for plotting tests
 create_mock_graph_obj <- function(n_points = 20, n_clusters = 3) {
   list(
     graph = list(
@@ -101,7 +101,7 @@ run_full_pipeline <- function(test_data, seed = 123, verbose = FALSE, nPC = NULL
     k <- min(5, max(2, n_landmarks - 1))
   }
   
-  result <- setup.lm.obj(
+  result <- setup.tdr.obj(
     .cells = test_data$cells,
     .meta = test_data$meta,
     .markers = names(test_data$cells[[1]] |> readRDS() |> colnames()),

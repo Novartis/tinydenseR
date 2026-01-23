@@ -37,10 +37,10 @@
 #' The function operates on mapped cells (after \code{get.map}), allowing you to
 #' optionally filter to specific clusters or cell types using \code{.id} parameter.
 #' 
-#' @param .lm.obj A list object initialized with \code{setup.lm.obj} and processed 
+#' @param .tdr.obj A list object initialized with \code{setup.tdr.obj} and processed 
 #'   with \code{get.graph} and \code{get.map}. Must contain RNA assay data.
 #' @param .goi Character vector of gene names to summarize. All genes must exist 
-#'   in \code{.lm.obj$raw.landmarks} column names.
+#'   in \code{.tdr.obj$raw.landmarks} column names.
 #' @param .id.idx Integer index of a specific landmark to analyze. If NULL (default), 
 #'   uses \code{.id} parameter or all cells. Rarely used directly.
 #' @param .id Character vector of cluster or cell type IDs to filter analysis. 
@@ -67,7 +67,7 @@
 #' @examples
 #' \dontrun{
 #' # Complete workflow with gene expression summary
-#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks() |>
 #'   get.graph() |>
 #'   get.map()
@@ -86,7 +86,7 @@
 #' @export
 goi.summary <-
   function(
-    .lm.obj,
+    .tdr.obj,
     .goi,
     .id.idx = NULL,
     .id = NULL,
@@ -94,19 +94,19 @@ goi.summary <-
     .verbose = TRUE
   ){
     
-    if(!all(.goi %in% colnames(x = .lm.obj$raw.landmarks))){
+    if(!all(.goi %in% colnames(x = .tdr.obj$raw.landmarks))){
       stop("Gene(s) not found in data: ",
-           paste(.goi[!(.goi %in% colnames(x = .lm.obj$raw.landmarks))],
+           paste(.goi[!(.goi %in% colnames(x = .tdr.obj$raw.landmarks))],
                  collapse = ", "),
-           "\nCheck gene names (case-sensitive) or use colnames(.lm.obj$raw.landmarks) to see available genes.")
+           "\nCheck gene names (case-sensitive) or use colnames(.tdr.obj$raw.landmarks) to see available genes.")
     }
     
-    if(.lm.obj$assay.type != "RNA"){
+    if(.tdr.obj$assay.type != "RNA"){
       stop("goi.summary() only supports RNA assay data.\n",
-           "Current assay type: ", .lm.obj$assay.type)
+           "Current assay type: ", .tdr.obj$assay.type)
     }
     
-    if(is.null(x = .lm.obj$map)){
+    if(is.null(x = .tdr.obj$map)){
       stop("Cell mapping not found. Run get.graph() and get.map() before calling goi.summary().")
     }
     
@@ -125,18 +125,18 @@ goi.summary <-
                     choices = c("clustering",
                                 "celltyping"))
         
-        if(!all(.id %in% unique(x = .lm.obj$graph[[.id.from]]$ids))){
+        if(!all(.id %in% unique(x = .tdr.obj$graph[[.id.from]]$ids))){
           
           stop("Invalid ", .id.from, " ID(s): ",
-               paste(.id[!(.id %in% unique(x = .lm.obj$graph[[.id.from]]$ids))],
+               paste(.id[!(.id %in% unique(x = .tdr.obj$graph[[.id.from]]$ids))],
                      collapse = ", "),
-               "\nThese IDs were not found. Use unique(.lm.obj$graph$", .id.from, "$ids) to see valid IDs.")
+               "\nThese IDs were not found. Use unique(.tdr.obj$graph$", .id.from, "$ids) to see valid IDs.")
           
         }
         
         # Filter to cells belonging to specified cluster/celltype IDs
         .id.idx <-
-          lapply(X = .lm.obj$map[[.id.from]]$ids,
+          lapply(X = .tdr.obj$map[[.id.from]]$ids,
                  FUN = function(smpl){
                    which(x = smpl %in% .id)
                  })
@@ -145,7 +145,7 @@ goi.summary <-
         
         # Use all cells (default behavior)
         .id.idx <-
-          lapply(X = .lm.obj$map[[.id.from]]$ids,
+          lapply(X = .tdr.obj$map[[.id.from]]$ids,
                  FUN = seq_along)
         
       }
@@ -153,7 +153,7 @@ goi.summary <-
       
       # Filter to cells mapped to a specific landmark index
       .id.idx <-
-        lapply(X = .lm.obj$map$nearest.landmarks,
+        lapply(X = .tdr.obj$map$nearest.landmarks,
                FUN = function(smpl.knn)
                  which(x = smpl.knn[,1] == .id.idx))
       
@@ -161,18 +161,18 @@ goi.summary <-
     
     # Process each sample: extract expression, label cells as pos./neg. for each gene
     if(isTRUE(x = .verbose)){
-      message("-> Processing ", length(.lm.obj$cells), " samples for GOI summary...")
+      message("-> Processing ", length(.tdr.obj$cells), " samples for GOI summary...")
       .goi_start <- Sys.time()
     }
     
     goi <-
-      seq_along(along.with = .lm.obj$cells) |>
-      stats::setNames(nm = names(x = .lm.obj$cells)) |>
+      seq_along(along.with = .tdr.obj$cells) |>
+      stats::setNames(nm = names(x = .tdr.obj$cells)) |>
       lapply(FUN = function(cells.elem){
         
         # Load expression data for selected cells and genes
         goi.exprs.mat <-
-          readRDS(file = .lm.obj$cells[[cells.elem]]) |> 
+          readRDS(file = .tdr.obj$cells[[cells.elem]]) |> 
           (\(x)
            x[.goi,.id.idx[[cells.elem]],drop = FALSE]
           )() |>
@@ -184,12 +184,12 @@ goi.summary <-
         
         # Create cluster ID matrix for all cells × genes combinations
         ids <-
-          .lm.obj$map$clustering$ids[[cells.elem]][.id.idx[[cells.elem]]] |>
+          .tdr.obj$map$clustering$ids[[cells.elem]][.id.idx[[cells.elem]]] |>
           rep(times = length(x = .goi)) |>
           matrix(byrow = FALSE,
                  nrow = length(x = .id.idx[[cells.elem]]),
                  ncol = length(x = .goi),
-                 dimnames = list(names(x = .lm.obj$map$clustering$ids[[cells.elem]][.id.idx[[cells.elem]]]),
+                 dimnames = list(names(x = .tdr.obj$map$clustering$ids[[cells.elem]][.id.idx[[cells.elem]]]),
                                  .goi))
         
         # Add "pos." prefix for expressing cells, "neg." for non-expressing
@@ -202,15 +202,15 @@ goi.summary <-
                  ids[!all.goi.detected])
         
         # Repeat same process for cell type labels (if available)
-        if(!is.null(x = .lm.obj$map$celltyping)){
+        if(!is.null(x = .tdr.obj$map$celltyping)){
           
           ct.ids <-
-            .lm.obj$map$celltyping$ids[[cells.elem]][.id.idx[[cells.elem]]] |>
+            .tdr.obj$map$celltyping$ids[[cells.elem]][.id.idx[[cells.elem]]] |>
             rep(times = length(x = .goi)) |>
             matrix(byrow = FALSE,
                    nrow = length(x = .id.idx[[cells.elem]]),
                    ncol = length(x = .goi),
-                   dimnames = list(names(x = .lm.obj$map$celltyping$ids[[cells.elem]][.id.idx[[cells.elem]]]),
+                   dimnames = list(names(x = .tdr.obj$map$celltyping$ids[[cells.elem]][.id.idx[[cells.elem]]]),
                                    .goi))
           
           ct.ids[all.goi.detected] <-
@@ -229,8 +229,8 @@ goi.summary <-
         
         if(isTRUE(x = .verbose)){
           .show_progress(current = cells.elem, 
-                         total = length(.lm.obj$cells),
-                         item_label = names(x = .lm.obj$cells)[cells.elem],
+                         total = length(.tdr.obj$cells),
+                         item_label = names(x = .tdr.obj$cells)[cells.elem],
                          start_time = .goi_start)
         }
         
@@ -253,7 +253,7 @@ goi.summary <-
               unlist(use.names = TRUE) |>
               matrix(nrow = length(x = .id.idx[[cells.elem]]),
                      ncol = length(x = .goi),
-                     dimnames = list(names(x = .lm.obj$map$clustering$ids[[cells.elem]][.id.idx[[cells.elem]]]),
+                     dimnames = list(names(x = .tdr.obj$map$clustering$ids[[cells.elem]][.id.idx[[cells.elem]]]),
                                      .goi)) |>
               as.data.frame() |>
               as.list()
@@ -325,7 +325,7 @@ goi.summary <-
                  (goi.elem$clustering$cell.count * 100) /
                  Matrix::rowSums(x = goi.elem$clustering$cell.count)
                
-               if(!is.null(x = .lm.obj$map$celltyping)){
+               if(!is.null(x = .tdr.obj$map$celltyping)){
                  
                  # Same process for cell type labels
                  goi.elem$celltyping$cell.count <-

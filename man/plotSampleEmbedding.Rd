@@ -5,7 +5,7 @@
 \title{Plot Sample Embedding from get.embedding}
 \usage{
 plotSampleEmbedding(
-  .lm.obj,
+  .tdr.obj,
   .embedding = "pePC",
   .sup.embed.slot = NULL,
   .color.by = NULL,
@@ -19,20 +19,20 @@ plotSampleEmbedding(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()} and
-\code{get.embedding()}. All embeddings are stored in \code{.lm.obj$map$embedding}:
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()} and
+\code{get.embedding()}. All embeddings are stored in \code{.tdr.obj$map$embedding}:
 unsupervised (\code{pca}, \code{traj}) and supervised (\code{pePC$<name>}).}
 
 \item{.embedding}{Character string specifying which embedding type to plot. One of:
 \describe{
 \item{"pePC"}{(default) Supervised partial-effect PCA. Requires \code{.sup.embed.slot}.}
-\item{"pca"}{Unsupervised PCA on log-transformed landmark densities. Uses \code{.lm.obj$map$embedding$pca}.}
-\item{"traj"}{Diffusion map trajectory embedding. Uses \code{.lm.obj$map$embedding$traj}.}
+\item{"pca"}{Unsupervised PCA on log-transformed landmark densities. Uses \code{.tdr.obj$map$embedding$pca}.}
+\item{"traj"}{Diffusion map trajectory embedding. Uses \code{.tdr.obj$map$embedding$traj}.}
 }}
 
 \item{.sup.embed.slot}{Character string specifying which supervised embedding to plot.
 Only used when \code{.embedding = "pePC"}. Must match a name in
-\code{.lm.obj$map$embedding$pePC} (contrast name for FWL method, term name for nested model).
+\code{.tdr.obj$map$embedding$pePC} (contrast name for FWL method, term name for nested model).
 Ignored (with warning) when \code{.embedding} is "pca" or "traj".}
 
 \item{.color.by}{Character string specifying which metadata column to use for coloring
@@ -76,11 +76,11 @@ This function plots the sample coordinates from embeddings computed by
 \describe{
 \item{pePC (supervised)}{Partial-effect PCA isolating variation attributable to a
 specific contrast or set of covariates. Requires running \code{get.embedding()} with
-\code{.contrast.of.interest} or \code{.red.model}. Stored in \code{.lm.obj$map$embedding$pePC$<name>}.}
+\code{.contrast.of.interest} or \code{.red.model}. Stored in \code{.tdr.obj$map$embedding$pePC$<name>}.}
 \item{pca (unsupervised)}{Standard PCA on log-transformed landmark densities. Good for
-exploratory visualization and QC. Stored in \code{.lm.obj$map$embedding$pca}.}
+exploratory visualization and QC. Stored in \code{.tdr.obj$map$embedding$pca}.}
 \item{traj (unsupervised)}{Diffusion map trajectory capturing continuous variation.
-Useful for developmental or temporal trajectories. Stored in \code{.lm.obj$map$embedding$traj}.}
+Useful for developmental or temporal trajectories. Stored in \code{.tdr.obj$map$embedding$traj}.}
 }
 
 For pePC embeddings with rank > 1 (e.g., from nested model comparison with multiple
@@ -94,7 +94,7 @@ or \code{.sup.embed.slot}.
 \examples{
 \dontrun{
 # Compute unsupervised embeddings
-lm.obj <- get.embedding(.lm.obj = lm.obj)
+lm.obj <- get.embedding(.tdr.obj = lm.obj)
 
 # Plot unsupervised PCA
 plotSampleEmbedding(lm.obj, .embedding = "pca", .color.by = "Condition")

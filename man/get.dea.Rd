@@ -5,7 +5,7 @@
 \title{Differential Expression Analysis}
 \usage{
 get.dea(
-  .lm.obj,
+  .tdr.obj,
   .design,
   .contrasts = NULL,
   .block = NULL,
@@ -17,14 +17,14 @@ get.dea(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
 
 \item{.design}{Design matrix specifying experimental design. Rows = samples, columns = coefficients.}
 
 \item{.contrasts}{Optional contrast matrix for specific comparisons. Create with
 \code{limma::makeContrasts()}. If NULL, tests all \code{.design} coefficients.}
 
-\item{.block}{Optional character: column name in \code{.lm.obj$metadata} for blocking factor
+\item{.block}{Optional character: column name in \code{.tdr.obj$metadata} for blocking factor
 (e.g., "Donor"). Accounts for within-block correlation.}
 
 \item{.geneset.ls}{Optional named list of character vectors defining gene sets for GSVA enrichment
@@ -100,7 +100,7 @@ Pseudobulk aggregation:
 \examples{
 \dontrun{
 # After mapping
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |> get.graph() |> get.map()
 
 # DE analysis on all cells

@@ -21,7 +21,7 @@ space for large datasets.}
 }
 \value{
 Named list of file paths to temporary RDS files, one per sample. Structure suitable for
-\code{setup.lm.obj(.cells = ...)}.
+\code{setup.tdr.obj(.cells = ...)}.
 }
 \description{
 Converts a list of count matrices into tinydenseR's standardized .cells format. Each matrix
@@ -37,7 +37,7 @@ All matrices in \code{.count.mat.list} should have:
 \itemize{
 \item Same feature names (rownames) across samples
 \item Cell barcodes as column names
-\item Raw or normalized counts (specify via \code{setup.lm.obj(.assay.type = ...)})
+\item Raw or normalized counts (specify via \code{setup.tdr.obj(.assay.type = ...)})
 }
 }
 \examples{
@@ -65,7 +65,7 @@ cells <- get.cells.list.mat(.count.mat.list = count.matrices,
                             .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ])
 
 # Use in tinydenseR workflow
-lm.obj <- setup.lm.obj(.cells = cells,
+lm.obj <- setup.tdr.obj(.cells = cells,
                        .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
                        .assay.type = "RNA")
 }
@@ -74,5 +74,5 @@ lm.obj <- setup.lm.obj(.cells = cells,
 \seealso{
 \code{\link{get.cells}} for automatic format detection,
 \code{\link{get.cells.SCE}} for SingleCellExperiment input,
-\code{\link{setup.lm.obj}} for next step in workflow
+\code{\link{setup.tdr.obj}} for next step in workflow
 }

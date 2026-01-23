@@ -5,7 +5,7 @@
 \title{Plot Traditional Statistics}
 \usage{
 plotTradStats(
-  .lm.obj,
+  .tdr.obj,
   .model.name = "default",
   .split.by = "clustering",
   .coefs = NULL,
@@ -17,10 +17,10 @@ plotTradStats(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
-Statistical results should be stored in \code{.lm.obj$map$lm}.}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
+Statistical results should be stored in \code{.tdr.obj$map$lm}.}
 
-\item{.model.name}{Character string naming which model fit to use from \code{.lm.obj$map$lm}
+\item{.model.name}{Character string naming which model fit to use from \code{.tdr.obj$map$lm}
 (default "default"). Must match a name used in \code{get.lm(.model.name = ...)}.}
 
 \item{.split.by}{Character: "clustering" (default) or "celltyping" - which population grouping to use.}

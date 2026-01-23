@@ -7,7 +7,7 @@ count_discoveries <-
     
     stats_obj <-
       tinydenseR::get.lm(
-        .lm.obj = lm_obj, 
+        .tdr.obj = lm_obj, 
         .design = design_mat, 
         .verbose = FALSE)
     

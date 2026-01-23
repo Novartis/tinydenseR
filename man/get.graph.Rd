@@ -5,18 +5,18 @@
 \title{Graph embedding of landmarks}
 \usage{
 get.graph(
-  .lm.obj,
+  .tdr.obj,
   .k = 20,
-  .scale = if (.lm.obj$assay.type == "RNA") FALSE else TRUE,
+  .scale = if (.tdr.obj$assay.type == "RNA") FALSE else TRUE,
   .verbose = TRUE,
   .seed = 123,
   .cl.method = "snn",
   .cl.resolution.parameter = 0.8,
-  .small.size = floor(x = nrow(x = .lm.obj$landmarks)/200)
+  .small.size = floor(x = nrow(x = .tdr.obj$landmarks)/200)
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object initialized with \code{setup.lm.obj} and processed with
+\item{.tdr.obj}{A tinydenseR object initialized with \code{setup.tdr.obj} and processed with
 \code{get.landmarks}.}
 
 \item{.k}{Integer number of nearest neighbors for graph construction (default 20). Higher values
@@ -40,7 +40,7 @@ values produce more fine-grained clusters.}
 smaller than this are absorbed into nearest large cluster.}
 }
 \value{
-Updated \code{.lm.obj} with \code{$graph} component containing:
+Updated \code{.tdr.obj} with \code{$graph} component containing:
 \itemize{
 \item \code{uwot}: UMAP model with multiple components:
 \itemize{
@@ -100,14 +100,14 @@ for downstream statistical analysis, unless traditional analysis is requested la
 \examples{
 \dontrun{
 # Typical workflow after landmark selection
-lm.cells <- setup.lm.obj(.cells = .cells, 
+lm.cells <- setup.tdr.obj(.cells = .cells, 
                           .meta = .meta,
                           .assay.type = "RNA") |>
   get.landmarks(.nHVG = 500, .nPC = 3) |>
   get.graph(.k = 10)
 
 # Higher resolution for finer clusters
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |>
   get.graph(.cl.resolution.parameter = 200)
 
@@ -117,5 +117,5 @@ lm.cells <- get.graph(lm.cells, .cl.method = "fgraph")
 
 }
 \seealso{
-\code{\link{setup.lm.obj}}, \code{\link{get.landmarks}}, \code{\link{lm.cluster}}
+\code{\link{setup.tdr.obj}}, \code{\link{get.landmarks}}, \code{\link{lm.cluster}}
 }

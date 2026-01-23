@@ -5,7 +5,7 @@
 \title{Identify landmarks via leverage score sampling}
 \usage{
 get.landmarks(
-  .lm.obj,
+  .tdr.obj,
   .verbose = TRUE,
   .seed = 123,
   .nHVG = 5000,
@@ -15,7 +15,7 @@ get.landmarks(
 )
 }
 \arguments{
-\item{.lm.obj}{Object initialized with \code{setup.lm.obj}.}
+\item{.tdr.obj}{Object initialized with \code{setup.tdr.obj}.}
 
 \item{.verbose}{Logical, print progress messages. Default TRUE.}
 
@@ -37,7 +37,7 @@ technical/biological noise dominating variation.}
 regardless of variance (RNA only). Useful for known markers. Default NULL.}
 }
 \value{
-Updated \code{.lm.obj} with populated fields:
+Updated \code{.tdr.obj} with populated fields:
 \describe{
 \item{\code{$raw.landmarks}}{Raw counts matrix for landmarks (landmarks × features)}
 \item{\code{$landmarks}}{Processed landmark expression on selected features (landmarks × features):
@@ -92,18 +92,18 @@ This two-pass approach ensures landmarks are representative of global
 prioritizes cells in high-variance regions while maintaining diversity.
 
 \strong{Optional Harmony integration:}
-If \code{.harmony.var} was specified in \code{setup.lm.obj}, performs
+If \code{.harmony.var} was specified in \code{setup.tdr.obj}, performs
 batch correction on landmark PC embeddings. This creates a reference
 object for mapping query cells in a batch-corrected space.
 }
 \examples{
 \dontrun{
 # Typical workflow (from README)
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks(.nHVG = 500, .nPC = 3)
 
 # RNA with more PCs and custom HVGs
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks(.nPC = 50, .nHVG = 3000)
 
 # Force specific markers into feature set

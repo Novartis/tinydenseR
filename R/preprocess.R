@@ -36,7 +36,7 @@
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #'   
 #' @return Named list of file paths to temporary RDS files, one per sample. Structure suitable for 
-#'   \code{setup.lm.obj(.cells = ...)}.
+#'   \code{setup.tdr.obj(.cells = ...)}.
 #'   
 #' @details
 #' This function creates temporary RDS files containing each sample's count matrix. These files 
@@ -47,12 +47,12 @@
 #' \itemize{
 #'   \item Same feature names (rownames) across samples
 #'   \item Cell barcodes as column names
-#'   \item Raw or normalized counts (specify via \code{setup.lm.obj(.assay.type = ...)})
+#'   \item Raw or normalized counts (specify via \code{setup.tdr.obj(.assay.type = ...)})
 #' }
 #' 
 #' @seealso \code{\link{get.cells}} for automatic format detection, 
 #'   \code{\link{get.cells.SCE}} for SingleCellExperiment input,
-#'   \code{\link{setup.lm.obj}} for next step in workflow
+#'   \code{\link{setup.tdr.obj}} for next step in workflow
 #'   
 #' @examples
 #' \dontrun{
@@ -79,7 +79,7 @@
 #'                             .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ])
 #' 
 #' # Use in tinydenseR workflow
-#' lm.obj <- setup.lm.obj(.cells = cells,
+#' lm.obj <- setup.tdr.obj(.cells = cells,
 #'                        .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
 #'                        .assay.type = "RNA")
 #' }
@@ -185,7 +185,7 @@ get.cells.list.mat <-
 #' 
 #' @seealso \code{\link{get.cells}} for automatic format detection,
 #'   \code{\link{get.cells.Seurat}} for Seurat v4 objects,
-#'   \code{\link{setup.lm.obj}} for next workflow step
+#'   \code{\link{setup.tdr.obj}} for next workflow step
 #'   
 #' @examples
 #' \dontrun{
@@ -223,7 +223,7 @@ get.cells.list.mat <-
 #'                            .sample.var = "sample_id")
 #' 
 #' # Use in tinydenseR workflow
-#' lm.obj <- setup.lm.obj(.cells = cells,
+#' lm.obj <- setup.tdr.obj(.cells = cells,
 #'                        .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
 #'                        .assay.type = "RNA")
 #' }
@@ -429,7 +429,7 @@ get.cells.Seurat5 <-
 #' 
 #' @seealso \code{\link{get.cells}} for automatic format detection,
 #'   \code{\link{get.cells.Seurat5}} for Seurat v5 objects,
-#'   \code{\link{setup.lm.obj}} for next workflow step
+#'   \code{\link{setup.tdr.obj}} for next workflow step
 #'   
 #' @examples
 #' \dontrun{
@@ -462,7 +462,7 @@ get.cells.Seurat5 <-
 #'                           .sample.var = "sample_id")
 #' 
 #' # Use in tinydenseR workflow
-#' lm.obj <- setup.lm.obj(.cells = cells,
+#' lm.obj <- setup.tdr.obj(.cells = cells,
 #'                        .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
 #'                        .assay.type = "RNA")
 #' }
@@ -640,7 +640,7 @@ get.cells.Seurat <-
 #' 
 #' @seealso \code{\link{get.cells}} for automatic format detection,
 #'   \code{\link{get.cells.Seurat}} for Seurat objects,
-#'   \code{\link{setup.lm.obj}} for next workflow step
+#'   \code{\link{setup.tdr.obj}} for next workflow step
 #'   
 #' @examples
 #' \dontrun{
@@ -658,7 +658,7 @@ get.cells.Seurat <-
 #'                        .sample.var = "Sample")
 #'
 #' # Use in tinydenseR workflow
-#' lm.obj <- setup.lm.obj(.cells = cells,
+#' lm.obj <- setup.tdr.obj(.cells = cells,
 #'                        .meta = sim_trajectory.meta,
 #'                        .assay.type = "RNA")
 #' }
@@ -845,7 +845,7 @@ get.cells.SCE <-
 #' \code{assay()} accessor.
 #' 
 #' @seealso \code{\link{get.cells.list.mat}}, \code{\link{get.cells.Seurat}}, 
-#'   \code{\link{get.cells.Seurat5}}, \code{\link{get.cells.SCE}}, \code{\link{setup.lm.obj}}
+#'   \code{\link{get.cells.Seurat5}}, \code{\link{get.cells.SCE}}, \code{\link{setup.tdr.obj}}
 #'   
 #' @examples
 #' \dontrun{
@@ -988,7 +988,7 @@ get.cells <-
 #'
 #' Extracts sample-wise metadata from a Seurat v5 object by identifying which metadata columns have 
 #' consistent values within each sample (sample-level variables). Cell-level variables are excluded 
-#' with a warning. Returns a data frame suitable for \code{setup.lm.obj(.meta = ...)}.
+#' with a warning. Returns a data frame suitable for \code{setup.tdr.obj(.meta = ...)}.
 #'
 #' @param .seurat.obj Seurat v5 object with cell-level metadata in \code{@meta.data}.
 #' @param .sample.var Character: column name in \code{.seurat.obj@meta.data} identifying samples.
@@ -1110,7 +1110,7 @@ get.meta.Seurat5 <-
 #'
 #' Extracts sample-wise metadata from a Seurat v4 object by identifying which metadata columns have 
 #' consistent values within each sample. Identical functionality to \code{get.meta.Seurat5} but for 
-#' v4 objects. Returns a data frame suitable for \code{setup.lm.obj(.meta = ...)}.
+#' v4 objects. Returns a data frame suitable for \code{setup.tdr.obj(.meta = ...)}.
 #'
 #' @param .seurat.obj Seurat v4 object with cell-level metadata in \code{@meta.data}.
 #' @param .sample.var Character: column name in \code{.seurat.obj@meta.data} identifying samples.
@@ -1227,7 +1227,7 @@ get.meta.Seurat <-
 #' Extracts sample-wise metadata from a SingleCellExperiment object by identifying which colData 
 #' columns have consistent values within each sample. Identical logic to Seurat metadata extraction 
 #' but adapted for SCE's \code{colData} structure. Returns a data frame suitable for 
-#' \code{setup.lm.obj(.meta = ...)}.
+#' \code{setup.tdr.obj(.meta = ...)}.
 #'
 #' @param .sce.obj SingleCellExperiment object with cell-level metadata in \code{colData}.
 #' @param .sample.var Character: column name in \code{colData(.sce.obj)} identifying samples.

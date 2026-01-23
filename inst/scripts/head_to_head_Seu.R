@@ -204,200 +204,130 @@ reference.symphony <-
     seed = 123
   )
 
-# get intersect of genes
-.genes.names <-
-  names(x = object@assays$RNA@layers) |>
-  grep(pattern = "counts",
-       value = TRUE,
-       fixed = TRUE) |>
-  lapply(FUN = function(dataset){
-    
-    SeuratObject::LayerData(object = object, 
-                            assay = "RNA", 
-                            layer = dataset) |>
-      rownames()
-  }) |>
-  Reduce(f = base::intersect)
+# Use the new tinydenseR API to create .meta and .cells objects
+# get.meta.Seurat5 extracts sample-level metadata from Seurat v5 objects
+# get.cells.Seurat5 handles multiple BPCells layers, gene intersection, and cell filtering
 
-# get the .cells object
-if(!(file.path(wd,
-               "Seurat.data/RDS") |>
-     dir.exists())){
-  file.path(wd,
-            "Seurat.data/RDS") |>
-    dir.create(recursive = TRUE,
-               showWarnings = TRUE)
-}
-
-.cells <-
-  # create a named character vector with each sample
-  unique(x = object$donor_id_disease) |>
-  (\(x)
-   setNames(object = x,
-            nm = x)
-  )() |>
-  # loop over each sample
-  lapply(FUN = function(smpl){
-    
-    # define the on-disk location to save the matrix
-    uri <-
-      file.path(wd,
-                "Seurat.data/RDS",
-                paste0(smpl,
-                       ".RDS"))
-    
-    # loop over each dataset and combine cells from the same sample
-    names(x = object@assays$RNA@layers) |>
-      grep(pattern = "counts",
-           value = TRUE,
-           fixed = TRUE) |>
-      lapply(FUN = function(dataset){
-        
-        .cells.in.smpl <-
-          object$donor_id_disease[
-            object$publication == gsub(pattern = "counts.",
-                                       replacement = "",
-                                       x = dataset,
-                                       fixed = TRUE)
-          ] == smpl
-        
-        if(sum(.cells.in.smpl) == 0){
-          return(NULL)
-        }
-        
-        # extract the count matrix for the sample
-        SeuratObject::LayerData(object = object, 
-                                assay = "RNA", 
-                                layer = dataset)[.genes.names,
-                                                 .cells.in.smpl] |>
-          as(Class = "dgCMatrix") |>
-          (\(x)
-           # save each matrix to the on-disk location
-           saveRDS(
-             object = x,
-             file = uri,
-             compress = FALSE)
-          )()
-        
-        # progress
-        (which(x = unique(x = object$donor_id_disease)  == smpl) * 100 / 
-            (unique(x = object$donor_id_disease) |>
-               length())) |>
-          round(digits = 2) |>
-          print()
-        
-        return(uri)
-        
-      }) |> 
-      (\(x)
-       x[lengths(x = x) > 0]
-      )()
-    
-  }) |>
-  unlist() |>
-  as.list()
-
-#.cells <-
-#  list.files(path = file.path(wd,"Seurat.data/RDS"),
-#             pattern = "\\.RDS$",
-#             full.names = TRUE) |>
-#  (\(x)
-#   setNames(object = x,
-#            nm = basename(path = x) |>
-#              gsub(pattern = "\\.RDS$",
-#                   replacement = "")) 
-#  )() |>
-#  as.list()
-
-# get .meta object
+# Create .meta object using new API
+# Note: We need to add the metadata columns we want to keep to the Seurat object first
 .meta <-
-  object@meta.data[,c("publication","sex","donor_id", "disease","donor_id_disease")] |>
+  tinydenseR::get.meta.Seurat5(
+    .seurat.obj = object,
+    .sample.var = "donor_id_disease",
+    .verbose = TRUE
+  )
+
+# Add additional metadata columns that we need for downstream analysis
+.meta.extra <-
+  object@meta.data[, c("publication", "sex", "donor_id", "disease", "donor_id_disease")] |>
   dplyr::distinct() |>
   (\(x)
    `rownames<-`(x = x, 
                 value = x$donor_id_disease)
-  )() |> 
+  )()
+
+.meta <- 
+  dplyr::left_join(
+    x = .meta |> 
+      dplyr::mutate(donor_id_disease = rownames(x = .meta)),
+    y = .meta.extra,
+    by = "donor_id_disease"
+  ) |>
   (\(x)
-   x[match(x = names(x = .cells),
-           table = rownames(x = x)),]
+   `rownames<-`(x = x, 
+                value = x$donor_id_disease)
   )() |>
+  dplyr::select(-donor_id_disease)
+
+# Create .cells object using new API
+# This automatically handles:
+# - Multiple BPCells layers matching "counts" pattern
+# - Gene intersection across layers
+# - Filtering samples with >= 1000 cells
+.cells <-
+  tinydenseR::get.cells.Seurat5(
+    .seurat.obj = object,
+    .meta = .meta,
+    .sample.var = "donor_id_disease",
+    .assay = "RNA",
+    .layer.pattern = "counts",
+    .min.cells.per.sample = 1000,  # Filter to samples with > 1000 cells
+    .compress = FALSE,
+    .verbose = TRUE
+  )
+
+# Subset .meta to match .cells (samples that passed filtering)
+.meta <- .meta[names(x = .cells), ] |>
   droplevels()
 
 covid.lm.cells <-
-  tinydenseR::setup.lm.obj(
-    .meta = .meta[.meta$donor_id_disease %in%
-                    (table(object$donor_id_disease) |> 
-                       (\(x)
-                        names(x = x[x > 1000])
-                       )()),],
-    .cells = .cells[.meta$donor_id_disease %in% 
-                      (table(object$donor_id_disease) |> 
-                         (\(x)
-                          names(x = x[x > 1000])
-                         )())],
+  tinydenseR::setup.tdr.obj(
+    .cells = .cells,
+    .meta = .meta,
     .harmony.var = "publication",
     .assay.type = "RNA",
-    .verbose = TRUE) |>
+    .verbose = TRUE
+  ) |>
   tinydenseR::get.landmarks(
     .verbose = TRUE)
 
 covid.lm.cells <-
   tinydenseR::get.graph(
-    .lm.obj = covid.lm.cells,
+    .tdr.obj = covid.lm.cells,
     .cl.resolution.parameter = 2,
     .verbose = TRUE)
 
 tinydenseR::plotUMAP(
-  .lm.obj = covid.lm.cells,
+  .tdr.obj = covid.lm.cells,
   .panel.size = 2
 )
 
 tinydenseR::plotPCA(
-  .lm.obj = covid.lm.cells,
+  .tdr.obj = covid.lm.cells,
   .feature = covid.lm.cells$metadata$publication[covid.lm.cells$key],
   .panel.size = 2
 )
 
 tinydenseR::plotUMAP(
-  .lm.obj = covid.lm.cells,
+  .tdr.obj = covid.lm.cells,
   .feature = covid.lm.cells$metadata$publication[covid.lm.cells$key],
   .panel.size = 2
 )
 
 covid.lm.cells <-
   tinydenseR::get.map(
-    .lm.obj = covid.lm.cells,
+    .tdr.obj = covid.lm.cells,
     .ref.obj = reference.symphony,
     .integrate.vars = "LibraryId",
     .celltype.col.name = "celltype.l2",
     .verbose = TRUE)
 
 tinydenseR::plotUMAP(
-  .lm.obj = covid.lm.cells,
+  .tdr.obj = covid.lm.cells,
   .feature = covid.lm.cells$graph$celltyping$ids,
   .panel.size = 2
 )
 
 tinydenseR::plotSamplePCA(
-  .lm.obj = covid.lm.cells,
+  .tdr.obj = covid.lm.cells,
   .labels.from = "disease",
   .point.size = 1
 )
 
 tinydenseR::plotSamplePCA(
-  .lm.obj = covid.lm.cells,
+  .tdr.obj = covid.lm.cells,
   .labels.from = "publication",
   .point.size = 1
 )
 
 tinydenseR::plotSamplePCA(
-  .lm.obj = covid.lm.cells,
+  .tdr.obj = covid.lm.cells,
   .labels.from = "sex",
   .point.size = 1
 )
 
 tinydenseR::plotSamplePCA(
-  .lm.obj = covid.lm.cells,
+  .tdr.obj = covid.lm.cells,
   .labels.from = "log10.n.cells",
   .point.size = 1
 )
@@ -556,22 +486,23 @@ disease.covid.contrasts <-
     levels = colnames(x = disease.covid.design)
   )
 
-# get stats
-disease.covid.stats.res <-
+# get stats - new API stores results in .tdr.obj$map$lm[[.model.name]]
+covid.lm.cells <-
   tinydenseR::get.lm(
-    .lm.obj = covid.lm.cells,
+    .tdr.obj = covid.lm.cells,
     .design = disease.covid.design,
     .contrasts = disease.covid.contrasts
   )
 
+# plotBeeswarm now uses .model.name to access results from .tdr.obj$map$lm
 tinydenseR::plotBeeswarm(
-    .lm.obj = covid.lm.cells,
-    .stats.obj = disease.covid.stats.res,
+    .tdr.obj = covid.lm.cells,
+    .model.name = "default",
     .coefs = "COVID.19 - normal",
     .split.by = "clustering",
     .swarm.title = "PBMC",
     .legend.position = "left",
-    .FDR = 0.1,
+    .q = 0.1,
     .perc.plot = FALSE) +
   ggplot2::theme(plot.subtitle = ggplot2::element_text(hjust = 0.5)) +
   ggplot2::labs(subtitle = "COVID.19 vs normal")

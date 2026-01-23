@@ -5,7 +5,7 @@
 \title{Summarize gene expression patterns for genes of interest}
 \usage{
 goi.summary(
-  .lm.obj,
+  .tdr.obj,
   .goi,
   .id.idx = NULL,
   .id = NULL,
@@ -14,11 +14,11 @@ goi.summary(
 )
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with \code{setup.lm.obj} and processed
+\item{.tdr.obj}{A list object initialized with \code{setup.tdr.obj} and processed
 with \code{get.graph} and \code{get.map}. Must contain RNA assay data.}
 
 \item{.goi}{Character vector of gene names to summarize. All genes must exist
-in \code{.lm.obj$raw.landmarks} column names.}
+in \code{.tdr.obj$raw.landmarks} column names.}
 
 \item{.id.idx}{Integer index of a specific landmark to analyze. If NULL (default),
 uses \code{.id} parameter or all cells. Rarely used directly.}
@@ -72,7 +72,7 @@ optionally filter to specific clusters or cell types using \code{.id} parameter.
 \examples{
 \dontrun{
 # Complete workflow with gene expression summary
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |>
   get.graph() |>
   get.map()

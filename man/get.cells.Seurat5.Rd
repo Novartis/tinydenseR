@@ -94,7 +94,7 @@ cells <- get.cells.Seurat5(.seurat.obj = seurat.obj,
                            .sample.var = "sample_id")
 
 # Use in tinydenseR workflow
-lm.obj <- setup.lm.obj(.cells = cells,
+lm.obj <- setup.tdr.obj(.cells = cells,
                        .meta = sim_trajectory.meta[c("A_R1", "B_R1"), ],
                        .assay.type = "RNA")
 }
@@ -103,5 +103,5 @@ lm.obj <- setup.lm.obj(.cells = cells,
 \seealso{
 \code{\link{get.cells}} for automatic format detection,
 \code{\link{get.cells.Seurat}} for Seurat v4 objects,
-\code{\link{setup.lm.obj}} for next workflow step
+\code{\link{setup.tdr.obj}} for next workflow step
 }

@@ -5,7 +5,7 @@
 \title{Marker Gene/Protein Identification via Pairwise Comparison}
 \usage{
 get.marker(
-  .lm.obj,
+  .tdr.obj,
   .geneset.ls = NULL,
   .id1.idx = NULL,
   .id2.idx = NULL,
@@ -15,7 +15,7 @@ get.marker(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
 
 \item{.geneset.ls}{Optional named list of character vectors defining gene sets for GSVA enrichment.
 Only for RNA data.}
@@ -99,7 +99,7 @@ meta-population
 \examples{
 \dontrun{
 # After mapping and clustering
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |> get.graph() |> get.map()
 
 # Find markers for cluster 1 vs all others

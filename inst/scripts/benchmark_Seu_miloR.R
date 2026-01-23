@@ -356,36 +356,39 @@ benchmark_tinydenseR <- function(query_obj, reference_obj, run_id, n_cells) {
   
   cat(paste("Running tinydenseR benchmark - Run", run_id, "with", format(n_cells, big.mark = ","), "cells\n"))
   
-  # Prepare data for tinydenseR
-  # Extract expression matrix and metadata
-  expr_matrix <- SeuratObject::LayerData(query_obj, assay = "RNA", layer = "counts")
-  metadata <- query_obj@meta.data
+  # Prepare data for tinydenseR using the new API
+  # get.meta.Seurat5 extracts sample-level metadata from Seurat v5 objects
+  # get.cells.Seurat5 handles layer extraction, gene intersection, and cell filtering
   
-  # Create cells list for tinydenseR
-  unique_samples <- unique(metadata$donor_id_disease)
-  cells_list <- list()
+  # Create .meta object using new API
+  .meta <-
+    tinydenseR::get.meta.Seurat5(
+      .seurat.obj = query_obj,
+      .sample.var = "donor_id_disease",
+      .verbose = TRUE
+    )
   
-  for (sample in unique_samples) {
-    sample_cells <- rownames(metadata)[metadata$donor_id_disease == sample]
-    # Save matrix to temporary file
-    temp_file <- tempfile(fileext = ".RDS")
-    sample_matrix <- as(object = expr_matrix[, sample_cells],
-                        Class = "dgCMatrix")
-    saveRDS(sample_matrix, temp_file, compress = FALSE)
-    cells_list[[sample]] <- temp_file
-    
-  }
+  # Create .cells object using new API
+  .cells <-
+    tinydenseR::get.cells.Seurat5(
+      .seurat.obj = query_obj,
+      .meta = .meta,
+      .sample.var = "donor_id_disease",
+      .assay = "RNA",
+      .layer.pattern = "counts",
+      .min.cells.per.sample = 10,
+      .compress = FALSE,
+      .verbose = TRUE
+    )
   
-  cat(paste("Selected", length(cells_list), "samples for tinydenseR analysis\n"))
+  # Subset .meta to match .cells (samples that passed filtering)
+  .meta <- .meta[names(x = .cells), ]
   
-  if (length(cells_list) < 3) {
+  cat(paste("Selected", length(.cells), "samples for tinydenseR analysis\n"))
+  
+  if (length(.cells) < 3) {
     stop("Not enough samples with sufficient cells for tinydenseR analysis")
   }
-  
-  # Create metadata for samples
-  sample_metadata <- metadata[!duplicated(metadata$donor_id_disease), ]
-  rownames(sample_metadata) <- sample_metadata$donor_id_disease
-  sample_metadata <- sample_metadata[names(cells_list),]
   
   # Use profvis to capture real-time memory usage (following original approach)
   prof_result <- 
@@ -393,9 +396,9 @@ benchmark_tinydenseR <- function(query_obj, reference_obj, run_id, n_cells) {
       profvis::profvis(expr = {
         
         # Setup landmark object with optimized parameters for large datasets
-        lm_obj <- tinydenseR::setup.lm.obj(
-          .cells = cells_list,
-          .meta = sample_metadata,
+        lm_obj <- tinydenseR::setup.tdr.obj(
+          .cells = .cells,
+          .meta = .meta,
           .harmony.var = "publication",
           .assay.type = "RNA",
           .verbose = TRUE
@@ -403,20 +406,20 @@ benchmark_tinydenseR <- function(query_obj, reference_obj, run_id, n_cells) {
         
         # Get landmarks with parameters scaled for dataset size
         lm_obj <- tinydenseR::get.landmarks(
-          .lm.obj = lm_obj, 
+          .tdr.obj = lm_obj, 
           .nHVG = 2000,
           .verbose = TRUE
         )
         
         # Get landmark graph with appropriate resolution
         lm_obj <- tinydenseR::get.graph(
-          .lm.obj = lm_obj,
+          .tdr.obj = lm_obj,
           .verbose = TRUE
         )
         
         # Map to reference
         lm_obj <- tinydenseR::get.map(
-          .lm.obj = lm_obj,
+          .tdr.obj = lm_obj,
           .ref.obj = reference_obj,
           .integrate.vars = "LibraryId",
           .celltype.col.name = "celltype.l2",
@@ -429,8 +432,8 @@ benchmark_tinydenseR <- function(query_obj, reference_obj, run_id, n_cells) {
         if (startsWith(msg, "profvis: code exited with error:")) stop(msg)
       })
   
-  # Clean up temp files
-  sapply(cells_list, function(x) if(file.exists(x)) file.remove(x))
+  # Clean up temp files created by get.cells.Seurat5
+  sapply(.cells, function(x) if(file.exists(x)) file.remove(x))
   
   # Extract timing and memory using peak_mem_profvis (more accurate than manual calculation)
   profvis_results <- peak_mem_profvis(prof_result, input = "auto", output = "MiB", verbose = FALSE)

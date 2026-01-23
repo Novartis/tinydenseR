@@ -22,23 +22,23 @@
 #' heterogeneity. Uses PCA-weighted q-values that leverage the correlation structure among 
 #' landmarks to improve statistical power.
 #'
-#' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
+#' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
 #' @param .design Design matrix specifying the experimental design. Rows correspond to samples 
-#'   (matching \code{.lm.obj$cells}), columns to coefficients. Create with \code{model.matrix()}.
+#'   (matching \code{.tdr.obj$cells}), columns to coefficients. Create with \code{model.matrix()}.
 #' @param .contrasts Optional contrast matrix for specific comparisons. Each column defines one 
 #'   contrast. Create with \code{limma::makeContrasts()}. If NULL, tests all coefficients in 
 #'   \code{.design}.
-#' @param .block Optional character: column name in \code{.lm.obj$metadata} for blocking factor 
+#' @param .block Optional character: column name in \code{.tdr.obj$metadata} for blocking factor 
 #'   (e.g., "Donor", "Batch"). Accounts for within-block correlation using \code{duplicateCorrelation}.
 #' @param .model.name Character string naming this model fit (default "default"). Results are stored 
-#'   in \code{.lm.obj$map$lm[[.model.name]]}. Use different names to store multiple model fits 
+#'   in \code{.tdr.obj$map$lm[[.model.name]]}. Use different names to store multiple model fits 
 #'   (e.g., full vs reduced models for nested model comparisons).
 #' @param .force.recalc Logical: if TRUE, overwrite existing results in the specified slot 
 #'   (default FALSE). If FALSE and slot already exists, an error is thrown.
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #' @param .seed Integer: random seed for reproducibility in blocking correlation estimation. Default 123.
 #'   
-#' @return The modified \code{.lm.obj} with results stored in \code{.lm.obj$map$lm[[.model.name]]}:
+#' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$map$lm[[.model.name]]}:
 #'   \describe{
 #'     \item{\code{fit}}{limma MArrayLM object after eBayes with moderated statistics, containing:}
 #'     \item{\code{fit$coefficients}}{Log fold changes (landmarks x coefficients), nested in fit}
@@ -104,7 +104,7 @@
 #' @examples
 #' \dontrun{
 #' # After mapping
-#' lm.obj <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#' lm.obj <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks() |> get.graph() |> get.map()
 #' 
 #' # Simple two-group comparison (results stored in lm.obj$map$lm$default)
@@ -142,7 +142,7 @@
 #'
 get.lm <-
   function(
-    .lm.obj,
+    .tdr.obj,
     .design,
     .contrasts = NULL,
     .block = NULL,
@@ -155,12 +155,12 @@ get.lm <-
     # Check if slot already exists
     # -------------------------------------------------------------------------
     
-    if(!is.null(x = .lm.obj$map$lm[[.model.name]]) && !isTRUE(x = .force.recalc)){
-      stop(paste0("Model '", .model.name, "' already exists in .lm.obj$map$lm. ",
+    if(!is.null(x = .tdr.obj$map$lm[[.model.name]]) && !isTRUE(x = .force.recalc)){
+      stop(paste0("Model '", .model.name, "' already exists in .tdr.obj$map$lm. ",
                   "Use a different .model.name or set .force.recalc = TRUE to overwrite."))
     }
     
-    if(nrow(x = .design) != length(x = .lm.obj$cells)){
+    if(nrow(x = .design) != length(x = .tdr.obj$cells)){
       stop("Number of rows in design matrix must be equal to the number of samples")
     }
     
@@ -177,10 +177,10 @@ get.lm <-
     }
     
     #	Check design (source: https://rdrr.io/bioc/edgeR/src/R/glmfit.R)
-    nlib <- length(x = .lm.obj$cells)
+    nlib <- length(x = .tdr.obj$cells)
     .design <- as.matrix(x = .design)
     if(nrow(x = .design) != nlib) {
-      stop("nrow(design) disagrees with length(x = .lm.obj$cells)")
+      stop("nrow(design) disagrees with length(x = .tdr.obj$cells)")
     }
     ne <- limma::nonEstimable(x = .design)
     if(!is.null(x = ne)) {
@@ -189,7 +189,7 @@ get.lm <-
                        collapse = " ")))
     }
     
-    if(is.null(x = .lm.obj$map)){
+    if(is.null(x = .tdr.obj$map)){
       stop("First run get.map")
     }
     
@@ -200,13 +200,13 @@ get.lm <-
         
     # Use pre-computed Y from get.map
     Y <-
-      .lm.obj$map$Y
+      .tdr.obj$map$Y
     
     #if(nrow(x = Y) !=
-    #   nrow(x = .lm.obj$landmarks)){
+    #   nrow(x = .tdr.obj$landmarks)){
     #  
     #  stats$y <-
-    #    stats$y[match(x = rownames(x = .lm.obj$landmarks),
+    #    stats$y[match(x = rownames(x = .tdr.obj$landmarks),
     #                  table = rownames(x = stats$y)),]
     #  
     #  stats$y[
@@ -215,7 +215,7 @@ get.lm <-
     #           na.rm = TRUE)
     #  
     #  rownames(x = stats$y) <-
-    #    rownames(x = .lm.obj$landmarks)
+    #    rownames(x = .tdr.obj$landmarks)
     #  
     #}
     
@@ -224,7 +224,7 @@ get.lm <-
       if(length(x = .block) != 1){
         stop("Block must be a vector of length 1")
       }
-      if(!(.block %in% colnames(x = .lm.obj$metadata))){
+      if(!(.block %in% colnames(x = .tdr.obj$metadata))){
         stop(paste0(.block,
                     " not found in metadata"))
       }
@@ -240,7 +240,7 @@ get.lm <-
       dupcor <- 
         limma::duplicateCorrelation(object = Y,
                                     design = .design,
-                                    block = .lm.obj$metadata[[.block]])
+                                    block = .tdr.obj$metadata[[.block]])
     }
     
     if(isTRUE(x = .verbose)){
@@ -250,7 +250,7 @@ get.lm <-
     stats$fit <-
       limma::lmFit(object = Y,
                    design = .design,
-                   block = if(exists(x = "dupcor")) .lm.obj$metadata[[.block]] else  NULL,
+                   block = if(exists(x = "dupcor")) .tdr.obj$metadata[[.block]] else  NULL,
                    correlation = if(exists(x = "dupcor")) dupcor$consensus else NULL)
     
     if(!is.null(x = .contrasts)){
@@ -282,7 +282,7 @@ get.lm <-
               }
               
               # use 1/sum of probabilities as the weighting for the weighted BH adjustment from Cydar
-              w <- 1 / log10(x = Matrix::rowSums(x = .lm.obj$map$fdens) + 1)
+              w <- 1 / log10(x = Matrix::rowSums(x = .tdr.obj$map$fdens) + 1)
               w[is.infinite(x = w)] <- 1
               
               # Computing a density-weighted q-value.
@@ -326,14 +326,14 @@ get.lm <-
       # and stabilizes the correlation estimates in dupCor and blocked LM
       # but keep only top k later to avoid overfitting pi0
       tX <-
-        Matrix::t(x = .lm.obj$pca$embed)
+        Matrix::t(x = .tdr.obj$pca$embed)
       
       if(!(is.null(x = .block))){
         
         if(length(x = .block) != 1){
           stop("Block must be a vector of length 1")
         }
-        if(!(.block %in% colnames(x = .lm.obj$metadata))){
+        if(!(.block %in% colnames(x = .tdr.obj$metadata))){
           stop(paste0(.block,
                       " not found in metadata"))
         }
@@ -344,14 +344,14 @@ get.lm <-
         # and healthy donors when each donor also contributes before/after treatment samples.
         dupcor.q <- 
           limma::duplicateCorrelation(object = tX,
-                                      design = stats$fit$design[.lm.obj$key,],
-                                      block = .lm.obj$metadata[[.block]][.lm.obj$key])
+                                      design = stats$fit$design[.tdr.obj$key,],
+                                      block = .tdr.obj$metadata[[.block]][.tdr.obj$key])
       }
       
       fit.q <-
         limma::lmFit(object = tX,
-                     design = stats$fit$design[.lm.obj$key,],
-                     block = if(exists(x = "dupcor.q")) .lm.obj$metadata[[.block]][.lm.obj$key] else  NULL,
+                     design = stats$fit$design[.tdr.obj$key,],
+                     block = if(exists(x = "dupcor.q")) .tdr.obj$metadata[[.block]][.tdr.obj$key] else  NULL,
                      correlation = if(exists(x = "dupcor.q")) dupcor.q$consensus else NULL)
       
       # we only need residuals that remove all design effects, so
@@ -374,7 +374,7 @@ get.lm <-
         (\(x)
          # keep only top k PCs that capture most variation
          # to avoid overfitting pi0 later
-         x[,1:elbow.sec.deriv(x = .lm.obj$pca$sdev,
+         x[,1:elbow.sec.deriv(x = .tdr.obj$pca$sdev,
                               sort.order = "desc")$index,
            drop=FALSE]
         )()
@@ -518,7 +518,7 @@ get.lm <-
       if(length(x = .block) != 1){
         stop("Block must be a vector of length 1")
       }
-      if(!(.block %in% colnames(x = .lm.obj$metadata))){
+      if(!(.block %in% colnames(x = .tdr.obj$metadata))){
         stop(paste0(.block,
                     " not found in metadata"))
       }
@@ -528,10 +528,10 @@ get.lm <-
       }
       
       cl.dupcor <- 
-        log2(x = .lm.obj$map$clustering$cell.perc + 0.5) |>
+        log2(x = .tdr.obj$map$clustering$cell.perc + 0.5) |>
         Matrix::t() |>
         limma::duplicateCorrelation(design = .design,
-                                    block = .lm.obj$metadata[[.block]])
+                                    block = .tdr.obj$metadata[[.block]])
     }
     
     if(isTRUE(x = .verbose)){
@@ -539,10 +539,10 @@ get.lm <-
     }
     
     stats$trad$clustering$fit <-
-      limma::lmFit(object = log2(x = .lm.obj$map$clustering$cell.perc + 0.5) |>
+      limma::lmFit(object = log2(x = .tdr.obj$map$clustering$cell.perc + 0.5) |>
                      Matrix::t(),
                    design = .design,
-                   block = if(exists(x = "cl.dupcor")) .lm.obj$metadata[[.block]] else NULL,
+                   block = if(exists(x = "cl.dupcor")) .tdr.obj$metadata[[.block]] else NULL,
                    correlation = if(exists(x = "cl.dupcor")) cl.dupcor$consensus else NULL)
     
     if(!is.null(x = .contrasts)){
@@ -562,14 +562,14 @@ get.lm <-
             FUN = stats::p.adjust,
             method = "fdr")
     
-    if(!is.null(x = .lm.obj$graph$celltyping)){
+    if(!is.null(x = .tdr.obj$graph$celltyping)){
       
       if(!(is.null(x = .block))){
         
         if(length(x = .block) != 1){
           stop("Block must be a vector of length 1")
         }
-        if(!(.block %in% colnames(x = .lm.obj$metadata))){
+        if(!(.block %in% colnames(x = .tdr.obj$metadata))){
           stop(paste0(.block,
                       " not found in metadata"))
         }
@@ -579,10 +579,10 @@ get.lm <-
         }
         
         ct.dupcor <- 
-          log2(x = .lm.obj$map$celltyping$cell.perc + 0.5) |>
+          log2(x = .tdr.obj$map$celltyping$cell.perc + 0.5) |>
           Matrix::t() |>
           limma::duplicateCorrelation(design = .design,
-                                      block = .lm.obj$metadata[[.block]])
+                                      block = .tdr.obj$metadata[[.block]])
       }
       
       if(isTRUE(x = .verbose)){
@@ -590,10 +590,10 @@ get.lm <-
       }
       
       stats$trad$celltyping$fit <-
-        limma::lmFit(object = log2(x = .lm.obj$map$celltyping$cell.perc + 0.5) |>
+        limma::lmFit(object = log2(x = .tdr.obj$map$celltyping$cell.perc + 0.5) |>
                        Matrix::t(),
                      design = .design,
-                     block = if(exists(x = "ct.dupcor")) .lm.obj$metadata[[.block]] else NULL,
+                     block = if(exists(x = "ct.dupcor")) .tdr.obj$metadata[[.block]] else NULL,
                      correlation = if(exists(x = "ct.dupcor")) ct.dupcor$consensus else NULL)
       
       if(!is.null(x = .contrasts)){
@@ -616,22 +616,22 @@ get.lm <-
     }
     
     # -------------------------------------------------------------------------
-    # Store results and return modified .lm.obj
+    # Store results and return modified .tdr.obj
     # -------------------------------------------------------------------------
     
     # Initialize stats slot if needed
-    if(is.null(x = .lm.obj$map$lm)){
-      .lm.obj$map$lm <- list()
+    if(is.null(x = .tdr.obj$map$lm)){
+      .tdr.obj$map$lm <- list()
     }
     
     # Store results under the model name
-    .lm.obj$map$lm[[.model.name]] <- stats
+    .tdr.obj$map$lm[[.model.name]] <- stats
     
     if(isTRUE(x = .verbose)){
-      message("\nResults stored in: .lm.obj$map$lm$", .model.name)
+      message("\nResults stored in: .tdr.obj$map$lm$", .model.name)
     }
     
-    return(.lm.obj)
+    return(.tdr.obj)
     
   }
 
@@ -642,11 +642,11 @@ get.lm <-
 #' restrict analysis to specific clusters/cell types, and optionally perform gene set enrichment 
 #' via GSVA.
 #'
-#' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
+#' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
 #' @param .design Design matrix specifying experimental design. Rows = samples, columns = coefficients.
 #' @param .contrasts Optional contrast matrix for specific comparisons. Create with 
 #'   \code{limma::makeContrasts()}. If NULL, tests all \code{.design} coefficients.
-#' @param .block Optional character: column name in \code{.lm.obj$metadata} for blocking factor 
+#' @param .block Optional character: column name in \code{.tdr.obj$metadata} for blocking factor 
 #'   (e.g., "Donor"). Accounts for within-block correlation.
 #' @param .geneset.ls Optional named list of character vectors defining gene sets for GSVA enrichment 
 #'   analysis. Only for RNA data. Example: \code{list("Tcell" = c("CD3D", "CD3E"), "Bcell" = c("CD19", "MS4A1"))}.
@@ -713,7 +713,7 @@ get.lm <-
 #' @examples
 #' \dontrun{
 #' # After mapping
-#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks() |> get.graph() |> get.map()
 #' 
 #' # DE analysis on all cells
@@ -739,7 +739,7 @@ get.lm <-
 #'
 get.dea <-
   function(
-    .lm.obj,
+    .tdr.obj,
     .design,
     .contrasts = NULL,
     .block = NULL,
@@ -751,14 +751,14 @@ get.dea <-
   ) {
     
     if(!is.null(x = .geneset.ls)){
-      if(.lm.obj$assay.type != "RNA"){
+      if(.tdr.obj$assay.type != "RNA"){
         stop(".geneset.ls is only supported for RNA assay type")
       } else if(!is.list(x = .geneset.ls)){
         stop(".geneset.ls must be a list of character vectors")
       }
     } 
     
-    if(nrow(x = .design) != length(x = .lm.obj$cells)){
+    if(nrow(x = .design) != length(x = .tdr.obj$cells)){
       stop("Number of rows in design matrix must be equal to the number of samples")
     }
     
@@ -774,10 +774,10 @@ get.dea <-
     }
     
     #	Check design (source: https://rdrr.io/bioc/edgeR/src/R/glmfit.R)
-    nlib <- length(x = .lm.obj$cells)
+    nlib <- length(x = .tdr.obj$cells)
     .design <- as.matrix(x = .design)
     if(nrow(x = .design) != nlib) {
-      stop("nrow(design) disagrees with length(x = .lm.obj$cells)")
+      stop("nrow(design) disagrees with length(x = .tdr.obj$cells)")
     }
     ne <- limma::nonEstimable(x = .design)
     if(!is.null(x = ne)) {
@@ -795,9 +795,9 @@ get.dea <-
                     choices = c("clustering",
                                 "celltyping"))
         
-        if(!all(.id %in% unique(x = .lm.obj$graph[[.id.from]]$ids))){
+        if(!all(.id %in% unique(x = .tdr.obj$graph[[.id.from]]$ids))){
           
-          stop(paste0(paste0(.id[!(.id %in% unique(x = .lm.obj$graph[[.id.from]]$ids))],
+          stop(paste0(paste0(.id[!(.id %in% unique(x = .tdr.obj$graph[[.id.from]]$ids))],
                              collapse = ", "),
                       " not found in ",
                       .id.from))
@@ -805,20 +805,20 @@ get.dea <-
         }
         
         .lm.idx <-
-          which(x = .lm.obj$graph[[.id.from]]$ids %in% .id)
+          which(x = .tdr.obj$graph[[.id.from]]$ids %in% .id)
 
       } else {
         
         .lm.idx <-
-          nrow(x = .lm.obj$landmarks) |>
+          nrow(x = .tdr.obj$landmarks) |>
           seq_len()
         
       }
     } else {
       
-      if(!all(.id.idx %in% (nrow(x = .lm.obj$landmarks) |> seq_len()))) {
+      if(!all(.id.idx %in% (nrow(x = .tdr.obj$landmarks) |> seq_len()))) {
         stop(paste0(".id.idx must be a list of integer vectors from  1 to ",
-                    nrow(x = .lm.obj$landmarks)))
+                    nrow(x = .tdr.obj$landmarks)))
       }
       
       .lm.idx <-
@@ -828,7 +828,7 @@ get.dea <-
     
     # number of cells in each pseudobulk
     n.pseudo <-
-      lapply(X = .lm.obj$map$nearest.landmarks,
+      lapply(X = .tdr.obj$map$nearest.landmarks,
              FUN = function(smpl){
                sum(smpl[,1,drop = TRUE] %in% .lm.idx)
              }) |>
@@ -839,7 +839,7 @@ get.dea <-
       (n.pseudo / mean(x = n.pseudo)) < 0.1
     
     # get pseudobulk
-    if(.lm.obj$assay.type == "RNA"){
+    if(.tdr.obj$assay.type == "RNA"){
       
       if(any(smpl.outlier)){
         warning(paste0("The following samples were removed since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
@@ -848,15 +848,15 @@ get.dea <-
       }
       
       counts <-
-        stats::setNames(object = names(x = .lm.obj$cells)[!smpl.outlier],
-                        nm = names(x = .lm.obj$cells)[!smpl.outlier]) |>
+        stats::setNames(object = names(x = .tdr.obj$cells)[!smpl.outlier],
+                        nm = names(x = .tdr.obj$cells)[!smpl.outlier]) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .lm.obj$cells[[smpl]])
+            readRDS(file = .tdr.obj$cells[[smpl]])
           
           wcl <- 
-            .lm.obj$map$connect.prob[[smpl]][,.lm.idx,drop = FALSE]
+            .tdr.obj$map$connect.prob[[smpl]][,.lm.idx,drop = FALSE]
           
           # get weighted sum
           wsum <-
@@ -900,7 +900,7 @@ get.dea <-
         if(length(x = .block) != 1){
           stop("Block must be a vector of length 1")
         }
-        if(!(.block %in% colnames(x = .lm.obj$metadata))){
+        if(!(.block %in% colnames(x = .tdr.obj$metadata))){
           stop(paste0(.block,
                       " not found in metadata"))
         }
@@ -916,7 +916,7 @@ get.dea <-
         dupcor <- 
           limma::duplicateCorrelation(object = v,
                                       design = tmp.design,
-                                      block = .lm.obj$metadata[[.block]][!smpl.outlier])
+                                      block = .tdr.obj$metadata[[.block]][!smpl.outlier])
       }
       
       if(isTRUE(x = .verbose)){
@@ -926,7 +926,7 @@ get.dea <-
       .de <-
         limma::lmFit(object = v,
                      design = tmp.design,
-                     block = if(exists(x = "dupcor")) .lm.obj$metadata[[.block]][!smpl.outlier] else  NULL,
+                     block = if(exists(x = "dupcor")) .tdr.obj$metadata[[.block]][!smpl.outlier] else  NULL,
                      correlation = if(exists(x = "dupcor")) dupcor$consensus else NULL)
       
       if(!is.null(x = .contrasts)){
@@ -976,13 +976,13 @@ get.dea <-
           gsva.dupcor <- 
             limma::duplicateCorrelation(object = gsva.es,
                                         design = tmp.design,
-                                        block = .lm.obj$metadata[[.block]][!smpl.outlier])
+                                        block = .tdr.obj$metadata[[.block]][!smpl.outlier])
         }
         
         gsva.fit <- 
           limma::lmFit(object = gsva.es,
                        design = tmp.design,
-                       block = if(exists(x = "gsva.dupcor")) .lm.obj$metadata[[.block]][!smpl.outlier] else  NULL,
+                       block = if(exists(x = "gsva.dupcor")) .tdr.obj$metadata[[.block]][!smpl.outlier] else  NULL,
                        correlation = if(exists(x = "gsva.dupcor")) gsva.dupcor$consensus else NULL)
         
         if(!is.null(x = .contrasts)){
@@ -1014,18 +1014,18 @@ get.dea <-
     } else {
       
       counts <-
-        stats::setNames(object = names(x = .lm.obj$cells),#[!smpl.outlier],
-                        nm = names(x = .lm.obj$cells)) |>#[!smpl.outlier]) |>
+        stats::setNames(object = names(x = .tdr.obj$cells),#[!smpl.outlier],
+                        nm = names(x = .tdr.obj$cells)) |>#[!smpl.outlier]) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .lm.obj$cells[[smpl]])
+            readRDS(file = .tdr.obj$cells[[smpl]])
           
           exprs.mat <-
-            exprs.mat[,colnames(x = .lm.obj$landmarks)]
+            exprs.mat[,colnames(x = .tdr.obj$landmarks)]
           
           wcl <- 
-            .lm.obj$map$connect.prob[[smpl]][,.lm.idx,drop=FALSE]
+            .tdr.obj$map$connect.prob[[smpl]][,.lm.idx,drop=FALSE]
           
           # get weighted sum
           wsum <-
@@ -1051,7 +1051,7 @@ get.dea <-
         if(length(x = .block) != 1){
           stop("Block must be a vector of length 1")
         }
-        if(!(.block %in% colnames(x = .lm.obj$metadata))){
+        if(!(.block %in% colnames(x = .tdr.obj$metadata))){
           stop(paste0(.block,
                       " not found in metadata"))
         }
@@ -1067,7 +1067,7 @@ get.dea <-
         dupcor <- 
           limma::duplicateCorrelation(object = Matrix::t(x = counts),
                                       design = tmp.design,
-                                      block = .lm.obj$metadata[[.block]])#[!smpl.outlier])
+                                      block = .tdr.obj$metadata[[.block]])#[!smpl.outlier])
       }
       
       if(isTRUE(x = .verbose)){
@@ -1077,7 +1077,7 @@ get.dea <-
       .de <-
         limma::lmFit(object = Matrix::t(x = counts),
                      design = tmp.design,
-                     block = if(exists(x = "dupcor")) .lm.obj$metadata[[.block]] else  NULL,#[!smpl.outlier] else  NULL,
+                     block = if(exists(x = "dupcor")) .tdr.obj$metadata[[.block]] else  NULL,#[!smpl.outlier] else  NULL,
                      correlation = if(exists(x = "dupcor")) dupcor$consensus else NULL)
       
       if(!is.null(x = .contrasts)){
@@ -1126,7 +1126,7 @@ get.dea <-
 #' experimental conditions, this compares cell populations to find defining features. Useful for 
 #' characterizing clusters and validating cell type annotations.
 #'
-#' @param .lm.obj A tinydenseR object processed through \code{get.map()}.
+#' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
 #' @param .geneset.ls Optional named list of character vectors defining gene sets for GSVA enrichment. 
 #'   Only for RNA data.
 #' @param .id1.idx Optional list of integer vectors specifying landmark indices for group 1. If 
@@ -1200,7 +1200,7 @@ get.dea <-
 #' @examples
 #' \dontrun{
 #' # After mapping and clustering
-#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks() |> get.graph() |> get.map()
 #' 
 #' # Find markers for cluster 1 vs all others
@@ -1234,7 +1234,7 @@ get.dea <-
 #'
 get.marker <-
   function(
-    .lm.obj,
+    .tdr.obj,
     .geneset.ls = NULL,
     .id1.idx = NULL,
     .id2.idx = NULL,
@@ -1244,7 +1244,7 @@ get.marker <-
   ) {
     
     if(!is.null(x = .geneset.ls)){
-      if(.lm.obj$assay.type != "RNA"){
+      if(.tdr.obj$assay.type != "RNA"){
         stop(".geneset.ls is only supported for RNA assay type")
       } else if(!is.list(x = .geneset.ls)){
         stop(".geneset.ls must be a list of character vectors")
@@ -1267,9 +1267,9 @@ get.marker <-
     }
     
     if(is.null(x = .id1.idx)){
-      if(!all(.id1 %in% unique(x = .lm.obj$graph[[.id.from]]$ids))){
+      if(!all(.id1 %in% unique(x = .tdr.obj$graph[[.id.from]]$ids))){
         
-        stop(paste0(paste0(.id1[!(.id1 %in% unique(x = .lm.obj$graph[[.id.from]]$ids))],
+        stop(paste0(paste0(.id1[!(.id1 %in% unique(x = .tdr.obj$graph[[.id.from]]$ids))],
                            collapse = ", "),
                     " not found in ",
                     .id.from))
@@ -1279,11 +1279,11 @@ get.marker <-
     
     if(is.null(x = .id2.idx)){
       if(!all(.id2 %in% c("..all.other.landmarks..",
-                          unique(x = .lm.obj$graph[[.id.from]]$ids) |>
+                          unique(x = .tdr.obj$graph[[.id.from]]$ids) |>
                           as.character()))){
         
         stop(paste0(paste0(.id2[!(.id2 %in% c("..all.other.landmarks..",
-                                              unique(x = .lm.obj$graph[[.id.from]]$ids) |>
+                                              unique(x = .tdr.obj$graph[[.id.from]]$ids) |>
                                                 as.character()))],
                            collapse = ", "),
                     " not found in ",
@@ -1295,13 +1295,13 @@ get.marker <-
     if(is.null(x = .id1.idx)){
       
       .lm1.idx <-
-        which(x = .lm.obj$graph[[.id.from]]$ids %in% .id1)
+        which(x = .tdr.obj$graph[[.id.from]]$ids %in% .id1)
       
     } else {
       
-      if(!all(.id1.idx %in% (nrow(x = .lm.obj$landmarks) |> seq_len()))) {
+      if(!all(.id1.idx %in% (nrow(x = .tdr.obj$landmarks) |> seq_len()))) {
         stop(paste0(".id1.idx must be a list of integer vectors from  1 to ",
-                    nrow(x = .lm.obj$landmarks)))
+                    nrow(x = .tdr.obj$landmarks)))
       }
       
       .lm1.idx <-
@@ -1316,20 +1316,20 @@ get.marker <-
       .id2 <- "..all.other.landmarks.."
       
       .lm2.idx <-
-        which(x = !(.lm.obj$graph[[.id.from]]$ids %in% .id1))
+        which(x = !(.tdr.obj$graph[[.id.from]]$ids %in% .id1))
       
     } else {
       
       if(is.null(x = .id2.idx)){
         
         .lm2.idx <-
-          which(x = .lm.obj$graph[[.id.from]]$ids %in% .id2)
+          which(x = .tdr.obj$graph[[.id.from]]$ids %in% .id2)
         
       } else {
         
-        if(!all(.id2.idx %in% (nrow(x = .lm.obj$landmarks) |> seq_len()))) {
+        if(!all(.id2.idx %in% (nrow(x = .tdr.obj$landmarks) |> seq_len()))) {
           stop(paste0(".id2.idx must be a list of integer vectors from  1 to ",
-                      nrow(x = .lm.obj$landmarks)))
+                      nrow(x = .tdr.obj$landmarks)))
         }
         
         .lm2.idx <-
@@ -1341,14 +1341,14 @@ get.marker <-
     
     # number of cells in each .id1 and .id2 pseudobulks
     n.pseudo1 <-
-      lapply(X = .lm.obj$map$nearest.landmarks,
+      lapply(X = .tdr.obj$map$nearest.landmarks,
              FUN = function(smpl){
                sum(smpl[,1,drop = TRUE] %in% .lm1.idx)
              }) |>
       unlist()
     
     n.pseudo2 <-
-      lapply(X = .lm.obj$map$nearest.landmarks,
+      lapply(X = .tdr.obj$map$nearest.landmarks,
              FUN = function(smpl){
                sum(smpl[,1,drop = TRUE] %in% .lm2.idx)
              }) |>
@@ -1366,7 +1366,7 @@ get.marker <-
                     n.pseudo2))) < 0.1
     
     # get pseudobulk
-    if(.lm.obj$assay.type == "RNA"){
+    if(.tdr.obj$assay.type == "RNA"){
       
       if(any(smpl.outlier.1)){
         warning(paste0("The following samples were removed from .id1 since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
@@ -1381,19 +1381,19 @@ get.marker <-
       }
       
       counts1 <-
-        stats::setNames(object = names(x = .lm.obj$cells)[!smpl.outlier.1],
-                        nm = names(x = .lm.obj$cells)[!smpl.outlier.1]) |>
+        stats::setNames(object = names(x = .tdr.obj$cells)[!smpl.outlier.1],
+                        nm = names(x = .tdr.obj$cells)[!smpl.outlier.1]) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .lm.obj$cells[[smpl]])
+            readRDS(file = .tdr.obj$cells[[smpl]])
           
           res <-
             tryCatch(
               expr = {
                 
                 wcl <- 
-                  .lm.obj$map$connect.prob[[smpl]][,.lm1.idx,drop = FALSE]
+                  .tdr.obj$map$connect.prob[[smpl]][,.lm1.idx,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -1425,19 +1425,19 @@ get.marker <-
         )()
       
       counts2 <-
-        stats::setNames(object = names(x = .lm.obj$cells)[!smpl.outlier.2],
-                        nm = names(x = .lm.obj$cells)[!smpl.outlier.2]) |>
+        stats::setNames(object = names(x = .tdr.obj$cells)[!smpl.outlier.2],
+                        nm = names(x = .tdr.obj$cells)[!smpl.outlier.2]) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .lm.obj$cells[[smpl]])
+            readRDS(file = .tdr.obj$cells[[smpl]])
           
           res <-
             tryCatch(
               expr = {
                 
                 wcl <- 
-                  .lm.obj$map$connect.prob[[smpl]][,.lm2.idx,drop = FALSE]
+                  .tdr.obj$map$connect.prob[[smpl]][,.lm2.idx,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -1571,22 +1571,22 @@ get.marker <-
     } else {
       
       counts1 <-
-        stats::setNames(object = names(x = .lm.obj$cells),
-                        nm = names(x = .lm.obj$cells)) |>
+        stats::setNames(object = names(x = .tdr.obj$cells),
+                        nm = names(x = .tdr.obj$cells)) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .lm.obj$cells[[smpl]])
+            readRDS(file = .tdr.obj$cells[[smpl]])
           
           exprs.mat <-
-            exprs.mat[,colnames(x = .lm.obj$landmarks)]
+            exprs.mat[,colnames(x = .tdr.obj$landmarks)]
           
           res <-
             tryCatch(
               expr = {
                 
                 wcl <- 
-                  .lm.obj$map$connect.prob[[smpl]][,.lm1.idx,drop = FALSE]
+                  .tdr.obj$map$connect.prob[[smpl]][,.lm1.idx,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -1618,22 +1618,22 @@ get.marker <-
         )()
       
       counts2 <-
-        stats::setNames(object = names(x = .lm.obj$cells),
-                        nm = names(x = .lm.obj$cells)) |>
+        stats::setNames(object = names(x = .tdr.obj$cells),
+                        nm = names(x = .tdr.obj$cells)) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .lm.obj$cells[[smpl]])
+            readRDS(file = .tdr.obj$cells[[smpl]])
           
           exprs.mat <-
-            exprs.mat[,colnames(x = .lm.obj$landmarks)]
+            exprs.mat[,colnames(x = .tdr.obj$landmarks)]
           
           res <-
             tryCatch(
               expr = {
                 
                 wcl <- 
-                  .lm.obj$map$connect.prob[[smpl]][,.lm2.idx,drop = FALSE]
+                  .tdr.obj$map$connect.prob[[smpl]][,.lm2.idx,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -1748,7 +1748,7 @@ get.marker <-
 #' @keywords internal
 .compute.unsupervised.embeddings <-
   function(
-    .lm.obj,
+    .tdr.obj,
     .n.eigs = 20,
     .n.pcs = 20,
     .dist.metric = "cosine",
@@ -1756,23 +1756,23 @@ get.marker <-
   ){
     
     # Initialize embedding slot if not present
-    if(is.null(x = .lm.obj$map$embedding)){
-      .lm.obj$map$embedding <- list()
+    if(is.null(x = .tdr.obj$map$embedding)){
+      .tdr.obj$map$embedding <- list()
     }
     
     # -------------------------------------------------------------------------
     # Compute PCA if not already present
     # -------------------------------------------------------------------------
     
-    if(is.null(x = .lm.obj$map$embedding$pca)){
+    if(is.null(x = .tdr.obj$map$embedding$pca)){
       
       if(isTRUE(x = .verbose)){
         message("\nComputing sample-level PCA on landmark densities")
       }
       
-      # Compute PCA via irlba (samples as rows, using .lm.obj$map$Y)
+      # Compute PCA via irlba (samples as rows, using .tdr.obj$map$Y)
       pca.res <-
-        Matrix::t(x = .lm.obj$map$Y) |>
+        Matrix::t(x = .tdr.obj$map$Y) |>
         (\(x)
          irlba::prcomp_irlba(
            x = x,
@@ -1786,7 +1786,7 @@ get.marker <-
       # coord = embedding coordinates (samples x PCs), 
       # rotation = loadings (landmarks x PCs),
       # center, scale, sdev
-      .lm.obj$map$embedding$pca <- list(
+      .tdr.obj$map$embedding$pca <- list(
         coord = pca.res$x,
         rotation = pca.res$rotation,
         center = pca.res$center,
@@ -1795,8 +1795,8 @@ get.marker <-
       )
       
       # Set column names for coord
-      colnames(x = .lm.obj$map$embedding$pca$coord) <- 
-        paste0("PC", seq_len(length.out = ncol(x = .lm.obj$map$embedding$pca$coord)))
+      colnames(x = .tdr.obj$map$embedding$pca$coord) <- 
+        paste0("PC", seq_len(length.out = ncol(x = .tdr.obj$map$embedding$pca$coord)))
       
       if(isTRUE(x = .verbose)){
         var.explained <- round(100 * pca.res$sdev^2 / sum(pca.res$sdev^2), 1)
@@ -1816,7 +1816,7 @@ get.marker <-
     # Compute diffusion map trajectory (traj) if not already present
     # -------------------------------------------------------------------------
     
-    if(is.null(x = .lm.obj$map$embedding$traj)){
+    if(is.null(x = .tdr.obj$map$embedding$traj)){
       
       if(isTRUE(x = .verbose)){
         message("\nComputing diffusion map trajectory embedding")
@@ -1828,12 +1828,12 @@ get.marker <-
                 "Install with BiocManager::install('destiny'). ",
                 "Skipping trajectory computation.",
                 call. = FALSE)
-        return(.lm.obj)
+        return(.tdr.obj)
       }
       
       # Compute diffusion map on transposed Y (samples as rows)
       traj.res <- 
-        Matrix::t(x = .lm.obj$map$Y) |>
+        Matrix::t(x = .tdr.obj$map$Y) |>
         (\(x)
         destiny::DiffusionMap(
           data = x,
@@ -1859,10 +1859,10 @@ get.marker <-
         paste0("DC", seq_len(length.out = ncol(x = traj.coord)))
       
       rownames(x = traj.coord) <- 
-        rownames(x = .lm.obj$metadata)
+        rownames(x = .tdr.obj$metadata)
       
       # Store in format similar to pca slot
-      .lm.obj$map$embedding$traj <- list(
+      .tdr.obj$map$embedding$traj <- list(
         coord = traj.coord,
         eigenvalues = traj.res@eigenvalues,
         eigenvectors = traj.res@eigenvectors,
@@ -1881,7 +1881,7 @@ get.marker <-
       
     }
     
-    return(.lm.obj)
+    return(.tdr.obj)
     
   }
 
@@ -1889,20 +1889,20 @@ get.marker <-
 #'
 #' Computes embeddings for sample-level visualization. When called without supervised
 #' arguments, computes unsupervised embeddings (PCA and diffusion map trajectory) on
-#' landmark densities stored in \code{.lm.obj$map$Y}. When called with supervised arguments 
+#' landmark densities stored in \code{.tdr.obj$map$Y}. When called with supervised arguments 
 #' (\code{.contrast.of.interest} or \code{.red.model}), additionally computes a 
 #' partial-effect PCA (pePC) that isolates variation attributable to a specific effect. 
 #' Exact for OLS; if duplicateCorrelation/blocking is used, the decomposition is approximate.
 #'
-#' @param .lm.obj The tinydenseR object processed through \code{get.map()}. Contains
+#' @param .tdr.obj The tinydenseR object processed through \code{get.map()}. Contains
 #'   \code{$map$Y} (log2-transformed densities) used for unsupervised embeddings. Statistical
 #'   model fits should be stored in \code{$map$lm} via \code{get.lm()}.
-#' @param .full.model Character string naming the full model in \code{.lm.obj$map$lm}
+#' @param .full.model Character string naming the full model in \code{.tdr.obj$map$lm}
 #'   (default "default"). Required only when computing supervised embeddings (pePC).
 #' @param .term.of.interest Character string: the covariate/term being isolated when using the 
 #'   nested model method (\code{.red.model}). Must match a column name in 
-#'   \code{.lm.obj$metadata}. Ignored when using \code{.contrast.of.interest}.
-#' @param .red.model Optional character string naming the reduced model in \code{.lm.obj$map$lm}
+#'   \code{.tdr.obj$metadata}. Ignored when using \code{.contrast.of.interest}.
+#' @param .red.model Optional character string naming the reduced model in \code{.tdr.obj$map$lm}
 #'   (without the effect of interest). If provided, computes 
 #'   \eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}} directly. Make sure to construct
 #'   nested models by “dropping terms” (so reduced is a strict subset of full)!
@@ -1914,7 +1914,7 @@ get.marker <-
 #' @param .dist.metric Character: distance metric for diffusion map (default "cosine").
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #'
-#' @return Modified \code{.lm.obj} with embeddings stored in \code{.lm.obj$map$embedding}:
+#' @return Modified \code{.tdr.obj} with embeddings stored in \code{.tdr.obj$map$embedding}:
 #'   \describe{
 #'     \item{\code{pca}}{Unsupervised PCA on log-transformed landmark densities:
 #'       \itemize{
@@ -1944,15 +1944,14 @@ get.marker <-
 #'
 #' @details
 #' \strong{Unsupervised Embeddings (always computed):}
-#'
-#' \code{pca}: Standard PCA on log2-transformed landmark densities (log2(fdens + 0.5)),
-
-#' filtered to remove zero-variance landmarks, centered and scaled.
-#'
-#' \code{traj}: Diffusion map trajectory computed via \code{destiny::DiffusionMap} on
-#' the raw landmark density matrix. Useful for visualizing continuous trajectories.
-#'
-#' \strong{Supervised Embedding (pePC, when .contrast.of.interest or .red.model provided):}
+#
+# \code{pca}: Standard PCA on log2-transformed landmark densities (log2(fdens + 0.5)),
+# centered and scaled.
+#
+# \code{traj}: Diffusion map trajectory computed via \code{destiny::DiffusionMap} on
+# the log2-transformed landmark density matrix. Useful for visualizing continuous trajectories.
+#
+# \strong{Supervised Embedding (pePC, when .contrast.of.interest or .red.model provided):}
 #'
 #' \strong{Method 1: FWL-based contrast extraction} (when \code{.contrast.of.interest} is provided)
 #'
@@ -2003,7 +2002,7 @@ get.marker <-
 #' # ===========================================================================
 #' 
 #' # After get.map, compute unsupervised embeddings
-#' lm.obj <- get.embedding(.lm.obj = lm.obj)
+#' lm.obj <- get.embedding(.tdr.obj = lm.obj)
 #' 
 #' # Access unsupervised embeddings
 #' lm.obj$map$embedding$pca$coord   # sample PCA coordinates
@@ -2020,18 +2019,18 @@ get.marker <-
 #' # Fit full model with disease effect (stored as "full")
 #' .design <- model.matrix(object = ~ disease + sex + age,
 #'                         data = lm.obj$metadata)
-#' lm.obj <- get.lm(.lm.obj = lm.obj, .design = .design, 
+#' lm.obj <- get.lm(.tdr.obj = lm.obj, .design = .design, 
 #'                     .model.name = "full")
 #' 
 #' # Fit reduced model without disease (stored as "reduced")
 #' .red.design <- model.matrix(object = ~ sex + age,
 #'                             data = lm.obj$metadata)
-#' lm.obj <- get.lm(.lm.obj = lm.obj, .design = .red.design, 
+#' lm.obj <- get.lm(.tdr.obj = lm.obj, .design = .red.design, 
 #'                     .model.name = "reduced")
 #' 
 #' # Extract disease effect embedding (all stored in lm.obj)
 #' lm.obj <- get.embedding(
-#'     .lm.obj = lm.obj,
+#'     .tdr.obj = lm.obj,
 #'     .full.model = "full",
 #'     .term.of.interest = "disease",
 #'     .red.model = "reduced"
@@ -2077,7 +2076,7 @@ get.marker <-
 #'
 get.embedding <-
   function(
-    .lm.obj,
+    .tdr.obj,
     .full.model = "default",
     .term.of.interest = NULL,
     .red.model = NULL,
@@ -2092,9 +2091,9 @@ get.embedding <-
     # Input validation
     # -------------------------------------------------------------------------
     
-    # Check that .lm.obj has map$Y
-    if(is.null(x = .lm.obj$map$Y)){
-      stop("'.lm.obj$map$Y' not found. Run get.map() first.")
+    # Check that .tdr.obj has map$Y
+    if(is.null(x = .tdr.obj$map$Y)){
+      stop("'.tdr.obj$map$Y' not found. Run get.map() first.")
     }
     
     # Determine if this is unsupervised-only mode (no pePC args provided)
@@ -2104,8 +2103,8 @@ get.embedding <-
     # If supervised args provided, require the full model to exist
     if(!unsupervised.only){
       
-      if(is.null(x = .lm.obj$map$lm[[.full.model]])){
-        stop(paste0("Model '", .full.model, "' not found in .lm.obj$map$lm. ",
+      if(is.null(x = .tdr.obj$map$lm[[.full.model]])){
+        stop(paste0("Model '", .full.model, "' not found in .tdr.obj$map$lm. ",
                     "Run get.lm() first, or omit '.contrast.of.interest'/'.red.model' for unsupervised-only."))
       }
       
@@ -2120,29 +2119,29 @@ get.embedding <-
     }
     
     # Reference the stats object for convenience
-    .stats.obj <- .lm.obj$map$lm[[.full.model]]
+    .stats.obj <- .tdr.obj$map$lm[[.full.model]]
     
     # -------------------------------------------------------------------------
-    # Compute unsupervised embeddings (pca, traj) - stored in .lm.obj$map$embedding
+    # Compute unsupervised embeddings (pca, traj) - stored in .tdr.obj$map$embedding
     # -------------------------------------------------------------------------
     
-    .lm.obj <- 
+    .tdr.obj <- 
       .compute.unsupervised.embeddings(
-        .lm.obj = .lm.obj,
+        .tdr.obj = .tdr.obj,
         .n.eigs = .n.eigs,
         .n.pcs = .n.pcs,
         .dist.metric = .dist.metric,
         .verbose = .verbose
       )
     
-    # If no supervised args provided, return .lm.obj with unsupervised embeddings
+    # If no supervised args provided, return .tdr.obj with unsupervised embeddings
     if(unsupervised.only){
       
       if(isTRUE(x = .verbose)){
-        message("\nNo supervised embedding args provided. Returning .lm.obj with unsupervised embeddings.")
+        message("\nNo supervised embedding args provided. Returning .tdr.obj with unsupervised embeddings.")
       }
       
-      return(.lm.obj)
+      return(.tdr.obj)
       
     }
     
@@ -2166,9 +2165,9 @@ get.embedding <-
         stop("'.term.of.interest' must be a single character string when using nested model method")
         
       }
-      if(!(.term.of.interest %in% colnames(x = .lm.obj$metadata))){
+      if(!(.term.of.interest %in% colnames(x = .tdr.obj$metadata))){
         
-        stop("'.term.of.interest' must be a column name of '.lm.obj$metadata'")
+        stop("'.term.of.interest' must be a column name of '.tdr.obj$metadata'")
         
       }
       
@@ -2239,9 +2238,9 @@ get.embedding <-
         }
       }
       
-      # Get the expression matrix Y (landmarks x samples) from .lm.obj$map$Y
+      # Get the expression matrix Y (landmarks x samples) from .tdr.obj$map$Y
       Y <- 
-        .lm.obj$map$Y
+        .tdr.obj$map$Y
       
       G <- 
         nrow(x = Y)
@@ -2285,7 +2284,7 @@ get.embedding <-
         if(!is.null(x = .stats.obj$fit$block)){
           
           .block <- 
-            lapply(X = .lm.obj$metadata,
+            lapply(X = .tdr.obj$metadata,
                    FUN = function(meta.col){
                      if(length(meta.col) != length(.stats.obj$fit$block)) return(FALSE)
                      all(as.character(x = meta.col) == as.character(x = .stats.obj$fit$block))
@@ -2304,7 +2303,7 @@ get.embedding <-
             dupcor <- 
               limma::duplicateCorrelation(object = Y,
                                           design = Z,
-                                          block = .lm.obj$metadata[[.block]])
+                                          block = .tdr.obj$metadata[[.block]])
           }
         }
         
@@ -2320,7 +2319,7 @@ get.embedding <-
         fit.Y.on.Z <- 
           limma::lmFit(object = Y,
                        design = Z,
-                       block = if(!is.null(dupcor)) .lm.obj$metadata[[.block]] else NULL,
+                       block = if(!is.null(dupcor)) .tdr.obj$metadata[[.block]] else NULL,
                        correlation = if(!is.null(dupcor)) dupcor$consensus else NULL)
         
         # Yhat.red = fitted values from nuisance-only model (used for projection)
@@ -2405,12 +2404,12 @@ get.embedding <-
       }
       
       # Validate reduced model exists
-      if(is.null(x = .lm.obj$map$lm[[.red.model]])){
-        stop(paste0("Reduced model '", .red.model, "' not found in .lm.obj$map$lm. ",
+      if(is.null(x = .tdr.obj$map$lm[[.red.model]])){
+        stop(paste0("Reduced model '", .red.model, "' not found in .tdr.obj$map$lm. ",
                     "Run get.lm() with .model.name = '", .red.model, "' first."))
       }
       
-      .red.stats.obj <- .lm.obj$map$lm[[.red.model]]
+      .red.stats.obj <- .tdr.obj$map$lm[[.red.model]]
       
       if(isTRUE(x = .verbose)){
         message("\nComputing embedding via nested model comparison")
@@ -2419,15 +2418,15 @@ get.embedding <-
         message("  Reduced model ('", .red.model, "') columns: ", paste(colnames(.red.stats.obj$fit$design), collapse = ", "))
       }
       
-      # Get Y from .lm.obj$map$Y for dimension validation
-      Y <- .lm.obj$map$Y
+      # Get Y from .tdr.obj$map$Y for dimension validation
+      Y <- .tdr.obj$map$Y
       
       # Validate dimensions against model fits
       if(nrow(x = .stats.obj$fit$coefficients) != nrow(x = Y)){
-        stop("Number of landmarks in full model does not match .lm.obj$map$Y")
+        stop("Number of landmarks in full model does not match .tdr.obj$map$Y")
       }
       if(nrow(x = .red.stats.obj$fit$coefficients) != nrow(x = Y)){
-        stop("Number of landmarks in reduced model does not match .lm.obj$map$Y")
+        stop("Number of landmarks in reduced model does not match .tdr.obj$map$Y")
       }
       if(ncol(x = .stats.obj$fit$design) != ncol(x = .red.stats.obj$fit$design) ||
          nrow(x = .stats.obj$fit$design) != nrow(x = .red.stats.obj$fit$design)){
@@ -2511,7 +2510,7 @@ get.embedding <-
     
     # project E.red.t using delta.Yhat.t's V
     pca$coord <-
-      Matrix::t(x = (.lm.obj$map$Y - Yhat.red) - pca$center) %*%
+      Matrix::t(x = (.tdr.obj$map$Y - Yhat.red) - pca$center) %*%
       pca$rotation
     
     colnames(x = pca$coord) <- 
@@ -2521,7 +2520,7 @@ get.embedding <-
     # partial-effect principal component variance as a fraction of TOTAL variance
     perc.tot.var.exp <-
       (100 * ((pca$sdev[1:ncol(x = pca$coord)])^2) /
-         (matrixStats::rowVars(x = .lm.obj$map$Y) |>
+         (matrixStats::rowVars(x = .tdr.obj$map$Y) |>
             sum())) |>
       stats::setNames(nm = colnames(x = pca$coord))
     
@@ -2548,15 +2547,15 @@ get.embedding <-
     }
     
     # -------------------------------------------------------------------------
-    # Store results in .lm.obj$map$embedding$pePC[[slot.name]]
+    # Store results in .tdr.obj$map$embedding$pePC[[slot.name]]
     # -------------------------------------------------------------------------
     
     # Initialize pePC list if needed
-    if(is.null(x = .lm.obj$map$embedding$pePC)){
-      .lm.obj$map$embedding$pePC <- list()
+    if(is.null(x = .tdr.obj$map$embedding$pePC)){
+      .tdr.obj$map$embedding$pePC <- list()
     }
     
-    .lm.obj$map$embedding$pePC[[slot.name]] <- 
+    .tdr.obj$map$embedding$pePC[[slot.name]] <- 
       c(pca,
         list(perc.tot.var.exp = perc.tot.var.exp,
              effect.resid.cor = effect.resid.cor,
@@ -2565,11 +2564,11 @@ get.embedding <-
       )
     
     if(isTRUE(x = .verbose)){
-      message("\nSupervised embedding stored in: .lm.obj$map$embedding$pePC$", slot.name)
-      message("Unsupervised embeddings stored in: .lm.obj$map$embedding$pca, .lm.obj$map$embedding$traj")
+      message("\nSupervised embedding stored in: .tdr.obj$map$embedding$pePC$", slot.name)
+      message("Unsupervised embeddings stored in: .tdr.obj$map$embedding$pca, .tdr.obj$map$embedding$traj")
     }
     
-    # Return .lm.obj with all embeddings
-    return(.lm.obj)
+    # Return .tdr.obj with all embeddings
+    return(.tdr.obj)
     
   }

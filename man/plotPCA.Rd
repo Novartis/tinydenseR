@@ -5,10 +5,10 @@
 \title{Plot PCA}
 \usage{
 plotPCA(
-  .lm.obj,
+  .tdr.obj,
   .PC.x = 1,
   .PC.y = 2,
-  .feature = .lm.obj$graph$clustering$ids,
+  .feature = .tdr.obj$graph$clustering$ids,
   .cat.feature.color = Color.Palette[1, 1:5],
   .panel.size = if (is.numeric(x = .feature)) 2 else 3,
   .midpoint = NULL,
@@ -21,13 +21,13 @@ plotPCA(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object with PCA computed via \code{get.landmarks()}.}
+\item{.tdr.obj}{A tinydenseR object with PCA computed via \code{get.landmarks()}.}
 
 \item{.PC.x}{Integer specifying x-axis principal component (default 1).}
 
 \item{.PC.y}{Integer specifying y-axis principal component (default 2).}
 
-\item{.feature}{Numeric vector or factor of length \code{nrow(.lm.obj$landmarks)} to color points by.
+\item{.feature}{Numeric vector or factor of length \code{nrow(.tdr.obj$landmarks)} to color points by.
 Defaults to cluster IDs from \code{$graph$clustering$ids}. Can be:
 \itemize{
 \item Numeric: gene expression, fold changes, statistics (uses diverging color scale)
@@ -75,7 +75,7 @@ Interactive hover features require the \pkg{ggiraph} package. Install with
 \examples{
 \dontrun{
 # From README: Basic PCA visualization
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks(.nHVG = 500, .nPC = 3) |>
   get.graph()
 

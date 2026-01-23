@@ -5,17 +5,17 @@
 \title{Plot Sample PCA (Deprecated)}
 \usage{
 plotSamplePCA(
-  .lm.obj,
-  .labels.from = colnames(x = .lm.obj$metadata)[1],
+  .tdr.obj,
+  .labels.from = colnames(x = .tdr.obj$metadata)[1],
   .cat.feature.color = Color.Palette[1, 1:5],
   .point.size = 1,
   .panel.size = 2,
-  .midpoint = if (is.numeric(x = .lm.obj$metadata[[.labels.from]])) stats::median(x =
-    .lm.obj$metadata[[.labels.from]]) else NA
+  .midpoint = if (is.numeric(x = .tdr.obj$metadata[[.labels.from]])) stats::median(x =
+    .tdr.obj$metadata[[.labels.from]]) else NA
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.embedding()}.}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.embedding()}.}
 
 \item{.labels.from}{Character specifying metadata column for coloring points.}
 

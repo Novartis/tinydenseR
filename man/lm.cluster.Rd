@@ -5,7 +5,7 @@
 \title{Leiden clustering of landmarks}
 \usage{
 lm.cluster(
-  .lm.obj,
+  .tdr.obj,
   .cl.method = "snn",
   .cl.resolution.parameter = 0.8,
   .seed = 123,
@@ -14,7 +14,7 @@ lm.cluster(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object with \code{$graph} component from \code{get.graph}.}
+\item{.tdr.obj}{A tinydenseR object with \code{$graph} component from \code{get.graph}.}
 
 \item{.cl.method}{Character specifying clustering method: "snn" (shared nearest neighbors)
 or "fgraph" (fuzzy graph from UMAP). Default "snn".}
@@ -31,7 +31,7 @@ yield finer/more clusters.}
 than this are merged into most connected neighbors.}
 }
 \value{
-Updated \code{.lm.obj} with \code{$graph$clustering} containing:
+Updated \code{.tdr.obj} with \code{$graph$clustering} containing:
 \itemize{
 \item \code{ids}: Factor of cluster assignments for each landmark
 \item \code{median.exprs}: Matrix of mean expression per cluster. For RNA: top features
@@ -56,7 +56,7 @@ for downstream statistics.
 \examples{
 \dontrun{
 # After graph construction
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |>
   get.graph()
 

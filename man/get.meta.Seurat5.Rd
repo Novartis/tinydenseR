@@ -20,7 +20,7 @@ Rownames are sample IDs from \code{.sample.var}.
 \description{
 Extracts sample-wise metadata from a Seurat v5 object by identifying which metadata columns have
 consistent values within each sample (sample-level variables). Cell-level variables are excluded
-with a warning. Returns a data frame suitable for \code{setup.lm.obj(.meta = ...)}.
+with a warning. Returns a data frame suitable for \code{setup.tdr.obj(.meta = ...)}.
 }
 \details{
 This function automatically distinguishes sample-level from cell-level metadata:

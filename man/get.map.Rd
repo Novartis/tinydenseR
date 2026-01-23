@@ -5,7 +5,7 @@
 \title{Mapping cells to landmarks}
 \usage{
 get.map(
-  .lm.obj,
+  .tdr.obj,
   .ref.obj = NULL,
   .celltype.col.name = "cell_type",
   .cl.ct.to.ign = NULL,
@@ -14,7 +14,7 @@ get.map(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object with \code{$graph} component populated by \code{get.graph}.}
+\item{.tdr.obj}{A tinydenseR object with \code{$graph} component populated by \code{get.graph}.}
 
 \item{.ref.obj}{Optional Symphony reference object for cell type annotation. Must have
 \code{Z_corr} field (harmony-corrected embeddings) and metadata with cell type labels.
@@ -33,7 +33,7 @@ calculations. Only one value allowed; merge multiple populations first via \code
 \item{.seed}{Integer seed for reproducibility (default 123).}
 }
 \value{
-Updated \code{.lm.obj} with \code{$map} component containing:
+Updated \code{.tdr.obj} with \code{$map} component containing:
 \itemize{
 \item \code{fdens}: Matrix of fuzzy graph densities (landmarks × samples). Each entry is
 the sum of cell-landmark edge weights for that sample, normalized by sample size and
@@ -97,7 +97,7 @@ forms the basis for differential abundance testing in \code{get.lm}.
 \examples{
 \dontrun{
 # Complete workflow with mapping
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks(.nHVG = 500) |>
   get.graph() |>
   get.map()

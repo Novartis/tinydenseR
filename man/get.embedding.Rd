@@ -5,7 +5,7 @@
 \title{Compute Sample Embedding from Partial Fitted Values}
 \usage{
 get.embedding(
-  .lm.obj,
+  .tdr.obj,
   .full.model = "default",
   .term.of.interest = NULL,
   .red.model = NULL,
@@ -17,18 +17,18 @@ get.embedding(
 )
 }
 \arguments{
-\item{.lm.obj}{The tinydenseR object processed through \code{get.map()}. Contains
+\item{.tdr.obj}{The tinydenseR object processed through \code{get.map()}. Contains
 \code{$map$Y} (log2-transformed densities) used for unsupervised embeddings. Statistical
 model fits should be stored in \code{$map$lm} via \code{get.lm()}.}
 
-\item{.full.model}{Character string naming the full model in \code{.lm.obj$map$lm}
+\item{.full.model}{Character string naming the full model in \code{.tdr.obj$map$lm}
 (default "default"). Required only when computing supervised embeddings (pePC).}
 
 \item{.term.of.interest}{Character string: the covariate/term being isolated when using the
 nested model method (\code{.red.model}). Must match a column name in
-\code{.lm.obj$metadata}. Ignored when using \code{.contrast.of.interest}.}
+\code{.tdr.obj$metadata}. Ignored when using \code{.contrast.of.interest}.}
 
-\item{.red.model}{Optional character string naming the reduced model in \code{.lm.obj$map$lm}
+\item{.red.model}{Optional character string naming the reduced model in \code{.tdr.obj$map$lm}
 (without the effect of interest). If provided, computes
 \eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}} directly. Make sure to construct
 nested models by “dropping terms” (so reduced is a strict subset of full)!}
@@ -46,7 +46,7 @@ the Frisch-Waugh-Lovell (FWL) theorem to compute the true partial fitted compone
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
-Modified \code{.lm.obj} with embeddings stored in \code{.lm.obj$map$embedding}:
+Modified \code{.tdr.obj} with embeddings stored in \code{.tdr.obj$map$embedding}:
 \describe{
 \item{\code{pca}}{Unsupervised PCA on log-transformed landmark densities:
 \itemize{
@@ -77,7 +77,7 @@ Modified \code{.lm.obj} with embeddings stored in \code{.lm.obj$map$embedding}:
 \description{
 Computes embeddings for sample-level visualization. When called without supervised
 arguments, computes unsupervised embeddings (PCA and diffusion map trajectory) on
-landmark densities stored in \code{.lm.obj$map$Y}. When called with supervised arguments
+landmark densities stored in \code{.tdr.obj$map$Y}. When called with supervised arguments
 (\code{.contrast.of.interest} or \code{.red.model}), additionally computes a
 partial-effect PCA (pePC) that isolates variation attributable to a specific effect.
 Exact for OLS; if duplicateCorrelation/blocking is used, the decomposition is approximate.
@@ -86,10 +86,10 @@ Exact for OLS; if duplicateCorrelation/blocking is used, the decomposition is ap
 \strong{Unsupervised Embeddings (always computed):}
 
 \code{pca}: Standard PCA on log2-transformed landmark densities (log2(fdens + 0.5)),
-filtered to remove zero-variance landmarks, centered and scaled.
+centered and scaled.
 
 \code{traj}: Diffusion map trajectory computed via \code{destiny::DiffusionMap} on
-the raw landmark density matrix. Useful for visualizing continuous trajectories.
+the log2-transformed landmark density matrix. Useful for visualizing continuous trajectories.
 
 \strong{Supervised Embedding (pePC, when .contrast.of.interest or .red.model provided):}
 
@@ -139,7 +139,7 @@ to PCs is residual-only noise.
 # ===========================================================================
 
 # After get.map, compute unsupervised embeddings
-lm.obj <- get.embedding(.lm.obj = lm.obj)
+lm.obj <- get.embedding(.tdr.obj = lm.obj)
 
 # Access unsupervised embeddings
 lm.obj$map$embedding$pca$coord   # sample PCA coordinates
@@ -156,18 +156,18 @@ plotSampleEmbedding(lm.obj, .embedding = "traj", .color.by = "Timepoint")
 # Fit full model with disease effect (stored as "full")
 .design <- model.matrix(object = ~ disease + sex + age,
                         data = lm.obj$metadata)
-lm.obj <- get.lm(.lm.obj = lm.obj, .design = .design, 
+lm.obj <- get.lm(.tdr.obj = lm.obj, .design = .design, 
                     .model.name = "full")
 
 # Fit reduced model without disease (stored as "reduced")
 .red.design <- model.matrix(object = ~ sex + age,
                             data = lm.obj$metadata)
-lm.obj <- get.lm(.lm.obj = lm.obj, .design = .red.design, 
+lm.obj <- get.lm(.tdr.obj = lm.obj, .design = .red.design, 
                     .model.name = "reduced")
 
 # Extract disease effect embedding (all stored in lm.obj)
 lm.obj <- get.embedding(
-    .lm.obj = lm.obj,
+    .tdr.obj = lm.obj,
     .full.model = "full",
     .term.of.interest = "disease",
     .red.model = "reduced"

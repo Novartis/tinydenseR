@@ -65,7 +65,7 @@ cells <- get.cells.SCE(.sce.obj = sim_trajectory,
                        .sample.var = "Sample")
 
 # Use in tinydenseR workflow
-lm.obj <- setup.lm.obj(.cells = cells,
+lm.obj <- setup.tdr.obj(.cells = cells,
                        .meta = sim_trajectory.meta,
                        .assay.type = "RNA")
 }
@@ -74,5 +74,5 @@ lm.obj <- setup.lm.obj(.cells = cells,
 \seealso{
 \code{\link{get.cells}} for automatic format detection,
 \code{\link{get.cells.Seurat}} for Seurat objects,
-\code{\link{setup.lm.obj}} for next workflow step
+\code{\link{setup.tdr.obj}} for next workflow step
 }

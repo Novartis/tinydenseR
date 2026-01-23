@@ -4,10 +4,10 @@
 \alias{plotHeatmap}
 \title{Plot Mean Expression Heatmap}
 \usage{
-plotHeatmap(.lm.obj, .id.from = "clustering")
+plotHeatmap(.tdr.obj, .id.from = "clustering")
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.graph()}.}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.graph()}.}
 
 \item{.id.from}{Character: "clustering" or "celltyping" (default "clustering"). Determines which
 population definitions to show. Use "clustering" after \code{get.graph()}, or "celltyping" after
@@ -25,7 +25,7 @@ The heatmap is automatically generated during \code{get.graph()} and stored for 
 \details{
 The heatmap content depends on assay type:
 \itemize{
-\item \strong{Cytometry}: All markers from \code{.lm.obj$marker}
+\item \strong{Cytometry}: All markers from \code{.tdr.obj$marker}
 \item \strong{RNA-seq}: Top 3 positive and 3 negative genes per PC (from highly variable genes)
 }
 
@@ -33,12 +33,12 @@ Rows (features) are ordered by hierarchical clustering to group co-expressed mar
 Columns (populations) also clustered to reveal relationships between cell types.
 
 The heatmap is generated once during \code{get.graph()} and cached in
-\code{.lm.obj$graph[[.id.from]]$pheatmap}. This function simply displays the cached version.
+\code{.tdr.obj$graph[[.id.from]]$pheatmap}. This function simply displays the cached version.
 }
 \examples{
 \dontrun{
 # After clustering
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |> get.graph()
 
 # Show cluster marker heatmap

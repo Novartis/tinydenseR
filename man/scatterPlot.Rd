@@ -21,8 +21,8 @@ scatterPlot(
 )
 }
 \arguments{
-\item{.x.feature}{Numeric vector for x-axis values (e.g., \code{.lm.obj$scaled.landmarks[,"CD3"]} or
-\code{.lm.obj$pca$embed[,"PC1"]}).}
+\item{.x.feature}{Numeric vector for x-axis values (e.g., \code{.tdr.obj$scaled.landmarks[,"CD3"]} or
+\code{.tdr.obj$pca$embed[,"PC1"]}).}
 
 \item{.y.feature}{Numeric vector for y-axis values.}
 
@@ -66,7 +66,7 @@ PCA coordinates, graph embeddings, cluster IDs, metadata, etc.).
 This flexible plotting function enables custom visualizations beyond the standard \code{plotPCA}
 and \code{plotUMAP} interfaces. Use cases include:
 \itemize{
-\item Plotting Laplacian Eigenmap coordinates from \code{.lm.obj$graph$LE$embed}
+\item Plotting Laplacian Eigenmap coordinates from \code{.tdr.obj$graph$LE$embed}
 \item Exploring relationships between markers (e.g., CD3 vs CD4)
 \item Overlaying metadata on any 2D embedding
 \item Creating custom QC plots (e.g., library size vs mitochondrial \%)
@@ -82,7 +82,7 @@ by interpolating \code{.cat.feature.color}.
 \examples{
 \dontrun{
 # After processing
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |> get.graph()
 
 # Plot PC1 vs PC2 colored by cluster

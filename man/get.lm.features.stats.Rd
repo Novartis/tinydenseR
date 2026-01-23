@@ -4,13 +4,13 @@
 \alias{get.lm.features.stats}
 \title{Graph-based feature discovery for landmarks}
 \usage{
-get.lm.features.stats(.lm.obj)
+get.lm.features.stats(.tdr.obj)
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.landmarks} (PCA required).}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.landmarks} (PCA required).}
 }
 \value{
-Updated \code{.lm.obj} with \code{$interact.plot$lm.features} containing:
+Updated \code{.tdr.obj} with \code{$interact.plot$lm.features} containing:
 \itemize{
 \item \code{res}: List of data frames (one per landmark) with top 10 feature importances
 \item \code{html}: HTML-formatted tables for interactive plotting
@@ -41,7 +41,7 @@ when hovering over landmarks when \code{.hover.stats = "marker"}.
 \examples{
 \dontrun{
 # After landmark selection and graph construction
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |>
   get.graph() |>
   get.lm.features.stats()

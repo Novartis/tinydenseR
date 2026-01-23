@@ -74,8 +74,8 @@
 #' }
 #' 
 #' The landmark sampling strategy aims for proportional representation across samples
-#' while capping total landmarks at 5000 for computational efficiency. Smaller samples
-#' may have relatively more landmarks sampled to ensure adequate representation.
+#' while capping total landmarks at 5000 for computational efficiency. Large samples are
+#' capped to prevent domination and ensure adequate representation.
 #' 
 #' @param .cells A named list of file paths (character strings) pointing to RDS files,
 #'   each containing one expression matrix per sample. For RNA: sparse matrix (dgCMatrix)
@@ -118,7 +118,7 @@
 #'                     .sample.var = "Sample")
 #' 
 #' # Basic setup for RNA data
-#' lm.cells <- setup.lm.obj(
+#' tdr.obj <- setup.tdr.obj(
 #'   .cells = .cells,
 #'   .meta = .meta,
 #'   .assay.type = "RNA",
@@ -126,7 +126,7 @@
 #' )
 #' 
 #' # Cytometry workflow with marker selection
-#' lm.cells <- setup.lm.obj(
+#' tdr.obj <- setup.tdr.obj(
 #'   .cells = .cells,
 #'   .meta = .meta,
 #'   .markers = c("CD3", "CD4", "CD8", "CD19"),
@@ -134,7 +134,7 @@
 #' )
 #' 
 #' # RNA workflow with batch correction
-#' lm.cells <- setup.lm.obj(
+#' tdr.obj <- setup.tdr.obj(
 #'   .cells = .cells,
 #'   .meta = .meta,
 #'   .harmony.var = "batch",
@@ -143,7 +143,7 @@
 #' }
 #' @export
 #'
-setup.lm.obj <-
+setup.tdr.obj <-
   function(
     .cells,
     .meta,
@@ -215,7 +215,7 @@ setup.lm.obj <-
            "Current value: ", .prop.landmarks)
     }
     
-    .lm.obj.nm <-
+    .tdr.obj.nm <-
       c("cells",
         "landmarks",
         "scaled.landmarks",
@@ -233,14 +233,14 @@ setup.lm.obj <-
         "interact.plot",
         "harmony.obj")
     
-    .lm.obj <- vector(mode = "list",
-                      length = length(x = .lm.obj.nm)) |>
-      stats::setNames(nm = .lm.obj.nm)
+    .tdr.obj <- vector(mode = "list",
+                      length = length(x = .tdr.obj.nm)) |>
+      stats::setNames(nm = .tdr.obj.nm)
     
-    .lm.obj$n.threads <-
+    .tdr.obj$n.threads <-
       .n.threads
     
-    .lm.obj$assay.type <-
+    .tdr.obj$assay.type <-
       .assay.type
     
     if(lapply(X = .cells,
@@ -304,7 +304,7 @@ setup.lm.obj <-
         }) |>
         unlist()
       
-      .lm.obj$cells <- .cells
+      .tdr.obj$cells <- .cells
       
     } else {
       
@@ -312,67 +312,77 @@ setup.lm.obj <-
       
     }
     
-    .lm.obj$spec$n.cells <-
+    .tdr.obj$spec$n.cells <-
       n.cells
     
     # Quality check: warn if sample sizes are highly imbalanced (>10-fold difference)
-    if((max(.lm.obj$spec$n.cells) / min(.lm.obj$spec$n.cells)) > 10){
+    if((max(.tdr.obj$spec$n.cells) / min(.tdr.obj$spec$n.cells)) > 10){
       
       warning("Sample size imbalance detected: largest/smallest ratio > 10.\n",
-              "Smallest sample has ", min(.lm.obj$spec$n.cells), " cells.\n",
+              "Smallest sample has ", min(.tdr.obj$spec$n.cells), " cells.\n",
               "Consider removing low-quality samples.")
       
-      if(any(.lm.obj$spec$n.cells < 1000)){
+      if(any(.tdr.obj$spec$n.cells < 1000)){
         warning("Large variation in sample sizes detected. For cytometry, samples with <1000 cells may be unreliable.")
       }
       
     } 
     
     # Calculate target number of landmarks: 10% of total cells, capped at 5000
-    .lm.obj$spec$target.lm.n <-
-      pmin(sum(.lm.obj$spec$n.cells) * .prop.landmarks,
+    .tdr.obj$spec$target.lm.n <-
+      pmin(sum(.tdr.obj$spec$n.cells) * .prop.landmarks,
            5e3)
     
     # Allocate landmarks per sample: proportional to sample size, but capped
-    .lm.obj$spec$n.perSample <-
-      pmin(ceiling(x = .lm.obj$spec$n.cells * .prop.landmarks),
-           ceiling(x = .lm.obj$spec$target.lm.n / length(x = .lm.obj$cells)))
+    .tdr.obj$spec$n.perSample <-
+      pmin(ceiling(x = .tdr.obj$spec$n.cells * .prop.landmarks),
+           ceiling(x = .tdr.obj$spec$target.lm.n / length(x = .tdr.obj$cells)))
     
     # Create key vector: maps each future landmark to its sample
     # (will be used after landmark selection to link back to metadata)
-    .lm.obj$key <-
-      seq_along(along.with = .lm.obj$cells) |>
-      rep(times = .lm.obj$spec$n.perSample) |>
+    .tdr.obj$key <-
+      seq_along(along.with = .tdr.obj$cells) |>
+      rep(times = .tdr.obj$spec$n.perSample) |>
       (\(x)
        stats::setNames(object = x,
-                       nm = names(x = .lm.obj$cells)[x])
+                       nm = names(x = .tdr.obj$cells)[x])
       )()
     
-    .lm.obj$metadata <-
+    .tdr.obj$metadata <-
       .meta
     
-    .lm.obj$metadata$n.perSample <- 
-      .lm.obj$spec$n.perSample
+    .tdr.obj$metadata$n.perSample <- 
+      .tdr.obj$spec$n.perSample
     
-    .lm.obj$metadata$n.cells <-
-      .lm.obj$spec$n.cells
+    .tdr.obj$metadata$n.cells <-
+      .tdr.obj$spec$n.cells
     
-    .lm.obj$metadata$log10.n.cells <-
-      log10(x = .lm.obj$spec$n.cells)
+    .tdr.obj$metadata$log10.n.cells <-
+      log10(x = .tdr.obj$spec$n.cells)
     
     if(.assay.type == "cyto"){
-      .lm.obj$markers <- 
-        if(is.null(x = .markers)) readRDS(file = .lm.obj$cells[[1]]) |> colnames() else .markers
+      .tdr.obj$markers <- 
+        if(is.null(x = .markers)) readRDS(file = .tdr.obj$cells[[1]]) |> colnames() else .markers
     }
     
     if(!is.null(x = .harmony.var)){
-      .lm.obj$harmony.var <- 
+      .tdr.obj$harmony.var <- 
         .harmony.var  
     }
     
-    return(.lm.obj)
+    return(.tdr.obj)
     
   }
+
+#' @rdname setup.tdr.obj
+#' @description `setup.lm.obj()` is deprecated; use `setup.tdr.obj()` instead.
+#' @param ... Arguments passed to `setup.tdr.obj()`.
+#' @export
+setup.lm.obj <- function(...) {
+  .Deprecated("setup.tdr.obj", 
+              msg = "setup.lm.obj() is deprecated. Use setup.tdr.obj() instead.")
+  setup.tdr.obj(...)
+}
 
 #' Identify landmarks via leverage score sampling
 #'
@@ -406,11 +416,11 @@ setup.lm.obj <-
 #' prioritizes cells in high-variance regions while maintaining diversity.
 #' 
 #' **Optional Harmony integration:**
-#' If \code{.harmony.var} was specified in \code{setup.lm.obj}, performs
+#' If \code{.harmony.var} was specified in \code{setup.tdr.obj}, performs
 #' batch correction on landmark PC embeddings. This creates a reference
 #' object for mapping query cells in a batch-corrected space.
 #' 
-#' @param .lm.obj Object initialized with \code{setup.lm.obj}.
+#' @param .tdr.obj Object initialized with \code{setup.tdr.obj}.
 #' @param .verbose Logical, print progress messages. Default TRUE.
 #' @param .seed Integer for reproducibility. Default 123.
 #' @param .nHVG Integer, number of highly variable genes to select for RNA data.
@@ -425,7 +435,7 @@ setup.lm.obj <-
 #' @param .force.in Character vector of gene names to force into the feature set
 #'   regardless of variance (RNA only). Useful for known markers. Default NULL.
 #' 
-#' @return Updated \code{.lm.obj} with populated fields:
+#' @return Updated \code{.tdr.obj} with populated fields:
 #'   \describe{
 #'     \item{\code{$raw.landmarks}}{Raw counts matrix for landmarks (landmarks × features)}
 #'     \item{\code{$landmarks}}{Processed landmark expression on selected features (landmarks × features):
@@ -452,11 +462,11 @@ setup.lm.obj <-
 #' @examples
 #' \dontrun{
 #' # Typical workflow (from README)
-#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks(.nHVG = 500, .nPC = 3)
 #' 
 #' # RNA with more PCs and custom HVGs
-#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks(.nPC = 50, .nHVG = 3000)
 #' 
 #' # Force specific markers into feature set
@@ -466,7 +476,7 @@ setup.lm.obj <-
 #' @export
 #'
 get.landmarks <-
-  function(.lm.obj,
+  function(.tdr.obj,
            .verbose = TRUE,
            .seed = 123,
            .nHVG = 5000,
@@ -476,14 +486,14 @@ get.landmarks <-
     
     set.seed(seed = .seed)
     
-    if(names(x = .lm.obj) |>
+    if(names(x = .tdr.obj) |>
        is.null()){
-      stop("Invalid .lm.obj: missing structure.\n",
-           "Initialize with setup.lm.obj() first.")
+      stop("Invalid .tdr.obj: missing structure.\n",
+           "Initialize with setup.tdr.obj() first.")
     }
     
     if(!identical(
-      x = names(x = .lm.obj), 
+      x = names(x = .tdr.obj), 
       y = c("cells",
             "landmarks",
             "scaled.landmarks",
@@ -500,32 +510,32 @@ get.landmarks <-
             "harmony.var",
             "interact.plot",
             "harmony.obj"))){
-      stop("Invalid .lm.obj structure.\n",
-           "Ensure it was created with setup.lm.obj() and not manually modified.")
+      stop("Invalid .tdr.obj structure.\n",
+           "Ensure it was created with setup.tdr.obj() and not manually modified.")
     }
     
-    if(any(.nPC > min(.lm.obj$metadata$n.cells))){
+    if(any(.nPC > min(.tdr.obj$metadata$n.cells))){
       stop("Too many PCs requested: .nPC (", .nPC, ") exceeds smallest sample size (",
-           min(.lm.obj$metadata$n.cells), ").\n",
+           min(.tdr.obj$metadata$n.cells), ").\n",
            "Reduce .nPC or remove small samples.")
     }
     
     # PASS 1: Sample-wise landmark selection using local PCA
     # For each sample independently, compute PCA and select landmarks via leverage scores
     if(isTRUE(x = .verbose)){
-      message("-> Pass 1: Selecting landmarks from ", length(.lm.obj$cells), " samples...")
+      message("-> Pass 1: Selecting landmarks from ", length(.tdr.obj$cells), " samples...")
       .pass1_start <- Sys.time()
     }
     
-    .lm.obj$raw.landmarks <-
-      seq_along(along.with = .lm.obj$cells) |>
-      stats::setNames(nm = names(x = .lm.obj$cells)) |>
+    .tdr.obj$raw.landmarks <-
+      seq_along(along.with = .tdr.obj$cells) |>
+      stats::setNames(nm = names(x = .tdr.obj$cells)) |>
       lapply(FUN = function(.cells.idx){
         
         mat <-
-          readRDS(file = .lm.obj$cells[[.cells.idx]])
+          readRDS(file = .tdr.obj$cells[[.cells.idx]])
         
-        if(.lm.obj$assay.type == "RNA"){
+        if(.tdr.obj$assay.type == "RNA"){
           
           if(!inherits(x = mat,
                        what = "dgCMatrix")){
@@ -571,7 +581,7 @@ get.landmarks <-
         } else {
           
           mat <-
-            mat[,.lm.obj$markers]
+            mat[,.tdr.obj$markers]
           
         }
         
@@ -583,7 +593,7 @@ get.landmarks <-
         
         # Compute leverage scores: sum of squared PC loadings per cell
         # Cells with high leverage contribute most to defining PC space
-        if(.lm.obj$assay.type == "RNA"){
+        if(.tdr.obj$assay.type == "RNA"){
           
           # For RNA: use efficient truncated SVD (irlba)
           lev.score <-
@@ -616,30 +626,30 @@ get.landmarks <-
         # Sample landmarks proportionally to leverage scores
         lm.sample <-
           sample(x = nrow(x = mat),
-                 size = .lm.obj$spec$n.perSample[[.cells.idx]],
+                 size = .tdr.obj$spec$n.perSample[[.cells.idx]],
                  replace = FALSE,
                  prob = lev.score)
         
         landmarks <-
-          if(.lm.obj$assay.type == "RNA"){
+          if(.tdr.obj$assay.type == "RNA"){
             
-            readRDS(file = .lm.obj$cells[[.cells.idx]])[,lm.sample] |>
+            readRDS(file = .tdr.obj$cells[[.cells.idx]])[,lm.sample] |>
               Matrix::t() |>
               (\(x)
                `rownames<-`(x = x,
-                            value = paste0(names(x = .lm.obj$cells)[.cells.idx],
+                            value = paste0(names(x = .tdr.obj$cells)[.cells.idx],
                                            "_",
                                            rownames(x = x)))
               )()
             
           } else {
-            readRDS(file = .lm.obj$cells[[.cells.idx]])[lm.sample,.lm.obj$markers]
+            readRDS(file = .tdr.obj$cells[[.cells.idx]])[lm.sample,.tdr.obj$markers]
           }
         
         if(isTRUE(x = .verbose)){
           .show_progress(current = .cells.idx, 
-                         total = length(.lm.obj$cells),
-                         item_label = names(x = .lm.obj$cells)[.cells.idx],
+                         total = length(.tdr.obj$cells),
+                         item_label = names(x = .tdr.obj$cells)[.cells.idx],
                          start_time = .pass1_start)
         }
         
@@ -648,10 +658,10 @@ get.landmarks <-
       }) |>
       do.call(what = rbind)
     
-    if(.lm.obj$assay.type == "RNA"){
+    if(.tdr.obj$assay.type == "RNA"){
       
-      .lm.obj$raw.landmarks <-
-        methods::as(object = .lm.obj$raw.landmarks,
+      .tdr.obj$raw.landmarks <-
+        methods::as(object = .tdr.obj$raw.landmarks,
                    Class = "CsparseMatrix")
       
     }
@@ -661,13 +671,13 @@ get.landmarks <-
     }
     
     # Compute dataset-wide HVG selection and PCA on pooled Pass 1 landmarks
-    if(.lm.obj$assay.type == "RNA"){
+    if(.tdr.obj$assay.type == "RNA"){
       
       if(isTRUE(x = .exc.vdj.mito.ribo.genes.from.hvg)) {
         
         vdj.mito.ribo <-
           grep(pattern = "^TR[AB][VDJ]\\d+|^IG[KHL][VDJ]\\d+|^RP|^MT-",
-               x = colnames(x = .lm.obj$raw.landmarks),
+               x = colnames(x = .tdr.obj$raw.landmarks),
                fixed = FALSE,
                value = TRUE,
                ignore.case = TRUE)
@@ -682,10 +692,10 @@ get.landmarks <-
       if(!is.null(x = .force.in)){
         if(inherits(x = .force.in,
                     what = "character")){
-          if(any(!.force.in %in% colnames(x = .lm.obj$raw.landmarks))){
+          if(any(!.force.in %in% colnames(x = .tdr.obj$raw.landmarks))){
             
             warning("Genes not found in expression data: ",
-                    paste(.force.in[!(.force.in %in% colnames(x = .lm.obj$raw.landmarks))],
+                    paste(.force.in[!(.force.in %in% colnames(x = .tdr.obj$raw.landmarks))],
                           collapse = ", "))
             
           }
@@ -696,7 +706,7 @@ get.landmarks <-
           
           # Get indices of forced-in genes for later merging with HVGs
           .force.in.idx <-
-            which(x = colnames(x = .lm.obj$raw.landmarks)[!colnames(x = .lm.obj$raw.landmarks) %in% vdj.mito.ribo] %in% .force.in)
+            which(x = colnames(x = .tdr.obj$raw.landmarks)[!colnames(x = .tdr.obj$raw.landmarks) %in% vdj.mito.ribo] %in% .force.in)
           
         } else {
           stop(".force.in must be either NULL or a character vector")
@@ -708,18 +718,18 @@ get.landmarks <-
       }
       
       # Normalize and log-transform pooled landmarks
-      .lm.obj$landmarks <-
-        .lm.obj$raw.landmarks /
-        (Matrix::rowSums(x = .lm.obj$raw.landmarks) /
-           mean(x = Matrix::rowSums(x = .lm.obj$raw.landmarks)))
+      .tdr.obj$landmarks <-
+        .tdr.obj$raw.landmarks /
+        (Matrix::rowSums(x = .tdr.obj$raw.landmarks) /
+           mean(x = Matrix::rowSums(x = .tdr.obj$raw.landmarks)))
       
-      .lm.obj$landmarks@x <-
-        log2(x = .lm.obj$landmarks@x + 1)
+      .tdr.obj$landmarks@x <-
+        log2(x = .tdr.obj$landmarks@x + 1)
       
       # Select HVGs across all pooled landmarks, merge with forced-in genes
       HVG <-
         sparseMatrixStats::colVars(
-          x = .lm.obj$landmarks[,!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo]) |>
+          x = .tdr.obj$landmarks[,!colnames(x = .tdr.obj$landmarks) %in% vdj.mito.ribo]) |>
         order(decreasing = TRUE) |>
         utils::head(n = .nHVG) |>
         (\(x)
@@ -729,53 +739,53 @@ get.landmarks <-
         )() |>
         (\(x)
          `names<-`(x = x,
-                   value = colnames(x = .lm.obj$landmarks)[!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo][x])
+                   value = colnames(x = .tdr.obj$landmarks)[!colnames(x = .tdr.obj$landmarks) %in% vdj.mito.ribo][x])
         )()
       
     } else {
       
-      .lm.obj$landmarks <-
-        .lm.obj$raw.landmarks
+      .tdr.obj$landmarks <-
+        .tdr.obj$raw.landmarks
       
       HVG <-
-        ncol(x = .lm.obj$landmarks) |>
+        ncol(x = .tdr.obj$landmarks) |>
         seq_len() |>
         (\(x)
          `names<-`(x = x,
-                   value = colnames(x = .lm.obj$landmarks)[x])
+                   value = colnames(x = .tdr.obj$landmarks)[x])
         )()
       
     }
     
-    .lm.obj$landmarks <-
-      if(.lm.obj$assay.type == "RNA") {
-        .lm.obj$landmarks[,colnames(x = .lm.obj$landmarks)[!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo][HVG]]
+    .tdr.obj$landmarks <-
+      if(.tdr.obj$assay.type == "RNA") {
+        .tdr.obj$landmarks[,colnames(x = .tdr.obj$landmarks)[!colnames(x = .tdr.obj$landmarks) %in% vdj.mito.ribo][HVG]]
       } else {
-        .lm.obj$landmarks[,HVG]
+        .tdr.obj$landmarks[,HVG]
       }
     
-    .lm.obj$pca$center <-
-      Matrix::colMeans(x = .lm.obj$landmarks)
+    .tdr.obj$pca$center <-
+      Matrix::colMeans(x = .tdr.obj$landmarks)
     
-    .lm.obj$pca$scale <-
-      sparseMatrixStats::colSds(x = .lm.obj$landmarks)
+    .tdr.obj$pca$scale <-
+      sparseMatrixStats::colSds(x = .tdr.obj$landmarks)
     
-    if(.lm.obj$assay.type == "RNA"){
+    if(.tdr.obj$assay.type == "RNA"){
       
       pca_res <-
         irlba::irlba(
-          A = .lm.obj$landmarks,
+          A = .tdr.obj$landmarks,
           nv = .nPC,
-          center = .lm.obj$pca$center,
-          scale = .lm.obj$pca$scale)
+          center = .tdr.obj$pca$center,
+          scale = .tdr.obj$pca$scale)
       
     } else {
       
       pca_res <-
-        Matrix::t(x = .lm.obj$landmarks) |>
+        Matrix::t(x = .tdr.obj$landmarks) |>
         (\(x)
-         (x - .lm.obj$pca$center) /
-           .lm.obj$pca$scale
+         (x - .tdr.obj$pca$center) /
+           .tdr.obj$pca$scale
         )() |>
         Matrix::t() |>
         base::svd()
@@ -787,10 +797,10 @@ get.landmarks <-
              seq_along(along.with = pca_res$d))
     
     rownames(x = pca_res$u) <-
-      rownames(x = .lm.obj$landmarks)
+      rownames(x = .tdr.obj$landmarks)
     
     rownames(x = pca_res$v) <-
-      colnames(x = .lm.obj$landmarks)
+      colnames(x = .tdr.obj$landmarks)
     
     pca_res$embed <-
       pca_res$u %*%
@@ -801,37 +811,37 @@ get.landmarks <-
                                     names(x = pca_res$d)))
          )())
     
-    .lm.obj$pca <-
+    .tdr.obj$pca <-
       c(pca_res,
-        .lm.obj$pca)
+        .tdr.obj$pca)
     
     # Optional: Perform Harmony batch correction on landmark embeddings
-    if(!is.null(x = .lm.obj$harmony.var)){
+    if(!is.null(x = .tdr.obj$harmony.var)){
       
       set.seed(seed = .seed)
       # Run Harmony to correct for batch effects in PC space
       # nclust parameter: adaptive based on landmark count (min 20, max 100)
       tmp.harmony <- 
-        harmony::RunHarmony(data_mat = .lm.obj$pca$embed, 
-                            meta_data = .lm.obj$metadata[.lm.obj$key,],
-                            vars_use = .lm.obj$harmony.var, 
+        harmony::RunHarmony(data_mat = .tdr.obj$pca$embed, 
+                            meta_data = .tdr.obj$metadata[.tdr.obj$key,],
+                            vars_use = .tdr.obj$harmony.var, 
                             return_obj = TRUE,
                             # see https://github.com/immunogenomics/harmony/blob/b36bab002c1767af6e665c81f186b40a87870e64/R/ui.R#L191
-                            nclust = min(round(x = nrow(x = .lm.obj$pca$embed) / 30), 100) |>
+                            nclust = min(round(x = nrow(x = .tdr.obj$pca$embed) / 30), 100) |>
                               max(20),
                             verbose = .verbose)
       
-      .lm.obj$harmony.obj <-
+      .tdr.obj$harmony.obj <-
         symphony::buildReferenceFromHarmonyObj(
           harmony_obj = tmp.harmony,
-          metadata = .lm.obj$metadata[.lm.obj$key,],
+          metadata = .tdr.obj$metadata[.tdr.obj$key,],
           vargenes_means_sds =
             dplyr::tibble(
-              symbol = colnames(x = .lm.obj$landmarks),
-              mean = .lm.obj$pca$center,
-              stddev = .lm.obj$pca$scale
+              symbol = colnames(x = .tdr.obj$landmarks),
+              mean = .tdr.obj$pca$center,
+              stddev = .tdr.obj$pca$scale
             ),
-          pca_loadings = .lm.obj$pca$v,
+          pca_loadings = .tdr.obj$pca$v,
           verbose = .verbose,
           do_umap = FALSE,
           save_uwot_path = NULL,
@@ -842,11 +852,11 @@ get.landmarks <-
         message("Returning harmony corrected embedding.")
       }
       
-      .lm.obj$pca$embed <-
-        Matrix::t(x = .lm.obj$harmony.obj$Z_corr) |> 
+      .tdr.obj$pca$embed <-
+        Matrix::t(x = .tdr.obj$harmony.obj$Z_corr) |> 
         (\(x)
          `rownames<-`(x = x,
-                      value = rownames(x = .lm.obj$landmarks))
+                      value = rownames(x = .tdr.obj$landmarks))
          )()
       
     }
@@ -855,21 +865,21 @@ get.landmarks <-
     # Now that we have initial landmarks from all samples, compute global PCA
     # and reselect landmarks based on leverage scores in this shared space
     if(isTRUE(x = .verbose)){
-      message("-> Pass 2: Refining landmarks from ", length(.lm.obj$cells), " samples...")
+      message("-> Pass 2: Refining landmarks from ", length(.tdr.obj$cells), " samples...")
       .pass2_start <- Sys.time()
     }
     
-    .lm.obj$raw.landmarks <-
-      seq_along(along.with = .lm.obj$cells) |>
-      stats::setNames(nm = names(x = .lm.obj$cells)) |> 
+    .tdr.obj$raw.landmarks <-
+      seq_along(along.with = .tdr.obj$cells) |>
+      stats::setNames(nm = names(x = .tdr.obj$cells)) |> 
       lapply(FUN = function(.cells.idx){
         
         set.seed(seed = .seed)
         
         mat <-
-          readRDS(file = .lm.obj$cells[[.cells.idx]])
+          readRDS(file = .tdr.obj$cells[[.cells.idx]])
         
-        if(.lm.obj$assay.type == "RNA"){
+        if(.tdr.obj$assay.type == "RNA"){
           
           mat <-
             Matrix::t(x = mat) |>
@@ -877,7 +887,7 @@ get.landmarks <-
              # size factor normalization, taking into consideration size factor of landmarks
              (x / (Matrix::rowSums(x = x) /
                      mean(x = Matrix::rowSums(x = x)))) * 
-               (mean(x = Matrix::rowSums(x = x)) / mean(x = Matrix::rowSums(x = .lm.obj$raw.landmarks)))
+               (mean(x = Matrix::rowSums(x = x)) / mean(x = Matrix::rowSums(x = .tdr.obj$raw.landmarks)))
             )()
           
           mat@x <-
@@ -886,15 +896,15 @@ get.landmarks <-
         }
         
         # Calculate leverage scores in shared PC space (Harmony-corrected if applicable)
-        if(!is.null(x = .lm.obj$harmony.obj)){
+        if(!is.null(x = .tdr.obj$harmony.obj)){
           
           # Map cells to Harmony-corrected space using Symphony
           corr_embed <-
-            symphony::mapQuery(exp_query = Matrix::t(x = mat[,colnames(x = .lm.obj$landmarks)]),
+            symphony::mapQuery(exp_query = Matrix::t(x = mat[,colnames(x = .tdr.obj$landmarks)]),
                                metadata_query = matrix(data = 1,
                                                        nrow = nrow(x = mat),
                                                        ncol = 2),
-                               ref_obj = .lm.obj$harmony.obj,
+                               ref_obj = .tdr.obj$harmony.obj,
                                vars = NULL,
                                verbose = .verbose,
                                do_normalize = FALSE,
@@ -902,10 +912,10 @@ get.landmarks <-
           
           # Standardize features for SVD
           Y <-
-            Matrix::t(x = mat[,colnames(x = .lm.obj$landmarks)]) |>
+            Matrix::t(x = mat[,colnames(x = .tdr.obj$landmarks)]) |>
             (\(x)
-             (x - .lm.obj$pca$center) /
-               .lm.obj$pca$scale
+             (x - .tdr.obj$pca$center) /
+               .tdr.obj$pca$scale
             )() |>
             Matrix::t()
           
@@ -921,7 +931,7 @@ get.landmarks <-
                       nv = nrow(x = corr_embed))
           
           dimnames(x = res$v) <-
-            list(colnames(x = .lm.obj$landmarks),
+            list(colnames(x = .tdr.obj$landmarks),
                  rownames(x = corr_embed))
           
           #res$v <-
@@ -943,11 +953,11 @@ get.landmarks <-
           
           # Without Harmony: project cells onto global PCA and compute leverage scores
           lev.score <-
-            (((((Matrix::t(x = mat[,colnames(x = .lm.obj$landmarks)]) - .lm.obj$pca$center) /
-                  .lm.obj$pca$scale) |>
+            (((((Matrix::t(x = mat[,colnames(x = .tdr.obj$landmarks)]) - .tdr.obj$pca$center) /
+                  .tdr.obj$pca$scale) |>
                  Matrix::t()) %*%
-                .lm.obj$pca$v) %*%
-               diag(x = 1 / .lm.obj$pca$d)) |>
+                .tdr.obj$pca$v) %*%
+               diag(x = 1 / .tdr.obj$pca$d)) |>
             (\(x)
              Matrix::rowSums(x = x ^ 2)
             )()
@@ -957,32 +967,32 @@ get.landmarks <-
         # Sample landmarks proportionally to leverage scores
         lm.sample <-
           sample(x = nrow(x = mat),
-                 size = .lm.obj$spec$n.perSample[[.cells.idx]],
+                 size = .tdr.obj$spec$n.perSample[[.cells.idx]],
                  replace = FALSE,
                  prob = lev.score)
         
         # Extract raw counts for sampled landmarks
         landmarks <-
-          if(.lm.obj$assay.type == "RNA"){
+          if(.tdr.obj$assay.type == "RNA"){
             
             # For RNA: reload to get raw counts, add sample prefix to cell IDs
-            readRDS(file = .lm.obj$cells[[.cells.idx]])[,lm.sample] |>
+            readRDS(file = .tdr.obj$cells[[.cells.idx]])[,lm.sample] |>
               Matrix::t() |>
               (\(x)
                `rownames<-`(x = x,
-                            value = paste0(names(x = .lm.obj$cells)[.cells.idx],
+                            value = paste0(names(x = .tdr.obj$cells)[.cells.idx],
                                            "_",
                                            rownames(x = x)))
               )()
             
           } else {
-            readRDS(file = .lm.obj$cells[[.cells.idx]])[lm.sample,.lm.obj$markers]
+            readRDS(file = .tdr.obj$cells[[.cells.idx]])[lm.sample,.tdr.obj$markers]
           }
         
         if(isTRUE(x = .verbose)){
           .show_progress(current = .cells.idx, 
-                         total = length(.lm.obj$cells),
-                         item_label = names(x = .lm.obj$cells)[.cells.idx],
+                         total = length(.tdr.obj$cells),
+                         item_label = names(x = .tdr.obj$cells)[.cells.idx],
                          start_time = .pass2_start)
         }
         
@@ -996,19 +1006,19 @@ get.landmarks <-
     }
     
     # Recompute PCA on refined Pass 2 landmarks (final feature set and embedding)
-    if(.lm.obj$assay.type == "RNA"){
+    if(.tdr.obj$assay.type == "RNA"){
       
-      .lm.obj$landmarks <-
-        .lm.obj$raw.landmarks /
-        (Matrix::rowSums(x = .lm.obj$raw.landmarks) /
-           mean(x = Matrix::rowSums(x = .lm.obj$raw.landmarks)))
+      .tdr.obj$landmarks <-
+        .tdr.obj$raw.landmarks /
+        (Matrix::rowSums(x = .tdr.obj$raw.landmarks) /
+           mean(x = Matrix::rowSums(x = .tdr.obj$raw.landmarks)))
       
-      .lm.obj$landmarks@x <-
-        log2(x = .lm.obj$landmarks@x + 1)
+      .tdr.obj$landmarks@x <-
+        log2(x = .tdr.obj$landmarks@x + 1)
       
       HVG <-
         sparseMatrixStats::colVars(
-          x = .lm.obj$landmarks[,!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo]) |>
+          x = .tdr.obj$landmarks[,!colnames(x = .tdr.obj$landmarks) %in% vdj.mito.ribo]) |>
         order(decreasing = TRUE) |>
         utils::head(n = .nHVG) |>
         (\(x)
@@ -1018,105 +1028,105 @@ get.landmarks <-
         )() |>
         (\(x)
          `names<-`(x = x,
-                   value = colnames(x = .lm.obj$landmarks)[!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo][x])
+                   value = colnames(x = .tdr.obj$landmarks)[!colnames(x = .tdr.obj$landmarks) %in% vdj.mito.ribo][x])
         )()
       
     } else {
       
-      .lm.obj$landmarks <-
-        .lm.obj$raw.landmarks
+      .tdr.obj$landmarks <-
+        .tdr.obj$raw.landmarks
       
       HVG <-
-        ncol(x = .lm.obj$landmarks) |>
+        ncol(x = .tdr.obj$landmarks) |>
         seq_len() |>
         (\(x)
          `names<-`(x = x,
-                   value = colnames(x = .lm.obj$landmarks)[x])
+                   value = colnames(x = .tdr.obj$landmarks)[x])
         )()
       
     }
     
-    .lm.obj$landmarks <-
-      if(.lm.obj$assay.type == "RNA") {
-        .lm.obj$landmarks[,colnames(x = .lm.obj$landmarks)[!colnames(x = .lm.obj$landmarks) %in% vdj.mito.ribo][HVG]]
+    .tdr.obj$landmarks <-
+      if(.tdr.obj$assay.type == "RNA") {
+        .tdr.obj$landmarks[,colnames(x = .tdr.obj$landmarks)[!colnames(x = .tdr.obj$landmarks) %in% vdj.mito.ribo][HVG]]
       } else {
-        .lm.obj$landmarks[,HVG]
+        .tdr.obj$landmarks[,HVG]
       }
     
-    .lm.obj$pca$center <-
-      Matrix::colMeans(x = .lm.obj$landmarks)
+    .tdr.obj$pca$center <-
+      Matrix::colMeans(x = .tdr.obj$landmarks)
     
-    .lm.obj$pca$scale <-
-      sparseMatrixStats::colSds(x = .lm.obj$landmarks)
+    .tdr.obj$pca$scale <-
+      sparseMatrixStats::colSds(x = .tdr.obj$landmarks)
     
-    if(.lm.obj$assay.type == "RNA"){
+    if(.tdr.obj$assay.type == "RNA"){
       
       pca_res <-
         irlba::irlba(
-          A = .lm.obj$landmarks,
+          A = .tdr.obj$landmarks,
           nv = .nPC,
-          center = .lm.obj$pca$center,
-          scale = .lm.obj$pca$scale)
+          center = .tdr.obj$pca$center,
+          scale = .tdr.obj$pca$scale)
       
     } else {
       
       pca_res <-
-        Matrix::t(x = .lm.obj$landmarks) |>
+        Matrix::t(x = .tdr.obj$landmarks) |>
         (\(x)
-         (x - .lm.obj$pca$center) /
-           .lm.obj$pca$scale
+         (x - .tdr.obj$pca$center) /
+           .tdr.obj$pca$scale
         )() |>
         Matrix::t() |>
         base::svd()
       
     }
     
-    .lm.obj$pca <-
+    .tdr.obj$pca <-
       c(pca_res,
-        .lm.obj$pca)
+        .tdr.obj$pca)
     
-    dimnames(x = .lm.obj$pca$u) <-
-      list(rownames(x = .lm.obj$landmarks),
+    dimnames(x = .tdr.obj$pca$u) <-
+      list(rownames(x = .tdr.obj$landmarks),
            paste0("PC",
-                  seq_along(along.with = .lm.obj$pca$d)))
+                  seq_along(along.with = .tdr.obj$pca$d)))
     
-    names(x = .lm.obj$pca$d) <-
+    names(x = .tdr.obj$pca$d) <-
       paste0("PC",
-             seq_along(along.with = .lm.obj$pca$d))
+             seq_along(along.with = .tdr.obj$pca$d))
     
-    dimnames(x = .lm.obj$pca$v) <-
-      list(colnames(x = .lm.obj$landmarks),
+    dimnames(x = .tdr.obj$pca$v) <-
+      list(colnames(x = .tdr.obj$landmarks),
            paste0("PC",
-                  seq_along(along.with = .lm.obj$pca$d)))
+                  seq_along(along.with = .tdr.obj$pca$d)))
     
-    .lm.obj$pca$embed <-
-      .lm.obj$pca$u %*%
-      (base::diag(x = .lm.obj$pca$d) |>
+    .tdr.obj$pca$embed <-
+      .tdr.obj$pca$u %*%
+      (base::diag(x = .tdr.obj$pca$d) |>
          (\(x)
           `dimnames<-`(x= x,
-                       value = list(names(x = .lm.obj$pca$d),
-                                    names(x = .lm.obj$pca$d)))
+                       value = list(names(x = .tdr.obj$pca$d),
+                                    names(x = .tdr.obj$pca$d)))
          )())
     
-    .lm.obj$pca$sdev <-
-      .lm.obj$pca$d /
-      sqrt(x = max(1, nrow(x = .lm.obj$landmarks) - 1))
+    .tdr.obj$pca$sdev <-
+      .tdr.obj$pca$d /
+      sqrt(x = max(1, nrow(x = .tdr.obj$landmarks) - 1))
     
-    .lm.obj$pca$rotation <-
-      .lm.obj$pca$v
+    .tdr.obj$pca$rotation <-
+      .tdr.obj$pca$v
     
-    .lm.obj$pca$v <- .lm.obj$pca$d <- .lm.obj$pca$u <-
+    .tdr.obj$pca$v <- .tdr.obj$pca$d <- .tdr.obj$pca$u <-
       NULL
     
-    .lm.obj$pca$HVG <-
+    .tdr.obj$pca$HVG <-
       names(x = HVG)
     
     # Reconstruct landmark expression matrices from PCA (denoised versions)
-    if(.lm.obj$assay.type == "RNA"){
+    if(.tdr.obj$assay.type == "RNA"){
       
       # Z-scored version: for visualization/heatmaps
-      .lm.obj$scaled.landmarks <-
-        (.lm.obj$pca$embed %*% Matrix::t(x = .lm.obj$pca$rotation)) |>
+      .tdr.obj$scaled.landmarks <-
+        (.tdr.obj$pca$embed %*% Matrix::t(x = .tdr.obj$pca$rotation)) |>
         Matrix::t() |>
         (\(x)
          (x - Matrix::rowMeans(x = x)) /
@@ -1125,28 +1135,28 @@ get.landmarks <-
         Matrix::t() |>
         (\(x)
          `dimnames<-`(x = x,
-                      value = list(rownames(x = .lm.obj$landmarks),
-                                   colnames(x = .lm.obj$landmarks)))
+                      value = list(rownames(x = .tdr.obj$landmarks),
+                                   colnames(x = .tdr.obj$landmarks)))
         )()
       
       # Log-normalized version: back-transformed from PCA, de-noised
-      .lm.obj$landmarks <-
-        (.lm.obj$pca$embed %*% Matrix::t(x = .lm.obj$pca$rotation)) |>
+      .tdr.obj$landmarks <-
+        (.tdr.obj$pca$embed %*% Matrix::t(x = .tdr.obj$pca$rotation)) |>
         Matrix::t() |>
         (\(x)
-         (x * .lm.obj$pca$scale) +
-           .lm.obj$pca$center)() |>
+         (x * .tdr.obj$pca$scale) +
+           .tdr.obj$pca$center)() |>
         Matrix::t() |>
         (\(x)
          `dimnames<-`(x = x,
-                      value = list(rownames(x = .lm.obj$landmarks),
-                                   colnames(x = .lm.obj$landmarks)))
+                      value = list(rownames(x = .tdr.obj$landmarks),
+                                   colnames(x = .tdr.obj$landmarks)))
         )()
       
     } else {
       
-      .lm.obj$scaled.landmarks <-
-        Matrix::t(x = .lm.obj$landmarks) |>
+      .tdr.obj$scaled.landmarks <-
+        Matrix::t(x = .tdr.obj$landmarks) |>
         (\(x)
          (x - Matrix::rowMeans(x = x)) /
            matrixStats::rowSds(x = x)
@@ -1155,32 +1165,32 @@ get.landmarks <-
       
     }
     
-    if(!is.null(x = .lm.obj$harmony.var)){
+    if(!is.null(x = .tdr.obj$harmony.var)){
       
       warning("PCA embedding and rotations will be replaced by harmony-corrected embedding and roughly approximated rotations.")
       
       set.seed(seed = .seed)
       tmp.harmony <- 
-        harmony::RunHarmony(data_mat = .lm.obj$pca$embed, 
-                            meta_data = .lm.obj$metadata[.lm.obj$key,],
-                            vars_use = .lm.obj$harmony.var, 
+        harmony::RunHarmony(data_mat = .tdr.obj$pca$embed, 
+                            meta_data = .tdr.obj$metadata[.tdr.obj$key,],
+                            vars_use = .tdr.obj$harmony.var, 
                             return_obj = TRUE,
                             # see https://github.com/immunogenomics/harmony/blob/b36bab002c1767af6e665c81f186b40a87870e64/R/ui.R#L191
-                            nclust = min(round(x = nrow(x = .lm.obj$pca$embed) / 30), 100) |>
+                            nclust = min(round(x = nrow(x = .tdr.obj$pca$embed) / 30), 100) |>
                               max(20),
                             verbose = .verbose)
       
-      .lm.obj$harmony.obj <-
+      .tdr.obj$harmony.obj <-
         symphony::buildReferenceFromHarmonyObj(
           harmony_obj = tmp.harmony,
-          metadata = .lm.obj$metadata[.lm.obj$key,],
+          metadata = .tdr.obj$metadata[.tdr.obj$key,],
           vargenes_means_sds =
             dplyr::tibble(
-              symbol = colnames(x = .lm.obj$landmarks),
-              mean = .lm.obj$pca$center,
-              stddev = .lm.obj$pca$scale
+              symbol = colnames(x = .tdr.obj$landmarks),
+              mean = .tdr.obj$pca$center,
+              stddev = .tdr.obj$pca$scale
             ),
-          pca_loadings = .lm.obj$pca$rotation,
+          pca_loadings = .tdr.obj$pca$rotation,
           verbose = .verbose,
           do_umap = FALSE,
           save_uwot_path = NULL,
@@ -1191,11 +1201,11 @@ get.landmarks <-
         message("Returning harmony corrected embedding.")
       }
       
-      .lm.obj$pca$embed <-
-        Matrix::t(x = .lm.obj$harmony.obj$Z_corr)  |> 
+      .tdr.obj$pca$embed <-
+        Matrix::t(x = .tdr.obj$harmony.obj$Z_corr)  |> 
         (\(x)
          `rownames<-`(x = x,
-                      value = rownames(x = .lm.obj$landmarks))
+                      value = rownames(x = .tdr.obj$landmarks))
         )()
       
       if(isTRUE(x = .verbose)){
@@ -1211,37 +1221,37 @@ get.landmarks <-
       # Build design matrix Z with intercept
       Z <-
         stats::model.matrix(object = ~ 1 + ., 
-                            data = .lm.obj$metadata[.lm.obj$key, 
-                                                    .lm.obj$harmony.var,
+                            data = .tdr.obj$metadata[.tdr.obj$key, 
+                                                    .tdr.obj$harmony.var,
                                                     drop = FALSE])
       
-      # Residualize each column in .lm.obj$landmarks (unfortunately best can do is linear)
+      # Residualize each column in .tdr.obj$landmarks (unfortunately best can do is linear)
       Y.resid <- 
         stats::lm.fit(x = Z, # fast base R linear model fit
-                      y = as.matrix(x = .lm.obj$landmarks)) |>  
+                      y = as.matrix(x = .tdr.obj$landmarks)) |>  
         stats::residuals()  # same shape as Y
       
       # Scale by stored stddev
       Y.resid <- 
         Matrix::t(x = Y.resid) |> 
         (\(x)
-         x / .lm.obj$pca$scale
+         x / .tdr.obj$pca$scale
         )() |>
         Matrix::t()
       
       Yt.X <-
-        Matrix::crossprod(x = (.lm.obj$harmony.obj$Z_corr - Matrix::rowMeans(x = .lm.obj$harmony.obj$Z_corr)) |>
+        Matrix::crossprod(x = (.tdr.obj$harmony.obj$Z_corr - Matrix::rowMeans(x = .tdr.obj$harmony.obj$Z_corr)) |>
                             Matrix::t(),
                           y = Y.resid)
       
       res <-
         base::svd(x = Yt.X, 
-                  nu = nrow(x = .lm.obj$harmony.obj$Z_corr),
-                  nv = nrow(x = .lm.obj$harmony.obj$Z_corr))
+                  nu = nrow(x = .tdr.obj$harmony.obj$Z_corr),
+                  nv = nrow(x = .tdr.obj$harmony.obj$Z_corr))
       
       dimnames(x = res$v) <-
-        list(colnames(x = .lm.obj$landmarks),
-             rownames(x = .lm.obj$harmony.obj$Z_corr))
+        list(colnames(x = .tdr.obj$landmarks),
+             rownames(x = .tdr.obj$harmony.obj$Z_corr))
       
       res$v <-
         (Matrix::t(x = res$v) * 
@@ -1251,12 +1261,12 @@ get.landmarks <-
               sign())) |>
         Matrix::t()
       
-      .lm.obj$pca$rotation <-
+      .tdr.obj$pca$rotation <-
         res$v
       
     }
     
-    return(.lm.obj)
+    return(.tdr.obj)
     
   }
 

@@ -287,7 +287,7 @@ test_that("pipeline handles extreme marker values", {
   # Should handle extreme values without producing Inf/NaN
   expect_error(
     {
-      result <- setup.lm.obj(
+      result <- setup.tdr.obj(
         .cells = cells_extreme,
         .meta = meta_extreme,
         .markers = c("marker_low", "marker_high", "marker_normal"),

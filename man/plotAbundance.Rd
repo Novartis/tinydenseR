@@ -5,8 +5,8 @@
 \title{Plot Abundance}
 \usage{
 plotAbundance(
-  .lm.obj,
-  .x.split = colnames(x = .lm.obj$metadata)[1],
+  .tdr.obj,
+  .x.split = colnames(x = .tdr.obj$metadata)[1],
   .pop = NULL,
   .pop.from = "clustering",
   .subject.id = NULL,
@@ -19,7 +19,7 @@ plotAbundance(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
 
 \item{.x.split}{Character specifying metadata column for x-axis grouping (default first column).}
 

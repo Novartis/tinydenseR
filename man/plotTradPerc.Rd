@@ -5,8 +5,8 @@
 \title{Plot Traditional Percentages}
 \usage{
 plotTradPerc(
-  .lm.obj,
-  .x.split = colnames(x = .lm.obj$metadata)[1],
+  .tdr.obj,
+  .x.split = colnames(x = .tdr.obj$metadata)[1],
   .x.split.subset = NULL,
   .pop = NULL,
   .pop.from = "clustering",
@@ -22,7 +22,7 @@ plotTradPerc(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
 
 \item{.x.split}{Character specifying metadata column for x-axis grouping. Defaults to first
 column.}
@@ -76,7 +76,7 @@ the same subject/mouse. Useful for:
 \examples{
 \dontrun{
 # After mapping
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |>
   get.graph() |>
   get.map()

@@ -323,7 +323,7 @@ utils::head(x = .meta.DE.0.5)
 
 The core workflow involves four main steps:
 
-1. **`setup.lm.obj()`**: Initialize landmark object with data
+1. **`setup.tdr.obj()`**: Initialize landmark object with data
 2. **`get.landmarks()`**: Select landmark cells and compute PCA
 3. **`get.graph()`**: Build nearest-neighbor graph and cluster landmarks
 4. **`get.map()`**: Map all cells to their nearest landmarks
@@ -331,7 +331,7 @@ The core workflow involves four main steps:
 ```{r build-landmark-object}
 set.seed(seed = 123)
 lm.cells.DE.0.5 <-
-  tinydenseR::setup.lm.obj(
+  tinydenseR::setup.tdr.obj(
     .cells = .cells.DE.0.5,
     .meta = .meta.DE.0.5,
     .assay.type = "cyto"  # For flow/mass cytometry data
@@ -345,7 +345,7 @@ Let's visualize the landmark cells:
 
 ```{r viz-clustering}
 tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .feature = lm.cells.DE.0.5$graph$clustering$ids,
   .plot.title = "Landmarks",
   .point.size = 2,
@@ -381,10 +381,10 @@ Before performing differential expression analysis, we first run `get.lm()` to i
   ))()
 
 # Run differential abundance testing
-# get.lm() returns the updated .lm.obj with results in $map$lm[[.model.name]]
+# get.lm() returns the updated .tdr.obj with results in $map$lm[[.model.name]]
 lm.cells.DE.0.5 <-
   tinydenseR::get.lm(
-    .lm.obj = lm.cells.DE.0.5,
+    .tdr.obj = lm.cells.DE.0.5,
     .design = .design.0.5
   )
 
@@ -397,7 +397,7 @@ Let's visualize abundance changes to identify regions that might show differenti
 
 ```{r viz-abundance-fc}
 tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .feature = lm.cells.DE.0.5$map$lm[["default"]]$fit$coefficients[, "Activation"],
   .plot.title = "Activation vs Baseline",
   .color.label = "Abundance\nlog2(+0.5) FC",
@@ -416,7 +416,7 @@ We can also visualize regions of statistically significant abundance change:
 
 ```{r viz-hypothesis}
 tinydenseR::plotPCA(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .feature = base::ifelse(
     test = lm.cells.DE.0.5$map$lm[["default"]]$fit$coefficients[, "Activation"] < 0,
     yes = "less abundant",
@@ -442,7 +442,7 @@ A beeswarm plot provides a comprehensive view of abundance changes across cluste
 
 ```{r beeswarm}
 tinydenseR::plotBeeswarm(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .model.name = "default",
   .coefs = "Activation",
   .swarm.title = "Activation vs Baseline",
@@ -458,7 +458,7 @@ Now that we've identified cluster 3 as the target population, we can perform dif
 ```{r dea-cluster3}
 # Perform differential expression analysis for cluster 3 (target cells)
 .dea.0.5 <- tinydenseR::get.dea(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .design = .design.0.5,
   .id = "cluster.3"
 )
@@ -483,7 +483,7 @@ Let's examine the results:
 ```{r dea-res}
 # Visualize differential expression analysis for cluster 3 (target cells)
 tinydenseR::plotDEA(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .dea.obj = .dea.0.5
 )
 ```
@@ -544,7 +544,7 @@ final_data_DE |>
 
 # Perform differential expression analysis independently of clustering 3
 .cl.ind.dea.0.5 <- tinydenseR::get.dea(
-    .lm.obj = lm.cells.DE.0.5,
+    .tdr.obj = lm.cells.DE.0.5,
     .design = .design.0.5,
     .id.idx = which(x = (lm.cells.DE.0.5$landmarks[,"Marker1"] > log(x = 10)) &
                         (lm.cells.DE.0.5$landmarks[,"Marker5"] > log(x = 100)))
@@ -558,7 +558,7 @@ final_data_DE |>
 .cl.ind.dea.0.5$adj.p
 # Visualize differential expression analysis independently of clustering
 tinydenseR::plotDEA(
-    .lm.obj = lm.cells.DE.0.5,
+    .tdr.obj = lm.cells.DE.0.5,
     .dea.obj = .cl.ind.dea.0.5
 )
 ```
@@ -573,7 +573,7 @@ Above we identified differential cell states within cluster 3. Let's use `get.ma
 # Identify markers for cluster 3
 .marker.0.5 <-
   tinydenseR::get.marker(
-    .lm.obj = lm.cells.DE.0.5,
+    .tdr.obj = lm.cells.DE.0.5,
     .id1 = "cluster.3"
   )
 ```
@@ -583,7 +583,7 @@ We can visualize how markers are expressed in cluster 3 versus the rest of the p
 ```{r marker-visualization, fig.height=6}
 # Visualize marker expression: Intercept shows overall expression, .id1 shows cluster-specific enrichment
 tinydenseR::plotDEA(
-    .lm.obj = lm.cells.DE.0.5,
+    .tdr.obj = lm.cells.DE.0.5,
     .dea.obj = .marker.0.5,
     .coefs = c("(Intercept)", ".id1")
   )
@@ -627,7 +627,7 @@ tinydenseR::scatterPlot(
 In addition to the high resolution analysis described above, tinydenseR can also provide cluster-based results as follows.
 
 ```{r cluster-stats}
-tinydenseR::plotTradStats(.lm.obj = lm.cells.DE.0.5, .model.name = "default")
+tinydenseR::plotTradStats(.tdr.obj = lm.cells.DE.0.5, .model.name = "default")
 ```
 
 ```{r cluster-percentages, fig.height=5}
@@ -652,7 +652,7 @@ stat.test.percentages.DE.0.5 <-
   rstatix::add_xy_position(x = "treatment")
 
 tinydenseR::plotTradPerc(
-  .lm.obj = lm.cells.DE.0.5,
+  .tdr.obj = lm.cells.DE.0.5,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 

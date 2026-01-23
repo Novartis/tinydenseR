@@ -6,8 +6,8 @@
 Plot UMAP}
 \usage{
 plotUMAP(
-  .lm.obj,
-  .feature = .lm.obj$graph$clustering$ids,
+  .tdr.obj,
+  .feature = .tdr.obj$graph$clustering$ids,
   .cat.feature.color = Color.Palette[1, 1:5],
   .panel.size = 2,
   .midpoint = NULL,
@@ -20,9 +20,9 @@ plotUMAP(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object with UMAP computed via \code{get.graph()}.}
+\item{.tdr.obj}{A tinydenseR object with UMAP computed via \code{get.graph()}.}
 
-\item{.feature}{Numeric vector or factor of length \code{nrow(.lm.obj$landmarks)} to color points by.
+\item{.feature}{Numeric vector or factor of length \code{nrow(.tdr.obj$landmarks)} to color points by.
 Defaults to cluster IDs from \code{$graph$clustering$ids}. Can be:
 \itemize{
 \item Numeric: gene expression, fold changes, statistics (uses diverging color scale)
@@ -70,7 +70,7 @@ Requires \code{get.graph()} to have been run. Interactive hover features require
 \examples{
 \dontrun{
 # After graph construction
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |>
   get.graph()
 

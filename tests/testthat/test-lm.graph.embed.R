@@ -50,7 +50,7 @@ test_that("fast.jaccard.r returns a symmetric sparse matrix", {
 
 # Test for get.graph
 
-test_that("get.graph adds graph to .lm.obj", {
+test_that("get.graph adds graph to .tdr.obj", {
   .cells <- list(sample1 = matrix(data = runif(n = 270), 
                                   nrow = 90, 
                                   ncol = 3, 
@@ -80,14 +80,14 @@ test_that("get.graph adds graph to .lm.obj", {
     })
   .meta <- data.frame(row.names = c("sample1", "sample2"),
                       group = c("A", "B"))
-  result <- setup.lm.obj(.cells = .cells,
+  result <- setup.tdr.obj(.cells = .cells,
                          .meta = .meta,
                          .markers = c("CD3", "CD4", "CD8"),
                          .assay.type = "cyto",
                          .verbose = FALSE)
-  result <- get.landmarks(.lm.obj = result,
+  result <- get.landmarks(.tdr.obj = result,
                            .verbose = FALSE)
-  result <- get.graph(.lm.obj = result,
+  result <- get.graph(.tdr.obj = result,
                         .k = 3,
                         .scale = FALSE,
                         .verbose = FALSE,
@@ -99,7 +99,7 @@ test_that("get.graph adds graph to .lm.obj", {
 
 # Test for get.map
 
-test_that("get.map adds mapping info to .lm.obj", {
+test_that("get.map adds mapping info to .tdr.obj", {
   .cells <- list(sample1 = matrix(data = runif(n = 270), 
                                   nrow = 90, 
                                   ncol = 3, 
@@ -129,14 +129,14 @@ test_that("get.map adds mapping info to .lm.obj", {
     })
   .meta <- data.frame(row.names = c("sample1", "sample2"),
                       group = c("A", "B"))
-  result <- setup.lm.obj(.cells = .cells,
+  result <- setup.tdr.obj(.cells = .cells,
                          .meta = .meta,
                          .markers = c("CD3", "CD4", "CD8"),
                          .assay.type = "cyto",
                          .verbose = FALSE)
-  result <- get.landmarks(.lm.obj = result,
+  result <- get.landmarks(.tdr.obj = result,
                           .verbose = FALSE)
-  result <- get.graph(.lm.obj = result,
+  result <- get.graph(.tdr.obj = result,
                          .k = 3,
                          .scale = FALSE,
                          .verbose = FALSE,
@@ -176,19 +176,19 @@ test_that("get.lm.features.stats returns a list of feature stats", {
     })
   .meta <- data.frame(row.names = c("sample1", "sample2"),
                       group = c("A", "B"))
-  result <- setup.lm.obj(.cells = .cells,
+  result <- setup.tdr.obj(.cells = .cells,
                          .meta = .meta,
                          .markers = c("CD3", "CD4", "CD8"),
                          .assay.type = "cyto",
                          .verbose = FALSE)
-  result <- get.landmarks(.lm.obj = result,
+  result <- get.landmarks(.tdr.obj = result,
                           .verbose = FALSE)
-  result <- get.graph(.lm.obj = result,
+  result <- get.graph(.tdr.obj = result,
                          .k = 3,
                          .scale = FALSE,
                          .verbose = FALSE,
                          .seed = 42)
   expect_type(object = result, type = "list")
-  result <- get.lm.features.stats(.lm.obj = result)
+  result <- get.lm.features.stats(.tdr.obj = result)
   expect_type(object = result, type = "list")
 })

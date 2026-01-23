@@ -21,12 +21,12 @@ library(tinydenseR)
 
 test_that("plotting functions validate input types", {
   # Test that plotting functions require proper input types
-  expect_error(plotUMAP(.lm.obj = NULL))
-  expect_error(plotUMAP(.lm.obj = "not_a_list"))
-  expect_error(plotUMAP(.lm.obj = list()))
+  expect_error(plotUMAP(.tdr.obj = NULL))
+  expect_error(plotUMAP(.tdr.obj = "not_a_list"))
+  expect_error(plotUMAP(.tdr.obj = list()))
   
-  expect_error(plotPCA(.lm.obj = NULL))
-  expect_error(plotPCA(.lm.obj = "not_a_list"))
+  expect_error(plotPCA(.tdr.obj = NULL))
+  expect_error(plotPCA(.tdr.obj = "not_a_list"))
   
   expect_error(scatterPlot(.x.feature = NULL, .y.feature = NULL))
   # Test scatterPlot with mismatched vector lengths
@@ -35,14 +35,14 @@ test_that("plotting functions validate input types", {
 
 test_that("plotUMAP works with minimal valid structure", {
   # Test plotUMAP with minimal required structure
-  .lm.obj <- list(
+  .tdr.obj <- list(
     graph = list(
       uwot = list(embedding = matrix(c(1, 2, 3, 4), ncol=2)),
       clustering = list(ids = factor(c("A", "B")))
     )
   )
   
-  result <- plotUMAP(.lm.obj = .lm.obj)
+  result <- plotUMAP(.tdr.obj = .tdr.obj)
   expect_true("ggplot" %in% class(result))
 })
 
@@ -66,27 +66,27 @@ test_that("plotting functions handle mismatched dimensions", {
 test_that("plotting functions validate required fields", {
   # Test plotUMAP missing required fields
   incomplete_obj1 <- list(graph = list())
-  expect_error(plotUMAP(.lm.obj = incomplete_obj1))
+  expect_error(plotUMAP(.tdr.obj = incomplete_obj1))
   
   incomplete_obj2 <- list(graph = list(uwot = list()))
-  expect_error(plotUMAP(.lm.obj = incomplete_obj2))
+  expect_error(plotUMAP(.tdr.obj = incomplete_obj2))
   
   incomplete_obj3 <- list(graph = list(uwot = list(embedding = matrix(c(1,2), ncol=2))))
-  expect_error(plotUMAP(.lm.obj = incomplete_obj3))  # Missing clustering
+  expect_error(plotUMAP(.tdr.obj = incomplete_obj3))  # Missing clustering
 })
 
 test_that("input validation for other plotting functions", {
   # Test basic input validation for functions that require complex structures
   # Rather than mock the complex structures, just test they expect the right input types
   
-  expect_error(plotPCA(.lm.obj = list()))
-  expect_error(plotBeeswarm(.lm.obj = list()))
-  expect_error(plot2Markers(.lm.obj = list()))
-  expect_error(plotSamplePCA(.lm.obj = list()))
-  expect_error(plotTradStats(.lm.obj = list(), .stats.obj = list()))
-  expect_error(plotTradPerc(.lm.obj = list()))
-  expect_error(plotAbundance(.lm.obj = list()))
-  expect_error(plotDEA(.lm.obj = list(), .dea.obj = list(), .coefs = "test"))
+  expect_error(plotPCA(.tdr.obj = list()))
+  expect_error(plotBeeswarm(.tdr.obj = list()))
+  expect_error(plot2Markers(.tdr.obj = list()))
+  expect_error(plotSamplePCA(.tdr.obj = list()))
+  expect_error(plotTradStats(.tdr.obj = list(), .stats.obj = list()))
+  expect_error(plotTradPerc(.tdr.obj = list()))
+  expect_error(plotAbundance(.tdr.obj = list()))
+  expect_error(plotDEA(.tdr.obj = list(), .dea.obj = list(), .coefs = "test"))
 })
 
 

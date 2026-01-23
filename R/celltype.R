@@ -36,9 +36,9 @@
 #'   \item \code{\link{get.dea}} enables cell-type-specific differential expression analysis
 #' }
 #'
-#' @param .lm.obj A list object initialized with \code{setup.lm.obj} and processed 
+#' @param .tdr.obj A list object initialized with \code{setup.tdr.obj} and processed 
 #'   with \code{get.landmarks} and \code{get.graph}. Must contain 
-#'   \code{.lm.obj$graph$clustering$ids}.
+#'   \code{.tdr.obj$graph$clustering$ids}.
 #' @param .celltyping.map A named list mapping cell types to cluster IDs. 
 #'   List names are cell type labels (e.g., "CD4.T.cells"), and each element 
 #'   is a character vector of cluster IDs (e.g., c("cluster.01", "cluster.02")) 
@@ -46,12 +46,12 @@
 #'   \itemize{
 #'     \item Each cell type name must be unique
 #'     \item Each cluster can only map to one cell type
-#'     \item All clusters in \code{.lm.obj$graph$clustering$ids} must be mapped
+#'     \item All clusters in \code{.tdr.obj$graph$clustering$ids} must be mapped
 #'   }
 #' @examples
 #' \dontrun{
 #' # After clustering with get.graph()
-#' lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+#' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks() |>
 #'   get.graph()
 #' 
@@ -64,7 +64,7 @@
 #' )
 #' lm.cells <- celltyping(lm.cells, celltype_map)
 #' }
-#' @return The \code{.lm.obj} with the following updated fields:
+#' @return The \code{.tdr.obj} with the following updated fields:
 #'   \describe{
 #'     \item{\code{$graph$celltyping$ids}}{Factor vector of cell type labels 
 #'       for each landmark}
@@ -81,7 +81,7 @@
 #'   \code{\link{lm.cluster}} for the clustering that produces cluster IDs used here
 #' @export
 celltyping <-
-  function(.lm.obj,
+  function(.tdr.obj,
            .celltyping.map){
     
     cell.pop <- NULL
@@ -112,11 +112,11 @@ celltyping <-
                   "\nEach cluster can only belong to one cell type."))
     }
     
-    if(any(!(unique(x = .lm.obj$graph$clustering$ids) %in%
+    if(any(!(unique(x = .tdr.obj$graph$clustering$ids) %in%
              cls.in.map))){
       stop(paste0("Every cluster must be mapped to a cell type. Unmapped clusters: ",
-                  paste(unique(x = .lm.obj$graph$clustering$ids)[
-                    !(unique(x = .lm.obj$graph$clustering$ids) %in%
+                  paste(unique(x = .tdr.obj$graph$clustering$ids)[
+                    !(unique(x = .tdr.obj$graph$clustering$ids) %in%
                         cls.in.map)],
                     collapse = ", "),
                   "\nAdd these to .celltyping.map or merge them with existing clusters."))
@@ -124,23 +124,23 @@ celltyping <-
     }
     
     if(!all(cls.in.map %in%
-            unique(x = .lm.obj$graph$clustering$ids))){
+            unique(x = .tdr.obj$graph$clustering$ids))){
       stop(paste0("Invalid cluster ID(s) in .celltyping.map: ",
                   paste(cls.in.map[!(cls.in.map %in%
-                                       unique(x = .lm.obj$graph$clustering$ids))],
+                                       unique(x = .tdr.obj$graph$clustering$ids))],
                         collapse = ", "),
-                  "\nThese clusters do not exist in .lm.obj$graph$clustering$ids.",
+                  "\nThese clusters do not exist in .tdr.obj$graph$clustering$ids.",
                   "\nRun lm.cluster() to see available cluster IDs."))
     }
     
-    .lm.obj$graph$celltyping <-
+    .tdr.obj$graph$celltyping <-
       vector(mode = "list")
     
     # Create cell type labels by:
     # 1. Inverting the map: cluster IDs -> cell type names
     # 2. Indexing by cluster IDs to get corresponding cell type for each landmark
     # 3. Converting to factor to maintain consistency with clustering$ids
-    .lm.obj$graph$celltyping$ids <-
+    .tdr.obj$graph$celltyping$ids <-
       .celltyping.map |>
       (\(x)
        stats::setNames(
@@ -150,17 +150,17 @@ celltyping <-
                  unlist(use.names = FALSE)),
          nm = unlist(x = x,
                      use.names = FALSE))[
-                       as.character(x = .lm.obj$graph$clustering$ids)]
+                       as.character(x = .tdr.obj$graph$clustering$ids)]
       )() |>
       as.factor()
     
     # For RNA: select top PC-loading genes for heatmap visualization
     # Takes top 3 positive and top 3 negative loadings per PC to capture
     # genes that drive the major axes of variation
-    if(.lm.obj$assay.type == "RNA") {
+    if(.tdr.obj$assay.type == "RNA") {
       
       top <-
-        apply(X = .lm.obj$pca$rotation,
+        apply(X = .tdr.obj$pca$rotation,
               MARGIN = 2,
               FUN = function(PC.rot){
                 
@@ -176,16 +176,16 @@ celltyping <-
               }) |>
         as.vector() |> 
         (\(x)
-         rownames(x = .lm.obj$pca$rotation)[x]
+         rownames(x = .tdr.obj$pca$rotation)[x]
         )() |>
         unique()
       
     }
     
-    .lm.obj$graph$celltyping$median.exprs <-
-      (if(.lm.obj$assay.type == "RNA") .lm.obj$scaled.landmarks[,top] else .lm.obj$landmarks) |>
+    .tdr.obj$graph$celltyping$median.exprs <-
+      (if(.tdr.obj$assay.type == "RNA") .tdr.obj$scaled.landmarks[,top] else .tdr.obj$landmarks) |>
       dplyr::as_tibble() |>
-      cbind(cell.pop = as.character(x = .lm.obj$graph$celltyping$ids)) |>
+      cbind(cell.pop = as.character(x = .tdr.obj$graph$celltyping$ids)) |>
       dplyr::group_by(cell.pop) |>
       dplyr::summarize_all(.funs = mean) |>
       as.data.frame() |>
@@ -195,8 +195,8 @@ celltyping <-
       )() |>
       as.matrix()
     
-    .lm.obj$graph$celltyping$pheatmap <-
-      pheatmap::pheatmap(mat = .lm.obj$graph$celltyping$median.exprs,
+    .tdr.obj$graph$celltyping$pheatmap <-
+      pheatmap::pheatmap(mat = .tdr.obj$graph$celltyping$median.exprs,
                          color = grDevices::colorRampPalette(
                            unname(obj =
                                     Color.Palette[1,c(1,6,2)]))(100),
@@ -213,6 +213,6 @@ celltyping <-
                          treeheight_col = 20,
                          silent = TRUE)
     
-    return(.lm.obj)
+    return(.tdr.obj)
     
   }

@@ -5,7 +5,7 @@
 \title{Bee swarm Plot of Density Estimate Change}
 \usage{
 plotBeeswarm(
-  .lm.obj,
+  .tdr.obj,
   .model.name = "default",
   .coefs,
   .q = 0.1,
@@ -24,10 +24,10 @@ plotBeeswarm(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
-Statistical results should be stored in \code{.lm.obj$map$lm}.}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
+Statistical results should be stored in \code{.tdr.obj$map$lm}.}
 
-\item{.model.name}{Character string naming which model fit to use from \code{.lm.obj$map$lm}
+\item{.model.name}{Character string naming which model fit to use from \code{.tdr.obj$map$lm}
 (default "default"). Must match a name used in \code{get.lm(.model.name = ...)}.}
 
 \item{.coefs}{Character vector of coefficient names from the design matrix to plot. Must match
@@ -87,7 +87,7 @@ samples, helping interpret whether changes occur in rare or common populations.
 \examples{
 \dontrun{
 # After statistical testing
-lm.obj <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.obj <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |>
   get.graph() |>
   get.map()

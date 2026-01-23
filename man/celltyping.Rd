@@ -4,12 +4,12 @@
 \alias{celltyping}
 \title{Manually assign cell type labels to clusters}
 \usage{
-celltyping(.lm.obj, .celltyping.map)
+celltyping(.tdr.obj, .celltyping.map)
 }
 \arguments{
-\item{.lm.obj}{A list object initialized with \code{setup.lm.obj} and processed
+\item{.tdr.obj}{A list object initialized with \code{setup.tdr.obj} and processed
 with \code{get.landmarks} and \code{get.graph}. Must contain
-\code{.lm.obj$graph$clustering$ids}.}
+\code{.tdr.obj$graph$clustering$ids}.}
 
 \item{.celltyping.map}{A named list mapping cell types to cluster IDs.
 List names are cell type labels (e.g., "CD4.T.cells"), and each element
@@ -18,11 +18,11 @@ that belong to that cell type. Requirements:
 \itemize{
 \item Each cell type name must be unique
 \item Each cluster can only map to one cell type
-\item All clusters in \code{.lm.obj$graph$clustering$ids} must be mapped
+\item All clusters in \code{.tdr.obj$graph$clustering$ids} must be mapped
 }}
 }
 \value{
-The \code{.lm.obj} with the following updated fields:
+The \code{.tdr.obj} with the following updated fields:
 \describe{
 \item{\code{$graph$celltyping$ids}}{Factor vector of cell type labels
 for each landmark}
@@ -59,7 +59,7 @@ Cell type labels assigned here will be used in downstream analyses:
 \examples{
 \dontrun{
 # After clustering with get.graph()
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |>
   get.graph()
 

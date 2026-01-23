@@ -19,12 +19,12 @@ library(tinydenseR)
 
 # Integration tests for typical workflow
 
-test_that("setup.lm.obj integration works", {
+test_that("setup.tdr.obj integration works", {
   # Test just the setup step which is more reliable
   test_data <- create_test_lm_obj(n_cells = 10, n_markers = 3, n_samples = 2)
   
   # Step 1: Setup
-  .lm.obj <- setup.lm.obj(
+  .tdr.obj <- setup.tdr.obj(
     .cells = test_data$cells,
     .meta = test_data$meta,
     .markers = c("marker_1", "marker_2", "marker_3"),
@@ -32,11 +32,11 @@ test_that("setup.lm.obj integration works", {
     .verbose = FALSE
   )
   
-  expect_type(object = .lm.obj, type = "list")
-  expect_true("cells" %in% names(x = .lm.obj))
-  expect_true("metadata" %in% names(x = .lm.obj))
-  expect_true("assay.type" %in% names(x = .lm.obj))
-  expect_equal(.lm.obj$assay.type, "cyto")
+  expect_type(object = .tdr.obj, type = "list")
+  expect_true("cells" %in% names(x = .tdr.obj))
+  expect_true("metadata" %in% names(x = .tdr.obj))
+  expect_true("assay.type" %in% names(x = .tdr.obj))
+  expect_equal(.tdr.obj$assay.type, "cyto")
   
   # Clean up temp files
   cleanup_test_files(test_data)
@@ -45,14 +45,14 @@ test_that("setup.lm.obj integration works", {
 test_that("workflow functions validate inputs properly", {
   # Test that functions properly validate their inputs
   
-  # Test setup.lm.obj validation with mismatched names
+  # Test setup.tdr.obj validation with mismatched names
   cells_list <- list("sample1" = matrix(1:10, ncol=2))
   meta_df <- data.frame(condition = "A", row.names = "sample2")
-  expect_error(setup.lm.obj(.cells = cells_list, .meta = meta_df),
+  expect_error(setup.tdr.obj(.cells = cells_list, .meta = meta_df),
                "Sample names mismatch between .cells and .meta")
   
   # Test get.landmarks validation with incomplete object
-  .lm.obj <- list(assay.type = "RNA")
-  expect_error(get.landmarks(.lm.obj = .lm.obj),
-               "Invalid .lm.obj")  # Should error due to missing required fields
+  .tdr.obj <- list(assay.type = "RNA")
+  expect_error(get.landmarks(.tdr.obj = .tdr.obj),
+               "Invalid .tdr.obj")  # Should error due to missing required fields
 })

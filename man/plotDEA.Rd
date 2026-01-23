@@ -5,11 +5,11 @@
 \title{Plot Differential Expression Analysis Results}
 \usage{
 plotDEA(
-  .lm.obj,
+  .tdr.obj,
   .dea.obj,
   .coefs = colnames(x = .dea.obj$coefficients),
   .order.by = "clustering",
-  .markers = colnames(x = .lm.obj$graph[[.order.by]]$median.exprs),
+  .markers = colnames(x = .tdr.obj$graph[[.order.by]]$median.exprs),
   .q = 0.1,
   .row.space.scaler = 0.2,
   .col.space.scaler = 0.065,
@@ -17,7 +17,7 @@ plotDEA(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
 
 \item{.dea.obj}{Differential expression results from \code{get.dea()}.}
 

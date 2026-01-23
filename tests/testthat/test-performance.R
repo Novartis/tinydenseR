@@ -24,18 +24,18 @@ test_that("functions handle empty inputs gracefully", {
   empty_cells <- list("sample1" = tempfile())
   empty_meta <- data.frame(condition = "A", row.names = "sample2")
   
-  expect_error(setup.lm.obj(.cells = empty_cells, .meta = empty_meta),
+  expect_error(setup.tdr.obj(.cells = empty_cells, .meta = empty_meta),
                "Sample names mismatch between .cells and .meta")
   
   # Test get.lm with invalid inputs
-  expect_error(get.lm(.lm.obj = list()))
+  expect_error(get.lm(.tdr.obj = list()))
 })
 
 test_that("functions handle large datasets", {
   skip_on_cran()
   skip_if_not_installed("Matrix")
   
-  # Test setup.lm.obj with larger mock data
+  # Test setup.tdr.obj with larger mock data
   large_cells <- list(
     sample1 = tempfile(),
     sample2 = tempfile(),
@@ -55,7 +55,7 @@ test_that("functions handle large datasets", {
     row.names = paste0("sample", 1:3)
   )
   
-  result <- setup.lm.obj(
+  result <- setup.tdr.obj(
     .cells = large_cells, 
     .meta = large_meta, 
     .verbose = FALSE
@@ -70,32 +70,32 @@ test_that("functions handle large datasets", {
 
 test_that("plotting functions handle different data sizes", {
   # Test with minimal data
-  .lm.obj_small <- list(
+  .tdr.obj_small <- list(
     graph = list(
       uwot = list(embedding = matrix(runif(4), ncol=2)),
       clustering = list(ids = factor(c("A", "B")))
     )
   )
   
-  result_small <- plotUMAP(.lm.obj = .lm.obj_small)
+  result_small <- plotUMAP(.tdr.obj = .tdr.obj_small)
   expect_true("ggplot" %in% class(result_small))
   
   # Test with larger data
-  .lm.obj_large <- list(
+  .tdr.obj_large <- list(
     graph = list(
       uwot = list(embedding = matrix(runif(2000), ncol=2)),
       clustering = list(ids = factor(sample(letters[1:5], 1000, replace = TRUE)))
     )
   )
   
-  result_large <- plotUMAP(.lm.obj = .lm.obj_large)
+  result_large <- plotUMAP(.tdr.obj = .tdr.obj_large)
   expect_true("ggplot" %in% class(result_large))
 })
 
 test_that("functions handle edge cases", {
   # Test with invalid data types
-  expect_error(get.lm(.lm.obj = "not_a_list"))
-  expect_error(get.dea(.lm.obj = NULL))
+  expect_error(get.lm(.tdr.obj = "not_a_list"))
+  expect_error(get.dea(.tdr.obj = NULL))
   
   # Test plotting functions with minimal valid data
   minimal_obj <- list(
@@ -105,13 +105,13 @@ test_that("functions handle edge cases", {
     )
   )
   
-  result <- plotUMAP(.lm.obj = minimal_obj)
+  result <- plotUMAP(.tdr.obj = minimal_obj)
   expect_true("ggplot" %in% class(result))
 })
 
 test_that("functions validate input types properly", {
   # Test that functions check for proper input types
-  expect_error(setup.lm.obj(.cells = "not_a_list", .meta = data.frame()))
+  expect_error(setup.tdr.obj(.cells = "not_a_list", .meta = data.frame()))
   
   # Test with valid cells but wrong meta type - create a temporary RDS file with minimal data
   temp_file <- tempfile(fileext = ".RDS")
@@ -119,12 +119,12 @@ test_that("functions validate input types properly", {
                            dimnames = list(c("cell1", "cell2"), c("gene1", "gene2", "gene3", "gene4", "gene5")))
   saveRDS(minimal_matrix, file = temp_file)
   empty_cells <- list("sample1" = temp_file)
-  expect_error(setup.lm.obj(.cells = empty_cells, .meta = "not_a_dataframe"), 
+  expect_error(setup.tdr.obj(.cells = empty_cells, .meta = "not_a_dataframe"), 
                ".meta must be a data.frame object")
   unlink(temp_file)  # Clean up
   
   # Test with proper types but wrong structure
   wrong_cells <- list(1, 2, 3)  # numeric instead of file paths
   proper_meta <- data.frame(condition = "A", row.names = "sample1")
-  expect_error(setup.lm.obj(.cells = wrong_cells, .meta = proper_meta))
+  expect_error(setup.tdr.obj(.cells = wrong_cells, .meta = proper_meta))
 })

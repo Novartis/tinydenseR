@@ -5,7 +5,7 @@
 \title{Bidimensional Hexbin Plot for Marker Expression}
 \usage{
 plot2Markers(
-  .lm.obj,
+  .tdr.obj,
   .id = NULL,
   .id.from = "clustering",
   .x.feature = "CD3",
@@ -20,15 +20,15 @@ plot2Markers(
 )
 }
 \arguments{
-\item{.lm.obj}{A tinydenseR object processed through \code{get.landmarks()} and \code{get.graph()}.}
+\item{.tdr.obj}{A tinydenseR object processed through \code{get.landmarks()} and \code{get.graph()}.}
 
 \item{.id}{Optional character: cluster or celltype ID to highlight. If NULL (default), plots all landmarks.}
 
 \item{.id.from}{Character: "clustering" (default) or "celltyping". Source of \code{.id}.}
 
-\item{.x.feature}{Character: column name from \code{.lm.obj$landmarks} for x-axis (default "CD3").}
+\item{.x.feature}{Character: column name from \code{.tdr.obj$landmarks} for x-axis (default "CD3").}
 
-\item{.y.feature}{Character: column name from \code{.lm.obj$landmarks} for y-axis (default "CD20").}
+\item{.y.feature}{Character: column name from \code{.tdr.obj$landmarks} for y-axis (default "CD20").}
 
 \item{.bins}{Integer: number of hexagonal bins for main plot (default 128). Higher values = finer resolution.}
 
@@ -74,7 +74,7 @@ This visualization helps identify:
 \examples{
 \dontrun{
 # After landmark identification and graph construction
-lm.cells <- setup.lm.obj(.cells = .cells, .meta = .meta) |>
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |>
   get.graph()
 

@@ -185,7 +185,7 @@ sim_trajectory <-
 
 # Set up the landmark object
 lm.cells <-
-    tinydenseR::setup.lm.obj(
+    tinydenseR::setup.tdr.obj(
         .cells = .min.cells,
         .meta = .min.meta, 
         .assay.type = "RNA",
@@ -197,7 +197,7 @@ lm.cells <-
     tinydenseR::get.map()
 
 # Visualize results
-tinydenseR::plotPCA(.lm.obj = lm.cells,
+tinydenseR::plotPCA(.tdr.obj = lm.cells,
                     .point.size = 1,
                     .panel.size = 1.5)
 ```
@@ -509,7 +509,7 @@ if (curl::has_internet()) {
 set.seed(seed = 123)
 
 # Create the main tinydenseR object
-lm.cells <- tinydenseR::setup.lm.obj(
+lm.cells <- tinydenseR::setup.tdr.obj(
     .cells = .cells,                    # Expression data
     .meta = .meta,                      # Sample metadata  ,       
     .assay.type = "RNA",              # Data type
@@ -530,7 +530,7 @@ lm.cells <- tinydenseR::setup.lm.obj(
     )
 
 # Map all cells to landmarks
-lm.cells <- tinydenseR::get.map(.lm.obj = lm.cells,
+lm.cells <- tinydenseR::get.map(.tdr.obj = lm.cells,
                                .verbose = FALSE)
 ```
 
@@ -570,17 +570,17 @@ lm.cells$map$fdens |>
 # Test for differential abundance between conditions
 # Results stored in lm.cells$map$lm[["default"]]
 lm.cells <- tinydenseR::get.lm(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .design = .design,
     .verbose = FALSE 
 )
-#> Warning in tinydenseR::get.lm(.lm.obj = lm.cells, .design = .design, .verbose =
-#> FALSE): q-value estimation is not recommended for fewer than 100 tests. Using
+#> Warning in tinydenseR::get.lm(.tdr.obj = lm.cells, .design = .design, .verbose
+#> = FALSE): q-value estimation is not recommended for fewer than 100 tests. Using
 #> BH instead.
 
 # Perform differential expression analysis
 .dea <- tinydenseR::get.dea(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .design = .design, 
     .verbose = FALSE
 )
@@ -593,7 +593,7 @@ Landmarks with differential density:
 ``` r
 # Show density fold changes between conditions
 tinydenseR::plotPCA(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .feature = lm.cells$map$lm[["default"]]$fit$coefficients[,"ConditionB"],
     .panel.size = 1.5,
     .point.size = 1,
@@ -603,7 +603,7 @@ tinydenseR::plotPCA(
 
 # Highlight significantly different regions
 tinydenseR::plotPCA(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .feature = ifelse(
         test = lm.cells$map$lm[["default"]]$fit$coefficients[,"ConditionB"] < 0,
         yes = "less abundant",
@@ -632,12 +632,12 @@ red.design <- model.matrix(object = ~ Replicate,
 
 # Fit reduced model (stored in lm.cells$map$lm[["reduced"]])
 lm.cells <- tinydenseR::get.lm(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .design = red.design,
     .model.name = "reduced",
     .verbose = FALSE 
 )
-#> Warning in tinydenseR::get.lm(.lm.obj = lm.cells, .design = red.design, :
+#> Warning in tinydenseR::get.lm(.tdr.obj = lm.cells, .design = red.design, :
 #> q-value estimation is not recommended for fewer than 100 tests. Using BH
 #> instead.
 
@@ -645,7 +645,7 @@ lm.cells <- tinydenseR::get.lm(
 # Embedding stored in lm.cells$map$embedding$pePC[["Condition"]]
 lm.cells <-
   tinydenseR::get.embedding(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .full.model = "default",
     .term.of.interest = "Condition",
     .red.model = "reduced",
@@ -662,7 +662,7 @@ lm.cells <-
 ``` r
 # Embed samples based on differences along Condition
 tinydenseR::plotSampleEmbedding(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .embedding = "pePC",
     .sup.embed.slot = "Condition",
     .color.by = "Condition",
@@ -685,7 +685,7 @@ tinydenseR::plotSampleEmbedding(
 most_down_gene <- sort(.dea$coefficients[,"ConditionB"])[1] |> names()
 
 tinydenseR::plotPCA(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .feature = lm.cells$landmarks[,most_down_gene],
     .panel.size = 1.5,
     .point.size = 1,
@@ -696,7 +696,7 @@ tinydenseR::plotPCA(
 most_up_gene <- sort(.dea$coefficients[,"ConditionB"], decreasing = TRUE)[1] |> names()
 
 tinydenseR::plotPCA(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .feature = lm.cells$landmarks[,most_up_gene],
     .panel.size = 1.5,
     .point.size = 1,
@@ -713,11 +713,11 @@ tinydenseR::plotPCA(
 ``` r
 # Add feature statistics for interactive exploration
 lm.cells <- 
-  tinydenseR::get.lm.features.stats(.lm.obj = lm.cells)
+  tinydenseR::get.lm.features.stats(.tdr.obj = lm.cells)
 
 # Create interactive plot with hover information
 tinydenseR::plotPCA(
-    .lm.obj = lm.cells,
+    .tdr.obj = lm.cells,
     .hover.stats = "marker",
     .panel.size = 1.5,
     .point.size = 1
