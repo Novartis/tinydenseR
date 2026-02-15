@@ -350,6 +350,11 @@ plotUMAP <-
     }
     
     # Randomize row order to avoid plotting bias
+    old.seed2 <- .Random.seed
+    on.exit(expr = assign(x = ".Random.seed",
+                          value = old.seed2,
+                          envir = .GlobalEnv),
+            add = TRUE)
     set.seed(seed = 123)
     dat.df <-
       dat.df  |>
@@ -432,9 +437,9 @@ plotUMAP <-
     
   }
 
-#' Bee swarm Plot of Density Estimate Change
+#' Bee Swarm Plot of Density Estimate Change
 #'
-#' Creates a beeswarm plot showing effect sizes (log fold changes) from differential abundance 
+#' Creates a beeswarm plot showing effect sizes (log fold changes) from differential density 
 #' testing, with points colored by significance. Optionally splits results by cluster or cell type 
 #' and displays mean cell percentages alongside for biological context.
 #'
@@ -477,7 +482,7 @@ plotUMAP <-
 #' When split by clustering/celltyping, the percentage plot shows mean cell type abundances across 
 #' samples, helping interpret whether changes occur in rare or common populations.
 #' 
-#' @seealso \code{\link{get.lm}}, \code{\link{plotAbundance}}
+#' @seealso \code{\link{get.lm}}, \code{\link{plotDensity}}
 #' 
 #' @examples
 #' \dontrun{
@@ -710,6 +715,11 @@ plotBeeswarm <-
       
     }
     
+    old.seed <- .Random.seed
+    on.exit(expr = assign(x = ".Random.seed",
+                          value = old.seed,
+                          envir = .GlobalEnv),
+            add = TRUE)
     set.seed(seed = 123)
     other.plot <-
       dat.df |>
@@ -733,7 +743,7 @@ plotBeeswarm <-
                   x = .coefs,
                   fixed = FALSE)  
            },
-           x = "abundance\nlog2(+0.5)FC",
+           x = "density\nlog2(+0.5)FC",
            color = paste0("q < ", .q)) +
          {
            if(isTRUE(x = .facets)) {
@@ -748,7 +758,8 @@ plotBeeswarm <-
          ggplot2::geom_violin(color = "black",
                               alpha = 0,
                               scale = "width",
-                              draw_quantiles = 0.5) +
+                              quantiles = 0.5,
+                              quantile.linetype = "solid") +
          ggplot2::geom_vline(xintercept = 0,
                              linetype = "dotted",
                              color = "black") +
@@ -1934,11 +1945,11 @@ plotTradPerc <-
     
   }
 
-#' Plot Abundance
+#' Plot Density
 #'
-#' Creates dot/line plots showing log2-transformed landmark fuzzy densities (abundances) per sample. 
+#' Creates dot/line plots showing log2-transformed landmark fuzzy densities per sample. 
 #' Unlike \code{plotTradPerc()} which plots cell percentages at the cluster/celltype level, this 
-#' function plots landmark-level abundances. Useful for inspecting distributions and 
+#' function plots landmark-level densities Useful for inspecting distributions and 
 #' paired/longitudinal patterns at the landmark resolution.
 #'
 #' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
@@ -1956,17 +1967,17 @@ plotTradPerc <-
 #' @param .seed Integer random seed for jitter (default 123).
 #' @param .orientation Character: "wide" (default) or "square" faceting.
 #'   
-#' @return A \code{ggplot} object showing log2-transformed landmark abundances (fuzzy densities).
+#' @return A \code{ggplot} object showing log2-transformed landmark densities.
 #'   
 #' @seealso \code{\link{plotTradPerc}}, \code{\link{plotTradStats}}
 #' 
 #' @examples
 #' \dontrun{
-#' # Basic abundance plot
-#' plotAbundance(lm.cells, .pop = "B.cells")
+#' # Basic density plot
+#' plotDensity(lm.cells, .pop = "B.cells")
 #' 
 #' # With paired subject lines
-#' plotAbundance(lm.cells, 
+#' plotDensity(lm.cells, 
 #'               .pop = "B.cells",
 #'               .subject.id = "MouseID",
 #'               .color.by = "Treatment")
@@ -1974,7 +1985,7 @@ plotTradPerc <-
 #' 
 #' @export
 #'
-plotAbundance <-
+plotDensity <-
   function(
     .tdr.obj,
     .x.split = colnames(x = .tdr.obj$metadata)[1],
@@ -2091,7 +2102,7 @@ plotAbundance <-
                                                          angle = 45),
                      plot.title = ggplot2::element_text(hjust = 0.5)) +
       ggplot2::labs(x = .x.split,
-                    y = "abundance\nlog2(+0.5)",
+                    y = "density\nlog2(+0.5)",
                     color = .color.by) +
       ggplot2::geom_boxplot(outliers = FALSE,
                             color = "grey50") +
@@ -2460,6 +2471,11 @@ scatterPlot <-
       dat.df$.color.feature <- 1
     }
     
+    old.seed <- .Random.seed
+    on.exit(expr = assign(x = ".Random.seed",
+                          value = old.seed,
+                          envir = .GlobalEnv),
+            add = TRUE)
     set.seed(seed = .seed)
     p <-
       dat.df  |>
@@ -2583,5 +2599,256 @@ plotHeatmap <-
     
     # Display cached pheatmap generated during get.graph()
     return(gridExtra::grid.arrange(.tdr.obj$graph[[.id.from]]$pheatmap$gtable))
+    
+  }
+
+#' Plot specDE Components
+#'
+#' Visualizes spectral differential expression (specDE) results. When a component
+#' is specified, shows UMAP colored by scores alongside Y-vs-specDE scatter.
+#' When component is NULL, displays a diagnostic overview of all components.
+#'
+#' @param .tdr.obj A tinydenseR object after \code{get.specDE()}.
+#' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$specDE}.
+#' @param .specDE.dim Integer or NULL: component to visualize (1-indexed). If NULL,
+#'   plots Ak vs Sk diagnostic scatter for all components.
+#' @param .point.size Numeric: point size for scatter plots. Default 1.
+#' @param .label.size Numeric: label size for diagnostic scatter plots. Default 3. Applies only if .specDE.dim is NULL.
+#' @param .panel.size Numeric: panel size in inches. Default 2.
+#' @param .seed Integer: random seed for point ordering. Default 123.
+#'
+#' @return A ggplot2 object (if \code{.specDE.dim = NULL}) or a patchwork composition
+#'   (if \code{.specDE.dim} is integer).
+#'
+#' @details
+#' \strong{Component view} (\code{.specDE.dim = integer}):
+#' \itemize{
+#'   \item Left panel: UMAP embedding colored by specDE scores
+#'   \item Right panel: Scatter of Y vs specDE scores (essential for interpretation)
+#' }
+#'
+#' \strong{Diagnostic view} (\code{.specDE.dim = NULL}):
+#' \itemize{
+#'   \item X-axis: Smoothness (Sk); higher = large-scale graph-smooth structure
+#'   \item Y-axis: Y-alignment (Ak); higher = stronger density coupling
+#'   \item Color: Variance explained (Vk)
+#'   \item Labels: Component names (specDE1, specDE2, ...)
+#' }
+#'
+#' \strong{Interpreting the diagnostic plot:}
+#' \itemize{
+#'   \item DA-dominated (typical): upper-right, high Ak + high Sk
+#'   \item DE-dominated (functional): lower region, moderate/low Ak
+#'   \item Structural/constraint: low Ak with high Vk (bright color), regardless of Sk
+#' }
+#' No single metric determines DA vs DE---use Y vs score scatter to confirm.
+#'
+#' @seealso \code{\link{get.specDE}} for computing specDE
+#'
+#' @examples
+#' \dontrun{
+#' # After running specDE
+#' lm.obj <- get.specDE(lm.obj, .coef.col = "Infection")
+#'
+#' # Diagnostic overview
+#' plotSpecDE(lm.obj, .coef.col = "Infection", .specDE.dim = NULL)
+#'
+#' # Visualize first component
+#' plotSpecDE(lm.obj, .coef.col = "Infection", .specDE.dim = 1)
+#' }
+#'
+#' @export
+#'
+plotSpecDE <-
+  function(
+    .tdr.obj,
+    .coef.col,
+    .specDE.dim = NULL,
+    .point.size = 1,
+    .label.size = 3,
+    .panel.size = 2,
+    .seed = 123
+  ) {
+    
+    # R CMD check appeasement
+    Sk <- Ak <- Vk <- component <- umap.1 <- umap.2 <- Y <- score <- NULL
+    
+    # -------------------------------------------------------------------------
+    # Input validation
+    # -------------------------------------------------------------------------
+    
+    if (is.null(x = .tdr.obj$specDE[[.coef.col]])) {
+      avail <-
+        if (is.null(x = .tdr.obj$specDE)) {
+          "none (run get.specDE() first)"
+        } else {
+          paste(names(x = .tdr.obj$specDE), collapse = ", ")
+        }
+      stop("specDE results for '", .coef.col, "' not found.\n",
+           "Available: ", avail)
+    }
+    
+    specDE.res <-
+      .tdr.obj$specDE[[.coef.col]]
+    
+    # -------------------------------------------------------------------------
+    # Diagnostic view: Sk x Ak scatter
+    # -------------------------------------------------------------------------
+    
+    if (is.null(x = .specDE.dim)) {
+      
+      diag.df <-
+        data.frame(
+          component = gsub(pattern = "specDE",
+                           replacement = "",
+                           x = names(x = specDE.res$smoothness)),
+          Sk = specDE.res$smoothness,
+          Ak = specDE.res$Y.alignment,
+          Vk = specDE.res$var.explained
+        )
+      
+      p <-
+        ggplot2::ggplot(data = diag.df,
+                        mapping = ggplot2::aes(x = Sk,
+                                               y = Ak,
+                                               color = Vk*100,
+                                               label = component)) +
+        ggplot2::geom_point(size = I(x = .point.size)) +
+        ggrepel::geom_text_repel(size = I(x = .label.size),
+                                 max.overlaps = 20, 
+                                 seed = .seed) +
+        ggplot2::scale_color_gradient(low = unname(obj = Color.Palette[1,1]),
+                                      high = unname(obj = Color.Palette[1,2]),
+                                      name = "% of var") +
+        ggplot2::labs(
+          title = paste0("specDE diagnostics: ", .coef.col),
+          x = "Smoothness (Sk)",
+          y = "Y-alignment (Ak)"
+        ) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(
+          plot.title = ggplot2::element_text(hjust = 0.5)
+        ) +
+        ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
+                                                  units = "in"),
+                                cols = grid::unit(x = .panel.size,
+                                                  units = "in"))
+      
+      return(p)
+      
+    }
+    
+    # -------------------------------------------------------------------------
+    # Component view: UMAP + Y-vs-score scatter
+    # -------------------------------------------------------------------------
+    
+    if (!is.numeric(x = .specDE.dim) ||
+        length(x = .specDE.dim) != 1 ||
+        .specDE.dim < 1 ||
+        .specDE.dim > ncol(x = specDE.res$scores)) {
+      stop(".specDE.dim must be an integer between 1 and ", ncol(x = specDE.res$scores))
+    }
+    
+    .specDE.dim <-
+      as.integer(x = .specDE.dim)
+    
+    comp.name <-
+      colnames(x = specDE.res$scores)[.specDE.dim]
+    
+    score.vec <-
+      specDE.res$scores[, .specDE.dim]
+    
+    # Check UMAP exists
+    if (is.null(x = .tdr.obj$graph$uwot$embedding)) {
+      stop("UMAP embedding not found. Run get.graph() first.")
+    }
+    
+    # Build data frames
+    old.seed <- .Random.seed
+    on.exit(expr = assign(x = ".Random.seed",
+                          value = old.seed,
+                          envir = .GlobalEnv),
+            add = TRUE)
+    set.seed(seed = .seed)
+    
+    umap.df <-
+      data.frame(
+        umap.1 = .tdr.obj$graph$uwot$embedding[, 1],
+        umap.2 = .tdr.obj$graph$uwot$embedding[, 2],
+        score = score.vec
+      ) |>
+      (\(x)
+       x[sample(x = nrow(x = x)), ]
+      )()
+    
+    scatter.df <-
+      data.frame(
+        Y = specDE.res$Y,
+        score = score.vec
+      )
+    
+    # Panel 1: UMAP colored by scores
+    p.umap <-
+      ggplot2::ggplot(data = umap.df,
+                      mapping = ggplot2::aes(x = umap.1,
+                                             y = umap.2,
+                                             color = score)) +
+      ggplot2::geom_point(size = I(x = .point.size)) +
+      ggplot2::scale_color_gradient2(
+        low = unname(obj = Color.Palette[1, 1]),
+        mid = unname(obj = Color.Palette[1, 6]),
+        high = unname(obj = Color.Palette[1, 2]),
+        midpoint = 0,
+        name = comp.name
+      ) +
+      ggplot2::labs(
+        title = paste0(comp.name, " on UMAP"),
+        x = "UMAP1",
+        y = "UMAP2"
+      ) +
+      ggplot2::theme_bw() +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(hjust = 0.5),
+        legend.position = "bottom"
+      ) +
+      ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
+                                                units = "in"),
+                              cols = grid::unit(x = .panel.size,
+                                                units = "in"))
+    
+    # Panel 2: Y vs score scatter
+    p.scatter <-
+      ggplot2::ggplot(data = scatter.df,
+                      mapping = ggplot2::aes(x = Y,
+                                             y = score)) +
+      ggplot2::geom_point(size = I(x = .point.size),
+                          alpha = 0.5) +
+      ggplot2::geom_smooth(method = "lm",
+                           formula = y ~ x,
+                           se = FALSE,
+                           color = "red",
+                           linewidth = 0.5) +
+      ggplot2::labs(
+        title = paste0("Y vs ", comp.name),
+        subtitle = sprintf("Ak = %.3f, Sk = %.3f, Vk = %.1f%%",
+                           specDE.res$Y.alignment[.specDE.dim],
+                           specDE.res$smoothness[.specDE.dim],
+                           specDE.res$var.explained[.specDE.dim] * 100),
+        x = paste0("Density contrast (", .coef.col, ")"),
+        y = comp.name
+      ) +
+      ggplot2::theme_bw() +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(hjust = 0.5),
+        plot.subtitle = ggplot2::element_text(hjust = 0.5)
+      ) +
+      ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
+                                                units = "in"),
+                              cols = grid::unit(x = .panel.size,
+                                                units = "in"))
+    
+    # Combine with patchwork
+    p.umap + p.scatter +
+      patchwork::plot_layout(ncol = 2)
     
   }

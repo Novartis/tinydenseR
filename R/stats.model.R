@@ -14,13 +14,13 @@
 # limitations under the License.
 #####
 
-#' Differential Abundance Testing
+#' Differential Density Testing
 #'
-#' Performs landmark-based differential abundance (DA) testing using limma on log-transformed fuzzy 
-#' densities. Tests which landmarks (cell populations) change in abundance between conditions. More 
-#' sensitive than traditional cluster-level testing because landmarks can capture within-cluster 
-#' heterogeneity. Uses PCA-weighted q-values that leverage the correlation structure among 
-#' landmarks to improve statistical power.
+#' Performs landmark-based differential density testing using limma on size factor-normalized and 
+#' log-transformed fuzzy densities. Tests which landmarks (cell states) change in density
+#' between conditions. More sensitive than traditional cluster-level testing because
+#' landmarks can capture within-cluster heterogeneity. Uses PCA-weighted q-values that 
+#' leverage the correlation structure among landmarks to improve statistical power.
 #'
 #' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
 #' @param .design Design matrix specifying the experimental design. Rows correspond to samples 
@@ -374,7 +374,7 @@ get.lm <-
         (\(x)
          # keep only top k PCs that capture most variation
          # to avoid overfitting pi0 later
-         x[,1:elbow.sec.deriv(x = .tdr.obj$pca$sdev,
+         x[,1:elbow.sec.deriv(x = .tdr.obj$pca$sdev^2,
                               sort.order = "desc")$index,
            drop=FALSE]
         )()
@@ -656,6 +656,8 @@ get.lm <-
 #'   \code{.id.from} to determine source.
 #' @param .id.from Character: "clustering" or "celltyping". Source of IDs when \code{.id} is specified.
 #' @param .verbose Logical: print progress messages? Default TRUE.
+#' @param .label.confidence Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
+#'   to assign a cell to a landmark. Used only if \code{.id.idx} is provided.
 #'   
 #' @return List containing DE analysis results:
 #'   \describe{
@@ -747,8 +749,16 @@ get.dea <-
     .id.idx = NULL,
     .id = NULL,
     .id.from = NULL,
-    .verbose = TRUE
+    .verbose = TRUE,
+    .label.confidence = 0.8
   ) {
+    
+    i <- j <- landmark <- cell <- label <- x <- confidence <-
+      NULL
+    
+    if(.label.confidence < 0.5 || .label.confidence > 1){
+      stop(".label.confidence must be between 0.5 and 1")
+    }
     
     if(!is.null(x = .geneset.ls)){
       if(.tdr.obj$assay.type != "RNA"){
@@ -805,34 +815,75 @@ get.dea <-
         }
         
         .lm.idx <-
-          which(x = .tdr.obj$graph[[.id.from]]$ids %in% .id)
+          lapply(X = .tdr.obj$map[[.id.from]]$ids,
+                 FUN = function(smpl){
+                   which(x = smpl %in% .id)         
+                 })
 
       } else {
         
         .lm.idx <-
-          nrow(x = .tdr.obj$landmarks) |>
-          seq_len()
+          stats::setNames(object = .tdr.obj$metadata$n.cells,
+                          nm = names(x = .tdr.obj$cells)) |>
+          lapply(FUN = seq_len)
         
       }
     } else {
       
       if(!all(.id.idx %in% (nrow(x = .tdr.obj$landmarks) |> seq_len()))) {
-        stop(paste0(".id.idx must be a list of integer vectors from  1 to ",
+        stop(paste0(".id.idx must be an integer vector between 1 and ",
                     nrow(x = .tdr.obj$landmarks)))
       }
       
+      tmp.lbl <-
+        rep(x = "out",
+            times = nrow(x = .tdr.obj$landmarks))
+        
+      tmp.lbl[.id.idx] <-
+        "in"
+      
       .lm.idx <-
-        .id.idx 
+        lapply(X = .tdr.obj$map$fuzzy.graph,
+               FUN = function(smpl) {
+                 
+                 in.and.out <-
+                   Matrix::summary(object = smpl) |>
+                   dplyr::rename(cell = i,
+                                 landmark = j) |>
+                   dplyr::mutate(label = tmp.lbl[landmark]) |>
+                   dplyr::select(-landmark) |>
+                   collapse::fgroup_by(cell,
+                                       label,
+                                       sort = FALSE) |>
+                   collapse::fsum() |>
+                   collapse::fgroup_by(cell,
+                                       sort = FALSE) |>
+                   collapse::fmutate(confidence = x / collapse::fsum(x)) |>
+                   collapse::fungroup() |>
+                   collapse::fsubset(confidence >= .label.confidence) |> 
+                   (\(x)
+                    {
+                      label <- 
+                        rep(x = "..low.confidence..",
+                            times = nrow(x = smpl))
+                      
+                      label[x$cell] <-
+                        x$label
+                      
+                      label
+
+                   }
+                   )() 
+                 
+                 which(x = in.and.out == "in")
+                 
+               }) 
 
     }
     
     # number of cells in each pseudobulk
     n.pseudo <-
-      lapply(X = .tdr.obj$map$nearest.landmarks,
-             FUN = function(smpl){
-               sum(smpl[,1,drop = TRUE] %in% .lm.idx)
-             }) |>
-      unlist()
+      lengths(x = .lm.idx)
     
     # remove outlier samples with too few cells
     smpl.outlier <-
@@ -853,10 +904,10 @@ get.dea <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .tdr.obj$cells[[smpl]])
+            readRDS(file = .tdr.obj$cells[[smpl]])[,.lm.idx[[smpl]]]
           
           wcl <- 
-            .tdr.obj$map$connect.prob[[smpl]][,.lm.idx,drop = FALSE]
+            .tdr.obj$map$fuzzy.graph[[smpl]][.lm.idx[[smpl]],,drop = FALSE]
           
           # get weighted sum
           wsum <-
@@ -1022,10 +1073,10 @@ get.dea <-
             readRDS(file = .tdr.obj$cells[[smpl]])
           
           exprs.mat <-
-            exprs.mat[,colnames(x = .tdr.obj$landmarks)]
+            exprs.mat[.lm.idx[[smpl]],colnames(x = .tdr.obj$landmarks)]
           
           wcl <- 
-            .tdr.obj$map$connect.prob[[smpl]][,.lm.idx,drop=FALSE]
+            .tdr.obj$map$fuzzy.graph[[smpl]][.lm.idx[[smpl]],,drop=FALSE]
           
           # get weighted sum
           wsum <-
@@ -1393,7 +1444,7 @@ get.marker <-
               expr = {
                 
                 wcl <- 
-                  .tdr.obj$map$connect.prob[[smpl]][,.lm1.idx,drop = FALSE]
+                  .tdr.obj$map$fuzzy.graph[[smpl]][,.lm1.idx,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -1437,7 +1488,7 @@ get.marker <-
               expr = {
                 
                 wcl <- 
-                  .tdr.obj$map$connect.prob[[smpl]][,.lm2.idx,drop = FALSE]
+                  .tdr.obj$map$fuzzy.graph[[smpl]][,.lm2.idx,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -1586,7 +1637,7 @@ get.marker <-
               expr = {
                 
                 wcl <- 
-                  .tdr.obj$map$connect.prob[[smpl]][,.lm1.idx,drop = FALSE]
+                  .tdr.obj$map$fuzzy.graph[[smpl]][,.lm1.idx,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -1633,7 +1684,7 @@ get.marker <-
               expr = {
                 
                 wcl <- 
-                  .tdr.obj$map$connect.prob[[smpl]][,.lm2.idx,drop = FALSE]
+                  .tdr.obj$map$fuzzy.graph[[smpl]][,.lm2.idx,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -1832,6 +1883,12 @@ get.marker <-
       }
       
       # Compute diffusion map on transposed Y (samples as rows)
+      Matrix.warnDeprecatedCoerce <-
+        # destiny relies on Deprecated Matrix package function: see https://github.com/theislab/destiny/issues/61
+        getOption(x = "Matrix.warnDeprecatedCoerce")
+      
+      options(Matrix.warnDeprecatedCoerce = 0)
+      
       traj.res <- 
         Matrix::t(x = .tdr.obj$map$Y) |>
         (\(x)
@@ -1842,6 +1899,9 @@ get.marker <-
           distance = .dist.metric
         )
         )()
+      
+      options(Matrix.warnDeprecatedCoerce = Matrix.warnDeprecatedCoerce)
+
       # Extract eigenvalues and compute cell embeddings
       stdev <- traj.res@eigenvalues
       stdev[stdev < 0] <- 0
@@ -1905,7 +1965,7 @@ get.marker <-
 #' @param .red.model Optional character string naming the reduced model in \code{.tdr.obj$map$lm}
 #'   (without the effect of interest). If provided, computes 
 #'   \eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}} directly. Make sure to construct
-#'   nested models by “dropping terms” (so reduced is a strict subset of full)!
+#'   nested models by "dropping terms" (so reduced is a strict subset of full)!
 #' @param .contrast.of.interest Optional: Character string naming the contrast to extract.
 #'   Must match a column name in the full model's contrasts. When specified, uses
 #'   the Frisch-Waugh-Lovell (FWL) theorem to compute the true partial fitted component.
@@ -2360,6 +2420,14 @@ get.embedding <-
         message("Computing partial regression coefficients")
       }
       
+      # Store nuisance design Z for downstream use (get.lm.spectral.dea)
+      # If no nuisance, Z is intercept-only
+      if(!exists("Z") || is.null(Z)){
+        Z <- matrix(1, nrow = ncol(x = Y), ncol = 1, 
+                    dimnames = list(colnames(Y), "(Intercept)"))
+      }
+      nuisance.design <- Z
+      
       denom <- sum(x_c_perp^2)
       
       if(denom < .Machine$double.eps * 100){
@@ -2453,6 +2521,10 @@ get.embedding <-
       colnames(x = delta.Yhat) <- 
         colnames(x = Y)
       
+      # Store nuisance design Z for downstream use (get.lm.spectral.dea)
+      # For nested models, nuisance = reduced model design
+      nuisance.design <- .red.stats.obj$fit$design
+      
       method <- "nested_models"
       
     }
@@ -2471,7 +2543,7 @@ get.embedding <-
     
     # Compute rank analytically (O(1)) instead of expensive QR decomposition
     if(method == "fwl_contrast"){
-      # Contrasts are rank-1 by construction (outer product gamma_g ⊗ x_c_perp)
+      # Contrasts are rank-1 by construction (outer product gamma_g (x) x_c_perp)
       embed.rank <- 1L
     } else {
       # Nested models: rank = df_full - df_red, capped at matrix dimensions
@@ -2560,6 +2632,7 @@ get.embedding <-
         list(perc.tot.var.exp = perc.tot.var.exp,
              effect.resid.cor = effect.resid.cor,
              delta.Yhat = as.matrix(x = delta.Yhat),
+             nuisance.design = nuisance.design,
              method = method)
       )
     
@@ -2569,6 +2642,516 @@ get.embedding <-
     }
     
     # Return .tdr.obj with all embeddings
+    return(.tdr.obj)
+    
+  }
+
+#' Spectral Differential Expression (specDE)
+#'
+#' Decomposes gene/marker expression into latent programs that covary with a
+#' density contrast field across the cell graph. specDE identifies spectral modes
+#' of a graph-conditioned differential expression operator, providing continuous
+#' program scores per landmark and program-specific gene/marker loadings.
+#'
+#' @details
+#' specDE answers: "What are the dominant expression programs that covary with a 
+#' density contrast across the graph?" The method:
+#' \enumerate{
+#'   \item Extracts the density contrast vector Y (coefficients from \code{get.lm})
+#'   \item Prepares expression matrix X (size-factor normalized + log2 for RNA; raw for cyto)
+#'   \item Builds random-walk normalized graph P from SNN
+#'   \item Computes Y-weighted expression interaction: \code{diag(Y) \%*\% X}
+#'   \item Graph-smooths: \code{M.local = P \%*\% diag(Y) \%*\% X}, then centers
+#'   \item Decomposes M.local via SVD into latent programs
+#'   \item Orders components by \code{abs(cor(Y, score))} (specDE1 = most Y-aligned)
+#'   \item Computes loadings via regression of X on each component
+#'   \item Computes Laplacian smoothness (Sk) for each component
+#' }
+#'
+#' \strong{Diagnostic metrics (Ak, Vk, Sk):}
+#'
+#' \strong{Ak (Y-alignment):} Measures how strongly component scores covary with density 
+#' contrast Y. High Ak indicates strong coupling to the tested contrast; low Ak indicates
+#' weak coupling. Components are ordered by Ak (specDE1 = most Y-aligned). Note: high Ak
+#' measures association with Y, not mechanism---it does not imply DA is the cause.
+#'
+#' \strong{Vk (variance explained):} Proportion of M.local variance captured by the
+#' component. High Vk indicates a dominant mode; low Vk indicates a minor/specific pattern.
+#' Vk is not a relevance score---high Vk does not imply biological importance or Y-coupling.
+#'
+#' \strong{Sk (graph smoothness):} Derived from the normalized Laplacian. High Sk indicates
+#' large-scale, graph-smooth structure (low-frequency); low Sk indicates localized, rapidly
+#' varying structure (high-frequency). Sk measures spatial scale, not biological mechanism---
+#' both DA and DE programs can be smooth. A smooth (high Sk) component can still represent
+#' DE-only biology if its association with Y is weak or non-monotonic.
+#'
+#' \strong{Joint interpretation (DA vs DE):}
+#' \itemize{
+#'   \item DA-dominated (typical): high Ak, high Sk, moderate-high Vk
+#'   \item DE-dominated (functional): moderate/low Ak, any Sk, often lower Vk
+#'   \item Structural/constraint: low Ak, high Vk, often high Sk
+#' }
+#' No single metric determines DA vs DE. Interpretation requires their joint pattern plus
+#' visualization (e.g., Y vs score scatter via \code{plotSpecDE}).
+#'
+#' @param .tdr.obj A tinydenseR object after \code{get.lm()}.
+#' @param .coef.col Character: column name in model coefficients to use as density contrast Y.
+#'   Must be a valid column in \code{.tdr.obj$map$lm[[.model.name]]$fit$coefficients}.
+#' @param .model.name Character: name of the fitted model to use (default "default").
+#' @param .nv Integer: number of specDE components to compute. Defaults to 
+#'   \code{ncol(.tdr.obj$pca$embed)}, matching the number of PCs from \code{get.landmarks}.
+#' @param .min.prop Numeric: for RNA, minimum proportion of landmarks where a gene must be 
+#'   detected (>0) to be included. Default 0.005 (0.5 percent).
+#' @param .store.M Logical: if TRUE, store the M.local matrix in output. Default FALSE
+#'   (saves memory; M.local can be large for RNA).
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'
+#' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$specDE[[.coef.col]]}:
+#'   \describe{
+#'     \item{scores}{Matrix (landmarks x components): specDE scores per landmark, ordered by Y-alignment}
+#'     \item{loadings}{Matrix (genes/markers x components): gene/marker loadings per component}
+#'     \item{sdev}{Numeric vector: standard deviation per component}
+#'     \item{var.explained}{Numeric vector (Vk): proportion of variance explained per component}
+#'     \item{Y.alignment}{Numeric vector (Ak): absolute correlation with Y per component}
+#'     \item{smoothness}{Numeric vector (Sk): Laplacian smoothness per component (higher = smoother)}
+#'     \item{Y}{Numeric vector: the centered density contrast used}
+#'     \item{M.local}{Matrix (optional): the density-weighted expression matrix (if .store.M = TRUE)}
+#'     \item{params}{List: parameters used (.model.name, .coef.col, .nv, .min.prop)}
+#'   }
+#'
+#' @seealso \code{\link{get.lm}} (required predecessor)
+#'
+#' @examples
+#' \dontrun{
+#' # After fitting linear model
+#' lm.obj <- get.lm(lm.obj, .design = design)
+#' 
+#' # Run specDE for "Infection" coefficient
+#' lm.obj <- get.specDE(lm.obj, .coef.col = "Infection")
+#' 
+#' # Access results
+#' lm.obj$specDE$Infection$scores[, "specDE1"]
+#' lm.obj$specDE$Infection$loadings[, "specDE1"]
+#' 
+#' # Diagnostic table
+#' data.frame(
+#'   component = colnames(lm.obj$specDE$Infection$scores),
+#'   Ak = lm.obj$specDE$Infection$Y.alignment,
+#'   Vk = lm.obj$specDE$Infection$var.explained,
+#'   Sk = lm.obj$specDE$Infection$smoothness
+#' )
+#' }
+#'
+#' @export
+get.specDE <-
+  function(.tdr.obj,
+           .coef.col,
+           .model.name = "default",
+           .nv = NULL,
+           .min.prop = 0.005,
+           .store.M = FALSE,
+           .verbose = TRUE) {
+    
+    # -------------------------------------------------------------------------
+    # Input validation
+    # -------------------------------------------------------------------------
+    
+    if (is.null(x = .tdr.obj$map$lm[[.model.name]])) {
+      stop("Model '", .model.name, "' not found. Run get.lm() first.")
+    }
+    
+    coef.mat <-
+      .tdr.obj$map$lm[[.model.name]]$fit$coefficients
+    
+    if (!(.coef.col %in% colnames(x = coef.mat))) {
+      stop("Coefficient '", .coef.col, "' not found in model coefficients.\n",
+           "Available: ", paste(colnames(x = coef.mat), collapse = ", "))
+    }
+    
+    if (is.null(x = .tdr.obj$graph$snn)) {
+      stop("SNN graph not found. Run get.graph() first.")
+    }
+    
+    if(!Matrix::isSymmetric(object = .tdr.obj$graph$snn)){
+      stop("SNN graph not symmetric.")
+    }
+    
+    if (is.null(x = .tdr.obj$raw.landmarks)) {
+      stop("Raw landmarks not found. Run get.landmarks() first.")
+    }
+    
+    if (is.null(x = .tdr.obj$pca$embed)) {
+      stop("PCA embedding not found. Run get.landmarks() first.")
+    }
+    
+    # Default .nv to number of PCs from get.landmarks
+    if (is.null(x = .nv)) {
+      .nv <-
+        ncol(x = .tdr.obj$pca$embed)
+    }
+    
+    if (!is.numeric(x = .nv) || length(x = .nv) != 1 || .nv < 1) {
+      stop(".nv must be a positive integer.")
+    }
+    
+    .nv <-
+      as.integer(x = .nv)
+    
+    # -------------------------------------------------------------------------
+    # Extract Y: density contrast vector (centered)
+    # -------------------------------------------------------------------------
+    
+    if (isTRUE(x = .verbose)) {
+      message("\n=== specDE: Spectral Differential Expression ===")
+      message("Coefficient: ", .coef.col)
+    }
+    
+    Y <-
+      coef.mat[, .coef.col] |>
+      (\(x)
+       x - mean(x = x)
+      )()
+    
+    # -------------------------------------------------------------------------
+    # Prepare expression matrix X
+    # -------------------------------------------------------------------------
+    
+    if (isTRUE(x = .verbose)) {
+      message("Preparing expression matrix...")
+    }
+    
+    if (.tdr.obj$assay.type == "RNA") {
+      
+      # Filter genes: detected in at least min.prop of landmarks
+      X <-
+        .tdr.obj$raw.landmarks |>
+        (\(x)
+         x[, Matrix::colSums(x = x > 0) > (nrow(x = x) * .min.prop)]
+        )()
+      
+      if (isTRUE(x = .verbose)) {
+        message("  Genes after filtering (>", .min.prop * 100, "% detection): ",
+                ncol(x = X), " / ", ncol(x = .tdr.obj$raw.landmarks))
+      }
+      
+      # Size factor normalization
+      X <-
+        X |>
+        Matrix::t() |>
+        (\(x)
+         x / (Matrix::rowSums(x = x) / mean(x = Matrix::rowSums(x = x)))
+        )() |>
+        Matrix::t()
+      
+      # Log2 transform (in-place for sparse matrix efficiency)
+      X@x <-
+        log2(x = X@x + 1)
+      
+    } else {
+      
+      # Cytometry: use raw landmarks directly
+      X <-
+        .tdr.obj$raw.landmarks
+      
+    }
+    
+    # Center expression (genes/markers)
+    X <-
+      X |>
+      (\(x)
+       Matrix::t(x = x) - Matrix::colMeans(x = x)
+      )() |>
+      Matrix::t()
+    
+    # -------------------------------------------------------------------------
+    # Build random-walk normalized graph P
+    # -------------------------------------------------------------------------
+    
+    if (isTRUE(x = .verbose)) {
+      message("Building random-walk normalized graph...")
+    }
+    
+    SNN <-
+      .tdr.obj$graph$snn
+    
+    D.inv <-
+      Matrix::Diagonal(x = 1 / Matrix::rowSums(x = SNN))
+    
+    P <-
+      (D.inv %*% SNN) |>
+      (\(x)
+       `dimnames<-`(x = x,
+                    value = dimnames(x = SNN))
+      )()
+    
+    # -------------------------------------------------------------------------
+    # Y-X interaction and graph smoothing
+    # -------------------------------------------------------------------------
+    
+    if (isTRUE(x = .verbose)) {
+      message("Computing density-weighted expression (M.local)...")
+    }
+    
+    # Y-weighted expression: diag(Y) %*% X
+    YX.interaction <-
+      (Matrix::Diagonal(x = Y) %*% X) |>
+      (\(x)
+       `dimnames<-`(x = x,
+                    value = dimnames(x = X))
+      )()
+    
+    # Graph-smooth and center
+    M.local <-
+      (P %*% YX.interaction) |>
+      (\(x)
+       Matrix::t(x = x) - Matrix::colMeans(x = x)
+      )() |>
+      Matrix::t()
+    
+    n.landmarks <-
+      nrow(x = M.local)
+    
+    # -------------------------------------------------------------------------
+    # SVD decomposition (following get.landmarks pattern)
+    # -------------------------------------------------------------------------
+    
+    if (isTRUE(x = .verbose)) {
+      message("Computing specDE decomposition...")
+    }
+    
+    if (.tdr.obj$assay.type == "RNA") {
+      
+      # RNA: use truncated SVD (irlba) for efficiency
+      svd.res <-
+        irlba::irlba(A = M.local,
+                     nv = .nv,
+                     nu = .nv)
+      
+    } else {
+      
+      # Cytometry: use full SVD then subset
+      svd.res <-
+        as.matrix(x = M.local) |>
+        base::svd()
+      
+      .nv <-
+        min(.nv, length(x = svd.res$d))
+      
+      svd.res$d <-
+        svd.res$d[seq_len(length.out = .nv)]
+      
+      svd.res$u <-
+        svd.res$u[, seq_len(length.out = .nv), drop = FALSE]
+      
+      svd.res$v <-
+        svd.res$v[, seq_len(length.out = .nv), drop = FALSE]
+      
+    }
+    
+    if (isTRUE(x = .verbose)) {
+      message("  -> ", .nv, " components retained")
+    }
+    
+    # -------------------------------------------------------------------------
+    # Extract scores with sign correction
+    # -------------------------------------------------------------------------
+    
+    # Standard deviation
+    sdev <-
+      svd.res$d / sqrt(x = max(1, n.landmarks - 1))
+    
+    # Direction scores: sign correction based on P %*% Y
+    dir.scores <-
+      (svd.res$u %*% base::diag(x = svd.res$d)) * 
+      (as.numeric(x = P %*% Y) |> sign())
+    
+    # -------------------------------------------------------------------------
+    # Order by Y-alignment
+    # -------------------------------------------------------------------------
+    
+    Y.cor <-
+      stats::cor(x = Y,
+                 y = dir.scores)[1, ]
+    
+    Y.cor.ord <-
+      abs(x = Y.cor) |>
+      order(decreasing = TRUE)
+    
+    # Reorder scores and apply sign so positive = aligned with Y
+    scores <-
+      (Matrix::t(x = dir.scores[, Y.cor.ord, drop = FALSE]) *
+         sign(x = Y.cor[Y.cor.ord])) |>
+      Matrix::t() |>
+      as.matrix() |>
+      (\(x)
+       `dimnames<-`(x = x,
+                    value = list(rownames(x = X),
+                                 paste0("specDE", 
+                                        seq_len(length.out = ncol(x = x)))))
+      )()
+    
+    # Reorder sdev
+    sdev <-
+      sdev[Y.cor.ord]
+    
+    names(x = sdev) <-
+      colnames(x = scores)
+    
+    # Y-alignment (absolute correlation, reordered)
+    Y.alignment <-
+      abs(x = Y.cor[Y.cor.ord])
+    
+    names(x = Y.alignment) <-
+      colnames(x = scores)
+    
+    if (isTRUE(x = .verbose)) {
+      message("Y-alignment (top 5): ",
+              paste(sprintf("%.3f", utils::head(x = Y.alignment, n = 5)), collapse = ", "))
+    }
+    
+    # -------------------------------------------------------------------------
+    # Compute loadings via regression
+    # -------------------------------------------------------------------------
+    
+    if (isTRUE(x = .verbose)) {
+      message("Computing gene/marker loadings...")
+    }
+    
+    loadings <-
+      seq_len(length.out = ncol(x = scores)) |>
+      stats::setNames(nm = colnames(x = scores)) |>
+      lapply(FUN = function(k) {
+        
+        score.k <-
+          scores[, k] - mean(x = scores[, k])
+        
+        denom <-
+          Matrix::crossprod(x = score.k) |>
+          as.numeric()
+        
+        if (denom < .Machine$double.eps) return(rep(x = NA_real_, times = ncol(X)))
+        
+        beta <-
+          (Matrix::crossprod(x = score.k, 
+                             y = X) |> 
+             as.numeric()) / 
+          denom
+        
+        return(beta)
+        
+      }) |>
+      do.call(what = cbind)
+    
+    rownames(x = loadings) <-
+      colnames(x = X)
+    
+    # -------------------------------------------------------------------------
+    # Variance explained
+    # -------------------------------------------------------------------------
+    
+    # Because M.local is centered by columns, compute the sample-variance-consistent Frobenius energy cheaply and exactly
+    M.local.var <-
+      (Matrix::colSums(x = M.local^2) |>
+         sum()) / 
+      (n.landmarks - 1)
+      
+    var.explained <-
+      (sdev^2) / M.local.var
+    
+    names(x = var.explained) <-
+      colnames(x = scores)
+    
+    if (isTRUE(x = .verbose)) {
+      message("Variance explained (top 5): ",
+              paste(sprintf("%.1f%%", utils::head(x = var.explained * 100, n = 5)), collapse = ", "))
+    }
+    
+    # -------------------------------------------------------------------------
+    # Laplacian smoothness (Sk)
+    # -------------------------------------------------------------------------
+    
+    if (isTRUE(x = .verbose)) {
+      message("Computing Laplacian smoothness...")
+    }
+    
+    # Normalized Laplacian: L_sym = I - D^{-1/2} W D^{-1/2}
+    D.vec <-
+      Matrix::rowSums(x = SNN)
+    
+    D.inv.sqrt <-
+      Matrix::Diagonal(x = 1 / sqrt(x = D.vec))
+    
+    L.sym <-
+      Matrix::Diagonal(n = nrow(x = SNN)) -
+      (D.inv.sqrt %*% SNN %*% D.inv.sqrt)
+    
+    smoothness <-
+      seq_len(length.out = ncol(x = scores)) |>
+      sapply(FUN = function(k) {
+        
+        s <-
+          scores[, k] |>
+          (\(x)
+           x - mean(x = x)
+          )()
+        
+        # Laplacian Dirichlet energy
+        energy <-
+          as.numeric(x = t(x = s) %*% L.sym %*% s) /
+          sum(s^2)
+        
+        # Smoothness = 1 - energy (capped at 1 for normalized Laplacian)
+        1 - pmin(pmax(energy, 0), 2) / 2
+      })
+    
+    names(x = smoothness) <-
+      colnames(x = scores)
+    
+    if (isTRUE(x = .verbose)) {
+      message("Smoothness (top 5): ",
+              paste(sprintf("%.3f", utils::head(x = smoothness, n = 5)), collapse = ", "))
+    }
+    
+    # -------------------------------------------------------------------------
+    # Store results
+    # -------------------------------------------------------------------------
+    
+    if (is.null(x = .tdr.obj$specDE)) {
+      .tdr.obj$specDE <-
+        list()
+    }
+    
+    .tdr.obj$specDE[[.coef.col]] <-
+      list(
+        scores = scores,
+        loadings = loadings,
+        sdev = sdev,
+        var.explained = var.explained,
+        Y.alignment = Y.alignment,
+        smoothness = smoothness,
+        Y = Y,
+        params = list(
+          model.name = .model.name,
+          coef.col = .coef.col,
+          nv = .nv,
+          min.prop = .min.prop
+        )
+      )
+    
+    if (isTRUE(x = .store.M)) {
+      .tdr.obj$specDE[[.coef.col]]$M.local <-
+        M.local
+    }
+    
+    if (isTRUE(x = .verbose)) {
+      message("\nResults stored in: .tdr.obj$specDE$", .coef.col)
+      message("  $scores       : ", nrow(x = scores), " landmarks x ", ncol(x = scores), " components")
+      message("  $loadings     : ", nrow(x = loadings), " features x ", ncol(x = loadings), " components")
+      message("  $var.explained: Vk (proportion of variance)")
+      message("  $Y.alignment  : Ak (|cor(Y, score)|)")
+      message("  $smoothness   : Sk (Laplacian smoothness)")
+    }
+    
     return(.tdr.obj)
     
   }
