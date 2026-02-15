@@ -13,7 +13,8 @@ get.dea(
   .id.idx = NULL,
   .id = NULL,
   .id.from = NULL,
-  .verbose = TRUE
+  .verbose = TRUE,
+  .label.confidence = 0.8
 )
 }
 \arguments{
@@ -39,6 +40,9 @@ only cells with these landmarks as nearest neighbors are aggregated. Useful for 
 \item{.id.from}{Character: "clustering" or "celltyping". Source of IDs when \code{.id} is specified.}
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
+
+\item{.label.confidence}{Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
+to assign a cell to a landmark. Used only if \code{.id.idx} is provided.}
 }
 \value{
 List containing DE analysis results:

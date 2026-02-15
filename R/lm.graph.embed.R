@@ -78,7 +78,7 @@ leiden.cluster <-
   function(.tdr.obj = NULL,
            .sim.matrix,
            .resolution.parameter,
-           .small.size = floor(nrow(.sim.matrix) / 200),
+           .small.size = (nrow(x = .sim.matrix) / 200) |> floor(),
            .verbose = TRUE,
            .seed = 123) {
     
@@ -145,8 +145,7 @@ leiden.cluster <-
     }
     
     m0 <-
-      kres$cluster |>
-      as.integer()
+      as.integer(x = kres$cluster)
     
     # Run Leiden clustering with CPM objective (Constant Potts Model)
     # beta=0.01: small randomness for reproducibility
@@ -622,6 +621,8 @@ get.graph <-
 #'   calculations. Only one value allowed; merge multiple populations first via \code{celltyping}.
 #' @param .verbose Logical for progress messages (default TRUE).
 #' @param .seed Integer seed for reproducibility (default 123).
+#' @param .label.confidence Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
+#'   to assign a cell to a landmark‑derived cluster/celltype label.
 #'   
 #' @return Updated \code{.tdr.obj} with \code{$map} component containing:
 #'   \itemize{
@@ -674,7 +675,7 @@ get.graph <-
 #' 
 #' The \code{fdens} matrix quantifies how strongly each landmark is connected to cells in each 
 #' sample. High values indicate the landmark's neighborhood is enriched in that sample. This 
-#' forms the basis for differential abundance testing in \code{get.lm}.
+#' forms the basis for differential density testing in \code{get.lm}.
 #' 
 #' @seealso \code{\link{get.graph}}, \code{\link{get.lm}}, \code{\link{celltyping}}
 #' 
@@ -703,10 +704,16 @@ get.map <-
            .celltype.col.name = "cell_type",
            .cl.ct.to.ign = NULL,
            .verbose = TRUE,
-           .seed = 123){
+           .seed = 123,
+           .label.confidence = 0.8){
     
-    # R CMD check appeasement for non-standard evaluation in dplyr
-    cell.pop <- id <- value <- ri <- NULL
+    # R CMD check appeasement for non-standard evaluation in dplyr and collapse
+    cell.pop <- id <- value <- ri <- i <- j <- landmark <- cell <- label <- x <- confidence <-
+      NULL
+    
+    if(.label.confidence < 0.5 || .label.confidence > 1){
+      stop(".label.confidence must be between 0.5 and 1")
+    }
     
     # Validate and setup Symphony reference if provided
     if(!is.null(x = .ref.obj)){
@@ -924,8 +931,34 @@ get.map <-
         }
         
         res2$cell.clustering <-
-          as.character(x = .tdr.obj$graph$clustering$ids[res2$nn$euclidean$idx[,1]]) |>
-          stats::setNames(nm = rownames(x = mat.exprs))
+          Matrix::summary(object = res2$fgraph) |>
+          dplyr::rename(cell = i,
+                        landmark = j) |>
+          dplyr::mutate(label = as.character(x = .tdr.obj$graph$clustering$ids[landmark])) |>
+          dplyr::select(-landmark) |>
+          collapse::fgroup_by(cell,
+                              label,
+                              sort = FALSE) |>
+          collapse::fsum() |>
+          collapse::fgroup_by(cell,
+                              sort = FALSE) |>
+          collapse::fmutate(confidence = x / collapse::fsum(x)) |>
+          collapse::fungroup() |>
+          collapse::fsubset(confidence >= .label.confidence) |>
+          (\(x)
+           {
+             label <- 
+               rep(x = "..low.confidence..",
+                   times = nrow(x = mat.exprs))
+             
+             label[x$cell] <-
+               x$label
+             
+             stats::setNames(object = label,
+                             nm = rownames(x = mat.exprs)
+             )
+          }
+          )()
         
         if(is.null(x = .tdr.obj$symphony.obj)){
           
@@ -938,8 +971,34 @@ get.map <-
             }
             
             res2$cell.celltyping <-
-              as.character(x = .tdr.obj$graph$celltyping$ids[res2$nn$euclidean$idx[,1]]) |>
-              stats::setNames(nm = rownames(x = mat.exprs))  
+              Matrix::summary(object = res2$fgraph) |>
+              dplyr::rename(cell = i,
+                            landmark = j) |>
+              dplyr::mutate(label = as.character(x = .tdr.obj$graph$celltyping$ids[landmark])) |>
+              dplyr::select(-landmark) |>
+              collapse::fgroup_by(cell,
+                                  label,
+                                  sort = FALSE) |>
+              collapse::fsum() |>
+              collapse::fgroup_by(cell,
+                                  sort = FALSE) |>
+              collapse::fmutate(confidence = x / collapse::fsum(x)) |>
+              collapse::fungroup() |>
+              collapse::fsubset(confidence >= .label.confidence) |>
+              (\(x)
+               {
+                 label <- 
+                   rep(x = "..low.confidence..",
+                       times = nrow(x = mat.exprs))
+                 
+                 label[x$cell] <-
+                   x$label
+                 
+                 stats::setNames(object = label,
+                                 nm = rownames(x = mat.exprs)
+                 )
+              }
+              )()
             
           }
           
@@ -1203,7 +1262,7 @@ get.map <-
            clustering = list(ids = cell.clustering),
            celltyping = list(ids = cell.celltyping),
            nearest.landmarks = cell.nlmn,
-           connect.prob = cell.fg)
+           fuzzy.graph = cell.fg)
     
     .tdr.obj$map$clustering$cell.count <-
       seq_along(along.with = .tdr.obj$map$clustering$ids) |>

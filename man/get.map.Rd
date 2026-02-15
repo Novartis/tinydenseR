@@ -10,7 +10,8 @@ get.map(
   .celltype.col.name = "cell_type",
   .cl.ct.to.ign = NULL,
   .verbose = TRUE,
-  .seed = 123
+  .seed = 123,
+  .label.confidence = 0.8
 )
 }
 \arguments{
@@ -31,6 +32,9 @@ calculations. Only one value allowed; merge multiple populations first via \code
 \item{.verbose}{Logical for progress messages (default TRUE).}
 
 \item{.seed}{Integer seed for reproducibility (default 123).}
+
+\item{.label.confidence}{Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
+to assign a cell to a landmark‑derived cluster/celltype label.}
 }
 \value{
 Updated \code{.tdr.obj} with \code{$map} component containing:
@@ -92,7 +96,7 @@ When \code{.ref.obj} is provided:
 
 The \code{fdens} matrix quantifies how strongly each landmark is connected to cells in each
 sample. High values indicate the landmark's neighborhood is enriched in that sample. This
-forms the basis for differential abundance testing in \code{get.lm}.
+forms the basis for differential density testing in \code{get.lm}.
 }
 \examples{
 \dontrun{
