@@ -159,8 +159,11 @@ if (curl::has_internet()) {
     message("No internet connection detected. Using miloR package data directly.")
     library(miloR)
     data(sim_trajectory)
+    
     SummarizedExperiment::colData(x = sim_trajectory$SCE) <-
-        S4Vectors::DataFrame(as.list(x = sim_trajectory$meta))
+        as.list(x = sim_trajectory$meta) |>
+      S4Vectors::DataFrame()
+    
     colnames(x = sim_trajectory$SCE) <- 
         sim_trajectory$meta$cell_id
 }
@@ -349,8 +352,12 @@ if (curl::has_internet()) {
   sim_trajectory.meta <- sim_trajectory$meta
   sim_trajectory <- sim_trajectory$SCE
   
-  SingleCellExperiment::colData(x = sim_trajectory) <-
-  sim_trajectory.meta
+  SummarizedExperiment::colData(x = sim_trajectory) <-
+    as.list(x = sim_trajectory.meta) |>
+    S4Vectors::DataFrame()
+  
+  colnames(x = sim_trajectory) <- 
+    SummarizedExperiment::colData(x = sim_trajectory)$cell_id
 
 }
 #> Downloading trajectory data from miloR repository...
@@ -567,7 +574,7 @@ lm.cells$map$fdens |>
 .design <- model.matrix(object = ~ Condition + Replicate,
                        data = lm.cells$metadata)
 
-# Test for differential abundance between conditions
+# Test for differential density between conditions
 # Results stored in lm.cells$map$lm[["default"]]
 lm.cells <- tinydenseR::get.lm(
     .tdr.obj = lm.cells,

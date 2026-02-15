@@ -366,7 +366,7 @@ tinydenseR::plotPCA(
   )()
 ```
 
-### Abundance Analysis: Identifying Affected Subpopulations
+### Density Analysis: Identifying Affected Subpopulations
 
 Before performing differential expression analysis, we first run `get.lm()` to identify which cell states might be affected by the experimental design. This guides us to the appropriate subpopulations for subsequent DE testing.
 
@@ -380,7 +380,7 @@ Before performing differential expression analysis, we first run `get.lm()` to i
                        x = base::colnames(x = x))
   ))()
 
-# Run differential abundance testing
+# Run differential density testing
 # get.lm() returns the updated .tdr.obj with results in $map$lm[[.model.name]]
 lm.cells.DE.0.5 <-
   tinydenseR::get.lm(
@@ -391,16 +391,16 @@ lm.cells.DE.0.5 <-
 # Access results via lm.cells.DE.0.5$map$lm[["default"]]
 ```
 
-#### Visualize Abundance Changes
+#### Visualize Density Changes
 
-Let's visualize abundance changes to identify regions that might show differential expression:
+Let's visualize density changes to identify regions that might show differential expression:
 
-```{r viz-abundance-fc}
+```{r viz-density-fc}
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells.DE.0.5,
   .feature = lm.cells.DE.0.5$map$lm[["default"]]$fit$coefficients[, "Activation"],
   .plot.title = "Activation vs Baseline",
-  .color.label = "Abundance\nlog2(+0.5) FC",
+  .color.label = "density\nlog2(+0.5) FC",
   .panel.size = 2,
   .point.size = 2,
   .midpoint = 0
@@ -412,7 +412,7 @@ Interestingly, we can clearly see which cell states are affected despite the sma
 
 #### Hypothesis testing results
 
-We can also visualize regions of statistically significant abundance change:
+We can also visualize regions of statistically significant density change:
 
 ```{r viz-hypothesis}
 tinydenseR::plotPCA(
@@ -438,7 +438,7 @@ tinydenseR::plotPCA(
 
 #### Beeswarm Plot
 
-A beeswarm plot provides a comprehensive view of abundance changes across clusters:
+A beeswarm plot provides a comprehensive view of density changes across clusters:
 
 ```{r beeswarm}
 tinydenseR::plotBeeswarm(
@@ -492,7 +492,7 @@ As expected, Marker2 shows the strongest signal for differential expression upon
 
 #### Alternative Definition of Target Population
 
-As we saw in section **Visualize Abundance Changes**, the affected population separate well along PC1, which is primarily driven by Markers 1, 4 and 5.
+As we saw in section **Visualize Density Changes**, the affected population separate well along PC1, which is primarily driven by Markers 1, 4 and 5.
 
 ```{r PC1-markers}
 lm.cells.DE.0.5$pca$rotation[order(lm.cells.DE.0.5$pca$rotation[,"PC1"],
@@ -606,7 +606,7 @@ As expected, **Marker1, Marker4, and Marker5** show strong positive coefficients
 
 ### Additional Visualization of Marker Expression
 
-A scatter plot provides flexibility to explore different types of visualizations. Here we plot the distributions of **Marker2 and Marker5** and color the landmarks by abundance log2FC:
+A scatter plot provides flexibility to explore different types of visualizations. Here we plot the distributions of **Marker2 and Marker5** and color the landmarks by density log2FC:
 
 ```{r scatter}
 tinydenseR::scatterPlot(
@@ -615,7 +615,7 @@ tinydenseR::scatterPlot(
   .y.feature = lm.cells.DE.0.5$landmarks[,"Marker5"],
   .y.label = "Marker5",
   .color.feature = lm.cells.DE.0.5$map$lm[["default"]]$fit$coefficients[, "Activation"],
-  .color.label = "Abundance\nlog2(+0.5) FC",
+  .color.label = "density\nlog2(+0.5) FC",
   .plot.title = "Activation vs Baseline",
   .panel.size = c(3,3),
   .point.size = 2
@@ -684,7 +684,7 @@ In this vignette, we demonstrated how to:
 2. **Prepare data** in the tinydenseR format (`.cells` and `.meta` objects)
 3. **Build a landmark object** using the core tinydenseR workflow
 4. **Run differential expression tests** within specific cell populations
-5. **Visualize results** and verify no confounding abundance changes
+5. **Visualize results** and verify no confounding density changes
 6. **Interpret findings** in the context of known ground truth
 
 ### Key Advantages of tinydenseR for DE Analysis
@@ -698,7 +698,7 @@ In this vignette, we demonstrated how to:
 
 ### Next Steps
 
-- See the **Differential Abundance Analysis** vignette for detecting proportion changes
+- See the **Differential Density Analysis** vignette for detecting proportion changes
 - See the **Trajectory Analysis** vignette for analyzing developmental or dynamic processes
 - Explore additional tinydenseR features in the function documentation
 

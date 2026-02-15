@@ -47,8 +47,8 @@ Traditional approaches cluster cells first, then test for proportion differences
 
 - Represents the cell population landscape with data-driven selection of landmark cells
 - Maps all cells to their nearest landmarks
-- Models abundance at each landmark using **samples as biological replicates**
-- Detects regions of differential abundance without arbitrary clustering
+- Models density at each landmark using **samples as biological replicates**
+- Detects regions of differential density without arbitrary clustering
 
 This approach is particularly powerful for:
 
@@ -206,7 +206,8 @@ final_data_DA |>
     ggplot2::annotation_logticks(sides = "l") +
     ggplot2::geom_violin(color = "black",
                          alpha = 0,
-                         draw_quantiles = 0.5) +
+                         quantiles = 0.5, 
+                         quantile.linetype = "solid") +
     ggh4x::force_panelsizes(cols = grid::unit(x = 2, units = "in"), 
                             rows = grid::unit(x = 2, units = "in"))
 ```
@@ -315,9 +316,9 @@ ggplot2::ggplot(data = DA_res_DA, mapping = ggplot2::aes(x = coef, y = id)) +
                           rows = grid::unit(x = 2, units = "in"))
 ```
 
-Our simulation worked: we see approximately 2-fold depletion (log2FC ≈ -1) from baseline abundance.
+Our simulation worked: we see approximately 2-fold depletion (log2FC ≈ -1) from baseline density.
 
-## Differential Abundance Analysis with tinydenseR
+## Differential Density Analysis with tinydenseR
 
 Now let's analyze the data using `tinydenseR`, focusing on the **0.5% setting** - the most challenging scenario where the target population represents only 0.5% of cells at baseline.
 
@@ -386,7 +387,7 @@ lm.cells.DA.0.5 <-
   tinydenseR::get.map()
 ```
 
-Before testing for differential abundance, let's re-examine the data structure by projecting cells from two representative samples using the PCA computed on landmark cells:
+Before testing for differential density, let's re-examine the data structure by projecting cells from two representative samples using the PCA computed on landmark cells:
 
 ```{r viz-ground-truth-pca}
 # Compute PCA projection for all cells
@@ -473,7 +474,7 @@ Now we set up a design matrix and run clustering-independent statistical test:
                        x = base::colnames(x = x))
   ))()
 
-# Run differential abundance testing
+# Run differential density testing
 # get.lm() returns the updated .tdr.obj with results in $map$lm[[.model.name]]
 lm.cells.DA.0.5 <-
   tinydenseR::get.lm(
@@ -484,18 +485,18 @@ lm.cells.DA.0.5 <-
 # Access results via lm.cells.DA.0.5$map$lm[["default"]]
 ```
 
-### Visualizing Differential Abundance Results
+### Visualizing Differential Density Results
 
-#### Abundance fold changes
+#### Density fold changes
 
-We can visualize the log2 fold changes in abundance at each landmark between Depletion and Baseline conditions:
+We can visualize the log2 fold changes in density at each landmark between Depletion and Baseline conditions:
 
-```{r viz-abundance-fc}
+```{r viz-density-fc}
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells.DA.0.5,
   .feature = lm.cells.DA.0.5$map$lm[["default"]]$fit$coefficients[, "Depletion"],
   .plot.title = "Depletion vs Baseline",
-  .color.label = "Abundance\nlog2(+0.5) FC",
+  .color.label = "density\nlog2(+0.5) FC",
   .panel.size = 2,
   .point.size = 2,
   .midpoint = 0
@@ -505,7 +506,7 @@ tinydenseR::plotPCA(
 
 #### Hypothesis testing results
 
-We can also visualize regions of statistically significant abundance change:
+We can also visualize regions of statistically significant density change:
 
 ```{r viz-hypothesis}
 tinydenseR::plotPCA(
@@ -531,7 +532,7 @@ tinydenseR::plotPCA(
 
 #### Beeswarm Plot
 
-A beeswarm plot provides a comprehensive view of abundance changes across clusters:
+A beeswarm plot provides a comprehensive view of density changes across clusters:
 
 ```{r beeswarm}
 tinydenseR::plotBeeswarm(
@@ -549,7 +550,7 @@ Please note that the log2FC in density approaches -1 (marked by a dashed red lin
 
 ## Identifying Markers of Cells in Differential States
 
-While differential abundance analysis reveals which populations change in proportion, we can also examine the **marker expression profiles** that define these populations. This helps us understand the biological identity of the affected cell types.
+While differential density analysis reveals which populations change in proportion, we can also examine the **marker expression profiles** that define these populations. This helps us understand the biological identity of the affected cell types.
 
 Above we identified differential cell states within cluster 4. Let's use `get.marker()` to identify which markers define this cluster compared to all other cells:
 
@@ -590,7 +591,7 @@ As expected, **Marker1, Marker4, and Marker5** show strong positive coefficients
 
 ### Additional Visualization of Marker Expression
 
-A scatter plot provides flexibility to explore different types of visualizations. Here we show abundance log2FC across landmarks across the distributions of **Marker1 and Marker5**:
+A scatter plot provides flexibility to explore different types of visualizations. Here we show density log2FC across landmarks across the distributions of **Marker1 and Marker5**:
 
 ```{r scatter}
 tinydenseR::scatterPlot(
@@ -599,7 +600,7 @@ tinydenseR::scatterPlot(
   .y.feature = lm.cells.DA.0.5$landmarks[,"Marker5"],
   .y.label = "Marker5",
   .color.feature = lm.cells.DA.0.5$map$lm[["default"]]$fit$coefficients[, "Depletion"],
-  .color.label = "Abundance\nlog2(+0.5) FC",
+  .color.label = "density\nlog2(+0.5) FC",
   .plot.title = "Depletion vs Baseline",
   .panel.size = c(3,3),
   .point.size = 2
@@ -664,10 +665,10 @@ The ground truth analysis confirms that all three settings (0.5%, 5%, 50%) show 
 
 In this vignette, we demonstrated how to:
 
-1. **Simulate realistic flow cytometry data** with differential abundance and batch effects
+1. **Simulate realistic flow cytometry data** with differential density and batch effects
 2. **Prepare data** in the tinydenseR format (`.cells` and `.meta` objects)
 3. **Build a landmark object** using the core tinydenseR workflow
-4. **Run statistical tests** for differential abundance with proper sample-level replication
+4. **Run statistical tests** for differential density with proper sample-level replication
 5. **Visualize results** using landmark-based and cluster-based approaches
 6. **Interpret findings** in the context of known ground truth
 
