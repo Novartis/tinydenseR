@@ -294,7 +294,8 @@ final_data_DA |>
      ggplot2::geom_violin(color = "black",
                           alpha = 0,
                           position = ggplot2::position_dodge(width = 0.5),
-                          draw_quantiles = 0.5) +
+                          quantiles = 0.5, 
+                          quantile.linetype = "solid") +
      ggh4x::force_panelsizes(cols = grid::unit(x = 2,
                                                units = "in"),
                              rows = grid::unit(x = 2,
@@ -352,7 +353,7 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.0.5,
 (tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.0.5,
                      .feature = lm.cells.DA.0.5$map$lm$default$fit$coefficients[,"Depletion"],
                      .plot.title = "Depletion vs Baseline",
-                     .color.label = "abundance\nlog2(+0.5)FC",
+                     .color.label = "density\nlog2(+0.5)FC",
                      .panel.size = 2,
                      .point.size = 1,
                      .midpoint = 0) +
@@ -431,12 +432,12 @@ stat.test.percentages.DA.0.5 <-
                                label.size = I(x = 3)) +
     ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))))
 
-(tinydenseR::plotAbundance(
+(tinydenseR::plotDensity(
   .tdr.obj = lm.cells.DA.0.5,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
-    ggplot2::labs(title = "within-cluster abundance"))
+    ggplot2::labs(title = "within-cluster density"))
 
 plotBeeswarm(
   .tdr.obj = lm.cells.DA.0.5,
@@ -622,7 +623,8 @@ final_data_DA |>
      ggplot2::geom_violin(color = "black",
                           alpha = 0,
                           position = ggplot2::position_dodge(width = 0.5),
-                          draw_quantiles = 0.5) +
+                          quantiles = 0.5,
+                          quantile.linetype = "solid") +
      ggh4x::force_panelsizes(cols = grid::unit(x = 2,
                                                units = "in"),
                              rows = grid::unit(x = 2,
@@ -680,7 +682,7 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.5,
 (tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.5,
                      .feature = lm.cells.DA.5$map$lm$default$fit$coefficients[,"Depletion"],
                      .plot.title = "Depletion vs Baseline",
-                     .color.label = "abundance\nlog2(+0.5)FC",
+                     .color.label = "density\nlog2(+0.5)FC",
                      .panel.size = 2,
                      .point.size = 1,
                      .midpoint = 0) +
@@ -760,12 +762,12 @@ stat.test.percentages.DA.5 <-
                                label.size = I(x = 3)) +
     ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))))
 
-(tinydenseR::plotAbundance(
+(tinydenseR::plotDensity(
   .tdr.obj = lm.cells.DA.5,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
-    ggplot2::labs(title = "within-cluster abundance"))
+    ggplot2::labs(title = "within-cluster density"))
 
 tinydenseR::plotBeeswarm(
   .tdr.obj = lm.cells.DA.5,
@@ -951,7 +953,8 @@ final_data_DA |>
      ggplot2::geom_violin(color = "black",
                           alpha = 0,
                           position = ggplot2::position_dodge(width = 0.5),
-                          draw_quantiles = 0.5) +
+                          quantiles = 0.5, 
+                          quantile.linetype = "solid") +
      ggh4x::force_panelsizes(cols = grid::unit(x = 2,
                                                units = "in"),
                              rows = grid::unit(x = 2,
@@ -1009,7 +1012,7 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.50,
 (tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.50,
                      .feature = lm.cells.DA.50$map$lm$default$fit$coefficients[,"Depletion"],
                      .plot.title = "Depletion vs Baseline",
-                     .color.label = "abundance\nlog2(+0.5)FC",
+                     .color.label = "density\nlog2(+0.5)FC",
                      .panel.size = 2,
                      .point.size = 1,
                      .midpoint = 0) +
@@ -1089,12 +1092,12 @@ stat.test.percentages.DA.50 <-
                                label.size = I(x = 3)) +
     ggplot2::scale_y_continuous(expand = expansion(mult = c(0.050, 0.150))))
 
-(tinydenseR::plotAbundance(
+(tinydenseR::plotDensity(
   .tdr.obj = lm.cells.DA.50,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
-    ggplot2::labs(title = "within-cluster abundance"))
+    ggplot2::labs(title = "within-cluster density"))
 
 tinydenseR::plotBeeswarm(
   .tdr.obj = lm.cells.DA.50,
@@ -1136,7 +1139,7 @@ tinydenseR::plotDEA(
 .subset.dea.50$coefficients
 
 # permutation tests
-source(file = "https://raw.githubusercontent.com/Novartis/tinydenseR/inst/scripts/perm_utils.R")
+source(file = "https://raw.githubusercontent.com/Novartis/tinydenseR/refs/heads/main/inst/scripts/perm_utils.R")
 
 # For each condition (0.5%, 5%, 50%), run exact permutation test
 conditions <- list(

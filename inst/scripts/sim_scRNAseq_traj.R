@@ -183,7 +183,7 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells,
                      .feature = lm.cells$map$lm$default$fit$coefficients[,"ConditionB"],
                      .panel.size = 2,
                      .point.size = 1,
-                     .plot.title = "estimated abundance\nlog2(+0.5) fold change",
+                     .plot.title = "estimated density\nlog2(+0.5) fold change",
                      .color.label = "Group B vs A",
                      .midpoint = 0) +
     ggplot2::theme(plot.subtitle = ggplot2::element_blank()) +
@@ -195,14 +195,14 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells,
   .feature =
     ifelse(
       test = lm.cells$map$lm$default$fit$coefficients[,"ConditionB"] < 0,
-      yes = "abundance down",
-      no = "abundance up") |>
+      yes = "density down",
+      no = "density up") |>
     ifelse(
       test = lm.cells$map$lm$default$fit$density.weighted.bh.fdr[,"ConditionB"] < 0.1,
       no = "not sig.")  |>
-    factor(levels = c("abundance down",
+    factor(levels = c("density down",
                       "not sig.",
-                      "abundance up")),
+                      "density up")),
   .plot.title = "hypothesis testing",
   .color.label = "Group B vs A\nq < 0.1",
   .cat.feature.color = Color.Palette[1,c(1,6,2)],
@@ -265,14 +265,14 @@ stat.test.percentages <-
                                label.size = I(x = 3)) +
     ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.15)))) 
 
-(tinydenseR::plotAbundance(
+(tinydenseR::plotDensity(
   .tdr.obj = lm.cells,
   .x.split = "Condition",
   .x.space.scaler = 0.3
 ) + 
     ggplot2::theme(axis.text.x = ggplot2::element_text(hjust = 0.5,
                                                        angle = 0)) + 
-    ggplot2::labs(title = "within-cluster abundance"))
+    ggplot2::labs(title = "within-cluster density"))
 
 tinydenseR::plotBeeswarm(
   .tdr.obj = lm.cells,
@@ -312,3 +312,46 @@ sort(x = .dea$coefficients[,"ConditionB"],
                        .color.label = x) +
      ggplot2::theme(plot.subtitle = ggplot2::element_blank())
   )()
+
+# Create reduced model to embed samples quantitatively along the Condition axis
+red.design <- model.matrix(object = ~ Replicate,
+                           data = lm.cells$metadata)
+
+# Fit reduced model (stored in lm.cells$map$lm[["reduced"]])
+lm.cells <- tinydenseR::get.lm(
+  .tdr.obj = lm.cells,
+  .design = red.design,
+  .model.name = "reduced",
+  .verbose = FALSE 
+)
+
+# Compute sample embedding using full vs reduced model comparison
+# Embedding stored in lm.cells$map$embedding$pePC[["Condition"]]
+lm.cells <-
+  tinydenseR::get.embedding(
+    .tdr.obj = lm.cells,
+    .full.model = "default",
+    .term.of.interest = "Condition",
+    .red.model = "reduced",
+    .verbose = FALSE 
+  )
+
+tinydenseR::plotSampleEmbedding(
+  .tdr.obj = lm.cells,
+  .embedding = "pePC",
+  .sup.embed.slot = "Condition",
+  .color.by = "Condition",
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,2)],
+  .panel.size = 1.5,
+  .point.size = 2
+) +
+  ggplot2::labs(title = "Quantitative Sample Embedding",
+                subtitle = "in relation to Condition") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                 plot.subtitle = ggplot2::element_text(hjust = 0.5))
+
+test <-
+  tinydenseR::smooth.and.threshold(
+    .tdr.obj = lm.cells,
+    .v = lm.cells$map$embedding$pePC$Condition$rotation[,"PC1"]
+  )
