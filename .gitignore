@@ -9,6 +9,9 @@
 # User-specific files
 .Ruserdata
 
+# Experimental/WIP code
+R/spectral.dea.R
+
 # Example code in package build process
 *-Ex.R
 
@@ -50,6 +53,9 @@ rsconnect/
 
 # Local analysis scripts
 inst/analysis/
+
+# Development scripts
+inst/dev/
 
 # RStudio Project
 tinydenseR.Rproj

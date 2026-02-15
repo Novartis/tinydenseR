@@ -8,7 +8,7 @@ leiden.cluster(
   .tdr.obj = NULL,
   .sim.matrix,
   .resolution.parameter,
-  .small.size = floor(nrow(.sim.matrix)/200),
+  .small.size = floor((nrow(x = .sim.matrix)/200)),
   .verbose = TRUE,
   .seed = 123
 )

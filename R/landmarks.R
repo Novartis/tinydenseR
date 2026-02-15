@@ -141,6 +141,7 @@
 #'   .assay.type = "RNA"
 #' )
 #' }
+#' @import Matrix
 #' @export
 #'
 setup.tdr.obj <-
@@ -764,56 +765,61 @@ get.landmarks <-
         .tdr.obj$landmarks[,HVG]
       }
     
-    .tdr.obj$pca$center <-
+    pca_res1 <-
+      vector(mode = "list")
+    
+    pca_res1$center <-
       Matrix::colMeans(x = .tdr.obj$landmarks)
     
-    .tdr.obj$pca$scale <-
+    pca_res1$scale <-
       sparseMatrixStats::colSds(x = .tdr.obj$landmarks)
     
     if(.tdr.obj$assay.type == "RNA"){
       
-      pca_res <-
-        irlba::irlba(
+      pca_res1 <-
+        c(pca_res1,
+          irlba::irlba(
           A = .tdr.obj$landmarks,
           nv = .nPC,
-          center = .tdr.obj$pca$center,
-          scale = .tdr.obj$pca$scale)
+          center = pca_res1$center,
+          scale = pca_res1$scale))
       
     } else {
       
-      pca_res <-
-        Matrix::t(x = .tdr.obj$landmarks) |>
+      pca_res1 <-
+        c(pca_res1,
+          Matrix::t(x = .tdr.obj$landmarks) |>
         (\(x)
-         (x - .tdr.obj$pca$center) /
-           .tdr.obj$pca$scale
+         (x - pca_res1$center) /
+           pca_res1$scale
         )() |>
         Matrix::t() |>
-        base::svd()
+        base::svd())
       
     }
     
-    colnames(x = pca_res$u) <- colnames(x = pca_res$v) <- names(x = pca_res$d) <-
+    colnames(x = pca_res1$u) <- colnames(x = pca_res1$v) <- names(x = pca_res1$d) <-
       paste0("PC",
-             seq_along(along.with = pca_res$d))
+             seq_along(along.with = pca_res1$d))
     
-    rownames(x = pca_res$u) <-
+    rownames(x = pca_res1$u) <-
       rownames(x = .tdr.obj$landmarks)
     
-    rownames(x = pca_res$v) <-
+    rownames(x = pca_res1$v) <-
       colnames(x = .tdr.obj$landmarks)
     
-    pca_res$embed <-
-      pca_res$u %*%
-      (base::diag(x = pca_res$d) |>
+    pca_res1$embed <-
+      pca_res1$u %*%
+      (base::diag(x = pca_res1$d) |>
          (\(x)
           `dimnames<-`(x= x,
-                       value = list(names(x = pca_res$d),
-                                    names(x = pca_res$d)))
+                       value = list(names(x = pca_res1$d),
+                                    names(x = pca_res1$d)))
          )())
     
-    .tdr.obj$pca <-
-      c(pca_res,
-        .tdr.obj$pca)
+#    .tdr.obj$pca <-
+#      c(pca_res,
+#        .tdr.obj$pca)
     
     # Optional: Perform Harmony batch correction on landmark embeddings
     if(!is.null(x = .tdr.obj$harmony.var)){
@@ -822,12 +828,12 @@ get.landmarks <-
       # Run Harmony to correct for batch effects in PC space
       # nclust parameter: adaptive based on landmark count (min 20, max 100)
       tmp.harmony <- 
-        harmony::RunHarmony(data_mat = .tdr.obj$pca$embed, 
+        harmony::RunHarmony(data_mat = pca_res1$embed, 
                             meta_data = .tdr.obj$metadata[.tdr.obj$key,],
                             vars_use = .tdr.obj$harmony.var, 
                             return_obj = TRUE,
                             # see https://github.com/immunogenomics/harmony/blob/b36bab002c1767af6e665c81f186b40a87870e64/R/ui.R#L191
-                            nclust = min(round(x = nrow(x = .tdr.obj$pca$embed) / 30), 100) |>
+                            nclust = min(round(x = nrow(x = pca_res1$embed) / 30), 100) |>
                               max(20),
                             verbose = .verbose)
       
@@ -838,10 +844,10 @@ get.landmarks <-
           vargenes_means_sds =
             dplyr::tibble(
               symbol = colnames(x = .tdr.obj$landmarks),
-              mean = .tdr.obj$pca$center,
-              stddev = .tdr.obj$pca$scale
+              mean = pca_res1$center,
+              stddev = pca_res1$scale
             ),
-          pca_loadings = .tdr.obj$pca$v,
+          pca_loadings = pca_res1$v,
           verbose = .verbose,
           do_umap = FALSE,
           save_uwot_path = NULL,
@@ -852,7 +858,7 @@ get.landmarks <-
         message("Returning harmony corrected embedding.")
       }
       
-      .tdr.obj$pca$embed <-
+      pca_res1$embed <-
         Matrix::t(x = .tdr.obj$harmony.obj$Z_corr) |> 
         (\(x)
          `rownames<-`(x = x,
@@ -914,8 +920,8 @@ get.landmarks <-
           Y <-
             Matrix::t(x = mat[,colnames(x = .tdr.obj$landmarks)]) |>
             (\(x)
-             (x - .tdr.obj$pca$center) /
-               .tdr.obj$pca$scale
+             (x - pca_res1$center) /
+               pca_res1$scale
             )() |>
             Matrix::t()
           
@@ -953,11 +959,11 @@ get.landmarks <-
           
           # Without Harmony: project cells onto global PCA and compute leverage scores
           lev.score <-
-            (((((Matrix::t(x = mat[,colnames(x = .tdr.obj$landmarks)]) - .tdr.obj$pca$center) /
-                  .tdr.obj$pca$scale) |>
+            (((((Matrix::t(x = mat[,colnames(x = .tdr.obj$landmarks)]) - pca_res1$center) /
+                  pca_res1$scale) |>
                  Matrix::t()) %*%
-                .tdr.obj$pca$v) %*%
-               diag(x = 1 / .tdr.obj$pca$d)) |>
+                pca_res1$v) %*%
+               diag(x = 1 / pca_res1$d)) |>
             (\(x)
              Matrix::rowSums(x = x ^ 2)
             )()
@@ -1053,72 +1059,77 @@ get.landmarks <-
         .tdr.obj$landmarks[,HVG]
       }
     
-    .tdr.obj$pca$center <-
+    pca_res2 <-
+      vector(mode = "list")
+    
+    pca_res2$center <-
       Matrix::colMeans(x = .tdr.obj$landmarks)
     
-    .tdr.obj$pca$scale <-
+    pca_res2$scale <-
       sparseMatrixStats::colSds(x = .tdr.obj$landmarks)
     
     if(.tdr.obj$assay.type == "RNA"){
       
-      pca_res <-
-        irlba::irlba(
+      pca_res2 <-
+        c(pca_res2,
+          irlba::irlba(
           A = .tdr.obj$landmarks,
           nv = .nPC,
-          center = .tdr.obj$pca$center,
-          scale = .tdr.obj$pca$scale)
+          center = pca_res2$center,
+          scale = pca_res2$scale))
       
     } else {
       
-      pca_res <-
-        Matrix::t(x = .tdr.obj$landmarks) |>
+      pca_res2 <-
+        c(pca_res2,
+          Matrix::t(x = .tdr.obj$landmarks) |>
         (\(x)
-         (x - .tdr.obj$pca$center) /
-           .tdr.obj$pca$scale
+         (x - pca_res2$center) /
+           pca_res2$scale
         )() |>
         Matrix::t() |>
-        base::svd()
+        base::svd())
       
     }
     
-    .tdr.obj$pca <-
-      c(pca_res,
-        .tdr.obj$pca)
+    #.tdr.obj$pca <-
+    #  c(pca_res,
+    #    .tdr.obj$pca)
     
-    dimnames(x = .tdr.obj$pca$u) <-
+    dimnames(x = pca_res2$u) <-
       list(rownames(x = .tdr.obj$landmarks),
            paste0("PC",
-                  seq_along(along.with = .tdr.obj$pca$d)))
+                  seq_along(along.with = pca_res2$d)))
     
-    names(x = .tdr.obj$pca$d) <-
+    names(x = pca_res2$d) <-
       paste0("PC",
-             seq_along(along.with = .tdr.obj$pca$d))
+             seq_along(along.with = pca_res2$d))
     
-    dimnames(x = .tdr.obj$pca$v) <-
+    dimnames(x = pca_res2$v) <-
       list(colnames(x = .tdr.obj$landmarks),
            paste0("PC",
-                  seq_along(along.with = .tdr.obj$pca$d)))
+                  seq_along(along.with = pca_res2$d)))
     
-    .tdr.obj$pca$embed <-
-      .tdr.obj$pca$u %*%
-      (base::diag(x = .tdr.obj$pca$d) |>
+    pca_res2$embed <-
+      pca_res2$u %*%
+      (base::diag(x = pca_res2$d) |>
          (\(x)
           `dimnames<-`(x= x,
-                       value = list(names(x = .tdr.obj$pca$d),
-                                    names(x = .tdr.obj$pca$d)))
+                       value = list(names(x = pca_res2$d),
+                                    names(x = pca_res2$d)))
          )())
     
-    .tdr.obj$pca$sdev <-
-      .tdr.obj$pca$d /
+    pca_res2$sdev <-
+      pca_res2$d /
       sqrt(x = max(1, nrow(x = .tdr.obj$landmarks) - 1))
     
-    .tdr.obj$pca$rotation <-
-      .tdr.obj$pca$v
+    pca_res2$rotation <-
+      pca_res2$v
     
-    .tdr.obj$pca$v <- .tdr.obj$pca$d <- .tdr.obj$pca$u <-
-      NULL
+    #pca_res2$v <- pca_res2$d <- pca_res2$u <-
+    #  NULL
     
-    .tdr.obj$pca$HVG <-
+    pca_res2$HVG <-
       names(x = HVG)
     
     # Reconstruct landmark expression matrices from PCA (denoised versions)
@@ -1126,7 +1137,7 @@ get.landmarks <-
       
       # Z-scored version: for visualization/heatmaps
       .tdr.obj$scaled.landmarks <-
-        (.tdr.obj$pca$embed %*% Matrix::t(x = .tdr.obj$pca$rotation)) |>
+        (pca_res2$embed %*% Matrix::t(x = pca_res2$rotation)) |>
         Matrix::t() |>
         (\(x)
          (x - Matrix::rowMeans(x = x)) /
@@ -1141,11 +1152,11 @@ get.landmarks <-
       
       # Log-normalized version: back-transformed from PCA, de-noised
       .tdr.obj$landmarks <-
-        (.tdr.obj$pca$embed %*% Matrix::t(x = .tdr.obj$pca$rotation)) |>
+        (pca_res2$embed %*% Matrix::t(x = pca_res2$rotation)) |>
         Matrix::t() |>
         (\(x)
-         (x * .tdr.obj$pca$scale) +
-           .tdr.obj$pca$center)() |>
+         (x * pca_res2$scale) +
+           pca_res2$center)() |>
         Matrix::t() |>
         (\(x)
          `dimnames<-`(x = x,
@@ -1171,12 +1182,12 @@ get.landmarks <-
       
       set.seed(seed = .seed)
       tmp.harmony <- 
-        harmony::RunHarmony(data_mat = .tdr.obj$pca$embed, 
+        harmony::RunHarmony(data_mat = pca_res2$embed, 
                             meta_data = .tdr.obj$metadata[.tdr.obj$key,],
                             vars_use = .tdr.obj$harmony.var, 
                             return_obj = TRUE,
                             # see https://github.com/immunogenomics/harmony/blob/b36bab002c1767af6e665c81f186b40a87870e64/R/ui.R#L191
-                            nclust = min(round(x = nrow(x = .tdr.obj$pca$embed) / 30), 100) |>
+                            nclust = min(round(x = nrow(x = pca_res2$embed) / 30), 100) |>
                               max(20),
                             verbose = .verbose)
       
@@ -1187,10 +1198,10 @@ get.landmarks <-
           vargenes_means_sds =
             dplyr::tibble(
               symbol = colnames(x = .tdr.obj$landmarks),
-              mean = .tdr.obj$pca$center,
-              stddev = .tdr.obj$pca$scale
+              mean = pca_res2$center,
+              stddev = pca_res2$scale
             ),
-          pca_loadings = .tdr.obj$pca$rotation,
+          pca_loadings = pca_res2$rotation,
           verbose = .verbose,
           do_umap = FALSE,
           save_uwot_path = NULL,
@@ -1201,7 +1212,7 @@ get.landmarks <-
         message("Returning harmony corrected embedding.")
       }
       
-      .tdr.obj$pca$embed <-
+      pca_res2$embed <-
         Matrix::t(x = .tdr.obj$harmony.obj$Z_corr)  |> 
         (\(x)
          `rownames<-`(x = x,
@@ -1235,7 +1246,7 @@ get.landmarks <-
       Y.resid <- 
         Matrix::t(x = Y.resid) |> 
         (\(x)
-         x / .tdr.obj$pca$scale
+         x / pca_res2$scale
         )() |>
         Matrix::t()
       
@@ -1261,10 +1272,13 @@ get.landmarks <-
               sign())) |>
         Matrix::t()
       
-      .tdr.obj$pca$rotation <-
+      pca_res2$rotation <-
         res$v
       
     }
+    
+    .tdr.obj$pca <-
+      pca_res2
     
     return(.tdr.obj)
     

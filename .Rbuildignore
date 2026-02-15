@@ -10,3 +10,5 @@
 ^codecov\.yml$
 ^doc$
 ^Meta$
+^R/spectral\.dea\.R$
+^inst/dev$

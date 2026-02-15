@@ -31,7 +31,7 @@ nested model method (\code{.red.model}). Must match a column name in
 \item{.red.model}{Optional character string naming the reduced model in \code{.tdr.obj$map$lm}
 (without the effect of interest). If provided, computes
 \eqn{\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}} directly. Make sure to construct
-nested models by “dropping terms” (so reduced is a strict subset of full)!}
+nested models by "dropping terms" (so reduced is a strict subset of full)!}
 
 \item{.contrast.of.interest}{Optional: Character string naming the contrast to extract.
 Must match a column name in the full model's contrasts. When specified, uses
@@ -84,14 +84,6 @@ Exact for OLS; if duplicateCorrelation/blocking is used, the decomposition is ap
 }
 \details{
 \strong{Unsupervised Embeddings (always computed):}
-
-\code{pca}: Standard PCA on log2-transformed landmark densities (log2(fdens + 0.5)),
-centered and scaled.
-
-\code{traj}: Diffusion map trajectory computed via \code{destiny::DiffusionMap} on
-the log2-transformed landmark density matrix. Useful for visualizing continuous trajectories.
-
-\strong{Supervised Embedding (pePC, when .contrast.of.interest or .red.model provided):}
 
 \strong{Method 1: FWL-based contrast extraction} (when \code{.contrast.of.interest} is provided)
 

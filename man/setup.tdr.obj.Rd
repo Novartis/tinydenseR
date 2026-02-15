@@ -87,8 +87,8 @@ This function:
 }
 
 The landmark sampling strategy aims for proportional representation across samples
-while capping total landmarks at 5000 for computational efficiency. Smaller samples
-may have relatively more landmarks sampled to ensure adequate representation.
+while capping total landmarks at 5000 for computational efficiency. Large samples are
+capped to prevent domination and ensure adequate representation.
 }
 \examples{
 \dontrun{
