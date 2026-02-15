@@ -2,7 +2,7 @@
 % Please edit documentation in R/stats.model.R
 \name{get.lm}
 \alias{get.lm}
-\title{Differential Abundance Testing}
+\title{Differential Density Testing}
 \usage{
 get.lm(
   .tdr.obj,
@@ -53,11 +53,11 @@ The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$map$lm[[.mode
 }
 }
 \description{
-Performs landmark-based differential abundance (DA) testing using limma on log-transformed fuzzy
-densities. Tests which landmarks (cell populations) change in abundance between conditions. More
-sensitive than traditional cluster-level testing because landmarks can capture within-cluster
-heterogeneity. Uses PCA-weighted q-values that leverage the correlation structure among
-landmarks to improve statistical power.
+Performs landmark-based differential density testing using limma on size factor-normalized and
+log-transformed fuzzy densities. Tests which landmarks (cell states) change in density
+between conditions. More sensitive than traditional cluster-level testing because
+landmarks can capture within-cluster heterogeneity. Uses PCA-weighted q-values that
+leverage the correlation structure among landmarks to improve statistical power.
 }
 \details{
 The landmark-based DA testing workflow:

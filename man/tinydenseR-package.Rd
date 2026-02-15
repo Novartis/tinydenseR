@@ -6,7 +6,7 @@
 \alias{tinydenseR-package}
 \title{tinydenseR: Linking Cell-To-Cell Variation to Sample-to-Sample Variation}
 \description{
-tinydenseR is a landmark-based platform for single cell data analysis that identifies differentially abundant cell types and differentially expressed features, including subtle within-cluster state changes. Modeling samples as replicates, tinydenseR enhances analytic efficiency and reproducibility while preserving the richness of single cell data.
+tinydenseR is a landmark-based platform for single cell data analysis that identifies differential cell states and features, including subtle within-cluster state changes. Modeling samples as replicates, tinydenseR enhances analytic efficiency and reproducibility while preserving the richness of single cell data.
 }
 \author{
 \strong{Maintainer}: Pedro Milanez-Almeida \email{pedro.milanez@novartis.com} (\href{https://orcid.org/0000-0001-8285-957X}{ORCID})

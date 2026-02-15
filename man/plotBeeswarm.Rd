@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{plotBeeswarm}
 \alias{plotBeeswarm}
-\title{Bee swarm Plot of Density Estimate Change}
+\title{Bee Swarm Plot of Density Estimate Change}
 \usage{
 plotBeeswarm(
   .tdr.obj,
@@ -72,7 +72,7 @@ A \code{patchwork} object combining plots:
 }
 }
 \description{
-Creates a beeswarm plot showing effect sizes (log fold changes) from differential abundance
+Creates a beeswarm plot showing effect sizes (log fold changes) from differential density
 testing, with points colored by significance. Optionally splits results by cluster or cell type
 and displays mean cell percentages alongside for biological context.
 }
@@ -107,5 +107,5 @@ plotBeeswarm(lm.obj, .model.name = "full", .coefs = "ConditionB")
 
 }
 \seealso{
-\code{\link{get.lm}}, \code{\link{plotAbundance}}
+\code{\link{get.lm}}, \code{\link{plotDensity}}
 }
