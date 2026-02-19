@@ -4,7 +4,16 @@
 \alias{plotSpecDE}
 \title{Plot specDE Components}
 \usage{
-plotSpecDE(.tdr.obj, .coef.col, .specDE.dim = 1, .point.size = 1, .seed = 123)
+plotSpecDE(
+  .tdr.obj,
+  .coef.col,
+  .specDE.dim = NULL,
+  .embed = "umap",
+  .point.size = 1,
+  .label.size = 3,
+  .panel.size = 2,
+  .seed = 123
+)
 }
 \arguments{
 \item{.tdr.obj}{A tinydenseR object after \code{get.specDE()}.}
@@ -14,7 +23,13 @@ plotSpecDE(.tdr.obj, .coef.col, .specDE.dim = 1, .point.size = 1, .seed = 123)
 \item{.specDE.dim}{Integer or NULL: component to visualize (1-indexed). If NULL,
 plots Ak vs Sk diagnostic scatter for all components.}
 
+\item{.embed}{Character: either \code{"umap"} or \code{"pca"}. Default "umap".}
+
 \item{.point.size}{Numeric: point size for scatter plots. Default 1.}
+
+\item{.label.size}{Numeric: label size for diagnostic scatter plots. Default 3. Applies only if .specDE.dim is NULL.}
+
+\item{.panel.size}{Numeric: panel size in inches. Default 2.}
 
 \item{.seed}{Integer: random seed for point ordering. Default 123.}
 }

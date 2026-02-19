@@ -653,21 +653,21 @@ plotBeeswarm <-
           dplyr::mutate(.data = dat.df,
                         facets = split.by,
                         split.by = rep(x = .tdr.obj$graph[[.split.by]]$ids[!(.tdr.obj$graph[[.split.by]]$ids %in% 
-                                                                              .tdr.obj$map$cl.ct.to.ign)] |>
+                                                                               .tdr.obj$map$cl.ct.to.ign)] |>
                                          as.character(),
                                        times = length(x = .coefs))  |> 
-            factor(levels = if(isTRUE(x = .order.ids)){
-              
-              .tdr.obj$graph[[.split.by]]$pheatmap$tree_row$labels[
-                .tdr.obj$graph[[.split.by]]$pheatmap$tree_row$order
-              ]
-            
-              } else {
-              
-              levels(x = .tdr.obj$graph[[.split.by]]$ids)
-            
-                }) |>
-              droplevels())
+                          factor(levels = if(isTRUE(x = .order.ids)){
+                            
+                            .tdr.obj$graph[[.split.by]]$pheatmap$tree_row$labels[
+                              .tdr.obj$graph[[.split.by]]$pheatmap$tree_row$order
+                            ]
+                            
+                          } else {
+                            
+                            levels(x = .tdr.obj$graph[[.split.by]]$ids)
+                            
+                          }) |>
+                          droplevels())
         
       }
       
@@ -700,17 +700,17 @@ plotBeeswarm <-
               .tdr.obj$graph[[.split.by]]$pheatmap$tree_row$labels[
                 .tdr.obj$graph[[.split.by]]$pheatmap$tree_row$order
               ]
-            
-              } else {
+              
+            } else {
               
               levels(x = .tdr.obj$graph[[.split.by]]$ids)
-            
-                })
+              
+            })
         ) |> 
         (\(x)
          x[!(.tdr.obj$graph[[.split.by]]$ids %in% 
                .tdr.obj$map$cl.ct.to.ign),]
-         )() |>
+        )() |>
         droplevels()
       
     }
@@ -901,7 +901,7 @@ plot2Markers <-
       
       dat.df <-
         (.tdr.obj$landmarks[if(!is.null(x = .id)) .id else 1:nrow(x = .tdr.obj$landmarks),
-                    colnames(x = .tdr.obj$landmarks) %in% c(.x.feature,.y.feature)]) |>
+                            colnames(x = .tdr.obj$landmarks) %in% c(.x.feature,.y.feature)]) |>
         as.data.frame()
       
       
@@ -909,7 +909,7 @@ plot2Markers <-
       
       dat.df <-
         (.tdr.obj$landmarks[if(!is.null(x = .id)) .id else 1:nrow(x = .tdr.obj$landmarks),
-                    colnames(x = .tdr.obj$landmarks) %in% c(.x.feature,.y.feature)]) |>
+                            colnames(x = .tdr.obj$landmarks) %in% c(.x.feature,.y.feature)]) |>
         as.data.frame()
       
     }
@@ -928,20 +928,20 @@ plot2Markers <-
       p <-
         p +
         ggplot2::scale_x_continuous(limits = (.tdr.obj$landmarks[,colnames(x = .tdr.obj$landmarks) %in%
-                                                           .x.feature, drop = TRUE]) |>
+                                                                   .x.feature, drop = TRUE]) |>
                                       (\(x)
                                        range(x[!((x > (mean(x = x) + .sd.range[2]*stats::sd(x = x))) |
                                                    (x < (mean(x = x) + .sd.range[1]*stats::sd(x = x))))])
                                       )()) +
         ggplot2::scale_y_continuous(limits = (.tdr.obj$landmarks[,colnames(x = .tdr.obj$landmarks) %in%
-                                                           .y.feature, drop = TRUE]) |>
+                                                                   .y.feature, drop = TRUE]) |>
                                       (\(x)
                                        range(x[!((x > (mean(x = x) + .sd.range[2]*stats::sd(x = x))) |
                                                    (x < (mean(x = x) + .sd.range[1]*stats::sd(x = x))))])
                                       )())
       
     }
-
+    
     if(!is.null(x = .id) &
        isTRUE(x = .reference)) {
       
@@ -1603,7 +1603,7 @@ plotTradStats <-
                                    
                                  })) |>
       droplevels()
-      
+    
     other.plot <-
       ggplot2::ggplot(data = dat.df,
                       mapping = ggplot2::aes(x = term,
@@ -2073,7 +2073,7 @@ plotDensity <-
     if(!is.null(x = .subject.id)){
       dat.df$group <-
         .tdr.obj$metadata[[.subject.id]][match(x = dat.df$sample,
-                                              table = rownames(x = .tdr.obj$metadata))]  
+                                               table = rownames(x = .tdr.obj$metadata))]  
     }
     
     p <-
@@ -2147,16 +2147,20 @@ plotDensity <-
     
   }
 
-#' Plot Differential Expression Analysis Results
+#' Plot Pseudobulk Differential Expression Results
 #'
-#' Visualizes differential expression results as a heatmap showing log fold changes for genes/markers 
-#' across coefficients. Rows ordered by cluster/celltype expression patterns, with significance 
-#' indicated by asterisks. Helps identify which features drive population-level changes.
+#' Visualizes pseudobulk differential expression results as a heatmap showing log fold changes 
+#' for genes/markers across coefficients. Rows ordered by cluster/celltype expression patterns, 
+#' with significance indicated by asterisks. Helps identify which features drive population-level changes.
 #'
-#' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
-#' @param .dea.obj Differential expression results from \code{get.dea()}.
-#' @param .coefs Character vector of coefficient names to plot. Defaults to all coefficients in 
-#'   \code{.dea.obj}.
+#' @param .tdr.obj A tinydenseR object processed through \code{get.pbDE()}.
+#' @param .de.obj Optional: differential expression results object. If NULL (default), retrieves 
+#'   results from \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}.
+#' @param .model.name Character: model name to retrieve from \code{.tdr.obj$pbDE} (default "default").
+#'   Ignored if \code{.de.obj} is provided.
+#' @param .population.name Character: population name to retrieve (default "all"). 
+#'   Ignored if \code{.de.obj} is provided.
+#' @param .coefs Character vector of coefficient names to plot. Defaults to all coefficients.
 #' @param .order.by Character: "clustering" (default) or "celltyping" - order rows by mean expression 
 #'   in these groups.
 #' @param .markers Character vector of feature names (genes/proteins) to plot. Defaults to features 
@@ -2181,30 +2185,37 @@ plotDensity <-
 #' 
 #' For RNA data, typically shows top PC-loading genes. For cytometry, shows all markers.
 #' 
-#' @seealso \code{\link{get.dea}}, \code{\link{plotBeeswarm}}
+#' @seealso \code{\link{get.pbDE}}, \code{\link{plotBeeswarm}}
 #' 
 #' @examples
 #' \dontrun{
-#' # After DEA
+#' # After pbDE analysis
 #' design <- model.matrix(~ Condition, data = .meta)
-#' dea <- get.dea(lm.cells, .design = design)
+#' lm.cells <- get.pbDE(lm.cells, .design = design)
 #' 
-#' # Heatmap of DE genes
-#' plotDEA(lm.cells, dea, .coefs = "ConditionB", .order.by = "clustering")
+#' # Heatmap of DE genes (uses .tdr.obj$pbDE$default$all)
+#' plotPbDE(lm.cells, .coefs = "ConditionB", .order.by = "clustering")
+#' 
+#' # Plot results from specific population
+#' lm.cells <- get.pbDE(lm.cells, .design = design, .id = "1", 
+#'                      .id.from = "clustering", .population.name = "cluster1")
+#' plotPbDE(lm.cells, .population.name = "cluster1", .coefs = "ConditionB")
 #' 
 #' # Focus on specific markers
-#' plotDEA(lm.cells, dea, 
-#'         .coefs = "ConditionB",
-#'         .markers = c("CD4", "CD8A", "CD3D"))
+#' plotPbDE(lm.cells, 
+#'          .coefs = "ConditionB",
+#'          .markers = c("CD4", "CD8A", "CD3D"))
 #' }
 #' 
 #' @export
 #'
-plotDEA <-
+plotPbDE <-
   function(
     .tdr.obj,
-    .dea.obj,
-    .coefs = colnames(x = .dea.obj$coefficients),
+    .de.obj = NULL,
+    .model.name = "default",
+    .population.name = "all",
+    .coefs = NULL,
     .order.by = "clustering",
     .markers = colnames(x = .tdr.obj$graph[[.order.by]]$median.exprs),
     .q = 0.1,
@@ -2216,9 +2227,23 @@ plotDEA <-
     # R CMD check appeasement
     sig.shape <- sig <- adj.p <- level <- marker <- term <- coef <- cell.perc <- NULL
     
+    # Get DE results from .tdr.obj$pbDE or from provided .de.obj
+    if(is.null(x = .de.obj)){
+      if(is.null(x = .tdr.obj$pbDE[[.model.name]][[.population.name]])){
+        stop(sprintf("No results found at .tdr.obj$pbDE$%s$%s. Run get.pbDE() first.", 
+                     .model.name, .population.name))
+      }
+      .de.obj <- .tdr.obj$pbDE[[.model.name]][[.population.name]]
+    }
+    
+    # Default coefficients
+    if(is.null(x = .coefs)){
+      .coefs <- colnames(x = .de.obj$coefficients)
+    }
+    
     # Extract log fold changes for selected markers and coefficients
     coef.df <-
-      cbind(.dea.obj$coefficients[.markers,.coefs,drop = FALSE]) |>
+      cbind(.de.obj$coefficients[.markers,.coefs,drop = FALSE]) |>
       dplyr::as_tibble(rownames = "marker") |>
       tidyr::pivot_longer(cols = dplyr::where(fn = is.numeric),
                           names_to = "term",
@@ -2226,7 +2251,7 @@ plotDEA <-
     
     # Extract adjusted p-values
     adj.p.df <-
-      cbind(.dea.obj$adj.p[.markers,.coefs,drop = FALSE])  |>
+      cbind(.de.obj$adj.p[.markers,.coefs,drop = FALSE])  |>
       dplyr::as_tibble(rownames = "marker") |>
       tidyr::pivot_longer(cols = dplyr::where(fn = is.numeric),
                           names_to = "term",
@@ -2357,6 +2382,55 @@ plotDEA <-
     return(other.plot)
     
   }
+
+#' Plot Differential Expression Analysis Results (Deprecated)
+#'
+#' @description
+#' `r lifecycle::badge("deprecated")`
+#'
+#' \code{plotDEA()} has been renamed to \code{\link{plotPbDE}()} for clarity. This function
+#' is provided for backward compatibility and will be removed in a future version.
+#'
+#' @param .tdr.obj A tinydenseR object.
+#' @param .dea.obj Differential expression results from \code{get.dea()} or \code{get.pbDE()}.
+#' @param .coefs Character vector of coefficient names to plot.
+#' @param .order.by Character: "clustering" or "celltyping".
+#' @param .markers Character vector of feature names.
+#' @param .q Numeric adjusted p-value threshold.
+#' @param .row.space.scaler Numeric row height scaling.
+#' @param .col.space.scaler Numeric column width scaling.
+#' @param .label.substr.rm Character substring to remove from labels.
+#'
+#' @return A \code{ggplot} heatmap.
+#' @seealso \code{\link{plotPbDE}}
+#' @keywords internal
+#' @export
+plotDEA <- function(
+    .tdr.obj,
+    .dea.obj,
+    .coefs = colnames(x = .dea.obj$coefficients),
+    .order.by = "clustering",
+    .markers = colnames(x = .tdr.obj$graph[[.order.by]]$median.exprs),
+    .q = 0.1,
+    .row.space.scaler = 0.2,
+    .col.space.scaler = 0.065,
+    .label.substr.rm = ""
+) {
+  .Deprecated("plotPbDE",
+              msg = "plotDEA() is deprecated. Use plotPbDE() instead.")
+  
+  plotPbDE(
+    .tdr.obj = .tdr.obj,
+    .de.obj = .dea.obj,
+    .coefs = .coefs,
+    .order.by = .order.by,
+    .markers = .markers,
+    .q = .q,
+    .row.space.scaler = .row.space.scaler,
+    .col.space.scaler = .col.space.scaler,
+    .label.substr.rm = .label.substr.rm
+  )
+}
 
 #' Scatter Plot with Feature Coloring
 #'
@@ -2612,6 +2686,7 @@ plotHeatmap <-
 #' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$specDE}.
 #' @param .specDE.dim Integer or NULL: component to visualize (1-indexed). If NULL,
 #'   plots Ak vs Sk diagnostic scatter for all components.
+#' @param .embed Character: either \code{"umap"} or \code{"pca"}. Default "umap".
 #' @param .point.size Numeric: point size for scatter plots. Default 1.
 #' @param .label.size Numeric: label size for diagnostic scatter plots. Default 3. Applies only if .specDE.dim is NULL.
 #' @param .panel.size Numeric: panel size in inches. Default 2.
@@ -2664,6 +2739,7 @@ plotSpecDE <-
     .tdr.obj,
     .coef.col,
     .specDE.dim = NULL,
+    .embed = "umap",
     .point.size = 1,
     .label.size = 3,
     .panel.size = 2,
@@ -2671,11 +2747,18 @@ plotSpecDE <-
   ) {
     
     # R CMD check appeasement
-    Sk <- Ak <- Vk <- component <- umap.1 <- umap.2 <- Y <- score <- NULL
+    Sk <- Ak <- Vk <- component <- PC1 <- PC2 <- umap.1 <- umap.2 <- Y <- score <- NULL
     
     # -------------------------------------------------------------------------
     # Input validation
     # -------------------------------------------------------------------------
+    
+    .embed <-
+      match.arg(arg = .embed,
+                choices = c(
+                  "umap",
+                  "pca"
+                ))
     
     if (is.null(x = .tdr.obj$specDE[[.coef.col]])) {
       avail <-
@@ -2771,12 +2854,13 @@ plotSpecDE <-
             add = TRUE)
     set.seed(seed = .seed)
     
-    umap.df <-
-      data.frame(
-        umap.1 = .tdr.obj$graph$uwot$embedding[, 1],
-        umap.2 = .tdr.obj$graph$uwot$embedding[, 2],
-        score = score.vec
-      ) |>
+    embed.df <-
+      (if(.embed == "umap"){
+        as.data.frame(x = .tdr.obj$graph$uwot$embedding)
+      } else {
+        as.data.frame(x = .tdr.obj$pca$embed)
+      }) |>
+      cbind(score = score.vec) |>
       (\(x)
        x[sample(x = nrow(x = x)), ]
       )()
@@ -2788,11 +2872,13 @@ plotSpecDE <-
       )
     
     # Panel 1: UMAP colored by scores
-    p.umap <-
-      ggplot2::ggplot(data = umap.df,
-                      mapping = ggplot2::aes(x = umap.1,
-                                             y = umap.2,
+    p.embed <-
+      ggplot2::ggplot(data = embed.df,
+                      mapping = ggplot2::aes(x = if(.embed == "umap") umap.1 else PC1,
+                                             y = if(.embed == "umap") umap.2 else PC2,
                                              color = score)) +
+      ggplot2::guides(color = ggplot2::guide_colorbar(title.position = "top",
+                                                      title.hjust = 0.5)) +
       ggplot2::geom_point(size = I(x = .point.size)) +
       ggplot2::scale_color_gradient2(
         low = unname(obj = Color.Palette[1, 1]),
@@ -2802,14 +2888,16 @@ plotSpecDE <-
         name = comp.name
       ) +
       ggplot2::labs(
-        title = paste0(comp.name, " on UMAP"),
-        x = "UMAP1",
-        y = "UMAP2"
+        title = comp.name,
+        x = if(.embed == "umap") "umap.1" else "PC1",
+        y = if(.embed == "umap") "umap.2" else "PC2"
       ) +
       ggplot2::theme_bw() +
       ggplot2::theme(
         plot.title = ggplot2::element_text(hjust = 0.5),
-        legend.position = "bottom"
+        legend.position = "bottom",
+        legend.margin = ggplot2::margin(t = -0.1, 
+                                        unit = "in")
       ) +
       ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
                                                 units = "in"),
@@ -2823,14 +2911,9 @@ plotSpecDE <-
                                              y = score)) +
       ggplot2::geom_point(size = I(x = .point.size),
                           alpha = 0.5) +
-      ggplot2::geom_smooth(method = "lm",
-                           formula = y ~ x,
-                           se = FALSE,
-                           color = "red",
-                           linewidth = 0.5) +
       ggplot2::labs(
         title = paste0("Y vs ", comp.name),
-        subtitle = sprintf("Ak = %.3f, Sk = %.3f, Vk = %.1f%%",
+        subtitle = sprintf("Ak = %.2f, Sk = %.2f, Vk = %.0f%%",
                            specDE.res$Y.alignment[.specDE.dim],
                            specDE.res$smoothness[.specDE.dim],
                            specDE.res$var.explained[.specDE.dim] * 100),
@@ -2848,7 +2931,525 @@ plotSpecDE <-
                                                 units = "in"))
     
     # Combine with patchwork
-    p.umap + p.scatter +
+    p.embed + p.scatter +
       patchwork::plot_layout(ncol = 2)
+    
+  }
+
+#' Plot specDE Expression Heatmap
+#'
+#' Creates an efficient expression heatmap with landmarks as columns and top-loaded
+#' features as rows. Landmarks are ordered by specDE scores (or custom ordering),
+#' and features are ranked by absolute loading. For RNA data, expression is properly
+#' normalized, log-transformed, and centered.
+#'
+#' @param .tdr.obj A tinydenseR object after \code{get.specDE()}.
+#' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$specDE}.
+#' @param .specDE.dim Integer or integer vector: specDE component(s) to use for:
+#'   (1) ranking features by absolute loading, and (2) ordering landmarks (if
+#'   \code{.order.by = NULL}). If vector (e.g., \code{c(1, 2)}), the first dimension
+#'   is used for feature ranking, and landmarks are sorted by all dimensions sequentially.
+#'   Default 1.
+#' @param .model.name Character: name of the fitted model (default "default").
+#' @param .n.features Integer: maximum number of features to display. For RNA, features
+#'   are ranked by absolute loading and top \code{.n.features} are shown. For cytometry,
+#'   all markers are shown and this parameter is ignored. Default 50.
+#' @param .order.by Numeric vector or matrix: custom ordering for landmarks. If NULL
+#'   (default), uses specDE scores from \code{.specDE.dim}. If a matrix with multiple
+#'   columns, landmarks are sorted by each column sequentially (ascending).
+#' @param .order.decreasing Logical: sort landmarks in decreasing order? Default FALSE.
+#' @param .viridis.options.annot Character vector: viridis color options for annotation
+#'   strips (Y + specDE dimensions). Cycled if fewer options than strips. 
+#'   Default \code{c("viridis", "plasma", "cividis")}.
+#' @param .annot.panel.width Numeric: width of annotation strips in inches. Default 4.
+#' @param .annot.panel.height Numeric: height of each annotation strip in inches. Default 0.15.
+#' @param .panel.width Numeric: width of expression heatmap panel in inches. Default 4.
+#' @param .panel.height Numeric: height of expression heatmap panel in inches. Default 3.
+#' @param .feature.font.size Numeric: font size for feature labels. Default 7.
+#' @param .show.landmark.labels Logical: show landmark IDs on x-axis? Default FALSE
+#'   (usually too many to display).
+#'
+#' @return A ggplot2 object (or patchwork composition with annotation strips).
+#'
+#' @details
+#' \strong{Feature selection and ordering}:
+#' Features are \emph{selected} by absolute loading value for the first element of \code{.specDE.dim}
+#' (for RNA, the top \code{.n.features}; for cytometry, all markers). However, the selected features 
+#' are then \emph{ordered} by signed loading (highest positive at top, most negative at bottom), 
+#' making it easy to see which genes are up vs down-regulated along the specDE component.
+#'
+#' \strong{Expression normalization} (RNA only):
+#' To avoid processing the full expression matrix, the function:
+#' \enumerate{
+#'   \item Computes row sums (per-landmark library size) from the entire \code{raw.landmarks}
+#'   \item Subsets to top features
+#'   \item Applies size factor normalization using pre-computed row sums
+#'   \item Log2-transforms: \code{log2(x + 1)}
+#'   \item Centers each feature (row) to mean 0
+#' }
+#'
+#' \strong{Landmark ordering}:
+#' When \code{.order.by} is multi-dimensional (matrix with >1 column), landmarks are
+#' sorted by the first column, then by the second within ties, etc. (equivalent to
+#' \code{dplyr::arrange(df, col1, col2, ...)}). If \code{.order.by = NULL}, landmarks
+#' are ordered by specDE scores from \code{.specDE.dim}.
+#'
+#' \strong{Annotation strips}:
+#' Regardless of \code{.order.by}, the following are always shown as annotation strips
+#' at the top: (1) Y (the density contrast from \code{get.lm}), and (2) specDE scores
+#' for all dimensions in \code{.specDE.dim}. This ensures the relationship between
+#' expression patterns and the specDE structure is always visible.
+#'
+#' \strong{Visualization}:
+#' Uses \code{ggplot2::geom_raster()} for efficient rendering of large heatmaps.
+#' Expression uses a diverging color scale centered at 0. Annotation strips use
+#' sequential viridis scales.
+#'
+#' @seealso \code{\link{get.specDE}} for computing specDE, \code{\link{plotSpecDE}}
+#'   for score visualization
+#'
+#' @examples
+#' \dontrun{
+#' # After running specDE
+#' lm.obj <- get.specDE(lm.obj, .coef.col = "Infection")
+#'
+#' # Basic heatmap using specDE1
+#' plotSpecDEHeatmap(lm.obj, .coef.col = "Infection", .specDE.dim = 1)
+#'
+#' # Order by two dimensions (e.g., to see 2D structure)
+#' plotSpecDEHeatmap(lm.obj, .coef.col = "Infection", .specDE.dim = c(1, 2))
+#'
+#' # Custom ordering by density contrast Y
+#' plotSpecDEHeatmap(lm.obj, .coef.col = "Infection", .specDE.dim = 1,
+#'                   .order.by = lm.obj$specDE$Infection$Y)
+#'
+#' # More features for cytometry
+#' plotSpecDEHeatmap(lm.obj, .coef.col = "Treatment", .specDE.dim = 1,
+#'                   .n.features = 100)
+#' }
+#'
+#' @export
+#'
+plotSpecDEHeatmap <-
+  function(
+    .tdr.obj,
+    .coef.col,
+    .specDE.dim = 1,
+    .model.name = "default",
+    .n.features = 50,
+    .order.by = NULL,
+    .order.decreasing = FALSE,
+    .viridis.options.annot = c("viridis", "plasma", "cividis"),
+    .annot.panel.width = 4,
+    .annot.panel.height = 0.15,
+    .panel.width = 4,
+    .panel.height = 3,
+    .feature.font.size = 7,
+    .show.landmark.labels = FALSE
+  ) {
+    
+    # R CMD check appeasement
+    landmark <- feature <- expr <- annot_dim <- annot_value <- NULL
+    
+    # -------------------------------------------------------------------------
+    # Input validation
+    # -------------------------------------------------------------------------
+    
+    if (is.null(x = .tdr.obj$specDE[[.coef.col]])) {
+      avail <-
+        if (is.null(x = .tdr.obj$specDE)) {
+          "none (run get.specDE() first)"
+        } else {
+          paste(names(x = .tdr.obj$specDE), collapse = ", ")
+        }
+      stop("specDE results for '", .coef.col, "' not found.\n",
+           "Available: ", avail)
+    }
+    
+    specDE.res <-
+      .tdr.obj$specDE[[.coef.col]]
+    
+    # Validate .specDE.dim
+    if (!is.numeric(x = .specDE.dim) ||
+        any(.specDE.dim < 1) ||
+        any(.specDE.dim > ncol(x = specDE.res$scores))) {
+      stop(".specDE.dim must be integer(s) between 1 and ",
+           ncol(x = specDE.res$scores))
+    }
+    
+    .specDE.dim <-
+      as.integer(x = .specDE.dim)
+    
+    if (is.null(x = .tdr.obj$raw.landmarks)) {
+      stop("Raw landmarks not found. Run get.landmarks() first.")
+    }
+    
+    # -------------------------------------------------------------------------
+    # Feature selection: rank by absolute loading
+    # -------------------------------------------------------------------------
+    
+    # Use the first .specDE.dim for feature ranking
+    loading.dim <-
+      .specDE.dim[1]
+    
+    loadings <-
+      specDE.res$loadings[, loading.dim]
+    
+    # Select features by absolute loading, but order by signed loading
+    feat.abs.order <-
+      order(abs(x = loadings), decreasing = TRUE)
+    
+    if (.tdr.obj$assay.type == "RNA") {
+      
+      # RNA: select top .n.features by absolute loading
+      n.select <-
+        min(.n.features, length(x = loadings))
+      
+      top.features <-
+        names(x = loadings)[feat.abs.order[seq_len(length.out = n.select)]]
+      
+    } else {
+      
+      # Cytometry: use all markers
+      top.features <-
+        names(x = loadings)[feat.abs.order]
+      
+    }
+    
+    # Order selected features by signed loading (high to low)
+    top.loadings <-
+      loadings[top.features]
+    
+    top.features <-
+      top.features[order(top.loadings, decreasing = TRUE)]
+    
+    # -------------------------------------------------------------------------
+    # Expression matrix: normalize and subset
+    # -------------------------------------------------------------------------
+    
+    if (.tdr.obj$assay.type == "RNA") {
+      
+      # Step 1: Get row (landmark) sums from full matrix BEFORE subsetting
+      lm.libsize <-
+        Matrix::rowSums(x = .tdr.obj$raw.landmarks)
+      
+      # Step 2: Subset to top features (raw.landmarks is landmarks x features)
+      X.sub <-
+        .tdr.obj$raw.landmarks[, top.features, drop = FALSE]
+      
+      # Step 3: Size factor normalization using pre-computed library sizes
+      # Size factor = libsize / mean(libsize)
+      size.factors <-
+        lm.libsize / mean(x = lm.libsize)
+      
+      X.norm <-
+        X.sub / size.factors
+      
+      # Step 4: Log2 transform
+      X.log <-
+        log2(x = as.matrix(x = X.norm) + 1)
+      
+      # Step 5: Center each feature (column) to mean 0
+      X.centered <-
+        scale(x = X.log, center = TRUE, scale = FALSE)
+      
+    } else {
+      
+      # Cytometry: use raw landmarks directly, just center
+      X.sub <-
+        .tdr.obj$raw.landmarks[, top.features, drop = FALSE]
+      
+      X.centered <-
+        scale(x = as.matrix(x = X.sub), center = TRUE, scale = FALSE)
+      
+    }
+    
+    # Transpose for heatmap: features x landmarks -> we want features as rows
+    # X.centered is landmarks x features, so we transpose
+    expr.mat <-
+      t(x = X.centered)
+    
+    # -------------------------------------------------------------------------
+    # Landmark ordering
+    # -------------------------------------------------------------------------
+    
+    if (is.null(x = .order.by)) {
+      
+      # Default: use specDE scores from .specDE.dim
+      .order.by <-
+        specDE.res$scores[, .specDE.dim, drop = FALSE]
+      
+    } else {
+      
+      # Ensure matrix format
+      .order.by <-
+        as.matrix(x = .order.by)
+      
+      if (nrow(x = .order.by) != ncol(x = expr.mat)) {
+        stop(".order.by must have ", ncol(x = expr.mat), " rows (one per landmark), ",
+             "but has ", nrow(x = .order.by))
+      }
+      
+    }
+    
+    # Set column names for annotation if missing
+    if (is.null(x = colnames(x = .order.by))) {
+      colnames(x = .order.by) <-
+        paste0("dim", seq_len(length.out = ncol(x = .order.by)))
+    }
+    
+    # Sort landmarks by .order.by columns sequentially
+    # Create a data frame for dplyr::arrange-style ordering
+    order.df <-
+      as.data.frame(x = .order.by)
+    
+    order.df$.idx <-
+      seq_len(length.out = nrow(x = order.df))
+    
+    # Sort by all columns (sequential tie-breaking)
+    if (.order.decreasing) {
+      # Decreasing: multiply by -1 for numeric sorting
+      for (col in colnames(x = .order.by)) {
+        order.df[[col]] <- -order.df[[col]]
+      }
+    }
+    
+    order.df <-
+      order.df[do.call(what = order,
+                       args = order.df[, colnames(x = .order.by), drop = FALSE]), ]
+    
+    lm.order <-
+      order.df$.idx
+    
+    # Reorder expression matrix columns
+    expr.mat <-
+      expr.mat[, lm.order, drop = FALSE]
+    
+    # Reorder .order.by for annotation
+    .order.by <-
+      .order.by[lm.order, , drop = FALSE]
+    
+    # -------------------------------------------------------------------------
+    # Build heatmap data frame for geom_raster
+    # -------------------------------------------------------------------------
+    
+    n.landmarks <-
+      ncol(x = expr.mat)
+    
+    n.features.plot <-
+      nrow(x = expr.mat)
+    
+    # Create unique string labels for landmarks to avoid issues with numeric names
+    # Use positional indices prefixed with "lm_" to ensure proper factor ordering
+    lm.labels <-
+      paste0("lm_", sprintf(fmt = "%05d", seq_len(length.out = n.landmarks)))
+    
+    # Build data frame manually to guarantee correct alignment
+    # Features as rows, landmarks as columns in expr.mat
+    # We want: for each feature (in signed loading order), all landmarks (in sorted order)
+    heat.df <-
+      data.frame(
+        # Repeat each landmark label n.features.plot times, then tile the whole thing once
+        # landmark varies fastest: lm1, lm2, lm3, lm1, lm2, lm3, ...
+        landmark = rep(x = lm.labels, times = n.features.plot),
+        # Each feature repeats n.landmarks times: f1, f1, f1, f2, f2, f2, ...
+        feature = rep(x = rownames(x = expr.mat), each = n.landmarks),
+        # Expression values: vectorize by row (each row = one feature's expression across landmarks)
+        expr = as.vector(x = t(x = expr.mat)),
+        stringsAsFactors = FALSE
+      )
+    
+    # Set factor levels to control plot ordering
+    heat.df$landmark <-
+      factor(x = heat.df$landmark,
+             levels = lm.labels)
+    
+    # Features: reverse so highest loading is at top of heatmap (y-axis goes bottom to top)
+    heat.df$feature <-
+      factor(x = heat.df$feature,
+             levels = rev(x = rownames(x = expr.mat)))
+    
+    # -------------------------------------------------------------------------
+    # Build fixed annotation strips: Y and specDE scores (always shown)
+    # -------------------------------------------------------------------------
+    
+    # Get Y (density contrast) reordered to match landmarks
+    Y.ordered <-
+      specDE.res$Y[lm.order]
+    
+    # Get specDE scores for selected dimensions, reordered
+    specDE.scores.ordered <-
+      specDE.res$scores[lm.order, .specDE.dim, drop = FALSE]
+    
+    # Build fixed annotation data: Y first, then specDE dims
+    fixed.annot.names <-
+      c("Y", colnames(x = specDE.scores.ordered))
+    
+    fixed.annot.mat <-
+      cbind(Y = Y.ordered, specDE.scores.ordered)
+    
+    colnames(x = fixed.annot.mat) <-
+      fixed.annot.names
+    
+    n.fixed.annot <-
+      ncol(x = fixed.annot.mat)
+    
+    # Cycle viridis options for fixed annotations
+    .viridis.options.annot <-
+      rep_len(x = .viridis.options.annot,
+              length.out = n.fixed.annot)
+    
+    annot.df.list <-
+      lapply(X = seq_len(length.out = n.fixed.annot),
+             FUN = function(d) {
+               data.frame(
+                 landmark = lm.labels,
+                 annot_dim = fixed.annot.names[d],
+                 annot_value = fixed.annot.mat[, d],
+                 stringsAsFactors = FALSE
+               )
+             })
+    
+    annot.df <-
+      do.call(what = rbind,
+              args = annot.df.list)
+    
+    # Set factor levels to ensure same ordering as expression heatmap
+    annot.df$landmark <-
+      factor(x = annot.df$landmark,
+             levels = lm.labels)
+    
+    annot.df$annot_dim <-
+      factor(x = annot.df$annot_dim,
+             levels = fixed.annot.names)
+    
+    # -------------------------------------------------------------------------
+    # Build ggplot: expression heatmap
+    # -------------------------------------------------------------------------
+    
+    p.heat <-
+      ggplot2::ggplot(data = heat.df,
+                      mapping = ggplot2::aes(x = landmark,
+                                             y = feature,
+                                             fill = expr)) +
+      ggplot2::geom_raster() +
+      ggplot2::scale_fill_gradient2(low = unname(obj = Color.Palette[1, 1]),
+                                    mid = unname(obj = Color.Palette[1, 6]),
+                                    high = unname(obj = Color.Palette[1, 2]),
+                                    midpoint = 0,
+                                    name = "Expression\n(centered)",
+                                    guide = ggplot2::guide_colorbar(
+                                      direction = "vertical",
+                                      barwidth = grid::unit(x = 0.15, units = "in"),
+                                      barheight = grid::unit(x = 0.5, units = "in"),
+                                      title.position = "top",
+                                      title.hjust = 0
+                                    )) +
+      ggplot2::labs(
+        x = "Landmarks",
+        y = "Features"
+      ) +
+      ggplot2::theme_bw() +
+      ggplot2::theme(
+        axis.text.y = ggplot2::element_text(size = .feature.font.size),
+        legend.position = "right",
+        legend.title = ggplot2::element_text(size = 7),
+        legend.text = ggplot2::element_text(size = 6)
+      )
+    
+    # Hide landmark labels if requested (usually too many)
+    if (!.show.landmark.labels) {
+      p.heat <-
+        p.heat +
+        ggplot2::theme(
+          axis.text.x = ggplot2::element_blank(),
+          axis.ticks.x = ggplot2::element_blank()
+        )
+    } else {
+      p.heat <-
+        p.heat +
+        ggplot2::theme(
+          axis.text.x = ggplot2::element_text(angle = 90, 
+                                               hjust = 1, 
+                                               vjust = 0.5,
+                                               size = 6)
+        )
+    }
+    
+    # Apply panel sizing to expression heatmap
+    p.heat <-
+      p.heat +
+      ggh4x::force_panelsizes(
+        cols = grid::unit(x = .panel.width, units = "in"),
+        rows = grid::unit(x = .panel.height, units = "in")
+      )
+    
+    # -------------------------------------------------------------------------
+    # Build annotation strips (one per fixed annotation: Y + specDE dims)
+    # -------------------------------------------------------------------------
+    
+    annot.plots <-
+      lapply(X = seq_len(length.out = n.fixed.annot),
+             FUN = function(d) {
+               
+               dim.name <-
+                 fixed.annot.names[d]
+               
+               dim.df <-
+                 annot.df[annot.df$annot_dim == dim.name, ]
+               
+               ggplot2::ggplot(data = dim.df,
+                               mapping = ggplot2::aes(x = landmark,
+                                                      y = 1,
+                                                      fill = annot_value)) +
+                 ggplot2::geom_raster() +
+                 ggplot2::scale_fill_viridis_c(option = .viridis.options.annot[d],
+                                               name = dim.name,
+                                               guide = ggplot2::guide_colorbar(
+                                                 direction = "vertical",
+                                                 barwidth = grid::unit(x = 0.15, units = "in"),
+                                                 barheight = grid::unit(x = 0.5, units = "in"),
+                                                 title.position = "top",
+                                                 title.hjust = 0
+                                               )) +
+                 ggplot2::labs(x = NULL, y = NULL) +
+                 ggplot2::theme_void() +
+                 ggplot2::theme(
+                   legend.position = "right",
+                   legend.title = ggplot2::element_text(size = 7),
+                   legend.text = ggplot2::element_text(size = 6)
+                 ) +
+                 ggh4x::force_panelsizes(
+                   cols = grid::unit(x = .annot.panel.width, units = "in"),
+                   rows = grid::unit(x = .annot.panel.height, units = "in")
+                 )
+             })
+    
+    # -------------------------------------------------------------------------
+    # Combine with patchwork
+    # -------------------------------------------------------------------------
+    
+    # Combine: annotations on top, heatmap below
+    # Heights are determined by ggh4x::force_panelsizes on each plot
+    # Collect legends on the right to avoid overlap
+    p.combined <-
+      patchwork::wrap_plots(c(annot.plots, list(p.heat)),
+                            ncol = 1,
+                            guides = "collect") +
+      patchwork::plot_annotation(
+        title = paste0("specDE Heatmap: ", .coef.col),
+        subtitle = paste0("Features ranked by loading on specDE", .specDE.dim[1]),
+        theme = ggplot2::theme(
+          plot.title = ggplot2::element_text(hjust = 0.5, size = 12, face = "bold"),
+          plot.subtitle = ggplot2::element_text(hjust = 0.5, size = 9)
+        )
+      ) &
+      ggplot2::theme(
+        legend.position = "right",
+        legend.direction = "vertical",
+        legend.box = "vertical"
+      )
+    
+    return(p.combined)
     
   }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{plotDEA}
 \alias{plotDEA}
-\title{Plot Differential Expression Analysis Results}
+\title{Plot Differential Expression Analysis Results (Deprecated)}
 \usage{
 plotDEA(
   .tdr.obj,
@@ -17,64 +17,34 @@ plotDEA(
 )
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{.tdr.obj}{A tinydenseR object.}
 
-\item{.dea.obj}{Differential expression results from \code{get.dea()}.}
+\item{.dea.obj}{Differential expression results from \code{get.dea()} or \code{get.pbDE()}.}
 
-\item{.coefs}{Character vector of coefficient names to plot. Defaults to all coefficients in
-\code{.dea.obj}.}
+\item{.coefs}{Character vector of coefficient names to plot.}
 
-\item{.order.by}{Character: "clustering" (default) or "celltyping" - order rows by mean expression
-in these groups.}
+\item{.order.by}{Character: "clustering" or "celltyping".}
 
-\item{.markers}{Character vector of feature names (genes/proteins) to plot. Defaults to features
-shown in cluster/celltype heatmap (top PC contributors for RNA, all markers for cytometry).}
+\item{.markers}{Character vector of feature names.}
 
-\item{.q}{Numeric adjusted p-value threshold for significance marking (default 0.1).}
+\item{.q}{Numeric adjusted p-value threshold.}
 
-\item{.row.space.scaler}{Numeric row height scaling (default 0.2 inches per feature).}
+\item{.row.space.scaler}{Numeric row height scaling.}
 
-\item{.col.space.scaler}{Numeric column width scaling (default 0.065 inches per coefficient).}
+\item{.col.space.scaler}{Numeric column width scaling.}
 
-\item{.label.substr.rm}{Character substring to remove from labels (default "").}
+\item{.label.substr.rm}{Character substring to remove from labels.}
 }
 \value{
-A \code{ggplot} heatmap showing effect sizes (log2 fold changes for RNA, estimated
-differences for cytometry) with point size indicating adjusted p-values and asterisks marking
-features meeting the significance threshold.
+A \code{ggplot} heatmap.
 }
 \description{
-Visualizes differential expression results as a heatmap showing log fold changes for genes/markers
-across coefficients. Rows ordered by cluster/celltype expression patterns, with significance
-indicated by asterisks. Helps identify which features drive population-level changes.
-}
-\details{
-This function shows which genes/markers are differentially expressed between conditions,
-organized by their expression patterns across clusters/cell types. The ordering helps identify:
-\itemize{
-\item Marker genes defining specific populations
-\item Broadly vs. specifically regulated features
-\item Cell type-specific transcriptional responses
-}
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}}
 
-For RNA data, typically shows top PC-loading genes. For cytometry, shows all markers.
-}
-\examples{
-\dontrun{
-# After DEA
-design <- model.matrix(~ Condition, data = .meta)
-dea <- get.dea(lm.cells, .design = design)
-
-# Heatmap of DE genes
-plotDEA(lm.cells, dea, .coefs = "ConditionB", .order.by = "clustering")
-
-# Focus on specific markers
-plotDEA(lm.cells, dea, 
-        .coefs = "ConditionB",
-        .markers = c("CD4", "CD8A", "CD3D"))
-}
-
+\code{plotDEA()} has been renamed to \code{\link{plotPbDE}()} for clarity. This function
+is provided for backward compatibility and will be removed in a future version.
 }
 \seealso{
-\code{\link{get.dea}}, \code{\link{plotBeeswarm}}
+\code{\link{plotPbDE}}
 }
+\keyword{internal}
