@@ -11,6 +11,9 @@ get.specDE(
   .nv = NULL,
   .min.prop = 0.005,
   .store.M = FALSE,
+  .degree.reg = FALSE,
+  .tau.mult = 1,
+  .lazy.alpha = 1,
   .verbose = TRUE
 )
 }
@@ -30,6 +33,19 @@ detected (>0) to be included. Default 0.005 (0.5 percent).}
 
 \item{.store.M}{Logical: if TRUE, store the M.local matrix in output. Default FALSE
 (saves memory; M.local can be large for RNA).}
+
+\item{.degree.reg}{Logical: if TRUE, apply degree regularization by adding
+tau * I (self-loops) to W before row-normalizing: W_tau = W + tau*I, then
+P = D(W_tau)^(-1) W_tau. This stabilizes diffusion on graphs with heterogeneous
+degree (e.g., small k). Default FALSE (standard random walk).}
+
+\item{.tau.mult}{Numeric: multiplier for tau when .degree.reg = TRUE.
+tau = .tau.mult * mean(degree). Default 1. Use smaller values (e.g., 0.1)
+to avoid over-damping on well-behaved graphs.}
+
+\item{.lazy.alpha}{Numeric in (0, 1]: mixing parameter for lazy random walk.
+P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).
+Values < 1 damp oscillations on sparse/irregular graphs.}
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
@@ -59,7 +75,7 @@ density contrast across the graph?" The method:
 \enumerate{
 \item Extracts the density contrast vector Y (coefficients from \code{get.lm})
 \item Prepares expression matrix X (size-factor normalized + log2 for RNA; raw for cyto)
-\item Builds random-walk normalized graph P from SNN
+\item Builds degree-regularized, lazy random-walk graph P from SNN
 \item Computes Y-weighted expression interaction: \code{diag(Y) \%*\% X}
 \item Graph-smooths: \code{M.local = P \%*\% diag(Y) \%*\% X}, then centers
 \item Decomposes M.local via SVD into latent programs

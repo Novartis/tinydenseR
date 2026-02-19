@@ -2,7 +2,7 @@
 % Please edit documentation in R/stats.model.R
 \name{get.dea}
 \alias{get.dea}
-\title{Differential Expression Analysis}
+\title{Pseudobulk Differential Expression Analysis (Deprecated)}
 \usage{
 get.dea(
   .tdr.obj,
@@ -31,8 +31,8 @@ get.dea(
 \item{.geneset.ls}{Optional named list of character vectors defining gene sets for GSVA enrichment
 analysis. Only for RNA data. Example: \code{list("Tcell" = c("CD3D", "CD3E"), "Bcell" = c("CD19", "MS4A1"))}.}
 
-\item{.id.idx}{Optional list of integer vectors specifying landmark indices to include. If provided,
-only cells with these landmarks as nearest neighbors are aggregated. Useful for custom cell selection.}
+\item{.id.idx}{Optional integer vector specifying landmark indices to include. If provided,
+cells are weighted by their fuzzy membership to these landmarks. Uses landmark-centric aggregation.}
 
 \item{.id}{Optional character vector of cluster/celltype IDs to restrict analysis to. Uses
 \code{.id.from} to determine source.}
@@ -45,89 +45,16 @@ only cells with these landmarks as nearest neighbors are aggregated. Useful for 
 to assign a cell to a landmark. Used only if \code{.id.idx} is provided.}
 }
 \value{
-List containing DE analysis results:
-\describe{
-\item{\code{fit}}{limma MArrayLM fit object with moderated statistics}
-\item{\code{coefficients}}{Log fold change matrix (features x coefficients)}
-\item{\code{p.value}}{P-values (features x coefficients)}
-\item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
-\item{\code{smpl.outlier}}{Logical vector indicating which samples were excluded as outliers}
-\item{\code{id.idx}}{List of integer vectors showing which cells were included per sample}
-\item{\code{n.pseudo}}{Integer vector of pseudobulk cell counts per sample}
-\item{\code{geneset}}{(RNA only, if \code{.geneset.ls} provided) GSVA results with \code{$fit}
-(limma fit), \code{$E} (enrichment scores), \code{$adj.p} (adjusted p-values)}
-}
+A list containing DE analysis results (legacy format). Use \code{get.pbDE()} instead
+which stores results in \code{.tdr.obj$pbDE} and returns the modified object.
 }
 \description{
-Performs pseudobulk differential expression (DE) analysis for genes/markers. Aggregates cells
-into pseudobulk samples, then uses limma-voom (RNA) or limma (cytometry) to test for DE. Can
-restrict analysis to specific clusters/cell types, and optionally perform gene set enrichment
-via GSVA.
-}
-\details{
-The pseudobulk DE workflow:
-\enumerate{
-\item \strong{Cell selection}: If \code{.id} or \code{.id.idx} specified, filter to those cells.
-Otherwise use all cells.
-\item \strong{Pseudobulk aggregation}:
-\itemize{
-\item RNA: Sum raw counts across cells within each sample
-\item Cytometry: Compute column medians of marker expression across cells within each sample
-}
-\item \strong{Outlier removal}: (RNA only) Exclude samples with <10\\% of average pseudobulk cell count
-\item \strong{Normalization}:
-\itemize{
-\item RNA: TMM normalization (\code{edgeR::calcNormFactors}) + voom transformation for variance modeling
-\item Cytometry: Data used as-is (assumes pre-transformed input)
-}
-\item \strong{Linear modeling}: \code{limma::lmFit} with optional blocking for paired/repeated samples
-\item \strong{Empirical Bayes}: Variance shrinkage via \code{limma::eBayes(robust = TRUE)}
-\item \strong{GSVA} (optional, RNA only): Gene set variation analysis on voom-normalized expression
-}
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}}
 
-\strong{When to use pseudobulk DE:}
-\itemize{
-\item Identifying marker genes for cell types/states
-\item Testing treatment effects on gene expression
-\item Comparing expression between conditions within specific populations
-}
-
-\strong{Pseudobulk vs single-cell DE:}
-Pseudobulk aggregation:
-\itemize{
-\item Respects biological replication (samples as units)
-\item Appropriate statistical framework (no pseudoreplication)
-\item Better power for moderate effects
-\item Recommended for between-sample comparisons
-}
-}
-\examples{
-\dontrun{
-# After mapping
-lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
-  get.landmarks() |> get.graph() |> get.map()
-
-# DE analysis on all cells
-design <- model.matrix(~ Condition, data = .meta)
-dea <- get.dea(lm.cells, .design = design)
-plotDEA(lm.cells, dea, .coefs = "ConditionB")
-
-# DE within specific cell type
-dea.tcell <- get.dea(lm.cells, .design = design,
-                     .id = c("1", "2", "3"),
-                     .id.from = "clustering")
-
-# With gene set enrichment
-hallmark.sets <- list(
-  "INTERFERON_RESPONSE" = c("ISG15", "ISG20", "IFIT1"),
-  "INFLAMMATORY_RESPONSE" = c("IL1B", "TNF", "CXCL8")
-)
-dea.gsva <- get.dea(lm.cells, .design = design,
-                    .geneset.ls = hallmark.sets)
-}
-
+\code{get.dea()} has been renamed to \code{\link{get.pbDE}()} for clarity. This function
+is provided for backward compatibility and will be removed in a future version.
 }
 \seealso{
-\code{\link{get.map}} (required), \code{\link{plotDEA}} for heatmap visualization,
-\code{\link{get.marker}} for marker gene identification
+\code{\link{get.pbDE}}
 }
+\keyword{internal}

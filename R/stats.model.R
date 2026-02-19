@@ -635,12 +635,12 @@ get.lm <-
     
   }
 
-#' Differential Expression Analysis
+#' Pseudobulk Differential Expression Analysis
 #'
 #' Performs pseudobulk differential expression (DE) analysis for genes/markers. Aggregates cells 
-#' into pseudobulk samples, then uses limma-voom (RNA) or limma (cytometry) to test for DE. Can 
-#' restrict analysis to specific clusters/cell types, and optionally perform gene set enrichment 
-#' via GSVA.
+#' into pseudobulk samples using fuzzy landmark membership, then uses limma-voom (RNA) or limma 
+#' (cytometry) to test for DE. Can restrict analysis to specific clusters/cell types, and optionally 
+#' perform gene set enrichment via GSVA.
 #'
 #' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
 #' @param .design Design matrix specifying experimental design. Rows = samples, columns = coefficients.
@@ -650,23 +650,31 @@ get.lm <-
 #'   (e.g., "Donor"). Accounts for within-block correlation.
 #' @param .geneset.ls Optional named list of character vectors defining gene sets for GSVA enrichment 
 #'   analysis. Only for RNA data. Example: \code{list("Tcell" = c("CD3D", "CD3E"), "Bcell" = c("CD19", "MS4A1"))}.
-#' @param .id.idx Optional list of integer vectors specifying landmark indices to include. If provided, 
-#'   only cells with these landmarks as nearest neighbors are aggregated. Useful for custom cell selection.
+#' @param .id.idx Optional integer vector specifying landmark indices to include. If provided, 
+#'   cells are weighted by their fuzzy membership to these landmarks. Uses landmark-centric aggregation.
 #' @param .id Optional character vector of cluster/celltype IDs to restrict analysis to. Uses 
 #'   \code{.id.from} to determine source.
 #' @param .id.from Character: "clustering" or "celltyping". Source of IDs when \code{.id} is specified.
+#' @param .model.name Character string naming this model fit (default "default"). Results are stored 
+#'   in \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}.
+#' @param .population.name Character string naming this population (default "all"). If \code{.id} is 
+#'   specified and \code{.population.name} is not changed from default, it is auto-set to the value 
+#'   of \code{.id} (or concatenated with "_" if multiple IDs). Enables storing multiple 
+#'   population-specific DE results under the same model.
+#' @param .force.recalc Logical: if TRUE, overwrite existing results in the specified slot 
+#'   (default FALSE). If FALSE and slot already exists, an error is thrown.
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #' @param .label.confidence Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
 #'   to assign a cell to a landmark. Used only if \code{.id.idx} is provided.
 #'   
-#' @return List containing DE analysis results:
+#' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}:
 #'   \describe{
 #'     \item{\code{fit}}{limma MArrayLM fit object with moderated statistics}
 #'     \item{\code{coefficients}}{Log fold change matrix (features x coefficients)}
 #'     \item{\code{p.value}}{P-values (features x coefficients)}
 #'     \item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
 #'     \item{\code{smpl.outlier}}{Logical vector indicating which samples were excluded as outliers}
-#'     \item{\code{id.idx}}{List of integer vectors showing which cells were included per sample}
+#'     \item{\code{lm.idx}}{Integer vector of landmark indices used for aggregation}
 #'     \item{\code{n.pseudo}}{Integer vector of pseudobulk cell counts per sample}
 #'     \item{\code{geneset}}{(RNA only, if \code{.geneset.ls} provided) GSVA results with \code{$fit} 
 #'       (limma fit), \code{$E} (enrichment scores), \code{$adj.p} (adjusted p-values)}
@@ -675,14 +683,15 @@ get.lm <-
 #' @details
 #' The pseudobulk DE workflow:
 #' \enumerate{
-#'   \item \strong{Cell selection}: If \code{.id} or \code{.id.idx} specified, filter to those cells. 
-#'     Otherwise use all cells.
-#'   \item \strong{Pseudobulk aggregation}: 
+#'   \item \strong{Landmark selection}: If \code{.id} or \code{.id.idx} specified, identify target landmarks. 
+#'     Otherwise use all landmarks.
+#'   \item \strong{Pseudobulk aggregation}: For each sample, compute weighted expression using fuzzy 
+#'     membership to target landmarks:
 #'     \itemize{
-#'       \item RNA: Sum raw counts across cells within each sample
-#'       \item Cytometry: Compute column medians of marker expression across cells within each sample
+#'       \item RNA: Weighted sum of counts, scaled by effective cell count
+#'       \item Cytometry: Weighted mean of marker expression
 #'     }
-#'   \item \strong{Outlier removal}: (RNA only) Exclude samples with <10\% of average pseudobulk cell count
+#'   \item \strong{Outlier removal}: (RNA only) Exclude samples with <10\% of average pseudobulk mass
 #'   \item \strong{Normalization}:
 #'     \itemize{
 #'       \item RNA: TMM normalization (\code{edgeR::calcNormFactors}) + voom transformation for variance modeling
@@ -693,24 +702,21 @@ get.lm <-
 #'   \item \strong{GSVA} (optional, RNA only): Gene set variation analysis on voom-normalized expression
 #' }
 #' 
+#' \strong{Landmark-centric aggregation:}
+#' Unlike cell-centric approaches that hard-assign cells to populations, this method uses fuzzy 
+#' membership weights from the landmark graph. Each cell contributes to the pseudobulk proportionally 
+#' to its membership in the target landmarks, providing smoother and more robust aggregation.
+#' 
 #' \strong{When to use pseudobulk DE:}
 #' \itemize{
-#'   \item Identifying marker genes for cell types/states
-#'   \item Testing treatment effects on gene expression
-#'   \item Comparing expression between conditions within specific populations
+#'   \item Testing treatment effects on gene expression within populations
+#'   \item Comparing expression between conditions using samples as biological replicates
+#'   \item Respects the true experimental design (no pseudoreplication)
 #' }
 #' 
-#' \strong{Pseudobulk vs single-cell DE:}
-#' Pseudobulk aggregation:
-#' \itemize{
-#'   \item Respects biological replication (samples as units)
-#'   \item Appropriate statistical framework (no pseudoreplication)
-#'   \item Better power for moderate effects
-#'   \item Recommended for between-sample comparisons
-#' }
-#' 
-#' @seealso \code{\link{get.map}} (required), \code{\link{plotDEA}} for heatmap visualization,
-#'   \code{\link{get.marker}} for marker gene identification
+#' @seealso \code{\link{get.map}} (required), \code{\link{plotPbDE}} for heatmap visualization,
+#'   \code{\link{get.marker}} for marker gene identification, \code{\link{get.specDE}} for 
+#'   density contrast-coupled expression programs
 #'   
 #' @examples
 #' \dontrun{
@@ -718,28 +724,34 @@ get.lm <-
 #' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks() |> get.graph() |> get.map()
 #' 
-#' # DE analysis on all cells
+#' # DE analysis on all cells (stored in $pbDE$default$all)
 #' design <- model.matrix(~ Condition, data = .meta)
-#' dea <- get.dea(lm.cells, .design = design)
-#' plotDEA(lm.cells, dea, .coefs = "ConditionB")
+#' lm.cells <- get.pbDE(lm.cells, .design = design)
+#' plotPbDE(lm.cells, .coefs = "ConditionB")
 #' 
-#' # DE within specific cell type
-#' dea.tcell <- get.dea(lm.cells, .design = design,
+#' # DE within specific cell type (stored in $pbDE$default$tcells)
+#' lm.cells <- get.pbDE(lm.cells, .design = design,
 #'                      .id = c("1", "2", "3"),
-#'                      .id.from = "clustering")
+#'                      .id.from = "clustering",
+#'                      .population.name = "tcells")
 #' 
 #' # With gene set enrichment
 #' hallmark.sets <- list(
 #'   "INTERFERON_RESPONSE" = c("ISG15", "ISG20", "IFIT1"),
 #'   "INFLAMMATORY_RESPONSE" = c("IL1B", "TNF", "CXCL8")
 #' )
-#' dea.gsva <- get.dea(lm.cells, .design = design,
-#'                     .geneset.ls = hallmark.sets)
+#' lm.cells <- get.pbDE(lm.cells, .design = design,
+#'                      .geneset.ls = hallmark.sets,
+#'                      .model.name = "gsva_model")
+#' 
+#' # Access results
+#' lm.cells$pbDE$default$all$adj.p
+#' lm.cells$pbDE$default$tcells$coefficients
 #' }
 #' 
 #' @export
 #'
-get.dea <-
+get.pbDE <-
   function(
     .tdr.obj,
     .design,
@@ -749,6 +761,9 @@ get.dea <-
     .id.idx = NULL,
     .id = NULL,
     .id.from = NULL,
+    .model.name = "default",
+    .population.name = "all",
+    .force.recalc = FALSE,
     .verbose = TRUE,
     .label.confidence = 0.8
   ) {
@@ -796,6 +811,40 @@ get.dea <-
                        collapse = " ")))
     }
     
+    # -------------------------------------------------------------------------
+    # Auto-set .population.name if .id is specified and .population.name is default
+    # -------------------------------------------------------------------------
+    
+    if(!is.null(x = .id) && .population.name == "all"){
+      # Auto-set population name to the specified cluster/celltype ID(s)
+      .population.name <- paste(.id, collapse = "_")
+      if(isTRUE(x = .verbose)){
+        message(sprintf("Auto-setting .population.name to '%s'", .population.name))
+      }
+    }
+    
+    if(!is.null(x = .id.idx) && .population.name == "all"){
+      # Custom indices require explicit naming
+      .population.name <- paste0("idx_", length(x = .id.idx))
+      if(isTRUE(x = .verbose)){
+        message(sprintf("Auto-setting .population.name to '%s' (custom landmark indices)", .population.name))
+      }
+    }
+    
+    # -------------------------------------------------------------------------
+    # Check if slot already exists
+    # -------------------------------------------------------------------------
+    
+    if(!is.null(x = .tdr.obj$pbDE[[.model.name]][[.population.name]]) && !isTRUE(x = .force.recalc)){
+      stop(paste0("Results for model '", .model.name, "' and population '", .population.name, 
+                  "' already exist in .tdr.obj$pbDE. ",
+                  "Use different names or set .force.recalc = TRUE to overwrite."))
+    }
+    
+    # -------------------------------------------------------------------------
+    # Determine landmark indices for aggregation (landmark-centric approach)
+    # -------------------------------------------------------------------------
+    
     if(is.null(x = .id.idx)){
       
       if(!is.null(x = .id)){
@@ -814,18 +863,15 @@ get.dea <-
           
         }
         
+        # Get landmark indices belonging to specified clusters/celltypes
         .lm.idx <-
-          lapply(X = .tdr.obj$map[[.id.from]]$ids,
-                 FUN = function(smpl){
-                   which(x = smpl %in% .id)         
-                 })
+          which(x = .tdr.obj$graph[[.id.from]]$ids %in% .id)
 
       } else {
         
+        # Use all landmarks
         .lm.idx <-
-          stats::setNames(object = .tdr.obj$metadata$n.cells,
-                          nm = names(x = .tdr.obj$cells)) |>
-          lapply(FUN = seq_len)
+          seq_len(nrow(x = .tdr.obj$landmarks))
         
       }
     } else {
@@ -835,55 +881,20 @@ get.dea <-
                     nrow(x = .tdr.obj$landmarks)))
       }
       
-      tmp.lbl <-
-        rep(x = "out",
-            times = nrow(x = .tdr.obj$landmarks))
-        
-      tmp.lbl[.id.idx] <-
-        "in"
-      
-      .lm.idx <-
-        lapply(X = .tdr.obj$map$fuzzy.graph,
-               FUN = function(smpl) {
-                 
-                 in.and.out <-
-                   Matrix::summary(object = smpl) |>
-                   dplyr::rename(cell = i,
-                                 landmark = j) |>
-                   dplyr::mutate(label = tmp.lbl[landmark]) |>
-                   dplyr::select(-landmark) |>
-                   collapse::fgroup_by(cell,
-                                       label,
-                                       sort = FALSE) |>
-                   collapse::fsum() |>
-                   collapse::fgroup_by(cell,
-                                       sort = FALSE) |>
-                   collapse::fmutate(confidence = x / collapse::fsum(x)) |>
-                   collapse::fungroup() |>
-                   collapse::fsubset(confidence >= .label.confidence) |> 
-                   (\(x)
-                    {
-                      label <- 
-                        rep(x = "..low.confidence..",
-                            times = nrow(x = smpl))
-                      
-                      label[x$cell] <-
-                        x$label
-                      
-                      label
-
-                   }
-                   )() 
-                 
-                 which(x = in.and.out == "in")
-                 
-               }) 
+      .lm.idx <- .id.idx
 
     }
     
-    # number of cells in each pseudobulk
+    if(isTRUE(x = .verbose)){
+      message(sprintf("\nUsing %d landmarks for pseudobulk aggregation", length(x = .lm.idx)))
+    }
+    
+    # Compute fuzzy mass per sample to target landmarks
     n.pseudo <-
-      lengths(x = .lm.idx)
+      sapply(X = .tdr.obj$map$fuzzy.graph,
+             FUN = function(smpl){
+               sum(smpl[, .lm.idx, drop = FALSE])
+             })
     
     # remove outlier samples with too few cells
     smpl.outlier <-
@@ -893,7 +904,7 @@ get.dea <-
     if(.tdr.obj$assay.type == "RNA"){
       
       if(any(smpl.outlier)){
-        warning(paste0("The following samples were removed since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
+        warning(paste0("The following samples were removed since they have less than a tenth of the average fuzzy mass in pseudobulks, which can lead to misleading results:\n",
                        paste(names(x = smpl.outlier)[smpl.outlier],
                              collapse = "\n")))
       }
@@ -904,16 +915,17 @@ get.dea <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .tdr.obj$cells[[smpl]])[,.lm.idx[[smpl]]]
+            readRDS(file = .tdr.obj$cells[[smpl]])
           
+          # Landmark-centric: select target landmark columns from fuzzy membership
           wcl <- 
-            .tdr.obj$map$fuzzy.graph[[smpl]][.lm.idx[[smpl]],,drop = FALSE]
+            .tdr.obj$map$fuzzy.graph[[smpl]][, .lm.idx, drop = FALSE]
           
-          # get weighted sum
+          # get weighted sum (all cells contribute proportionally to their membership)
           wsum <-
             exprs.mat %*% wcl
           
-          # get weighted mean using sum of weights and scale by number of cells
+          # get weighted mean using sum of weights and scale by effective cell count
           res <-
             (Matrix::rowSums(x = wsum) / sum(wcl)) * (sum(Matrix::rowSums(x = wcl) > 0))
 
@@ -1065,20 +1077,22 @@ get.dea <-
     } else {
       
       counts <-
-        stats::setNames(object = names(x = .tdr.obj$cells),#[!smpl.outlier],
-                        nm = names(x = .tdr.obj$cells)) |>#[!smpl.outlier]) |>
+        stats::setNames(object = names(x = .tdr.obj$cells),
+                        nm = names(x = .tdr.obj$cells)) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
             readRDS(file = .tdr.obj$cells[[smpl]])
           
+          # Get marker columns only
           exprs.mat <-
-            exprs.mat[.lm.idx[[smpl]],colnames(x = .tdr.obj$landmarks)]
+            exprs.mat[, colnames(x = .tdr.obj$landmarks), drop = FALSE]
           
+          # Landmark-centric: select target landmark columns from fuzzy membership
           wcl <- 
-            .tdr.obj$map$fuzzy.graph[[smpl]][.lm.idx[[smpl]],,drop=FALSE]
+            .tdr.obj$map$fuzzy.graph[[smpl]][, .lm.idx, drop = FALSE]
           
-          # get weighted sum
+          # get weighted sum (all cells contribute proportionally to their membership)
           wsum <-
             (Matrix::t(x = exprs.mat) %*% wcl)
           
@@ -1160,20 +1174,90 @@ get.dea <-
     .de$smpl.outlier <-
       smpl.outlier
     
-    .de$id.idx <-
-      .id.idx
+    .de$lm.idx <-
+      .lm.idx
     
     .de$n.pseudo <-
       n.pseudo
     
-    return(.de)
+    # -------------------------------------------------------------------------
+    # Store results in .tdr.obj$pbDE[[.model.name]][[.population.name]]
+    # -------------------------------------------------------------------------
+    
+    if(is.null(x = .tdr.obj$pbDE)){
+      .tdr.obj$pbDE <- list()
+    }
+    
+    if(is.null(x = .tdr.obj$pbDE[[.model.name]])){
+      .tdr.obj$pbDE[[.model.name]] <- list()
+    }
+    
+    .tdr.obj$pbDE[[.model.name]][[.population.name]] <- .de
+    
+    if(isTRUE(x = .verbose)){
+      message(sprintf("\nResults stored in .tdr.obj$pbDE$%s$%s", .model.name, .population.name))
+    }
+    
+    return(.tdr.obj)
     
   }
+
+#' Pseudobulk Differential Expression Analysis (Deprecated)
+#'
+#' @description
+#' `r lifecycle::badge("deprecated")`
+#'
+#' \code{get.dea()} has been renamed to \code{\link{get.pbDE}()} for clarity. This function
+
+#' is provided for backward compatibility and will be removed in a future version.
+#'
+#' @inheritParams get.pbDE
+#' @return A list containing DE analysis results (legacy format). Use \code{get.pbDE()} instead
+#'   which stores results in \code{.tdr.obj$pbDE} and returns the modified object.
+#'   
+#' @seealso \code{\link{get.pbDE}}
+#' @keywords internal
+#' @export
+get.dea <- function(
+    .tdr.obj,
+    .design,
+    .contrasts = NULL,
+    .block = NULL,
+    .geneset.ls = NULL,
+    .id.idx = NULL,
+    .id = NULL,
+    .id.from = NULL,
+    .verbose = TRUE,
+    .label.confidence = 0.8
+) {
+  .Deprecated("get.pbDE", 
+              msg = "get.dea() is deprecated. Use get.pbDE() instead, which stores results in .tdr.obj$pbDE.")
+  
+  # Call get.pbDE and extract results for backward compatibility
+  result <- get.pbDE(
+    .tdr.obj = .tdr.obj,
+    .design = .design,
+    .contrasts = .contrasts,
+    .block = .block,
+    .geneset.ls = .geneset.ls,
+    .id.idx = .id.idx,
+    .id = .id,
+    .id.from = .id.from,
+    .model.name = ".deprecated.call",
+    .population.name = "result",
+    .force.recalc = TRUE,
+    .verbose = .verbose,
+    .label.confidence = .label.confidence
+  )
+  
+  # Return just the DE results (legacy behavior)
+  return(result$pbDE$.deprecated.call$result)
+}
 
 #' Marker Gene/Protein Identification via Pairwise Comparison
 #'
 #' Identifies marker genes/proteins that distinguish one cell subset from another (or all others) by 
-#' performing pseudobulk differential expression between groups. Unlike \code{get.dea} which tests 
+#' performing pseudobulk differential expression between groups. Unlike \code{get.pbDE} which tests 
 #' experimental conditions, this compares cell populations to find defining features. Useful for 
 #' characterizing clusters and validating cell type annotations.
 #'
@@ -1239,13 +1323,13 @@ get.dea <-
 #'   \item Look for both high fold change AND statistical significance
 #' }
 #' 
-#' \strong{Difference from get.dea:}
+#' \strong{Difference from get.pbDE:}
 #' \itemize{
-#'   \item \code{get.dea}: Tests experimental conditions (treatment vs control) within populations
+#'   \item \code{get.pbDE}: Tests experimental conditions (treatment vs control) within populations
 #'   \item \code{get.marker}: Tests cell populations (cluster A vs B) within the same experiment
 #' }
 #' 
-#' @seealso \code{\link{get.map}} (required), \code{\link{get.dea}} for condition-based DE,
+#' @seealso \code{\link{get.map}} (required), \code{\link{get.pbDE}} for condition-based DE,
 #'   \code{\link{plotHeatmap}} for visualizing expression patterns
 #'   
 #' @examples
@@ -2659,7 +2743,7 @@ get.embedding <-
 #' \enumerate{
 #'   \item Extracts the density contrast vector Y (coefficients from \code{get.lm})
 #'   \item Prepares expression matrix X (size-factor normalized + log2 for RNA; raw for cyto)
-#'   \item Builds random-walk normalized graph P from SNN
+#'   \item Builds degree-regularized, lazy random-walk graph P from SNN
 #'   \item Computes Y-weighted expression interaction: \code{diag(Y) \%*\% X}
 #'   \item Graph-smooths: \code{M.local = P \%*\% diag(Y) \%*\% X}, then centers
 #'   \item Decomposes M.local via SVD into latent programs
@@ -2704,6 +2788,16 @@ get.embedding <-
 #'   detected (>0) to be included. Default 0.005 (0.5 percent).
 #' @param .store.M Logical: if TRUE, store the M.local matrix in output. Default FALSE
 #'   (saves memory; M.local can be large for RNA).
+#' @param .degree.reg Logical: if TRUE, apply degree regularization by adding
+#'   tau * I (self-loops) to W before row-normalizing: W_tau = W + tau*I, then
+#'   P = D(W_tau)^(-1) W_tau. This stabilizes diffusion on graphs with heterogeneous
+#'   degree (e.g., small k). Default FALSE (standard random walk).
+#' @param .tau.mult Numeric: multiplier for tau when .degree.reg = TRUE.
+#'   tau = .tau.mult * mean(degree). Default 1. Use smaller values (e.g., 0.1)
+#'   to avoid over-damping on well-behaved graphs.
+#' @param .lazy.alpha Numeric in (0, 1]: mixing parameter for lazy random walk.
+#'   P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).
+#'   Values < 1 damp oscillations on sparse/irregular graphs.
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #'
 #' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$specDE[[.coef.col]]}:
@@ -2750,6 +2844,9 @@ get.specDE <-
            .nv = NULL,
            .min.prop = 0.005,
            .store.M = FALSE,
+           .degree.reg = FALSE,
+           .tau.mult = 1,
+           .lazy.alpha = 1,
            .verbose = TRUE) {
     
     # -------------------------------------------------------------------------
@@ -2864,25 +2961,61 @@ get.specDE <-
       Matrix::t()
     
     # -------------------------------------------------------------------------
-    # Build random-walk normalized graph P
+    # Build random-walk normalized graph P (with optional degree regularization + lazy walk)
     # -------------------------------------------------------------------------
     
     if (isTRUE(x = .verbose)) {
       message("Building random-walk normalized graph...")
     }
     
+    # Validate lazy.alpha
+    if (!is.numeric(x = .lazy.alpha) || .lazy.alpha <= 0 || .lazy.alpha > 1) {
+      stop(".lazy.alpha must be in (0, 1]")
+    }
+    
     SNN <-
       .tdr.obj$graph$snn
     
-    D.inv <-
-      Matrix::Diagonal(x = 1 / Matrix::rowSums(x = SNN))
+    # Check for disconnected nodes
+    d <-
+      Matrix::rowSums(x = SNN)
     
+    if (any(d == 0)) {
+      n.disconnected <- sum(d == 0)
+      stop("Graph contains ", n.disconnected, " disconnected node(s) (degree = 0). ",
+           "Cannot compute random-walk matrix. Check graph construction or increase k.")
+    }
+    
+    # Degree regularization: add self-loops W_tau = W + tau*I, then row-normalize
+    # This keeps P as a proper Markov operator (rowSums = 1) while stabilizing low-degree nodes
+    if (isTRUE(x = .degree.reg)) {
+      tau <- .tau.mult * mean(x = d)
+      W.tau <- SNN + tau * Matrix::Diagonal(n = nrow(x = SNN))
+      d.tau <- Matrix::rowSums(x = W.tau)  # = d + tau
+      D.inv <- Matrix::Diagonal(x = 1 / d.tau)
+      P <- D.inv %*% W.tau
+      if (isTRUE(x = .verbose)) {
+        message("  Degree regularization: tau = ", round(x = tau, digits = 2),
+                " (tau.mult = ", .tau.mult, ")")
+      }
+    } else {
+      D.inv <- Matrix::Diagonal(x = 1 / d)
+      P <- D.inv %*% SNN
+    }
+    
+    # Set dimnames
     P <-
-      (D.inv %*% SNN) |>
-      (\(x)
-       `dimnames<-`(x = x,
-                    value = dimnames(x = SNN))
-      )()
+      `dimnames<-`(x = P,
+                   value = dimnames(x = SNN))
+    
+    # Lazy random walk: P_lazy = (1 - alpha) * I + alpha * P
+    if (.lazy.alpha < 1) {
+      I.mat <- Matrix::Diagonal(n = nrow(x = P))
+      P <- (1 - .lazy.alpha) * I.mat + .lazy.alpha * P
+      if (isTRUE(x = .verbose)) {
+        message("  Lazy walk: alpha = ", .lazy.alpha)
+      }
+    }
     
     # -------------------------------------------------------------------------
     # Y-X interaction and graph smoothing
@@ -3134,7 +3267,10 @@ get.specDE <-
           model.name = .model.name,
           coef.col = .coef.col,
           nv = .nv,
-          min.prop = .min.prop
+          min.prop = .min.prop,
+          degree.reg = .degree.reg,
+          tau.mult = .tau.mult,
+          lazy.alpha = .lazy.alpha
         )
       )
     

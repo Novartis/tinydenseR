@@ -53,7 +53,7 @@ limma MArrayLM fit object with moderated statistics and additional slots:
 }
 \description{
 Identifies marker genes/proteins that distinguish one cell subset from another (or all others) by
-performing pseudobulk differential expression between groups. Unlike \code{get.dea} which tests
+performing pseudobulk differential expression between groups. Unlike \code{get.pbDE} which tests
 experimental conditions, this compares cell populations to find defining features. Useful for
 characterizing clusters and validating cell type annotations.
 }
@@ -90,9 +90,9 @@ meta-population
 \item Look for both high fold change AND statistical significance
 }
 
-\strong{Difference from get.dea:}
+\strong{Difference from get.pbDE:}
 \itemize{
-\item \code{get.dea}: Tests experimental conditions (treatment vs control) within populations
+\item \code{get.pbDE}: Tests experimental conditions (treatment vs control) within populations
 \item \code{get.marker}: Tests cell populations (cluster A vs B) within the same experiment
 }
 }
@@ -131,6 +131,6 @@ markers.gsva <- get.marker(lm.cells,
 
 }
 \seealso{
-\code{\link{get.map}} (required), \code{\link{get.dea}} for condition-based DE,
+\code{\link{get.map}} (required), \code{\link{get.pbDE}} for condition-based DE,
 \code{\link{plotHeatmap}} for visualizing expression patterns
 }
