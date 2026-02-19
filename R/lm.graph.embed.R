@@ -427,7 +427,7 @@ fast.jaccard.r <-
 get.graph <-
   function(.tdr.obj,
            .k = 20,
-           .scale = if(.tdr.obj$assay.type == "RNA") FALSE else TRUE,
+           .scale = if(.tdr.obj$config$assay.type == "RNA") FALSE else TRUE,
            .verbose = TRUE,
            .seed = 123,
            .cl.method = "snn",
@@ -442,7 +442,7 @@ get.graph <-
     # Compute UMAP embedding with k-NN graph
     set.seed(seed = .seed)
     .tdr.obj$graph$uwot <-
-      uwot::umap(X = if(!is.null(x = .tdr.obj$harmony.obj) || .tdr.obj$assay.type == "RNA") .tdr.obj$pca$embed else .tdr.obj$landmarks,
+      uwot::umap(X = if(!is.null(x = .tdr.obj$integration$harmony.obj) || .tdr.obj$config$assay.type == "RNA") .tdr.obj$pca$embed else .tdr.obj$landmarks,
                  n_neighbors = .k,
                  n_components = 2,           # 2D for visualization
                  n_epochs = 500,             # Training iterations
@@ -452,9 +452,9 @@ get.graph <-
                  ret_model = TRUE,           # Keep model for query projection
                  batch = TRUE,
                  seed = .seed,
-                 n_threads = .tdr.obj$n.threads,
+                 n_threads = .tdr.obj$config$n.threads,
                  fast_sgd = FALSE,
-                 n_sgd_threads = .tdr.obj$n.threads,
+                 n_sgd_threads = .tdr.obj$config$n.threads,
                  ret_extra = c("fgraph",     # Fuzzy graph (for optional clustering)
                                "nn"))         # Nearest neighbors
     
@@ -718,7 +718,7 @@ get.map <-
     # Validate and setup Symphony reference if provided
     if(!is.null(x = .ref.obj)){
       
-      if(.tdr.obj$assay.type != "RNA"){
+      if(.tdr.obj$config$assay.type != "RNA"){
         stop("Cell typing with reference object is only supported for assay type RNA.\nCytometry data requires manual annotation via celltyping().")
       }
       
@@ -835,7 +835,7 @@ get.map <-
         mat.exprs <-
           readRDS(file = .tdr.obj$cells[[cells.idx]])
         
-        if(.tdr.obj$assay.type == "RNA"){
+        if(.tdr.obj$config$assay.type == "RNA"){
           
           mat.exprs <-
             Matrix::t(x = mat.exprs) |>
@@ -857,7 +857,7 @@ get.map <-
         } else {
           
           mat.exprs <-
-            mat.exprs[,.tdr.obj$markers]
+            mat.exprs[,.tdr.obj$config$markers]
           
           temp.cell.names <-
             rownames(x = mat.exprs)
@@ -867,7 +867,7 @@ get.map <-
         cells.of.interest <-
           !(temp.cell.names %in% rownames(x = .tdr.obj$landmarks))
         
-        if(!is.null(x = .tdr.obj$harmony.obj)){
+        if(!is.null(x = .tdr.obj$integration$harmony.obj)){
           
           # Map query
           mat.exprs <-
@@ -875,7 +875,7 @@ get.map <-
                                metadata_query = matrix(data = 1,
                                                        nrow = nrow(x = mat.exprs),
                                                        ncol = 2),
-                               ref_obj = .tdr.obj$harmony.obj,
+                               ref_obj = .tdr.obj$integration$harmony.obj,
                                vars = NULL,
                                verbose = .verbose,
                                do_normalize = FALSE,
@@ -886,7 +886,7 @@ get.map <-
                           value = rownames(x = mat.exprs))
             )()
           
-        } else if(.tdr.obj$assay.type == "RNA"){
+        } else if(.tdr.obj$config$assay.type == "RNA"){
           
           mat.exprs <-
             (((Matrix::t(x = mat.exprs[,.tdr.obj$pca$HVG]) - .tdr.obj$pca$center) /
@@ -913,8 +913,8 @@ get.map <-
             search_k = NULL,
             tmpdir = tempdir(),
             n_epochs = 0,
-            n_threads = .tdr.obj$n.threads,
-            n_sgd_threads = .tdr.obj$n.threads,
+            n_threads = .tdr.obj$config$n.threads,
+            n_sgd_threads = .tdr.obj$config$n.threads,
             grain_size = 1,
             verbose = isTRUE(x = .verbose),
             init = "average",
@@ -1032,7 +1032,7 @@ get.map <-
               #search_k = search_k,
               #prep_data = TRUE,
               #tmpdir = tmpdir,
-              n_threads = .tdr.obj$n.threads,
+              n_threads = .tdr.obj$config$n.threads,
               #grain_size = grain_size,
               verbose = FALSE
             )
@@ -1052,7 +1052,7 @@ get.map <-
         }
         
         
-        if(.tdr.obj$assay.type == "RNA"){
+        if(.tdr.obj$config$assay.type == "RNA"){
           
           names(x = res2$cell.clustering) <-
             paste0(names(x = .tdr.obj$cells)[cells.idx],
@@ -1136,7 +1136,7 @@ get.map <-
         unique()
       
       .tdr.obj$graph$celltyping$median.exprs <-
-        (if(.tdr.obj$assay.type == "RNA") .tdr.obj$scaled.landmarks[,top] else .tdr.obj$landmarks) |>
+        (if(.tdr.obj$config$assay.type == "RNA") .tdr.obj$scaled.landmarks[,top] else .tdr.obj$landmarks) |>
         dplyr::as_tibble() |>
         cbind(cell.pop = as.character(x = .tdr.obj$graph$celltyping$ids)) |>
         dplyr::group_by(cell.pop) |>
@@ -1441,7 +1441,7 @@ lm.cluster <-
     }
     
     # For RNA: select top genes from PCA rotation (top 3 and bottom 3 per PC)
-    if(.tdr.obj$assay.type == "RNA"){
+    if(.tdr.obj$config$assay.type == "RNA"){
       
       top <-
         apply(X = .tdr.obj$pca$rotation,
@@ -1468,7 +1468,7 @@ lm.cluster <-
     
     # Compute median expression per cluster
     .tdr.obj$graph$clustering$median.exprs <-
-      (if(.tdr.obj$assay.type == "RNA") .tdr.obj$scaled.landmarks[,top] else .tdr.obj$landmarks) |>
+      (if(.tdr.obj$config$assay.type == "RNA") .tdr.obj$scaled.landmarks[,top] else .tdr.obj$landmarks) |>
       dplyr::as_tibble() |>
       cbind(cell.pop = as.character(x = .tdr.obj$graph$clustering$ids)) |>
       dplyr::group_by(cell.pop) |>

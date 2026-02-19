@@ -58,7 +58,7 @@ Updated \code{.tdr.obj} with populated fields:
 }
 If Harmony used: \code{$embed} and \code{$rotation} are Harmony-corrected/approximated
 }
-\item{\code{$harmony.obj}}{Symphony reference object (if \code{.harmony.var} specified), used for batch-corrected mapping of query cells}
+\item{\code{$integration$harmony.obj}}{Symphony reference object (if \code{.harmony.var} specified), used for batch-corrected mapping of query cells}
 }
 }
 \description{

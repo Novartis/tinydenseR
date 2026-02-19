@@ -61,11 +61,21 @@ A list object with initialized structure containing:
 \describe{
 \item{\code{$cells}}{Input file paths}
 \item{\code{$metadata}}{Sample metadata with added cell count columns}
+\item{\code{$config}}{Configuration parameters:
+\describe{
 \item{\code{$key}}{Named vector mapping future landmarks to samples}
 \item{\code{$sampling}}{Sampling parameters including \code{n.cells}, \code{n.perSample}}
 \item{\code{$assay.type}}{Assay type ("cyto" or "RNA")}
 \item{\code{$markers}}{Marker list (cytometry only)}
+\item{\code{$n.threads}}{Number of threads for parallel processing}
+}
+}
+\item{\code{$integration}}{Integration/batch correction results:
+\describe{
 \item{\code{$harmony.var}}{Batch variables (if provided)}
+\item{\code{$harmony.obj}}{Symphony reference object (populated by \code{get.landmarks})}
+}
+}
 \item{\code{$specDE}}{Spectral DE results (populated by \code{get.specDE})}
 \item{Empty slots}{landmarks, scaled.landmarks, raw.landmarks, pca, graph, map, etc. - populated by downstream functions}
 }

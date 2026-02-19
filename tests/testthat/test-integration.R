@@ -35,8 +35,8 @@ test_that("setup.tdr.obj integration works", {
   expect_type(object = .tdr.obj, type = "list")
   expect_true("cells" %in% names(x = .tdr.obj))
   expect_true("metadata" %in% names(x = .tdr.obj))
-  expect_true("assay.type" %in% names(x = .tdr.obj))
-  expect_equal(.tdr.obj$assay.type, "cyto")
+  expect_true("config" %in% names(x = .tdr.obj))
+  expect_equal(.tdr.obj$config$assay.type, "cyto")
   
   # Clean up temp files
   cleanup_test_files(test_data)
@@ -52,7 +52,7 @@ test_that("workflow functions validate inputs properly", {
                "Sample names mismatch between .cells and .meta")
   
   # Test get.landmarks validation with incomplete object
-  .tdr.obj <- list(assay.type = "RNA")
+  .tdr.obj <- list(config = list(assay.type = "RNA"))
   expect_error(get.landmarks(.tdr.obj = .tdr.obj),
                "Invalid .tdr.obj")  # Should error due to missing required fields
 })

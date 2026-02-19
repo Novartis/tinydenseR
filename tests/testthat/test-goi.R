@@ -24,7 +24,7 @@ test_that("goi.summary validates gene names correctly", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 5,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3", "Gene4", "Gene5"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(clustering = list(ids = list(sample1 = c("1", "2", "3"))))
   )
   
@@ -45,7 +45,7 @@ test_that("goi.summary requires RNA assay type", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Marker1", "Marker2", "Marker3"))),
-    assay.type = "cyto",
+    config = list(assay.type = "cyto"),
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
   )
   
@@ -59,7 +59,7 @@ test_that("goi.summary requires cell mapping", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = NULL
   )
   
@@ -73,7 +73,7 @@ test_that("goi.summary validates .id parameter", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(
       clustering = list(ids = list(sample1 = c("1", "2", "3"))),
       nearest.landmarks = list(sample1 = matrix(data = 1:10, ncol = 2))
@@ -95,7 +95,7 @@ test_that("goi.summary validates .id.from parameter", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(
       clustering = list(ids = list(sample1 = c("1", "2", "3"))),
       nearest.landmarks = list(sample1 = matrix(data = 1:10, ncol = 2))
@@ -117,7 +117,7 @@ test_that("goi.summary handles case-sensitive gene names", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
   )
   
@@ -132,7 +132,7 @@ test_that("goi.summary accepts multiple genes", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 5,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3", "Gene4", "Gene5"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
   )
   
@@ -147,7 +147,7 @@ test_that("goi.summary error messages are informative", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
   )
   
@@ -162,7 +162,7 @@ test_that("goi.summary handles cytometry assay type correctly", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("CD4", "CD8", "CD19"))),
-    assay.type = "cyto",
+    config = list(assay.type = "cyto"),
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
   )
   
@@ -176,7 +176,7 @@ test_that("goi.summary validates .id.idx parameter type", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(
       clustering = list(ids = list(sample1 = c("1", "2", "3"))),
       nearest.landmarks = list(sample1 = matrix(data = 1:10, ncol = 2))
@@ -201,7 +201,7 @@ test_that("goi.summary returns structure with clustering, celltyping, and all", 
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(
       clustering = list(ids = list(sample1 = c("1", "2", "3"))),
       celltyping = NULL,
@@ -230,7 +230,7 @@ test_that("goi.summary handles empty gene vector", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
   )
   
@@ -259,7 +259,7 @@ test_that("goi.summary validates that genes exist in raw.landmarks colnames", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 5,
                     dimnames = list(NULL, c("ACTB", "GAPDH", "CD3D", "CD19", "MS4A1"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
   )
   
@@ -274,7 +274,7 @@ test_that("goi.summary ID validation works for celltyping", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(
       clustering = list(ids = list(sample1 = c("1", "2", "3"))),
       celltyping = list(ids = list(sample1 = c("Tcell", "Bcell", "Monocyte"))),
@@ -299,7 +299,7 @@ test_that("goi.summary suggestion message includes available genes", {
   .tdr.obj <- list(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     map = list(clustering = list(ids = list(sample1 = c("1", "2"))))
   )
   

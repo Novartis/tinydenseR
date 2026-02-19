@@ -449,7 +449,7 @@ lapply(X = .cells.DE.0.5,
   )()
 
 tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.0.5,
-                    .feature = lm.cells.DE.0.5$metada$Treatment[lm.cells.DE.0.5$key],
+                    .feature = lm.cells.DE.0.5$metada$Treatment[lm.cells.DE.0.5$config$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,
@@ -792,7 +792,7 @@ lapply(X = .cells.DE.1,
   )()
 
 tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.1,
-                    .feature = lm.cells.DE.1$metada$Treatment[lm.cells.DE.1$key],
+                    .feature = lm.cells.DE.1$metada$Treatment[lm.cells.DE.1$config$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,
@@ -1133,7 +1133,7 @@ lapply(X = .cells.DE.2,
   )()
 
 tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.2,
-                    .feature = lm.cells.DE.2$metada$Treatment[lm.cells.DE.2$key],
+                    .feature = lm.cells.DE.2$metada$Treatment[lm.cells.DE.2$config$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,

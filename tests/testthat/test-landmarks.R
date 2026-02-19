@@ -60,18 +60,19 @@ test_that("setup.tdr.obj returns a list with correct names", {
                     "scaled.landmarks",
                     "raw.landmarks",
                     "metadata",
-                    "key",
+                    "config",
+                    "integration",
                     "pca",
                     "graph",
                     "map",
-                    "assay.type",
-                    "sampling",
                     "specDE",
-                    "n.threads",
-                    "markers",
-                    "harmony.var",
-                    "interact.plot",
-                    "harmony.obj") %in% names(x = result)))
+                    "pbDE",
+                    "markerDE",
+                    "interact.plot") %in% names(x = result)))
+  # Check nested config structure
+  expect_true(all(c("key", "sampling", "assay.type", "markers", "n.threads") %in% names(x = result$config)))
+  # Check nested integration structure
+  expect_true(all(c("harmony.var", "harmony.obj") %in% names(x = result$integration)))
 })
 
 # Test error conditions for setup.tdr.obj
@@ -113,7 +114,7 @@ test_that("get.landmarks validates input properly", {
   
   # Test with incomplete object
   incomplete_obj <- list(
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     cells = list()
   )
   expect_error(get.landmarks(.tdr.obj = incomplete_obj),

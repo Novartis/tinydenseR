@@ -284,13 +284,13 @@ tinydenseR::plotUMAP(
 
 tinydenseR::plotPCA(
   .tdr.obj = covid.lm.cells,
-  .feature = covid.lm.cells$metadata$publication[covid.lm.cells$key],
+  .feature = covid.lm.cells$metadata$publication[covid.lm.cells$config$key],
   .panel.size = 2
 )
 
 tinydenseR::plotUMAP(
   .tdr.obj = covid.lm.cells,
-  .feature = covid.lm.cells$metadata$publication[covid.lm.cells$key],
+  .feature = covid.lm.cells$metadata$publication[covid.lm.cells$config$key],
   .panel.size = 2
 )
 

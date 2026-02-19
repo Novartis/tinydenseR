@@ -101,9 +101,9 @@ goi.summary <-
            "\nCheck gene names (case-sensitive) or use colnames(.tdr.obj$raw.landmarks) to see available genes.")
     }
     
-    if(.tdr.obj$assay.type != "RNA"){
+    if(.tdr.obj$config$assay.type != "RNA"){
       stop("goi.summary() only supports RNA assay data.\n",
-           "Current assay type: ", .tdr.obj$assay.type)
+           "Current assay type: ", .tdr.obj$config$assay.type)
     }
     
     if(is.null(x = .tdr.obj$map)){

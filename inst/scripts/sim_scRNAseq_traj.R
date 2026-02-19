@@ -173,7 +173,7 @@ count_matrices |>
     ggplot2::ylim(c(-7,20)))
 
 tinydenseR::plotPCA(.tdr.obj = lm.cells,
-                    .feature = lm.cells$metadata$Condition[lm.cells$key],
+                    .feature = lm.cells$metadata$Condition[lm.cells$config$key],
                     .cat.feature.color = Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,

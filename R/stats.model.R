@@ -344,14 +344,14 @@ get.lm <-
         # and healthy donors when each donor also contributes before/after treatment samples.
         dupcor.q <- 
           limma::duplicateCorrelation(object = tX,
-                                      design = stats$fit$design[.tdr.obj$key,],
-                                      block = .tdr.obj$metadata[[.block]][.tdr.obj$key])
+                                      design = stats$fit$design[.tdr.obj$config$key,],
+                                      block = .tdr.obj$metadata[[.block]][.tdr.obj$config$key])
       }
       
       fit.q <-
         limma::lmFit(object = tX,
-                     design = stats$fit$design[.tdr.obj$key,],
-                     block = if(exists(x = "dupcor.q")) .tdr.obj$metadata[[.block]][.tdr.obj$key] else  NULL,
+                     design = stats$fit$design[.tdr.obj$config$key,],
+                     block = if(exists(x = "dupcor.q")) .tdr.obj$metadata[[.block]][.tdr.obj$config$key] else  NULL,
                      correlation = if(exists(x = "dupcor.q")) dupcor.q$consensus else NULL)
       
       # we only need residuals that remove all design effects, so
@@ -776,7 +776,7 @@ get.pbDE <-
     }
     
     if(!is.null(x = .geneset.ls)){
-      if(.tdr.obj$assay.type != "RNA"){
+      if(.tdr.obj$config$assay.type != "RNA"){
         stop(".geneset.ls is only supported for RNA assay type")
       } else if(!is.list(x = .geneset.ls)){
         stop(".geneset.ls must be a list of character vectors")
@@ -901,7 +901,7 @@ get.pbDE <-
       (n.pseudo / mean(x = n.pseudo)) < 0.1
     
     # get pseudobulk
-    if(.tdr.obj$assay.type == "RNA"){
+    if(.tdr.obj$config$assay.type == "RNA"){
       
       if(any(smpl.outlier)){
         warning(paste0("The following samples were removed since they have less than a tenth of the average fuzzy mass in pseudobulks, which can lead to misleading results:\n",
@@ -1396,7 +1396,7 @@ get.markerDE <-
   ) {
     
     if(!is.null(x = .geneset.ls)){
-      if(.tdr.obj$assay.type != "RNA"){
+      if(.tdr.obj$config$assay.type != "RNA"){
         stop(".geneset.ls is only supported for RNA assay type")
       } else if(!is.list(x = .geneset.ls)){
         stop(".geneset.ls must be a list of character vectors")
@@ -1544,7 +1544,7 @@ get.markerDE <-
                     n.pseudo2))) < 0.1
     
     # get pseudobulk
-    if(.tdr.obj$assay.type == "RNA"){
+    if(.tdr.obj$config$assay.type == "RNA"){
       
       if(any(smpl.outlier.1)){
         warning(paste0("The following samples were removed from .id1 since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
@@ -3013,7 +3013,7 @@ get.specDE <-
       message("Preparing expression matrix...")
     }
     
-    if (.tdr.obj$assay.type == "RNA") {
+    if (.tdr.obj$config$assay.type == "RNA") {
       
       # Filter genes: detected in at least min.prop of landmarks
       X <-
@@ -3148,7 +3148,7 @@ get.specDE <-
       message("Computing specDE decomposition...")
     }
     
-    if (.tdr.obj$assay.type == "RNA") {
+    if (.tdr.obj$config$assay.type == "RNA") {
       
       # RNA: use truncated SVD (irlba) for efficiency
       svd.res <-

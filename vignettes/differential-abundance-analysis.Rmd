@@ -451,7 +451,7 @@ Below we visualize the landmark cells colored by batch:
 ```{r viz-landmarks}
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells.DA.0.5,
-  .feature = lm.cells.DA.0.5$metada$Batch[lm.cells.DA.0.5$key],
+  .feature = lm.cells.DA.0.5$metada$Batch[lm.cells.DA.0.5$config$key],
   .cat.feature.color = tinydenseR::Color.Palette[1, 1:2],
   .panel.size = 2,
   .point.size = 2,

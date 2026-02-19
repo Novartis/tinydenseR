@@ -897,7 +897,7 @@ plot2Markers <-
       }
     }
     
-    if(.tdr.obj$assay.type == "RNA"){
+    if(.tdr.obj$config$assay.type == "RNA"){
       
       dat.df <-
         (.tdr.obj$landmarks[if(!is.null(x = .id)) .id else 1:nrow(x = .tdr.obj$landmarks),
@@ -923,7 +923,7 @@ plot2Markers <-
                      plot.title = ggplot2::element_text(hjust = 0.5)) +
       ggplot2::labs(title = .plot.title)
     
-    if(.tdr.obj$assay.type != "RNA"){
+    if(.tdr.obj$config$assay.type != "RNA"){
       
       p <-
         p +
@@ -2360,7 +2360,7 @@ plotPbDE <-
       ggplot2::labs(title = "difference in expression",
                     x = "",
                     y = "",
-                    fill = if(.tdr.obj$assay.type == "RNA"){"log2(+0.5)FC"} else {"estimated\ndifference"},
+                    fill = if(.tdr.obj$config$assay.type == "RNA"){"log2(+0.5)FC"} else {"estimated\ndifference"},
                     size = if((is.na(x = dat.df$sig.shape) |> all())) {
                       paste0("adj.p\n(",
                              "all > ",
@@ -3186,7 +3186,7 @@ plotSpecDEHeatmap <-
     feat.abs.order <-
       order(abs(x = loadings), decreasing = TRUE)
     
-    if (.tdr.obj$assay.type == "RNA") {
+    if (.tdr.obj$config$assay.type == "RNA") {
       
       # RNA: select top .n.features by absolute loading
       n.select <-
@@ -3214,7 +3214,7 @@ plotSpecDEHeatmap <-
     # Expression matrix: normalize and subset
     # -------------------------------------------------------------------------
     
-    if (.tdr.obj$assay.type == "RNA") {
+    if (.tdr.obj$config$assay.type == "RNA") {
       
       # Step 1: Get row (landmark) sums from full matrix BEFORE subsetting
       lm.libsize <-

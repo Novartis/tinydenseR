@@ -7,7 +7,7 @@
 get.graph(
   .tdr.obj,
   .k = 20,
-  .scale = if (.tdr.obj$assay.type == "RNA") FALSE else TRUE,
+  .scale = if (.tdr.obj$config$assay.type == "RNA") FALSE else TRUE,
   .verbose = TRUE,
   .seed = 123,
   .cl.method = "snn",

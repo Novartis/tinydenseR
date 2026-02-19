@@ -157,7 +157,7 @@ celltyping <-
     # For RNA: select top PC-loading genes for heatmap visualization
     # Takes top 3 positive and top 3 negative loadings per PC to capture
     # genes that drive the major axes of variation
-    if(.tdr.obj$assay.type == "RNA") {
+    if(.tdr.obj$config$assay.type == "RNA") {
       
       top <-
         apply(X = .tdr.obj$pca$rotation,
@@ -183,7 +183,7 @@ celltyping <-
     }
     
     .tdr.obj$graph$celltyping$median.exprs <-
-      (if(.tdr.obj$assay.type == "RNA") .tdr.obj$scaled.landmarks[,top] else .tdr.obj$landmarks) |>
+      (if(.tdr.obj$config$assay.type == "RNA") .tdr.obj$scaled.landmarks[,top] else .tdr.obj$landmarks) |>
       dplyr::as_tibble() |>
       cbind(cell.pop = as.character(x = .tdr.obj$graph$celltyping$ids)) |>
       dplyr::group_by(cell.pop) |>

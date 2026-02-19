@@ -45,7 +45,7 @@ test_that("get.pbDE validates input correctly", {
   # Test error when design matrix doesn't match cells
   .tdr.obj <- list(
     cells = list(sample1 = "path1", sample2 = "path2"),
-    assay.type = "RNA"
+    config = list(assay.type = "RNA")
   )
   .design <- matrix(1, nrow = 3, ncol = 1)  # Wrong number of rows
   
@@ -56,7 +56,7 @@ test_that("get.pbDE validates input correctly", {
 test_that("get.pbDE validates geneset.ls for RNA", {
   .tdr.obj <- list(
     cells = list(sample1 = "path1"),
-    assay.type = "cyto"
+    config = list(assay.type = "cyto")
   )
   .design <- matrix(1, nrow = 1, ncol = 1)
   .geneset.ls <- list(gene1 = c("A", "B"))
@@ -69,7 +69,7 @@ test_that("get.pbDE validates geneset.ls for RNA", {
 
 test_that("get.markerDE validates geneset.ls correctly", {
   .tdr.obj <- list(
-    assay.type = "cyto",
+    config = list(assay.type = "cyto"),
     graph = list(clustering = list(ids = factor(c("A", "B"))))
   )
   .geneset.ls <- list(gene1 = c("A", "B"))
@@ -81,7 +81,7 @@ test_that("get.markerDE validates geneset.ls correctly", {
 test_that("get.markerDE requires valid id parameters", {
   .tdr.obj <- list(
     cells = list(sample1 = "path1"),
-    assay.type = "RNA",
+    config = list(assay.type = "RNA"),
     graph = list(clustering = list(ids = factor(c("A", "B"))))
   )
   .design <- matrix(1, nrow = 1, ncol = 1)
@@ -94,7 +94,7 @@ test_that("get.markerDE requires valid id parameters", {
 
 test_that("get.marker is deprecated", {
   .tdr.obj <- list(
-    assay.type = "cyto",
+    config = list(assay.type = "cyto"),
     graph = list(clustering = list(ids = factor(c("A", "B"))))
   )
   
