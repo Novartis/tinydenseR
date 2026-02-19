@@ -464,19 +464,20 @@ tinydenseR::plotPbDE(
 .dea.0.5$adj.p
 .dea.0.5$coefficients
 
-.subset.dea.0.5 <-
-  tinydenseR::get.marker(
+lm.cells.DA.0.5 <-
+  tinydenseR::get.markerDE(
     .tdr.obj = lm.cells.DA.0.5,
-    .id1 = "cluster.4"
+    .id1 = "cluster.4",
+    .comparison.name = "cluster4_vs_all"
   )
 
-tinydenseR::plotPbDE(
+tinydenseR::plotMarkerDE(
   .tdr.obj = lm.cells.DA.0.5,
-  .dea.obj = .subset.dea.0.5,
+  .comparison.name = "cluster4_vs_all",
   .coefs = ".id1")
 
-.subset.dea.0.5$adj.p
-.subset.dea.0.5$coefficients
+lm.cells.DA.0.5$markerDE$default$cluster4_vs_all$adj.p
+lm.cells.DA.0.5$markerDE$default$cluster4_vs_all$coefficients
 
 # 5%
 .cells.DA.5 <-
@@ -795,19 +796,20 @@ tinydenseR::plotPbDE(
 .dea.5$adj.p
 .dea.5$coefficients
 
-.subset.dea.5 <-
-  tinydenseR::get.marker(
+lm.cells.DA.5 <-
+  tinydenseR::get.markerDE(
     .tdr.obj = lm.cells.DA.5,
-    .id1 = "cluster.3"
+    .id1 = "cluster.3",
+    .comparison.name = "cluster3_vs_all"
   )
 
-tinydenseR::plotPbDE(
+tinydenseR::plotMarkerDE(
   .tdr.obj = lm.cells.DA.5,
-  .dea.obj = .subset.dea.5,
+  .comparison.name = "cluster3_vs_all",
   .coefs = ".id1")
 
-.subset.dea.5$adj.p
-.subset.dea.5$coefficients
+lm.cells.DA.5$markerDE$default$cluster3_vs_all$adj.p
+lm.cells.DA.5$markerDE$default$cluster3_vs_all$coefficients
 
 # 50%
 .cells.DA.50 <-
@@ -1124,19 +1126,20 @@ tinydenseR::plotPbDE(
 .dea.50$adj.p
 .dea.50$coefficients
 
-.subset.dea.50 <-
-  tinydenseR::get.marker(
+lm.cells.DA.50 <-
+  tinydenseR::get.markerDE(
     .tdr.obj = lm.cells.DA.50,
-    .id1 = "cluster.2"
+    .id1 = "cluster.2",
+    .comparison.name = "cluster2_vs_all"
   )
 
-tinydenseR::plotPbDE(
+tinydenseR::plotMarkerDE(
   .tdr.obj = lm.cells.DA.50,
-  .dea.obj = .subset.dea.50,
+  .comparison.name = "cluster2_vs_all",
   .coefs = ".id1")
 
-.subset.dea.50$adj.p
-.subset.dea.50$coefficients
+lm.cells.DA.50$markerDE$default$cluster2_vs_all$adj.p
+lm.cells.DA.50$markerDE$default$cluster2_vs_all$coefficients
 
 # permutation tests
 source(file = "https://raw.githubusercontent.com/Novartis/tinydenseR/refs/heads/main/inst/scripts/perm_utils.R")

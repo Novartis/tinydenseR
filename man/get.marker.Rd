@@ -2,7 +2,7 @@
 % Please edit documentation in R/stats.model.R
 \name{get.marker}
 \alias{get.marker}
-\title{Marker Gene/Protein Identification via Pairwise Comparison}
+\title{Deprecated: Use get.markerDE instead}
 \usage{
 get.marker(
   .tdr.obj,
@@ -17,120 +17,26 @@ get.marker(
 \arguments{
 \item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{.geneset.ls}{Optional named list of character vectors defining gene sets for GSVA enrichment.
-Only for RNA data.}
+\item{.geneset.ls}{Optional named list of character vectors for GSVA.}
 
-\item{.id1.idx}{Optional list of integer vectors specifying landmark indices for group 1. If
-provided, only cells with these landmarks as nearest neighbors are included.}
+\item{.id1.idx}{Optional landmark indices for group 1.}
 
-\item{.id2.idx}{Optional list of integer vectors specifying landmark indices for group 2. If
-provided, only cells with these landmarks as nearest neighbors are included.}
+\item{.id2.idx}{Optional landmark indices for group 2.}
 
-\item{.id1}{Character vector of cluster/celltype IDs for group 1 (test group). Required if
-\code{.id1.idx} not provided.}
+\item{.id1}{Cluster/celltype IDs for group 1.}
 
-\item{.id2}{Character vector of cluster/celltype IDs for group 2 (reference group). Default
-\code{"..all.other.landmarks.."} compares group 1 to all other cells. Can specify specific IDs
-for pairwise comparisons.}
+\item{.id2}{Reference group IDs. Default \code{"..all.other.landmarks.."}.}
 
-\item{.id.from}{Character: "clustering" (default) or "celltyping". Source of IDs in \code{.id1}
-and \code{.id2}.}
+\item{.id.from}{"clustering" or "celltyping".}
 }
 \value{
-limma MArrayLM fit object with moderated statistics and additional slots:
-\describe{
-\item{\code{coefficients}}{Log fold changes (features x coefficients), nested in fit}
-\item{\code{p.value}}{P-values (features x coefficients), nested in fit}
-\item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
-\item{\code{smpl.outlier.1}}{Logical vector: samples excluded from group 1}
-\item{\code{smpl.outlier.2}}{Logical vector: samples excluded from group 2}
-\item{\code{id1.idx}}{List of integer vectors: cells included per sample for group 1}
-\item{\code{id2.idx}}{List of integer vectors: cells included per sample for group 2}
-\item{\code{n.pseudo1}}{Integer vector: pseudobulk cell counts per sample for group 1}
-\item{\code{n.pseudo2}}{Integer vector: pseudobulk cell counts per sample for group 2}
-\item{\code{geneset}}{(RNA only, if \code{.geneset.ls} provided) GSVA fit object with \code{$adj.p} and \code{$E} (enrichment scores)}
-}
+limma MArrayLM fit object (legacy behavior - does NOT return .tdr.obj).
+For the new storage pattern, use \code{\link{get.markerDE}()} instead.
 }
 \description{
-Identifies marker genes/proteins that distinguish one cell subset from another (or all others) by
-performing pseudobulk differential expression between groups. Unlike \code{get.pbDE} which tests
-experimental conditions, this compares cell populations to find defining features. Useful for
-characterizing clusters and validating cell type annotations.
-}
-\details{
-The marker identification workflow:
-\enumerate{
-\item \strong{Cell selection}: Extract cells belonging to group 1 (\code{.id1}) and group 2
-(\code{.id2})
-\item \strong{Pseudobulk aggregation}:
-\itemize{
-\item RNA: Sum raw counts across cells within each group per sample
-\item Cytometry: Compute column medians of marker expression across cells within each group per sample
-}
-\item \strong{Outlier removal}: (RNA only) Exclude samples with <10\\% of average pseudobulk cell count from either group
-\item \strong{Paired comparison}: Fit model \code{~ .ids + .pairs} where \code{.ids} is the group indicator (.id1 vs .id2) and \code{.pairs} controls for sample of origin (blocking factor)
-\item \strong{Statistical testing}: limma-voom with TMM normalization (RNA) or limma (cytometry)
-\item \strong{FDR correction}: Adjust p-values across all features
-}
-
-\strong{Common use cases:}
-\itemize{
-\item \strong{One-vs-all}: Default \code{.id2 = "..all.other.landmarks.."} finds markers that
-uniquely identify a cluster
-\item \strong{Pairwise}: Specify both \code{.id1} and \code{.id2} to compare two specific
-populations (e.g., CD4 vs CD8 T cells)
-\item \strong{Combined groups}: Provide multiple IDs in \code{.id1} to find markers for a
-meta-population
-}
-
-\strong{Interpreting results:}
-\itemize{
-\item Positive logFC: Higher expression in group 1 (potential markers)
-\item Negative logFC: Higher expression in group 2 (anti-markers)
-\item Look for both high fold change AND statistical significance
-}
-
-\strong{Difference from get.pbDE:}
-\itemize{
-\item \code{get.pbDE}: Tests experimental conditions (treatment vs control) within populations
-\item \code{get.marker}: Tests cell populations (cluster A vs B) within the same experiment
-}
-}
-\examples{
-\dontrun{
-# After mapping and clustering
-lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
-  get.landmarks() |> get.graph() |> get.map()
-
-# Find markers for cluster 1 vs all others
-markers.cl1 <- get.marker(lm.cells,
-                          .id1 = "cluster.1",
-                          .id.from = "clustering")
-
-# Top upregulated markers (accessing .id1 coefficient)
-top.markers <- rownames(markers.cl1$coefficients)[
-  markers.cl1$adj.p[, ".id1"] < 0.05 & 
-  markers.cl1$coefficients[, ".id1"] > 1
-]
-
-# Pairwise comparison: CD4 T cells vs CD8 T cells
-markers.cd4vcd8 <- get.marker(lm.cells,
-                              .id1 = c("cluster.1", "cluster.3"),  # CD4 T clusters
-                              .id2 = c("cluster.2", "cluster.4"),  # CD8 T clusters
-                              .id.from = "clustering")
-
-# With gene set enrichment
-hallmark.sets <- list(
-  "GLYCOLYSIS" = c("HK2", "PFKP", "LDHA"),
-  "OXIDATIVE_PHOS" = c("ATP5A", "COX5A", "NDUFA4")
-)
-markers.gsva <- get.marker(lm.cells,
-                           .id1 = "cluster.1",
-                           .geneset.ls = hallmark.sets)
-}
-
+\code{get.marker()} has been renamed to \code{\link{get.markerDE}()} for API consistency.
+This function is deprecated and will be removed in a future release.
 }
 \seealso{
-\code{\link{get.map}} (required), \code{\link{get.pbDE}} for condition-based DE,
-\code{\link{plotHeatmap}} for visualizing expression patterns
+\code{\link{get.markerDE}}
 }

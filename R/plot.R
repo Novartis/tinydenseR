@@ -2432,6 +2432,93 @@ plotDEA <- function(
   )
 }
 
+#' Plot Marker DE Results
+#'
+#' Visualizes marker identification results from \code{get.markerDE} as a colored heatmap showing 
+#' log fold changes with significance overlays. Uses the new storage pattern where results are 
+#' stored in \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]}.
+#'
+#' @param .tdr.obj A tinydenseR object with marker results from \code{get.markerDE}.
+#' @param .de.obj Optional: Direct DE results object for backward compatibility. If NULL, fetches 
+#'   from \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]}.
+#' @param .model.name Character identifying the model (default "default").
+#' @param .comparison.name Character identifying the comparison (e.g., "cluster.1_vs_all"). Required 
+#'   if \code{.de.obj} is NULL.
+#' @param .coefs Character vector of coefficient names to plot. Default includes "(Intercept)" and 
+#'   ".id1" to show overall expression and group-specific enrichment.
+#' @param .order.by Source for marker ordering: "clustering" or "celltyping".
+#' @param .markers Features to include (default: all markers from \code{.order.by}).
+#' @param .q Numeric FDR threshold for significance markers (default 0.1).
+#' @param .row.space.scaler Numeric row height scaling (default 0.2).
+#' @param .col.space.scaler Numeric column width scaling (default 0.065).
+#' @param .label.substr.rm Character pattern to remove from coefficient labels.
+#'
+#' @return A \code{ggplot} heatmap showing log fold changes per feature and coefficient.
+#'
+#' @details The plot shows:
+#' \itemize{
+#'   \item Fill color: Log fold change (blue = lower in .id1, red = higher in .id1)
+#'   \item Point size: -log10(adjusted p-value)
+#'   \item Asterisk overlay: Features passing the q-value threshold
+#' }
+#'
+#' For marker analysis, the key coefficient is typically ".id1" which represents the difference 
+#' between group 1 and group 2 (or all other landmarks).
+#'
+#' @seealso \code{\link{get.markerDE}}, \code{\link{plotPbDE}}
+#'
+#' @examples
+#' \dontrun{
+#' # After running get.markerDE
+#' lm.cells <- get.markerDE(lm.cells, .id1 = "cluster.3", 
+#'                          .comparison.name = "cluster3_markers")
+#'
+#' # Visualize marker results
+#' plotMarkerDE(lm.cells, .comparison.name = "cluster3_markers",
+#'              .coefs = c("(Intercept)", ".id1"))
+#' }
+#'
+#' @export
+plotMarkerDE <- function(
+    .tdr.obj,
+    .de.obj = NULL,
+    .model.name = "default",
+    .comparison.name = NULL,
+    .coefs = NULL,
+    .order.by = "clustering",
+    .markers = colnames(x = .tdr.obj$graph[[.order.by]]$median.exprs),
+    .q = 0.1,
+    .row.space.scaler = 0.2,
+    .col.space.scaler = 0.065,
+    .label.substr.rm = ""
+) {
+  
+  # Get DE results from .tdr.obj$markerDE or from provided .de.obj
+  if(is.null(x = .de.obj)){
+    if(is.null(x = .comparison.name)){
+      stop("Please provide .comparison.name to fetch results from .tdr.obj$markerDE")
+    }
+    if(is.null(x = .tdr.obj$markerDE[[.model.name]][[.comparison.name]])){
+      stop(sprintf("No results found at .tdr.obj$markerDE$%s$%s. Run get.markerDE() first.", 
+                   .model.name, .comparison.name))
+    }
+    .de.obj <- .tdr.obj$markerDE[[.model.name]][[.comparison.name]]
+  }
+  
+  # Use plotPbDE with the extracted DE object
+  plotPbDE(
+    .tdr.obj = .tdr.obj,
+    .de.obj = .de.obj,
+    .coefs = .coefs,
+    .order.by = .order.by,
+    .markers = .markers,
+    .q = .q,
+    .row.space.scaler = .row.space.scaler,
+    .col.space.scaler = .col.space.scaler,
+    .label.substr.rm = .label.substr.rm
+  )
+}
+
 #' Scatter Plot with Feature Coloring
 #'
 #' Creates a 2D scatter plot with flexible x/y features and optional coloring by a third feature. 

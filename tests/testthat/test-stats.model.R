@@ -65,20 +65,20 @@ test_that("get.pbDE validates geneset.ls for RNA", {
                ".geneset.ls is only supported for RNA assay type")
 })
 
-# Test for get.marker
+# Test for get.markerDE
 
-test_that("get.marker validates geneset.ls correctly", {
+test_that("get.markerDE validates geneset.ls correctly", {
   .tdr.obj <- list(
     assay.type = "cyto",
     graph = list(clustering = list(ids = factor(c("A", "B"))))
   )
   .geneset.ls <- list(gene1 = c("A", "B"))
   
-  expect_error(get.marker(.tdr.obj = .tdr.obj, .geneset.ls = .geneset.ls, .id1 = "A", .id2 = "B"),
+  expect_error(get.markerDE(.tdr.obj = .tdr.obj, .geneset.ls = .geneset.ls, .id1 = "A", .id2 = "B"),
                ".geneset.ls is only supported for RNA assay type")
 })
 
-test_that("get.marker requires valid id parameters", {
+test_that("get.markerDE requires valid id parameters", {
   .tdr.obj <- list(
     cells = list(sample1 = "path1"),
     assay.type = "RNA",
@@ -86,10 +86,21 @@ test_that("get.marker requires valid id parameters", {
   )
   .design <- matrix(1, nrow = 1, ncol = 1)
   
-  expect_error(get.marker(.tdr.obj = .tdr.obj),
+  expect_error(get.markerDE(.tdr.obj = .tdr.obj),
                "Please provide .id1 or .id1.idx")
-  expect_error(get.marker(.tdr.obj = .tdr.obj, .id1 = "C"),
+  expect_error(get.markerDE(.tdr.obj = .tdr.obj, .id1 = "C"),
                "not found in clustering")
+})
 
+test_that("get.marker is deprecated", {
+  .tdr.obj <- list(
+    assay.type = "cyto",
+    graph = list(clustering = list(ids = factor(c("A", "B"))))
+  )
+  
+  expect_warning(
+    try(get.marker(.tdr.obj = .tdr.obj, .id1 = "A"), silent = TRUE),
+    "deprecated"
+  )
 })
   

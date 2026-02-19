@@ -71,9 +71,11 @@ and features are ranked by absolute loading. For RNA data, expression is properl
 normalized, log-transformed, and centered.
 }
 \details{
-\strong{Feature selection}:
-Features are ranked by absolute loading value for the first element of \code{.specDE.dim}.
-For RNA, the top \code{.n.features} are selected. For cytometry, all markers are shown.
+\strong{Feature selection and ordering}:
+Features are \emph{selected} by absolute loading value for the first element of \code{.specDE.dim}
+(for RNA, the top \code{.n.features}; for cytometry, all markers). However, the selected features
+are then \emph{ordered} by signed loading (highest positive at top, most negative at bottom),
+making it easy to see which genes are up vs down-regulated along the specDE component.
 
 \strong{Expression normalization} (RNA only):
 To avoid processing the full expression matrix, the function:

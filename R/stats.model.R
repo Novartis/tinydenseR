@@ -1275,8 +1275,15 @@ get.dea <- function(
 #'   for pairwise comparisons.
 #' @param .id.from Character: "clustering" (default) or "celltyping". Source of IDs in \code{.id1} 
 #'   and \code{.id2}.
+#' @param .model.name Character: A name for the analysis model (default: "default"). Used for 
+#'   organizing multiple analyses.
+#' @param .comparison.name Character: A name for this comparison. If NULL (default), auto-generated 
+#'   from .id1 and .id2 values (e.g., "cluster.1_vs_all" or "cluster.1_vs_cluster.2").
+#' @param .force.recalc Logical: If TRUE, recalculate even if results exist (default: FALSE).
 #'   
-#' @return limma MArrayLM fit object with moderated statistics and additional slots:
+#' @return The input \code{.tdr.obj} with results stored in 
+#'   \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]} as a limma MArrayLM fit object 
+#'   with moderated statistics and additional slots:
 #'   \describe{
 #'     \item{\code{coefficients}}{Log fold changes (features x coefficients), nested in fit}
 #'     \item{\code{p.value}}{P-values (features x coefficients), nested in fit}
@@ -1326,11 +1333,12 @@ get.dea <- function(
 #' \strong{Difference from get.pbDE:}
 #' \itemize{
 #'   \item \code{get.pbDE}: Tests experimental conditions (treatment vs control) within populations
-#'   \item \code{get.marker}: Tests cell populations (cluster A vs B) within the same experiment
+#'   \item \code{get.markerDE}: Tests cell populations (cluster A vs B) within the same experiment
 #' }
 #' 
 #' @seealso \code{\link{get.map}} (required), \code{\link{get.pbDE}} for condition-based DE,
-#'   \code{\link{plotHeatmap}} for visualizing expression patterns
+#'   \code{\link{plotHeatmap}} for visualizing expression patterns, \code{\link{plotMarkerDE}}
+#'   for visualizing marker results
 #'   
 #' @examples
 #' \dontrun{
@@ -1338,36 +1346,42 @@ get.dea <- function(
 #' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks() |> get.graph() |> get.map()
 #' 
-#' # Find markers for cluster 1 vs all others
-#' markers.cl1 <- get.marker(lm.cells,
-#'                           .id1 = "cluster.1",
-#'                           .id.from = "clustering")
+#' # Find markers for cluster 1 vs all others (stored in .tdr.obj$markerDE)
+#' lm.cells <- get.markerDE(lm.cells,
+#'                          .id1 = "cluster.1",
+#'                          .id.from = "clustering",
+#'                          .comparison.name = "cluster1_vs_all")
+#' 
+#' # Access results
+#' marker.results <- lm.cells$markerDE$default$cluster1_vs_all
 #' 
 #' # Top upregulated markers (accessing .id1 coefficient)
-#' top.markers <- rownames(markers.cl1$coefficients)[
-#'   markers.cl1$adj.p[, ".id1"] < 0.05 & 
-#'   markers.cl1$coefficients[, ".id1"] > 1
+#' top.markers <- rownames(marker.results$coefficients)[
+#'   marker.results$adj.p[, ".id1"] < 0.05 & 
+#'   marker.results$coefficients[, ".id1"] > 1
 #' ]
 #' 
 #' # Pairwise comparison: CD4 T cells vs CD8 T cells
-#' markers.cd4vcd8 <- get.marker(lm.cells,
-#'                               .id1 = c("cluster.1", "cluster.3"),  # CD4 T clusters
-#'                               .id2 = c("cluster.2", "cluster.4"),  # CD8 T clusters
-#'                               .id.from = "clustering")
+#' lm.cells <- get.markerDE(lm.cells,
+#'                          .id1 = c("cluster.1", "cluster.3"),  # CD4 T clusters
+#'                          .id2 = c("cluster.2", "cluster.4"),  # CD8 T clusters
+#'                          .id.from = "clustering",
+#'                          .comparison.name = "cd4_vs_cd8")
 #' 
 #' # With gene set enrichment
 #' hallmark.sets <- list(
 #'   "GLYCOLYSIS" = c("HK2", "PFKP", "LDHA"),
 #'   "OXIDATIVE_PHOS" = c("ATP5A", "COX5A", "NDUFA4")
 #' )
-#' markers.gsva <- get.marker(lm.cells,
-#'                            .id1 = "cluster.1",
-#'                            .geneset.ls = hallmark.sets)
+#' lm.cells <- get.markerDE(lm.cells,
+#'                          .id1 = "cluster.1",
+#'                          .geneset.ls = hallmark.sets,
+#'                          .comparison.name = "cluster1_gsva")
 #' }
 #' 
 #' @export
 #'
-get.marker <-
+get.markerDE <-
   function(
     .tdr.obj,
     .geneset.ls = NULL,
@@ -1375,7 +1389,10 @@ get.marker <-
     .id2.idx = NULL,
     .id1 = NULL,
     .id2 = "..all.other.landmarks..",
-    .id.from = "clustering"
+    .id.from = "clustering",
+    .model.name = "default",
+    .comparison.name = NULL,
+    .force.recalc = FALSE
   ) {
     
     if(!is.null(x = .geneset.ls)){
@@ -1472,6 +1489,32 @@ get.marker <-
         
       }
       
+    }
+    
+    # Auto-generate comparison name if not provided
+    if(is.null(x = .comparison.name)){
+      id1.str <- paste0(.id1, collapse = "_")
+      if(identical(.id2, "..all.other.landmarks..")){
+        id2.str <- "all"
+      } else {
+        id2.str <- paste0(.id2, collapse = "_")
+      }
+      .comparison.name <- paste0(id1.str, "_vs_", id2.str)
+    }
+    
+    # Initialize storage if needed
+    if(is.null(x = .tdr.obj$markerDE)){
+      .tdr.obj$markerDE <- list()
+    }
+    if(is.null(x = .tdr.obj$markerDE[[.model.name]])){
+      .tdr.obj$markerDE[[.model.name]] <- list()
+    }
+    
+    # Check for existing results
+    if(!.force.recalc && !is.null(x = .tdr.obj$markerDE[[.model.name]][[.comparison.name]])){
+      message(sprintf("Results already exist at .tdr.obj$markerDE$%s$%s. Use .force.recalc = TRUE to recalculate.", 
+                      .model.name, .comparison.name))
+      return(.tdr.obj)
     }
     
     # number of cells in each .id1 and .id2 pseudobulks
@@ -1860,10 +1903,10 @@ get.marker <-
       smpl.outlier.2
     
     .de$id1.idx <-
-      .id1.idx
+      .lm1.idx
     
     .de$id2.idx <-
-      .id2.idx
+      .lm2.idx
     
     .de$n.pseudo1 <-
       n.pseudo1
@@ -1871,9 +1914,62 @@ get.marker <-
     .de$n.pseudo2 <-
       n.pseudo2
     
-    return(.de)
+    # Store results in .tdr.obj
+    .tdr.obj$markerDE[[.model.name]][[.comparison.name]] <- .de
+    
+    message(sprintf("Marker DE results stored at .tdr.obj$markerDE$%s$%s", 
+                    .model.name, .comparison.name))
+    
+    return(.tdr.obj)
     
   }
+
+#' Deprecated: Use get.markerDE instead
+#'
+#' \code{get.marker()} has been renamed to \code{\link{get.markerDE}()} for API consistency. 
+#' This function is deprecated and will be removed in a future release.
+#'
+#' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
+#' @param .geneset.ls Optional named list of character vectors for GSVA.
+#' @param .id1.idx Optional landmark indices for group 1.
+#' @param .id2.idx Optional landmark indices for group 2.
+#' @param .id1 Cluster/celltype IDs for group 1.
+#' @param .id2 Reference group IDs. Default \code{"..all.other.landmarks.."}.
+#' @param .id.from "clustering" or "celltyping".
+#'
+#' @return limma MArrayLM fit object (legacy behavior - does NOT return .tdr.obj).
+#'   For the new storage pattern, use \code{\link{get.markerDE}()} instead.
+#' @seealso \code{\link{get.markerDE}}
+#' @export
+get.marker <- function(
+    .tdr.obj,
+    .geneset.ls = NULL,
+    .id1.idx = NULL,
+    .id2.idx = NULL,
+    .id1 = NULL,
+    .id2 = "..all.other.landmarks..",
+    .id.from = "clustering"
+) {
+  .Deprecated("get.markerDE", 
+              msg = "get.marker() is deprecated. Use get.markerDE() instead, which stores results in .tdr.obj$markerDE.")
+  
+  # Call get.markerDE and extract results for backward compatibility
+  result <- get.markerDE(
+    .tdr.obj = .tdr.obj,
+    .geneset.ls = .geneset.ls,
+    .id1.idx = .id1.idx,
+    .id2.idx = .id2.idx,
+    .id1 = .id1,
+    .id2 = .id2,
+    .id.from = .id.from,
+    .model.name = ".deprecated.call",
+    .comparison.name = "result",
+    .force.recalc = TRUE
+  )
+  
+  # Return just the DE results (legacy behavior)
+  return(result$markerDE$.deprecated.call$result)
+}
 
 # =============================================================================
 # Helper function: Compute unsupervised embeddings (pca and traj)

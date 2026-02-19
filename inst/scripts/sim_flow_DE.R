@@ -581,20 +581,21 @@ tinydenseR::plotBeeswarm(
 .dea.0.5$adj.p
 .dea.0.5$coefficients
 
-.subset.dea.0.5 <-
-  tinydenseR::get.marker(
+lm.cells.DE.0.5 <-
+  tinydenseR::get.markerDE(
     .tdr.obj = lm.cells.DE.0.5,
-    .id1 = "cluster.4"
+    .id1 = "cluster.4",
+    .comparison.name = "cluster4_vs_all"
   )
 
-tinydenseR::plotPbDE(
+tinydenseR::plotMarkerDE(
   .tdr.obj = lm.cells.DE.0.5,
-  .dea.obj = .subset.dea.0.5, 
+  .comparison.name = "cluster4_vs_all",
   .coefs = ".id1") |>
   gridExtra::grid.arrange()
 
-.subset.dea.0.5$adj.p
-.subset.dea.0.5$coefficients
+lm.cells.DE.0.5$markerDE$default$cluster4_vs_all$adj.p
+lm.cells.DE.0.5$markerDE$default$cluster4_vs_all$coefficients
 
 # 1SD
 .cells.DE.1 <-
@@ -922,19 +923,20 @@ tinydenseR::plotBeeswarm(
 .dea.1$adj.p
 .dea.1$coefficients
 
-.subset.dea.1 <-
-  tinydenseR::get.marker(
+lm.cells.DE.1 <-
+  tinydenseR::get.markerDE(
     .tdr.obj = lm.cells.DE.1,
-    .id1 = "cluster.3"
+    .id1 = "cluster.3",
+    .comparison.name = "cluster3_vs_all"
   )
 
-tinydenseR::plotPbDE(
+tinydenseR::plotMarkerDE(
   .tdr.obj = lm.cells.DE.1,
-  .dea.obj = .subset.dea.1, 
+  .comparison.name = "cluster3_vs_all",
   .coefs = ".id1")
 
-.subset.dea.1$adj.p
-.subset.dea.1$coefficients
+lm.cells.DE.1$markerDE$default$cluster3_vs_all$adj.p
+lm.cells.DE.1$markerDE$default$cluster3_vs_all$coefficients
 
 # 2SD
 .cells.DE.2 <-
@@ -1262,19 +1264,20 @@ tinydenseR::plotBeeswarm(
 .dea.2$adj.p
 .dea.2$coefficients
 
-.subset.dea.2 <-
-  tinydenseR::get.marker(
+lm.cells.DE.2 <-
+  tinydenseR::get.markerDE(
     .tdr.obj = lm.cells.DE.2,
-    .id1 = "cluster.4"
+    .id1 = "cluster.4",
+    .comparison.name = "cluster4_vs_all"
   )
 
-tinydenseR::plotPbDE(
+tinydenseR::plotMarkerDE(
   .tdr.obj = lm.cells.DE.2,
-  .dea.obj = .subset.dea.2, 
+  .comparison.name = "cluster4_vs_all",
   .coefs = ".id1")
 
-.subset.dea.2$adj.p
-.subset.dea.2$coefficients
+lm.cells.DE.2$markerDE$default$cluster4_vs_all$adj.p
+lm.cells.DE.2$markerDE$default$cluster4_vs_all$coefficients
 
 # permutation tests
 source(file = "https://raw.githubusercontent.com/Novartis/tinydenseR/inst/scripts/perm_utils.R")
