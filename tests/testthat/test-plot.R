@@ -86,7 +86,7 @@ test_that("input validation for other plotting functions", {
   expect_error(plotTradStats(.tdr.obj = list(), .stats.obj = list()))
   expect_error(plotTradPerc(.tdr.obj = list()))
   expect_error(plotDensity(.tdr.obj = list()))
-  expect_error(plotDEA(.tdr.obj = list(), .dea.obj = list(), .coefs = "test"))
+  expect_error(plotPbDE(.tdr.obj = list(), .de.obj = list(), .coefs = "test"))
 })
 
 

@@ -95,7 +95,7 @@ test_that("plotting functions handle different data sizes", {
 test_that("functions handle edge cases", {
   # Test with invalid data types
   expect_error(get.lm(.tdr.obj = "not_a_list"))
-  expect_error(get.dea(.tdr.obj = NULL))
+  expect_error(get.pbDE(.tdr.obj = NULL))
   
   # Test plotting functions with minimal valid data
   minimal_obj <- list(

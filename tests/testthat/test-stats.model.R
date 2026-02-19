@@ -39,9 +39,9 @@ test_that("get.lm requires map", {
                "First run get.map")
 })
 
-# Test for get.dea
+# Test for get.pbDE
 
-test_that("get.dea validates input correctly", {
+test_that("get.pbDE validates input correctly", {
   # Test error when design matrix doesn't match cells
   .tdr.obj <- list(
     cells = list(sample1 = "path1", sample2 = "path2"),
@@ -49,11 +49,11 @@ test_that("get.dea validates input correctly", {
   )
   .design <- matrix(1, nrow = 3, ncol = 1)  # Wrong number of rows
   
-  expect_error(get.dea(.tdr.obj = .tdr.obj, .design = .design),
+  expect_error(get.pbDE(.tdr.obj = .tdr.obj, .design = .design),
                "Number of rows in design matrix must be equal to the number of samples")
 })
 
-test_that("get.dea validates geneset.ls for RNA", {
+test_that("get.pbDE validates geneset.ls for RNA", {
   .tdr.obj <- list(
     cells = list(sample1 = "path1"),
     assay.type = "cyto"
@@ -61,7 +61,7 @@ test_that("get.dea validates geneset.ls for RNA", {
   .design <- matrix(1, nrow = 1, ncol = 1)
   .geneset.ls <- list(gene1 = c("A", "B"))
   
-  expect_error(get.dea(.tdr.obj = .tdr.obj, .design = .design, .geneset.ls = .geneset.ls),
+  expect_error(get.pbDE(.tdr.obj = .tdr.obj, .design = .design, .geneset.ls = .geneset.ls),
                ".geneset.ls is only supported for RNA assay type")
 })
 
