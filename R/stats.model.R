@@ -1917,8 +1917,7 @@ get.markerDE <-
     # Store results in .tdr.obj
     .tdr.obj$markerDE[[.model.name]][[.comparison.name]] <- .de
     
-    message(sprintf("Marker DE results stored at .tdr.obj$markerDE$%s$%s", 
-                    .model.name, .comparison.name))
+    message(sprintf("Marker DE results stored at .tdr.obj$markerDE$%s$%s", .model.name, .comparison.name))
     
     return(.tdr.obj)
     
@@ -1937,8 +1936,7 @@ get.markerDE <-
 #' @param .id2 Reference group IDs. Default \code{"..all.other.landmarks.."}.
 #' @param .id.from "clustering" or "celltyping".
 #'
-#' @return limma MArrayLM fit object (legacy behavior - does NOT return .tdr.obj).
-#'   For the new storage pattern, use \code{\link{get.markerDE}()} instead.
+#' @return A .tdr.obj with results stored in .tdr.obj$markerDE$.deprecated.call$result.
 #' @seealso \code{\link{get.markerDE}}
 #' @export
 get.marker <- function(
@@ -1953,8 +1951,8 @@ get.marker <- function(
   .Deprecated("get.markerDE", 
               msg = "get.marker() is deprecated. Use get.markerDE() instead, which stores results in .tdr.obj$markerDE.")
   
-  # Call get.markerDE and extract results for backward compatibility
-  result <- get.markerDE(
+  # Call get.markerDE and return the .tdr.obj directly
+  return(get.markerDE(
     .tdr.obj = .tdr.obj,
     .geneset.ls = .geneset.ls,
     .id1.idx = .id1.idx,
@@ -1965,10 +1963,7 @@ get.marker <- function(
     .model.name = ".deprecated.call",
     .comparison.name = "result",
     .force.recalc = TRUE
-  )
-  
-  # Return just the DE results (legacy behavior)
-  return(result$markerDE$.deprecated.call$result)
+  ))
 }
 
 # =============================================================================

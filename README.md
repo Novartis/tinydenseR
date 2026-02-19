@@ -42,6 +42,9 @@ heavily on clustering, which can be oversimplified and subjective.
 `tinydenseR` provides a clustering-independent framework that preserves
 biological complexity while maintaining statistical rigor.
 
+For details, check out our [preprint on
+bioRxiv](https://doi.org/10.1101/2025.11.26.690752)!
+
 ## Key Features
 
 - **🎯 Sample-centric analysis**: Treats samples, not cells, as
@@ -316,16 +319,20 @@ three replicates each.
 # for demonstration purposes only
 
 library(tinydenseR)
+#> Loading required package: Matrix
 library(tidyverse)
 #> ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
 #> ✔ dplyr     1.1.4     ✔ readr     2.1.5
 #> ✔ forcats   1.0.1     ✔ stringr   1.5.2
 #> ✔ ggplot2   4.0.0     ✔ tibble    3.3.0
 #> ✔ lubridate 1.9.4     ✔ tidyr     1.3.1
-#> ✔ purrr     1.1.0     
+#> ✔ purrr     1.1.0
 #> ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+#> ✖ tidyr::expand() masks Matrix::expand()
 #> ✖ dplyr::filter() masks stats::filter()
 #> ✖ dplyr::lag()    masks stats::lag()
+#> ✖ tidyr::pack()   masks Matrix::pack()
+#> ✖ tidyr::unpack() masks Matrix::unpack()
 #> ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
 
 # Check package version
@@ -439,6 +446,10 @@ if (curl::has_internet()) {
 #> The following object is masked from 'package:tidyr':
 #> 
 #>     expand
+#> 
+#> The following objects are masked from 'package:Matrix':
+#> 
+#>     expand, unname
 #> 
 #> The following object is masked from 'package:utils':
 #> 
@@ -661,9 +672,6 @@ lm.cells <-
 #> Warning in (function (A, nv = 5, nu = nv, maxit = 1000, work = nv + 7, reorth =
 #> TRUE, : You're computing too large a percentage of total singular values, use a
 #> standard svd instead.
-#> 'as(<dsCMatrix>, "dgTMatrix")' is deprecated.
-#> Use 'as(as(., "generalMatrix"), "TsparseMatrix")' instead.
-#> See help("Deprecated") and help("Matrix-deprecated").
 ```
 
 ``` r

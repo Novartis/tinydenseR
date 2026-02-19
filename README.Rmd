@@ -43,6 +43,8 @@ knitr::opts_chunk$set(
 
 **Why use `tinydenseR`?** Traditional single-cell analysis methods rely heavily on clustering, which can be oversimplified and subjective. `tinydenseR` provides a clustering-independent framework that preserves biological complexity while maintaining statistical rigor.
 
+For details, check out our [preprint on bioRxiv](https://doi.org/10.1101/2025.11.26.690752)!
+
 ## Key Features
 
 - **🎯 Sample-centric analysis**: Treats samples, not cells, as biological replicates for proper statistical modeling
