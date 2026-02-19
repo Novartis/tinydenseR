@@ -102,11 +102,12 @@
 #'     \item{\code{$cells}}{Input file paths}
 #'     \item{\code{$metadata}}{Sample metadata with added cell count columns}
 #'     \item{\code{$key}}{Named vector mapping future landmarks to samples}
-#'     \item{\code{$spec}}{Specifications including \code{n.cells}, \code{n.perSample}}
+#'     \item{\code{$sampling}}{Sampling parameters including \code{n.cells}, \code{n.perSample}}
 #'     \item{\code{$assay.type}}{Assay type ("cyto" or "RNA")}
 #'     \item{\code{$markers}}{Marker list (cytometry only)}
 #'     \item{\code{$harmony.var}}{Batch variables (if provided)}
-#'     \item{Empty slots}{lm, scaled.lm, raw.lm, pca, graph, map, etc. - populated by downstream functions}
+#'     \item{\code{$specDE}}{Spectral DE results (populated by \code{get.specDE})}
+#'     \item{Empty slots}{landmarks, scaled.landmarks, raw.landmarks, pca, graph, map, etc. - populated by downstream functions}
 #'   }
 #' 
 #' @examples
@@ -227,7 +228,8 @@ setup.tdr.obj <-
         "graph",
         "map",
         "assay.type",
-        "spec",
+        "sampling",
+        "specDE",
         "n.threads",
         "markers",
         "harmony.var",
@@ -313,37 +315,37 @@ setup.tdr.obj <-
       
     }
     
-    .tdr.obj$spec$n.cells <-
+    .tdr.obj$sampling$n.cells <-
       n.cells
     
     # Quality check: warn if sample sizes are highly imbalanced (>10-fold difference)
-    if((max(.tdr.obj$spec$n.cells) / min(.tdr.obj$spec$n.cells)) > 10){
+    if((max(.tdr.obj$sampling$n.cells) / min(.tdr.obj$sampling$n.cells)) > 10){
       
       warning("Sample size imbalance detected: largest/smallest ratio > 10.\n",
-              "Smallest sample has ", min(.tdr.obj$spec$n.cells), " cells.\n",
+              "Smallest sample has ", min(.tdr.obj$sampling$n.cells), " cells.\n",
               "Consider removing low-quality samples.")
       
-      if(any(.tdr.obj$spec$n.cells < 1000)){
+      if(any(.tdr.obj$sampling$n.cells < 1000)){
         warning("Large variation in sample sizes detected. For cytometry, samples with <1000 cells may be unreliable.")
       }
       
     } 
     
     # Calculate target number of landmarks: 10% of total cells, capped at 5000
-    .tdr.obj$spec$target.lm.n <-
-      pmin(sum(.tdr.obj$spec$n.cells) * .prop.landmarks,
+    .tdr.obj$sampling$target.lm.n <-
+      pmin(sum(.tdr.obj$sampling$n.cells) * .prop.landmarks,
            5e3)
     
     # Allocate landmarks per sample: proportional to sample size, but capped
-    .tdr.obj$spec$n.perSample <-
-      pmin(ceiling(x = .tdr.obj$spec$n.cells * .prop.landmarks),
-           ceiling(x = .tdr.obj$spec$target.lm.n / length(x = .tdr.obj$cells)))
+    .tdr.obj$sampling$n.perSample <-
+      pmin(ceiling(x = .tdr.obj$sampling$n.cells * .prop.landmarks),
+           ceiling(x = .tdr.obj$sampling$target.lm.n / length(x = .tdr.obj$cells)))
     
     # Create key vector: maps each future landmark to its sample
     # (will be used after landmark selection to link back to metadata)
     .tdr.obj$key <-
       seq_along(along.with = .tdr.obj$cells) |>
-      rep(times = .tdr.obj$spec$n.perSample) |>
+      rep(times = .tdr.obj$sampling$n.perSample) |>
       (\(x)
        stats::setNames(object = x,
                        nm = names(x = .tdr.obj$cells)[x])
@@ -353,13 +355,13 @@ setup.tdr.obj <-
       .meta
     
     .tdr.obj$metadata$n.perSample <- 
-      .tdr.obj$spec$n.perSample
+      .tdr.obj$sampling$n.perSample
     
     .tdr.obj$metadata$n.cells <-
-      .tdr.obj$spec$n.cells
+      .tdr.obj$sampling$n.cells
     
     .tdr.obj$metadata$log10.n.cells <-
-      log10(x = .tdr.obj$spec$n.cells)
+      log10(x = .tdr.obj$sampling$n.cells)
     
     if(.assay.type == "cyto"){
       .tdr.obj$markers <- 
@@ -505,7 +507,8 @@ get.landmarks <-
             "graph",
             "map",
             "assay.type",
-            "spec",
+            "sampling",
+            "specDE",
             "n.threads",
             "markers",
             "harmony.var",
@@ -627,7 +630,7 @@ get.landmarks <-
         # Sample landmarks proportionally to leverage scores
         lm.sample <-
           sample(x = nrow(x = mat),
-                 size = .tdr.obj$spec$n.perSample[[.cells.idx]],
+                 size = .tdr.obj$sampling$n.perSample[[.cells.idx]],
                  replace = FALSE,
                  prob = lev.score)
         
@@ -973,7 +976,7 @@ get.landmarks <-
         # Sample landmarks proportionally to leverage scores
         lm.sample <-
           sample(x = nrow(x = mat),
-                 size = .tdr.obj$spec$n.perSample[[.cells.idx]],
+                 size = .tdr.obj$sampling$n.perSample[[.cells.idx]],
                  replace = FALSE,
                  prob = lev.score)
         

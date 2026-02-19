@@ -586,7 +586,7 @@ lm.cells <- tinydenseR::get.lm(
 #> BH instead.
 
 # Perform differential expression analysis
-.dea <- tinydenseR::get.dea(
+lm.cells <- tinydenseR::get.pbDE(
     .tdr.obj = lm.cells,
     .design = .design, 
     .verbose = FALSE
