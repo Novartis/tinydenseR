@@ -282,7 +282,7 @@ tinydenseR::plotBeeswarm(
   .point.size = 2)
 
 .dea <-
-  tinydenseR::get.dea(
+  tinydenseR::get.pbDE(
     .tdr.obj = lm.cells,
     .design = .design,
   )

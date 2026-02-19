@@ -567,9 +567,9 @@ We can visualize how markers are expressed in cluster 4 versus the rest of the p
 
 ```{r marker-visualization, fig.height=6}
 # Visualize marker expression: Intercept shows overall expression, .id1 shows cluster-specific enrichment
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
     .tdr.obj = lm.cells.DA.0.5,
-    .dea.obj = .marker.0.5,
+    .de.obj = .marker.0.5,
     .coefs = c("(Intercept)", ".id1")
   )
 ```

@@ -451,13 +451,13 @@ plotBeeswarm(
                       linetype = "dashed")
 
 .dea.0.5 <-
-  tinydenseR::get.dea(
+  tinydenseR::get.pbDE(
     .tdr.obj = lm.cells.DA.0.5,
     .design = .design.0.5,
     .id = "cluster.4"
   )
 
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DA.0.5,
   .dea.obj = .dea.0.5)
 
@@ -470,7 +470,7 @@ tinydenseR::plotDEA(
     .id1 = "cluster.4"
   )
 
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DA.0.5,
   .dea.obj = .subset.dea.0.5,
   .coefs = ".id1")
@@ -782,13 +782,13 @@ tinydenseR::plotBeeswarm(
 
 
 .dea.5 <-
-  tinydenseR::get.dea(
+  tinydenseR::get.pbDE(
     .tdr.obj = lm.cells.DA.5,
     .design = .design.5,
     .id = "cluster.3"
   )
 
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DA.5,
   .dea.obj = .dea.5)
 
@@ -801,7 +801,7 @@ tinydenseR::plotDEA(
     .id1 = "cluster.3"
   )
 
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DA.5,
   .dea.obj = .subset.dea.5,
   .coefs = ".id1")
@@ -1111,13 +1111,13 @@ tinydenseR::plotBeeswarm(
                       linetype = "dashed")
 
 .dea.50 <-
-  tinydenseR::get.dea(
+  tinydenseR::get.pbDE(
     .tdr.obj = lm.cells.DA.50,
     .design = .design.50,
     .id = "cluster.2"
   )
 
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DA.50,
   .dea.obj = .dea.50) 
 
@@ -1130,7 +1130,7 @@ tinydenseR::plotDEA(
     .id1 = "cluster.2"
   )
 
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DA.50,
   .dea.obj = .subset.dea.50,
   .coefs = ".id1")

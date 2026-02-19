@@ -453,14 +453,15 @@ tinydenseR::plotBeeswarm(
 
 ### Differential Expression Testing
 
-Now that we've identified cluster 3 as the target population, we can perform differential expression analysis within this cluster using `get.dea()`:
+Now that we've identified cluster 3 as the target population, we can perform differential expression analysis within this cluster using `get.pbDE()`:
 
 ```{r dea-cluster3}
 # Perform differential expression analysis for cluster 3 (target cells)
-.dea.0.5 <- tinydenseR::get.dea(
+lm.cells.DE.0.5 <- tinydenseR::get.pbDE(
   .tdr.obj = lm.cells.DE.0.5,
   .design = .design.0.5,
-  .id = "cluster.3"
+  .id = "cluster.3",
+  .population.name = "cluster3"
 )
 ```
 
@@ -472,19 +473,19 @@ Let's examine the results:
 
 ```{r dea-results-coefficients}
 # View coefficients
-.dea.0.5$coefficients
+lm.cells.DE.0.5$pbDE$default$cluster3$coefficients
 ```
 
 ```{r dea-results-pvalues}
 # View adjusted p-values
-.dea.0.5$adj.p
+lm.cells.DE.0.5$pbDE$default$cluster3$adj.p
 ```
 
 ```{r dea-res}
 # Visualize differential expression analysis for cluster 3 (target cells)
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DE.0.5,
-  .dea.obj = .dea.0.5
+  .population.name = "cluster3"
 )
 ```
 
@@ -543,23 +544,24 @@ final_data_DE |>
 
 
 # Perform differential expression analysis independently of clustering 3
-.cl.ind.dea.0.5 <- tinydenseR::get.dea(
+lm.cells.DE.0.5 <- tinydenseR::get.pbDE(
     .tdr.obj = lm.cells.DE.0.5,
     .design = .design.0.5,
     .id.idx = which(x = (lm.cells.DE.0.5$landmarks[,"Marker1"] > log(x = 10)) &
-                        (lm.cells.DE.0.5$landmarks[,"Marker5"] > log(x = 100)))
+                        (lm.cells.DE.0.5$landmarks[,"Marker5"] > log(x = 100))),
+    .population.name = "marker_defined"
 )
 ```
 
 ```{r dea-cluster-independent-res}
 # View coefficients for all markers
-.cl.ind.dea.0.5$coefficients
+lm.cells.DE.0.5$pbDE$default$marker_defined$coefficients
 # View adjusted p-values for all markers
-.cl.ind.dea.0.5$adj.p
+lm.cells.DE.0.5$pbDE$default$marker_defined$adj.p
 # Visualize differential expression analysis independently of clustering
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
     .tdr.obj = lm.cells.DE.0.5,
-    .dea.obj = .cl.ind.dea.0.5
+    .population.name = "marker_defined"
 )
 ```
 
@@ -582,9 +584,9 @@ We can visualize how markers are expressed in cluster 3 versus the rest of the p
 
 ```{r marker-visualization, fig.height=6}
 # Visualize marker expression: Intercept shows overall expression, .id1 shows cluster-specific enrichment
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
     .tdr.obj = lm.cells.DE.0.5,
-    .dea.obj = .marker.0.5,
+    .de.obj = .marker.0.5,
     .coefs = c("(Intercept)", ".id1")
   )
 ```

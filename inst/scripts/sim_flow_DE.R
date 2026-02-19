@@ -555,13 +555,13 @@ tinydenseR::plotBeeswarm(
   .perc.plot = FALSE)
 
 .dea.0.5 <-
-  tinydenseR::get.dea(
+  tinydenseR::get.pbDE(
     .tdr.obj = lm.cells.DE.0.5,
     .design = .design.0.5,
     .id = "cluster.4"
   )
 
-(tinydenseR::plotDEA(
+(tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DE.0.5,
   .dea.obj = .dea.0.5, 
   .coefs = c("Activation", "Batch2"),
@@ -587,7 +587,7 @@ tinydenseR::plotBeeswarm(
     .id1 = "cluster.4"
   )
 
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DE.0.5,
   .dea.obj = .subset.dea.0.5, 
   .coefs = ".id1") |>
@@ -896,13 +896,13 @@ tinydenseR::plotBeeswarm(
   .perc.plot = FALSE)
 
 .dea.1 <-
-  tinydenseR::get.dea(
+  tinydenseR::get.pbDE(
     .tdr.obj = lm.cells.DE.1,
     .design = .design.1,
     .id = "cluster.3"
   )
 
-(tinydenseR::plotDEA(
+(tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DE.1,
   .dea.obj = .dea.1, 
   .coefs = c("Activation", "Batch2"),
@@ -928,7 +928,7 @@ tinydenseR::plotBeeswarm(
     .id1 = "cluster.3"
   )
 
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DE.1,
   .dea.obj = .subset.dea.1, 
   .coefs = ".id1")
@@ -1236,13 +1236,13 @@ tinydenseR::plotBeeswarm(
     .perc.plot = FALSE)
 
 .dea.2 <-
-  tinydenseR::get.dea(
+  tinydenseR::get.pbDE(
     .tdr.obj = lm.cells.DE.2,
     .design = .design.2,
     .id = "cluster.4"
   )
 
-(tinydenseR::plotDEA(
+(tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DE.2,
   .dea.obj = .dea.2, 
   .coefs = c("Activation", "Batch2"),
@@ -1268,7 +1268,7 @@ tinydenseR::plotBeeswarm(
     .id1 = "cluster.4"
   )
 
-tinydenseR::plotDEA(
+tinydenseR::plotPbDE(
   .tdr.obj = lm.cells.DE.2,
   .dea.obj = .subset.dea.2, 
   .coefs = ".id1")
