@@ -11,8 +11,9 @@ plotSpecDEHeatmap(
   .model.name = "default",
   .n.features = 50,
   .order.by = NULL,
+  .add.annot = NULL,
   .order.decreasing = FALSE,
-  .viridis.options.annot = c("viridis", "plasma", "cividis"),
+  .viridis.options.annot = c("cividis", "rocket", "inferno", "mako", "magma"),
   .annot.panel.width = 4,
   .annot.panel.height = 0.15,
   .panel.width = 4,
@@ -38,15 +39,20 @@ Default 1.}
 are ranked by absolute loading and top \code{.n.features} are shown. For cytometry,
 all markers are shown and this parameter is ignored. Default 50.}
 
-\item{.order.by}{Numeric vector or matrix: custom ordering for landmarks. If NULL
-(default), uses specDE scores from \code{.specDE.dim}. If a matrix with multiple
-columns, landmarks are sorted by each column sequentially (ascending).}
+\item{.order.by}{Numeric matrix with column names: custom ordering for landmarks.
+If NULL (default), uses centered density contrast from \code{.coef.col}. If provided,
+landmarks are sorted by columns sequentially (first column primary, etc.) and
+each column is displayed as an annotation strip with the column name as legend title.}
+
+\item{.add.annot}{Numeric matrix with column names: displayed as annotation strips.
+These are added as additional annotation strips after the density contrast and before
+specDE score strips.}
 
 \item{.order.decreasing}{Logical: sort landmarks in decreasing order? Default FALSE.}
 
 \item{.viridis.options.annot}{Character vector: viridis color options for annotation
-strips (Y + specDE dimensions). Cycled if fewer options than strips.
-Default \code{c("viridis", "plasma", "cividis")}.}
+strips (density contrast + specDE dimensions + .order.by columns). Cycled if fewer
+options than strips. Default \code{c("viridis", "plasma", "cividis")}.}
 
 \item{.annot.panel.width}{Numeric: width of annotation strips in inches. Default 4.}
 
@@ -94,10 +100,15 @@ sorted by the first column, then by the second within ties, etc. (equivalent to
 are ordered by specDE scores from \code{.specDE.dim}.
 
 \strong{Annotation strips}:
-Regardless of \code{.order.by}, the following are always shown as annotation strips
-at the top: (1) Y (the density contrast from \code{get.lm}), and (2) specDE scores
-for all dimensions in \code{.specDE.dim}. This ensures the relationship between
-expression patterns and the specDE structure is always visible.
+The following are shown as annotation strips at the top:
+\enumerate{
+\item Density contrast (centered Y from \code{get.lm})
+\item specDE scores for all dimensions in \code{.specDE.dim}
+\item If \code{.order.by} is provided: each column of \code{.order.by}, with
+column names used as legend titles
+}
+This ensures the relationship between expression patterns and the specDE structure
+is always visible, plus any custom ordering variables.
 
 \strong{Visualization}:
 Uses \code{ggplot2::geom_raster()} for efficient rendering of large heatmaps.
