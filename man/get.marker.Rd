@@ -11,7 +11,8 @@ get.marker(
   .id2.idx = NULL,
   .id1 = NULL,
   .id2 = "..all.other.landmarks..",
-  .id.from = "clustering"
+  .id.from = "clustering",
+  .label.confidence = 0.8
 )
 }
 \arguments{
@@ -28,10 +29,11 @@ get.marker(
 \item{.id2}{Reference group IDs. Default \code{"..all.other.landmarks.."}.}
 
 \item{.id.from}{"clustering" or "celltyping".}
+
+\item{.label.confidence}{Numeric (0.5-1): minimum confidence for cell assignment (default: 0.8).}
 }
 \value{
-limma MArrayLM fit object (legacy behavior - does NOT return .tdr.obj).
-For the new storage pattern, use \code{\link{get.markerDE}()} instead.
+A .tdr.obj with results stored in .tdr.obj$markerDE$.deprecated.call$result.
 }
 \description{
 \code{get.marker()} has been renamed to \code{\link{get.markerDE}()} for API consistency.

@@ -14,7 +14,8 @@ get.markerDE(
   .id.from = "clustering",
   .model.name = "default",
   .comparison.name = NULL,
-  .force.recalc = FALSE
+  .force.recalc = FALSE,
+  .label.confidence = 0.8
 )
 }
 \arguments{
@@ -23,11 +24,13 @@ get.markerDE(
 \item{.geneset.ls}{Optional named list of character vectors defining gene sets for GSVA enrichment.
 Only for RNA data.}
 
-\item{.id1.idx}{Optional list of integer vectors specifying landmark indices for group 1. If
-provided, only cells with these landmarks as nearest neighbors are included.}
+\item{.id1.idx}{Optional integer vector specifying landmark indices for group 1. When provided,
+the \code{.label.confidence} pipeline determines which cells confidently belong to this
+landmark set based on their fuzzy graph weights.}
 
-\item{.id2.idx}{Optional list of integer vectors specifying landmark indices for group 2. If
-provided, only cells with these landmarks as nearest neighbors are included.}
+\item{.id2.idx}{Optional integer vector specifying landmark indices for group 2. When provided,
+the \code{.label.confidence} pipeline determines which cells confidently belong to this
+landmark set based on their fuzzy graph weights.}
 
 \item{.id1}{Character vector of cluster/celltype IDs for group 1 (test group). Required if
 \code{.id1.idx} not provided.}
@@ -46,6 +49,11 @@ organizing multiple analyses.}
 from .id1 and .id2 values (e.g., "cluster.1_vs_all" or "cluster.1_vs_cluster.2").}
 
 \item{.force.recalc}{Logical: If TRUE, recalculate even if results exist (default: FALSE).}
+
+\item{.label.confidence}{Numeric (0.5-1): minimum confidence threshold for cell-to-population
+assignment when using \code{.id1.idx} or \code{.id2.idx} (default: 0.8). For each cell, the
+fraction of its fuzzy graph weight falling on "in" vs "out" landmarks is computed; cells below
+this threshold are excluded as low-confidence assignments.}
 }
 \value{
 The input \code{.tdr.obj} with results stored in

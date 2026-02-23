@@ -1315,10 +1315,12 @@ get.dea <- function(
 #' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
 #' @param .geneset.ls Optional named list of character vectors defining gene sets for GSVA enrichment. 
 #'   Only for RNA data.
-#' @param .id1.idx Optional list of integer vectors specifying landmark indices for group 1. If 
-#'   provided, only cells with these landmarks as nearest neighbors are included.
-#' @param .id2.idx Optional list of integer vectors specifying landmark indices for group 2. If 
-#'   provided, only cells with these landmarks as nearest neighbors are included.
+#' @param .id1.idx Optional integer vector specifying landmark indices for group 1. When provided,
+#'   the \code{.label.confidence} pipeline determines which cells confidently belong to this 
+#'   landmark set based on their fuzzy graph weights.
+#' @param .id2.idx Optional integer vector specifying landmark indices for group 2. When provided,
+#'   the \code{.label.confidence} pipeline determines which cells confidently belong to this 
+#'   landmark set based on their fuzzy graph weights.
 #' @param .id1 Character vector of cluster/celltype IDs for group 1 (test group). Required if 
 #'   \code{.id1.idx} not provided.
 #' @param .id2 Character vector of cluster/celltype IDs for group 2 (reference group). Default 
@@ -1331,6 +1333,10 @@ get.dea <- function(
 #' @param .comparison.name Character: A name for this comparison. If NULL (default), auto-generated 
 #'   from .id1 and .id2 values (e.g., "cluster.1_vs_all" or "cluster.1_vs_cluster.2").
 #' @param .force.recalc Logical: If TRUE, recalculate even if results exist (default: FALSE).
+#' @param .label.confidence Numeric (0.5-1): minimum confidence threshold for cell-to-population
+#'   assignment when using \code{.id1.idx} or \code{.id2.idx} (default: 0.8). For each cell, the
+#'   fraction of its fuzzy graph weight falling on "in" vs "out" landmarks is computed; cells below
+#'   this threshold are excluded as low-confidence assignments.
 #'   
 #' @return The input \code{.tdr.obj} with results stored in 
 #'   \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]} as a limma MArrayLM fit object 
@@ -1443,8 +1449,16 @@ get.markerDE <-
     .id.from = "clustering",
     .model.name = "default",
     .comparison.name = NULL,
-    .force.recalc = FALSE
+    .force.recalc = FALSE,
+    .label.confidence = 0.8
   ) {
+    
+    i <- j <- landmark <- cell <- label <- x <- confidence <-
+      NULL
+    
+    if(.label.confidence < 0.5 || .label.confidence > 1){
+      stop(".label.confidence must be between 0.5 and 1")
+    }
     
     if(!is.null(x = .geneset.ls)){
       if(.tdr.obj$config$assay.type != "RNA"){
@@ -1497,18 +1511,65 @@ get.markerDE <-
     
     if(is.null(x = .id1.idx)){
       
+      # Cell-centric: get per-sample cell indices matching group 1
       .lm1.idx <-
-        which(x = .tdr.obj$graph[[.id.from]]$ids %in% .id1)
+        lapply(X = .tdr.obj$map[[.id.from]]$ids,
+               FUN = function(smpl){
+                 which(x = smpl %in% .id1)
+               })
       
     } else {
       
       if(!all(.id1.idx %in% (nrow(x = .tdr.obj$landmarks) |> seq_len()))) {
-        stop(paste0(".id1.idx must be a list of integer vectors from  1 to ",
+        stop(paste0(".id1.idx must be an integer vector between 1 and ",
                     nrow(x = .tdr.obj$landmarks)))
       }
       
+      # Cell-centric: use .label.confidence to determine which cells
+      # confidently belong to the specified landmark set (group 1)
+      tmp.lbl1 <-
+        rep(x = "out",
+            times = nrow(x = .tdr.obj$landmarks))
+      
+      tmp.lbl1[.id1.idx] <-
+        "in"
+      
       .lm1.idx <-
-        .id1.idx
+        lapply(X = .tdr.obj$map$fuzzy.graph,
+               FUN = function(smpl) {
+                 
+                 in.and.out <-
+                   Matrix::summary(object = smpl) |>
+                   dplyr::rename(cell = i,
+                                 landmark = j) |>
+                   dplyr::mutate(label = tmp.lbl1[landmark]) |>
+                   dplyr::select(-landmark) |>
+                   collapse::fgroup_by(cell,
+                                       label,
+                                       sort = FALSE) |>
+                   collapse::fsum() |>
+                   collapse::fgroup_by(cell,
+                                       sort = FALSE) |>
+                   collapse::fmutate(confidence = x / collapse::fsum(x)) |>
+                   collapse::fungroup() |>
+                   collapse::fsubset(confidence >= .label.confidence) |>
+                   (\(x)
+                    {
+                      label <-
+                        rep(x = "..low.confidence..",
+                            times = nrow(x = smpl))
+                      
+                      label[x$cell] <-
+                        x$label
+                      
+                      label
+                      
+                    }
+                   )()
+                 
+                 which(x = in.and.out == "in")
+                 
+               })
       
     }
     
@@ -1518,25 +1579,78 @@ get.markerDE <-
       
       .id2 <- "..all.other.landmarks.."
       
+      # Cell-centric complement: all cells NOT in group 1
       .lm2.idx <-
-        which(x = !(.tdr.obj$graph[[.id.from]]$ids %in% .id1))
+        Map(f = function(n, idx1){
+          setdiff(x = seq_len(length.out = n),
+                  y = idx1)
+        },
+        n = .tdr.obj$metadata$n.cells,
+        idx1 = .lm1.idx)
       
     } else {
       
       if(is.null(x = .id2.idx)){
         
+        # Cell-centric: get per-sample cell indices matching group 2
         .lm2.idx <-
-          which(x = .tdr.obj$graph[[.id.from]]$ids %in% .id2)
+          lapply(X = .tdr.obj$map[[.id.from]]$ids,
+                 FUN = function(smpl){
+                   which(x = smpl %in% .id2)
+                 })
         
       } else {
         
         if(!all(.id2.idx %in% (nrow(x = .tdr.obj$landmarks) |> seq_len()))) {
-          stop(paste0(".id2.idx must be a list of integer vectors from  1 to ",
+          stop(paste0(".id2.idx must be an integer vector between 1 and ",
                       nrow(x = .tdr.obj$landmarks)))
         }
         
+        # Cell-centric: use .label.confidence to determine which cells
+        # confidently belong to the specified landmark set (group 2)
+        tmp.lbl2 <-
+          rep(x = "out",
+              times = nrow(x = .tdr.obj$landmarks))
+        
+        tmp.lbl2[.id2.idx] <-
+          "in"
+        
         .lm2.idx <-
-          .id2.idx
+          lapply(X = .tdr.obj$map$fuzzy.graph,
+                 FUN = function(smpl) {
+                   
+                   in.and.out <-
+                     Matrix::summary(object = smpl) |>
+                     dplyr::rename(cell = i,
+                                   landmark = j) |>
+                     dplyr::mutate(label = tmp.lbl2[landmark]) |>
+                     dplyr::select(-landmark) |>
+                     collapse::fgroup_by(cell,
+                                         label,
+                                         sort = FALSE) |>
+                     collapse::fsum() |>
+                     collapse::fgroup_by(cell,
+                                         sort = FALSE) |>
+                     collapse::fmutate(confidence = x / collapse::fsum(x)) |>
+                     collapse::fungroup() |>
+                     collapse::fsubset(confidence >= .label.confidence) |>
+                     (\(x)
+                      {
+                        label <-
+                          rep(x = "..low.confidence..",
+                              times = nrow(x = smpl))
+                        
+                        label[x$cell] <-
+                          x$label
+                        
+                        label
+                        
+                      }
+                     )()
+                   
+                   which(x = in.and.out == "in")
+                   
+                 })
         
       }
       
@@ -1570,18 +1684,10 @@ get.markerDE <-
     
     # number of cells in each .id1 and .id2 pseudobulks
     n.pseudo1 <-
-      lapply(X = .tdr.obj$map$nearest.landmarks,
-             FUN = function(smpl){
-               sum(smpl[,1,drop = TRUE] %in% .lm1.idx)
-             }) |>
-      unlist()
+      lengths(x = .lm1.idx)
     
     n.pseudo2 <-
-      lapply(X = .tdr.obj$map$nearest.landmarks,
-             FUN = function(smpl){
-               sum(smpl[,1,drop = TRUE] %in% .lm2.idx)
-             }) |>
-      unlist()
+      lengths(x = .lm2.idx)
     
     # warn if outlier samples with too few cells are detected
     smpl.outlier.1 <-
@@ -1621,12 +1727,14 @@ get.markerDE <-
             tryCatch(
               expr = {
                 
+                cell.idx <- .lm1.idx[[smpl]]
+                
                 wcl <- 
-                  .tdr.obj$map$fuzzy.graph[[smpl]][,.lm1.idx,drop = FALSE]
+                  .tdr.obj$map$fuzzy.graph[[smpl]][cell.idx,,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
-                  exprs.mat %*% wcl
+                  exprs.mat[,cell.idx] %*% wcl
                 
                 # get weighted mean using sum of weights and scale by number of cells
                 tmp.res <-
@@ -1665,18 +1773,20 @@ get.markerDE <-
             tryCatch(
               expr = {
                 
+                cell.idx <- .lm2.idx[[smpl]]
+                
                 wcl <- 
-                  .tdr.obj$map$fuzzy.graph[[smpl]][,.lm2.idx,drop = FALSE]
+                  .tdr.obj$map$fuzzy.graph[[smpl]][cell.idx,,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
-                  exprs.mat %*% wcl
+                  exprs.mat[,cell.idx] %*% wcl
                 
                 # get weighted mean using sum of weights and scale by number of cells
-                res <-
+                tmp.res <-
                   (Matrix::rowSums(x = wsum) / sum(wcl)) * (sum(Matrix::rowSums(x = wcl) > 0))
                 
-                #Matrix::rowSums(x = exprs.mat[,.id1.idx[[smpl]],drop = FALSE])
+                return(tmp.res)
                 
               },
               error = function(e) {
@@ -1807,19 +1917,21 @@ get.markerDE <-
           exprs.mat <-
             readRDS(file = .tdr.obj$cells[[smpl]])
           
-          exprs.mat <-
-            exprs.mat[,colnames(x = .tdr.obj$landmarks)]
+          cols <-
+            colnames(x = .tdr.obj$landmarks)
           
           res <-
             tryCatch(
               expr = {
                 
+                cell.idx <- .lm1.idx[[smpl]]
+                
                 wcl <- 
-                  .tdr.obj$map$fuzzy.graph[[smpl]][,.lm1.idx,drop = FALSE]
+                  .tdr.obj$map$fuzzy.graph[[smpl]][cell.idx,,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
-                  (Matrix::t(x = exprs.mat) %*% wcl)
+                  (Matrix::t(x = exprs.mat[cell.idx, cols]) %*% wcl)
                 
                 # get weighted mean using sum of weights
                 tmp.res <-
@@ -1831,8 +1943,8 @@ get.markerDE <-
               error = function(e) {
                 
                 stats::setNames(object = rep(x = 0,
-                                             times = ncol(x = exprs.mat)),
-                                nm = colnames(x = exprs.mat))
+                                             times = length(x = cols)),
+                                nm = cols)
                 
               })
           
@@ -1854,19 +1966,21 @@ get.markerDE <-
           exprs.mat <-
             readRDS(file = .tdr.obj$cells[[smpl]])
           
-          exprs.mat <-
-            exprs.mat[,colnames(x = .tdr.obj$landmarks)]
+          cols <-
+            colnames(x = .tdr.obj$landmarks)
           
           res <-
             tryCatch(
               expr = {
                 
+                cell.idx <- .lm2.idx[[smpl]]
+                
                 wcl <- 
-                  .tdr.obj$map$fuzzy.graph[[smpl]][,.lm2.idx,drop = FALSE]
+                  .tdr.obj$map$fuzzy.graph[[smpl]][cell.idx,,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
-                  (Matrix::t(x = exprs.mat) %*% wcl)
+                  (Matrix::t(x = exprs.mat[cell.idx, cols]) %*% wcl)
                 
                 # get weighted mean using sum of weights
                 tmp.res <-
@@ -1878,8 +1992,8 @@ get.markerDE <-
               error = function(e) {
                 
                 stats::setNames(object = rep(x = 0,
-                                             times = ncol(x = exprs.mat)),
-                                nm = colnames(x = exprs.mat))
+                                             times = length(x = cols)),
+                                nm = cols)
                 
               })
           
@@ -1986,6 +2100,7 @@ get.markerDE <-
 #' @param .id1 Cluster/celltype IDs for group 1.
 #' @param .id2 Reference group IDs. Default \code{"..all.other.landmarks.."}.
 #' @param .id.from "clustering" or "celltyping".
+#' @param .label.confidence Numeric (0.5-1): minimum confidence for cell assignment (default: 0.8).
 #'
 #' @return A .tdr.obj with results stored in .tdr.obj$markerDE$.deprecated.call$result.
 #' @seealso \code{\link{get.markerDE}}
@@ -1997,7 +2112,8 @@ get.marker <- function(
     .id2.idx = NULL,
     .id1 = NULL,
     .id2 = "..all.other.landmarks..",
-    .id.from = "clustering"
+    .id.from = "clustering",
+    .label.confidence = 0.8
 ) {
   .Deprecated("get.markerDE", 
               msg = "get.marker() is deprecated. Use get.markerDE() instead, which stores results in .tdr.obj$markerDE.")
@@ -2013,7 +2129,8 @@ get.marker <- function(
     .id.from = .id.from,
     .model.name = ".deprecated.call",
     .comparison.name = "result",
-    .force.recalc = TRUE
+    .force.recalc = TRUE,
+    .label.confidence = .label.confidence
   ))
 }
 
