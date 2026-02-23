@@ -31,11 +31,11 @@ release](https://img.shields.io/github/v/release/Novartis/tinydenseR?include_pre
 
 ## Overview
 
-`tinydenseR` is a landmark‑based R package for single-cell data analysis
-that goes beyond traditional clustering approaches. Instead of treating
-each cell as an independent biological replicate, tinydenseR considers
-samples as the true biological units, enabling more accurate statistical
-modeling and interpretation.
+`tinydenseR` is a landmark-based platform for single cell data analysis
+that identifies differential cell states and features, including subtle
+within-cluster state changes. Modeling samples as replicates,
+`tinydenseR` enhances analytic efficiency and reproducibility while
+preserving the richness of single cell data.
 
 **Why use `tinydenseR`?** Traditional single-cell analysis methods rely
 heavily on clustering, which can be oversimplified and subjective.
