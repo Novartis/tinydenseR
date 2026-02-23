@@ -32,7 +32,8 @@ get.dea(
 analysis. Only for RNA data. Example: \code{list("Tcell" = c("CD3D", "CD3E"), "Bcell" = c("CD19", "MS4A1"))}.}
 
 \item{.id.idx}{Optional integer vector specifying landmark indices to include. If provided,
-cells are weighted by their fuzzy membership to these landmarks. Uses landmark-centric aggregation.}
+cells are assigned to these landmarks using fuzzy membership confidence (see \code{.label.confidence}).
+Only cells whose fuzzy mass ratio to the target landmarks meets the confidence threshold are included.}
 
 \item{.id}{Optional character vector of cluster/celltype IDs to restrict analysis to. Uses
 \code{.id.from} to determine source.}
@@ -41,8 +42,10 @@ cells are weighted by their fuzzy membership to these landmarks. Uses landmark-c
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 
-\item{.label.confidence}{Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
-to assign a cell to a landmark. Used only if \code{.id.idx} is provided.}
+\item{.label.confidence}{Numeric scalar in \code{[0.5,1]} controlling the minimum posterior
+confidence required to assign a cell to a set of target landmarks (used when \code{.id.idx} is
+provided). For each cell, the ratio of fuzzy membership mass to the target landmarks vs total
+fuzzy mass is computed; cells below this threshold are excluded from aggregation. Default 0.8.}
 }
 \value{
 A list containing DE analysis results (legacy format). Use \code{get.pbDE()} instead

@@ -197,7 +197,7 @@ get.lm <-
     stats <-
       vector(mode = "list",
              length = 0)
-        
+    
     # Use pre-computed Y from get.map
     Y <-
       .tdr.obj$map$Y
@@ -650,8 +650,9 @@ get.lm <-
 #'   (e.g., "Donor"). Accounts for within-block correlation.
 #' @param .geneset.ls Optional named list of character vectors defining gene sets for GSVA enrichment 
 #'   analysis. Only for RNA data. Example: \code{list("Tcell" = c("CD3D", "CD3E"), "Bcell" = c("CD19", "MS4A1"))}.
-#' @param .id.idx Optional integer vector specifying landmark indices to include. If provided, 
-#'   cells are weighted by their fuzzy membership to these landmarks. Uses landmark-centric aggregation.
+#' @param .id.idx Optional integer vector specifying landmark indices to include. If provided,
+#'   cells are assigned to these landmarks using fuzzy membership confidence (see \code{.label.confidence}).
+#'   Only cells whose fuzzy mass ratio to the target landmarks meets the confidence threshold are included.
 #' @param .id Optional character vector of cluster/celltype IDs to restrict analysis to. Uses 
 #'   \code{.id.from} to determine source.
 #' @param .id.from Character: "clustering" or "celltyping". Source of IDs when \code{.id} is specified.
@@ -664,8 +665,10 @@ get.lm <-
 #' @param .force.recalc Logical: if TRUE, overwrite existing results in the specified slot 
 #'   (default FALSE). If FALSE and slot already exists, an error is thrown.
 #' @param .verbose Logical: print progress messages? Default TRUE.
-#' @param .label.confidence Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
-#'   to assign a cell to a landmark. Used only if \code{.id.idx} is provided.
+#' @param .label.confidence Numeric scalar in \code{[0.5,1]} controlling the minimum posterior
+#'   confidence required to assign a cell to a set of target landmarks (used when \code{.id.idx} is
+#'   provided). For each cell, the ratio of fuzzy membership mass to the target landmarks vs total
+#'   fuzzy mass is computed; cells below this threshold are excluded from aggregation. Default 0.8.
 #'   
 #' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}:
 #'   \describe{
@@ -683,15 +686,17 @@ get.lm <-
 #' @details
 #' The pseudobulk DE workflow:
 #' \enumerate{
-#'   \item \strong{Landmark selection}: If \code{.id} or \code{.id.idx} specified, identify target landmarks. 
-#'     Otherwise use all landmarks.
-#'   \item \strong{Pseudobulk aggregation}: For each sample, compute weighted expression using fuzzy 
-#'     membership to target landmarks:
+#'   \item \strong{Cell selection}: If \code{.id} specified, select cells whose transferred label
+#'     matches the requested population. If \code{.id.idx} specified, select cells whose fuzzy
+#'     membership confidence to the target landmarks meets \code{.label.confidence}. Otherwise
+#'     use all cells.
+#'   \item \strong{Pseudobulk aggregation}: For each sample, compute weighted expression of the
+#'     selected cells using their fuzzy membership across all landmarks:
 #'     \itemize{
 #'       \item RNA: Weighted sum of counts, scaled by effective cell count
 #'       \item Cytometry: Weighted mean of marker expression
 #'     }
-#'   \item \strong{Outlier removal}: (RNA only) Exclude samples with <10\% of average pseudobulk mass
+#'   \item \strong{Outlier removal}: (RNA only) Exclude samples with <10\% of average pseudobulk cell count
 #'   \item \strong{Normalization}:
 #'     \itemize{
 #'       \item RNA: TMM normalization (\code{edgeR::calcNormFactors}) + voom transformation for variance modeling
@@ -702,10 +707,11 @@ get.lm <-
 #'   \item \strong{GSVA} (optional, RNA only): Gene set variation analysis on voom-normalized expression
 #' }
 #' 
-#' \strong{Landmark-centric aggregation:}
-#' Unlike cell-centric approaches that hard-assign cells to populations, this method uses fuzzy 
-#' membership weights from the landmark graph. Each cell contributes to the pseudobulk proportionally 
-#' to its membership in the target landmarks, providing smoother and more robust aggregation.
+#' \strong{Cell-centric aggregation:}
+#' Cells are first selected into the population of interest, then their expression is aggregated
+#' using fuzzy membership weights across all landmarks. This approach first determines \emph{which}
+#' cells belong to the population, then lets the fuzzy graph determine \emph{how} each selected
+#' cell's expression is distributed across landmark neighborhoods.
 #' 
 #' \strong{When to use pseudobulk DE:}
 #' \itemize{
@@ -842,7 +848,8 @@ get.pbDE <-
     }
     
     # -------------------------------------------------------------------------
-    # Determine landmark indices for aggregation (landmark-centric approach)
+    # Determine cell indices for aggregation (cell-centric approach)
+    # .lm.idx is a per-sample list of cell indices
     # -------------------------------------------------------------------------
     
     if(is.null(x = .id.idx)){
@@ -863,15 +870,20 @@ get.pbDE <-
           
         }
         
-        # Get landmark indices belonging to specified clusters/celltypes
+        # Cell-centric: get per-sample cell indices matching the requested population
         .lm.idx <-
-          which(x = .tdr.obj$graph[[.id.from]]$ids %in% .id)
-
+          lapply(X = .tdr.obj$map[[.id.from]]$ids,
+                 FUN = function(smpl){
+                   which(x = smpl %in% .id)
+                 })
+        
       } else {
         
-        # Use all landmarks
+        # Use all cells per sample
         .lm.idx <-
-          seq_len(nrow(x = .tdr.obj$landmarks))
+          stats::setNames(object = .tdr.obj$metadata$n.cells,
+                          nm = names(x = .tdr.obj$cells)) |>
+          lapply(FUN = seq_len)
         
       }
     } else {
@@ -881,20 +893,62 @@ get.pbDE <-
                     nrow(x = .tdr.obj$landmarks)))
       }
       
-      .lm.idx <- .id.idx
-
+      # Cell-centric: use .label.confidence to determine which cells
+      # confidently belong to the specified landmark set
+      tmp.lbl <-
+        rep(x = "out",
+            times = nrow(x = .tdr.obj$landmarks))
+      
+      tmp.lbl[.id.idx] <-
+        "in"
+      
+      .lm.idx <-
+        lapply(X = .tdr.obj$map$fuzzy.graph,
+               FUN = function(smpl) {
+                 
+                 in.and.out <-
+                   Matrix::summary(object = smpl) |>
+                   dplyr::rename(cell = i,
+                                 landmark = j) |>
+                   dplyr::mutate(label = tmp.lbl[landmark]) |>
+                   dplyr::select(-landmark) |>
+                   collapse::fgroup_by(cell,
+                                       label,
+                                       sort = FALSE) |>
+                   collapse::fsum() |>
+                   collapse::fgroup_by(cell,
+                                       sort = FALSE) |>
+                   collapse::fmutate(confidence = x / collapse::fsum(x)) |>
+                   collapse::fungroup() |>
+                   collapse::fsubset(confidence >= .label.confidence) |>
+                   (\(x)
+                    {
+                      label <-
+                        rep(x = "..low.confidence..",
+                            times = nrow(x = smpl))
+                      
+                      label[x$cell] <-
+                        x$label
+                      
+                      label
+                      
+                    }
+                   )()
+                 
+                 which(x = in.and.out == "in")
+                 
+               })
+      
     }
     
     if(isTRUE(x = .verbose)){
-      message(sprintf("\nUsing %d landmarks for pseudobulk aggregation", length(x = .lm.idx)))
+      message(sprintf("\nUsing %s cells for pseudobulk aggregation",
+                      paste(lengths(x = .lm.idx), collapse = ", ")))
     }
     
-    # Compute fuzzy mass per sample to target landmarks
+    # number of cells in each pseudobulk
     n.pseudo <-
-      sapply(X = .tdr.obj$map$fuzzy.graph,
-             FUN = function(smpl){
-               sum(smpl[, .lm.idx, drop = FALSE])
-             })
+      lengths(x = .lm.idx)
     
     # remove outlier samples with too few cells
     smpl.outlier <-
@@ -904,7 +958,7 @@ get.pbDE <-
     if(.tdr.obj$config$assay.type == "RNA"){
       
       if(any(smpl.outlier)){
-        warning(paste0("The following samples were removed since they have less than a tenth of the average fuzzy mass in pseudobulks, which can lead to misleading results:\n",
+        warning(paste0("The following samples were removed since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
                        paste(names(x = smpl.outlier)[smpl.outlier],
                              collapse = "\n")))
       }
@@ -915,20 +969,19 @@ get.pbDE <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .tdr.obj$cells[[smpl]])
+            readRDS(file = .tdr.obj$cells[[smpl]])[,.lm.idx[[smpl]]]
           
-          # Landmark-centric: select target landmark columns from fuzzy membership
           wcl <- 
-            .tdr.obj$map$fuzzy.graph[[smpl]][, .lm.idx, drop = FALSE]
+            .tdr.obj$map$fuzzy.graph[[smpl]][.lm.idx[[smpl]],,drop = FALSE]
           
-          # get weighted sum (all cells contribute proportionally to their membership)
+          # get weighted sum
           wsum <-
             exprs.mat %*% wcl
           
-          # get weighted mean using sum of weights and scale by effective cell count
+          # get weighted mean using sum of weights and scale by number of cells
           res <-
             (Matrix::rowSums(x = wsum) / sum(wcl)) * (sum(Matrix::rowSums(x = wcl) > 0))
-
+          
           return(res)
           
         }) |>
@@ -1077,22 +1130,20 @@ get.pbDE <-
     } else {
       
       counts <-
-        stats::setNames(object = names(x = .tdr.obj$cells),
-                        nm = names(x = .tdr.obj$cells)) |>
+        stats::setNames(object = names(x = .tdr.obj$cells),#[!smpl.outlier],
+                        nm = names(x = .tdr.obj$cells)) |>#[!smpl.outlier]) |>
         lapply(FUN = function(smpl){
           
           exprs.mat <-
             readRDS(file = .tdr.obj$cells[[smpl]])
           
-          # Get marker columns only
           exprs.mat <-
-            exprs.mat[, colnames(x = .tdr.obj$landmarks), drop = FALSE]
+            exprs.mat[.lm.idx[[smpl]],colnames(x = .tdr.obj$landmarks)]
           
-          # Landmark-centric: select target landmark columns from fuzzy membership
           wcl <- 
-            .tdr.obj$map$fuzzy.graph[[smpl]][, .lm.idx, drop = FALSE]
+            .tdr.obj$map$fuzzy.graph[[smpl]][.lm.idx[[smpl]],,drop=FALSE]
           
-          # get weighted sum (all cells contribute proportionally to their membership)
+          # get weighted sum
           wsum <-
             (Matrix::t(x = exprs.mat) %*% wcl)
           
@@ -1174,7 +1225,7 @@ get.pbDE <-
     .de$smpl.outlier <-
       smpl.outlier
     
-    .de$lm.idx <-
+    .de$id.idx <-
       .lm.idx
     
     .de$n.pseudo <-

@@ -35,7 +35,8 @@ get.pbDE(
 analysis. Only for RNA data. Example: \code{list("Tcell" = c("CD3D", "CD3E"), "Bcell" = c("CD19", "MS4A1"))}.}
 
 \item{.id.idx}{Optional integer vector specifying landmark indices to include. If provided,
-cells are weighted by their fuzzy membership to these landmarks. Uses landmark-centric aggregation.}
+cells are assigned to these landmarks using fuzzy membership confidence (see \code{.label.confidence}).
+Only cells whose fuzzy mass ratio to the target landmarks meets the confidence threshold are included.}
 
 \item{.id}{Optional character vector of cluster/celltype IDs to restrict analysis to. Uses
 \code{.id.from} to determine source.}
@@ -55,8 +56,10 @@ population-specific DE results under the same model.}
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 
-\item{.label.confidence}{Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
-to assign a cell to a landmark. Used only if \code{.id.idx} is provided.}
+\item{.label.confidence}{Numeric scalar in \code{[0.5,1]} controlling the minimum posterior
+confidence required to assign a cell to a set of target landmarks (used when \code{.id.idx} is
+provided). For each cell, the ratio of fuzzy membership mass to the target landmarks vs total
+fuzzy mass is computed; cells below this threshold are excluded from aggregation. Default 0.8.}
 }
 \value{
 The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}:
@@ -81,15 +84,17 @@ perform gene set enrichment via GSVA.
 \details{
 The pseudobulk DE workflow:
 \enumerate{
-\item \strong{Landmark selection}: If \code{.id} or \code{.id.idx} specified, identify target landmarks.
-Otherwise use all landmarks.
-\item \strong{Pseudobulk aggregation}: For each sample, compute weighted expression using fuzzy
-membership to target landmarks:
+\item \strong{Cell selection}: If \code{.id} specified, select cells whose transferred label
+matches the requested population. If \code{.id.idx} specified, select cells whose fuzzy
+membership confidence to the target landmarks meets \code{.label.confidence}. Otherwise
+use all cells.
+\item \strong{Pseudobulk aggregation}: For each sample, compute weighted expression of the
+selected cells using their fuzzy membership across all landmarks:
 \itemize{
 \item RNA: Weighted sum of counts, scaled by effective cell count
 \item Cytometry: Weighted mean of marker expression
 }
-\item \strong{Outlier removal}: (RNA only) Exclude samples with <10\\% of average pseudobulk mass
+\item \strong{Outlier removal}: (RNA only) Exclude samples with <10\\% of average pseudobulk cell count
 \item \strong{Normalization}:
 \itemize{
 \item RNA: TMM normalization (\code{edgeR::calcNormFactors}) + voom transformation for variance modeling
@@ -100,10 +105,11 @@ membership to target landmarks:
 \item \strong{GSVA} (optional, RNA only): Gene set variation analysis on voom-normalized expression
 }
 
-\strong{Landmark-centric aggregation:}
-Unlike cell-centric approaches that hard-assign cells to populations, this method uses fuzzy
-membership weights from the landmark graph. Each cell contributes to the pseudobulk proportionally
-to its membership in the target landmarks, providing smoother and more robust aggregation.
+\strong{Cell-centric aggregation:}
+Cells are first selected into the population of interest, then their expression is aggregated
+using fuzzy membership weights across all landmarks. This approach first determines \emph{which}
+cells belong to the population, then lets the fuzzy graph determine \emph{how} each selected
+cell's expression is distributed across landmark neighborhoods.
 
 \strong{When to use pseudobulk DE:}
 \itemize{
