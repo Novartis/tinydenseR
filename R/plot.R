@@ -2962,10 +2962,14 @@ plotSpecDE <-
        x[sample(x = nrow(x = x)), ]
       )()
     
+    # Get Y (centered)
+    Y.vec <- specDE.res$Y
+
     scatter.df <-
       data.frame(
-        Y = specDE.res$Y,
-        score = score.vec
+        Y = Y.vec,
+        score = score.vec,
+        col = .tdr.obj$map$lm[[specDE.res$params$model.name]]$fit$coefficients[, specDE.res$params$coef.col]
       )
     
     # Panel 1: UMAP colored by scores
@@ -3002,25 +3006,50 @@ plotSpecDE <-
                                                 units = "in"))
     
     # Panel 2: Y vs score scatter
+    Y.label <- 
+      "Density contrast"
+    
     p.scatter <-
       ggplot2::ggplot(data = scatter.df,
                       mapping = ggplot2::aes(x = Y,
-                                             y = score)) +
-      ggplot2::geom_point(size = I(x = .point.size),
-                          alpha = 0.5) +
+                                             y = score,
+                                             color = col)) +
+      ggplot2::guides(color = ggplot2::guide_colorbar(title.position = "top",
+                                                      title.hjust = 0.5)) +
+      ggplot2::scale_color_gradient2(low = unname(obj = Color.Palette[1,1]),
+                                     mid = unname(obj = Color.Palette[1,6]),
+                                     high = unname(obj = Color.Palette[1,2]),
+                                     midpoint = 0)+
+      ggplot2::geom_vline(xintercept = 0,
+                          color = "black",
+                          linetype = "dashed",
+                          linewidth = I(x = 1/2)) +
+      ggplot2::geom_hline(yintercept = 0,
+                          color = "black",
+                          linetype = "dashed",
+                          linewidth = I(x = 1/2)) +
+      ggplot2::geom_point(size = I(x = .point.size)) +
       ggplot2::labs(
-        title = paste0("Y vs ", comp.name),
+        title = paste0(.coef.col, " vs ", comp.name),
         subtitle = sprintf("Ak = %.2f, Sk = %.2f, Vk = %.0f%%",
                            specDE.res$Y.alignment[.specDE.dim],
                            specDE.res$smoothness[.specDE.dim],
                            specDE.res$var.explained[.specDE.dim] * 100),
-        x = paste0("Density contrast (", .coef.col, ")"),
-        y = comp.name
+        x = paste0("Density contrast", "\n(centered ", .coef.col, ")"),
+        y = comp.name,
+        color = paste0(.coef.col,
+                       " (raw)")
       ) +
       ggplot2::theme_bw() +
       ggplot2::theme(
         plot.title = ggplot2::element_text(hjust = 0.5),
         plot.subtitle = ggplot2::element_text(hjust = 0.5)
+      ) +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(hjust = 0.5),
+        legend.position = "bottom",
+        legend.margin = ggplot2::margin(t = -0.1, 
+                                        unit = "in")
       ) +
       ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
                                                 units = "in"),
