@@ -3185,7 +3185,7 @@ plotSpecDEHeatmap <-
   ) {
     
     # R CMD check appeasement
-    landmark <- feature <- expr <- annot_dim <- annot_value <- NULL
+    loading <- x <- landmark <- feature <- expr <- annot_dim <- annot_value <- NULL
     
     # -------------------------------------------------------------------------
     # Input validation

@@ -1581,12 +1581,11 @@ get.markerDE <-
       
       # Cell-centric complement: all cells NOT in group 1
       .lm2.idx <-
-        Map(f = function(n, idx1){
-          setdiff(x = seq_len(length.out = n),
-                  y = idx1)
-        },
-        n = .tdr.obj$metadata$n.cells,
-        idx1 = .lm1.idx)
+        seq_along(along.with = .lm1.idx) |>
+        stats::setNames(nm = names(x = .lm1.idx)) |>
+        lapply(FUN = function(smpl){
+                 seq_len(length.out = .tdr.obj$config$sampling$n.cells[smpl])[-.lm1.idx[[smpl]]]
+               })
       
     } else {
       
