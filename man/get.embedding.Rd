@@ -12,7 +12,8 @@ get.embedding(
   .contrast.of.interest = NULL,
   .n.eigs = 20,
   .n.pcs = 20,
-  .dist.metric = "cosine",
+  .ret.trajectory = FALSE,
+  .traj.dist.metric = "cosine",
   .verbose = TRUE
 )
 }
@@ -41,7 +42,9 @@ the Frisch-Waugh-Lovell (FWL) theorem to compute the true partial fitted compone
 
 \item{.n.pcs}{Integer: number of PCs for unsupervised PCA and diffusion map (default 20).}
 
-\item{.dist.metric}{Character: distance metric for diffusion map (default "cosine").}
+\item{.ret.trajectory}{Logical: whether to compute diffusion map trajectory embedding (default FALSE).}
+
+\item{.traj.dist.metric}{Character: distance metric for diffusion map (default "cosine").}
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 }

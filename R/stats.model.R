@@ -2145,8 +2145,9 @@ get.marker <- function(
     .tdr.obj,
     .n.eigs = 20,
     .n.pcs = 20,
-    .dist.metric = "cosine",
-    .verbose = TRUE
+    .verbose = TRUE,
+    .ret.trajectory = FALSE,
+    .traj.dist.metric = "cosine"
   ){
     
     # Initialize embedding slot if not present
@@ -2210,78 +2211,81 @@ get.marker <- function(
     # Compute diffusion map trajectory (traj) if not already present
     # -------------------------------------------------------------------------
     
-    if(is.null(x = .tdr.obj$map$embedding$traj)){
+    if(isTRUE(x = .ret.trajectory)){
       
-      if(isTRUE(x = .verbose)){
-        message("\nComputing diffusion map trajectory embedding")
-      }
-      
-      # Check if destiny is available
-      if(!requireNamespace("destiny", quietly = TRUE)){
-        warning("Package 'destiny' is required for trajectory embedding. ",
-                "Install with BiocManager::install('destiny'). ",
-                "Skipping trajectory computation.",
-                call. = FALSE)
-        return(.tdr.obj)
-      }
-      
-      # Compute diffusion map on transposed Y (samples as rows)
-      Matrix.warnDeprecatedCoerce <-
-        # destiny relies on Deprecated Matrix package function: see https://github.com/theislab/destiny/issues/61
-        getOption(x = "Matrix.warnDeprecatedCoerce")
-      
-      options(Matrix.warnDeprecatedCoerce = 0)
-      
-      traj.res <- 
-        Matrix::t(x = .tdr.obj$map$Y) |>
-        (\(x)
-        destiny::DiffusionMap(
-          data = x,
-          n_eigs = min(c(.n.eigs, nrow(x = x) - 2, ncol(x = x))), 
-          n_pcs = NA, # suppress PCA inside destiny
-          distance = .dist.metric
+      if(is.null(x = .tdr.obj$map$embedding$traj)){
+        
+        if(isTRUE(x = .verbose)){
+          message("\nComputing diffusion map trajectory embedding")
+        }
+        
+        # Check if destiny is available
+        if(!requireNamespace("destiny", quietly = TRUE)){
+          warning("Package 'destiny' is required for trajectory embedding. ",
+                  "Install with BiocManager::install('destiny'). ",
+                  "Skipping trajectory computation.",
+                  call. = FALSE)
+          return(.tdr.obj)
+        }
+        
+        # Compute diffusion map on transposed Y (samples as rows)
+        Matrix.warnDeprecatedCoerce <-
+          # destiny relies on Deprecated Matrix package function: see https://github.com/theislab/destiny/issues/61
+          getOption(x = "Matrix.warnDeprecatedCoerce")
+        
+        options(Matrix.warnDeprecatedCoerce = 0)
+        
+        traj.res <- 
+          Matrix::t(x = .tdr.obj$map$Y) |>
+          (\(x)
+           destiny::DiffusionMap(
+             data = x,
+             n_eigs = min(c(.n.eigs, nrow(x = x) - 2, ncol(x = x))), 
+             n_pcs = NA, # suppress PCA inside destiny
+             distance = .traj.dist.metric
+           )
+          )()
+        
+        options(Matrix.warnDeprecatedCoerce = Matrix.warnDeprecatedCoerce)
+        
+        # Extract eigenvalues and compute cell embeddings
+        stdev <- traj.res@eigenvalues
+        stdev[stdev < 0] <- 0
+        
+        D <- 
+          abs(x = stdev) |>
+          sqrt() |>
+          diag()
+        
+        traj.coord <- 
+          traj.res@eigenvectors %*% D
+        
+        # Set column names
+        colnames(x = traj.coord) <- 
+          paste0("DC", seq_len(length.out = ncol(x = traj.coord)))
+        
+        rownames(x = traj.coord) <- 
+          rownames(x = .tdr.obj$metadata)
+        
+        # Store in format similar to pca slot
+        .tdr.obj$map$embedding$traj <- list(
+          coord = traj.coord,
+          eigenvalues = traj.res@eigenvalues,
+          eigenvectors = traj.res@eigenvectors,
+          sdev = abs(x = stdev) |> sqrt()
         )
-        )()
-      
-      options(Matrix.warnDeprecatedCoerce = Matrix.warnDeprecatedCoerce)
-
-      # Extract eigenvalues and compute cell embeddings
-      stdev <- traj.res@eigenvalues
-      stdev[stdev < 0] <- 0
-      
-      D <- 
-        abs(x = stdev) |>
-        sqrt() |>
-        diag()
-      
-      traj.coord <- 
-        traj.res@eigenvectors %*% D
-      
-      # Set column names
-      colnames(x = traj.coord) <- 
-        paste0("DC", seq_len(length.out = ncol(x = traj.coord)))
-      
-      rownames(x = traj.coord) <- 
-        rownames(x = .tdr.obj$metadata)
-      
-      # Store in format similar to pca slot
-      .tdr.obj$map$embedding$traj <- list(
-        coord = traj.coord,
-        eigenvalues = traj.res@eigenvalues,
-        eigenvectors = traj.res@eigenvectors,
-        sdev = abs(x = stdev) |> sqrt()
-      )
-      
-      if(isTRUE(x = .verbose)){
-        message("  Diffusion map computed with ", ncol(x = traj.coord), " components")
+        
+        if(isTRUE(x = .verbose)){
+          message("  Diffusion map computed with ", ncol(x = traj.coord), " components")
+        }
+        
+      } else {
+        
+        if(isTRUE(x = .verbose)){
+          message("\nTrajectory embedding already exists; skipping recomputation")
+        }
+        
       }
-      
-    } else {
-      
-      if(isTRUE(x = .verbose)){
-        message("\nTrajectory embedding already exists; skipping recomputation")
-      }
-      
     }
     
     return(.tdr.obj)
@@ -2314,7 +2318,8 @@ get.marker <- function(
 #'   the Frisch-Waugh-Lovell (FWL) theorem to compute the true partial fitted component.
 #' @param .n.eigs Integer: number of eigenvectors for diffusion map (default 20).
 #' @param .n.pcs Integer: number of PCs for unsupervised PCA and diffusion map (default 20).
-#' @param .dist.metric Character: distance metric for diffusion map (default "cosine").
+#' @param .ret.trajectory Logical: whether to compute diffusion map trajectory embedding (default FALSE).
+#' @param .traj.dist.metric Character: distance metric for diffusion map (default "cosine").
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #'
 #' @return Modified \code{.tdr.obj} with embeddings stored in \code{.tdr.obj$map$embedding}:
@@ -2486,7 +2491,8 @@ get.embedding <-
     .contrast.of.interest = NULL,
     .n.eigs = 20,
     .n.pcs = 20,
-    .dist.metric = "cosine",
+    .ret.trajectory = FALSE,
+    .traj.dist.metric = "cosine",
     .verbose = TRUE
   ){
     
@@ -2533,7 +2539,8 @@ get.embedding <-
         .tdr.obj = .tdr.obj,
         .n.eigs = .n.eigs,
         .n.pcs = .n.pcs,
-        .dist.metric = .dist.metric,
+        .ret.trajectory = .ret.trajectory,
+        .traj.dist.metric = .traj.dist.metric,
         .verbose = .verbose
       )
     
@@ -2794,7 +2801,7 @@ get.embedding <-
       
       delta.Yhat <- 
         Matrix::tcrossprod(x = matrix(gamma_g, ncol = 1),
-                                       y = matrix(x_c_perp, ncol = 1))
+                           y = matrix(x_c_perp, ncol = 1))
       
       rownames(x = delta.Yhat) <- 
         rownames(x = Y)
@@ -2848,11 +2855,11 @@ get.embedding <-
       # Compute fitted values for each model
       Yhat.full <- 
         Matrix::tcrossprod(x = .stats.obj$fit$coefficients, 
-                                      y = .stats.obj$fit$design)
+                           y = .stats.obj$fit$design)
       
       Yhat.red <-
         Matrix::tcrossprod(x = .red.stats.obj$fit$coefficients,
-                                     y = .red.stats.obj$fit$design)
+                           y = .red.stats.obj$fit$design)
       
       # delta.Yhat = (H_full - H_red)Y
       delta.Yhat <- 
@@ -2891,15 +2898,15 @@ get.embedding <-
     } else {
       # Nested models: rank = df_full - df_red, capped at matrix dimensions
       embed.rank <- 
-      min(
-        ncol(x = .stats.obj$fit$design) - ncol(x = .red.stats.obj$fit$design),
-        nrow(x = delta.Yhat.t) - 1L,
-        ncol(x = delta.Yhat.t)
-      )
+        min(
+          ncol(x = .stats.obj$fit$design) - ncol(x = .red.stats.obj$fit$design),
+          nrow(x = delta.Yhat.t) - 1L,
+          ncol(x = delta.Yhat.t)
+        )
     }
     embed.rank <- 
-    max(1L,
-    embed.rank)
+      max(1L,
+          embed.rank)
     
     
     if(isTRUE(x = .verbose)){
@@ -3446,7 +3453,7 @@ get.specDE <-
       (Matrix::colSums(x = M.local^2) |>
          sum()) / 
       (n.landmarks - 1)
-      
+    
     var.explained <-
       (sdev^2) / M.local.var
     
