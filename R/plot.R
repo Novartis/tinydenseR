@@ -1669,7 +1669,8 @@ plotTradStats <-
           na.rm = TRUE),
           units = "in"),
         rows = grid::unit(x = pmax((unique(x = dat.df$pop) |> length()) * .row.space.scaler,
-                                   3.5),
+                                   3.5, 
+                                   na.rm = TRUE),
                           units = "in"))
     
     patchwork::wrap_plots(perc.plot + other.plot, 
@@ -2216,8 +2217,8 @@ plotPbDE <-
     .model.name = "default",
     .population.name = "all",
     .coefs = NULL,
-    .order.by = "clustering",
-    .markers = colnames(x = .tdr.obj$graph[[.order.by]]$median.exprs),
+    .order.by = "none",
+    .markers = .tdr.obj$config$markers,
     .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.065,
@@ -2240,6 +2241,13 @@ plotPbDE <-
     if(is.null(x = .coefs)){
       .coefs <- colnames(x = .de.obj$coefficients)
     }
+    
+    # check .order.by
+    .order.by <-
+      match.arg(arg = .order.by,
+                choices = c("none",
+                            "clustering",
+                            "celltyping"))
     
     # Extract log fold changes for selected markers and coefficients
     coef.df <-
@@ -2266,11 +2274,13 @@ plotPbDE <-
       dplyr::mutate(marker =
                       factor(
                         x = marker,
-                        levels = rev(x = .tdr.obj$graph[[.order.by]]$pheatmap$tree_col$labels[
+                        levels = if(.order.by == "none") .tdr.obj$config$markers else {
+                          rev(x = .tdr.obj$graph[[.order.by]]$pheatmap$tree_col$labels[
                           .tdr.obj$graph[[.order.by]]$pheatmap$tree_col$order]) |>
                           (\(x)
                            x[x %in% marker]
-                          )()),
+                          )()
+                          }),
                     # Classify as higher/lower/not significant
                     sig =
                       ifelse(
@@ -2485,8 +2495,8 @@ plotMarkerDE <- function(
     .model.name = "default",
     .comparison.name = NULL,
     .coefs = NULL,
-    .order.by = "clustering",
-    .markers = colnames(x = .tdr.obj$graph[[.order.by]]$median.exprs),
+    .order.by = "none",
+    .markers = .tdr.obj$config$markers,
     .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.065,
