@@ -5031,7 +5031,7 @@ plotNmfDEHeatmap <-
                                      fontsize = 14))
     subtitle.grob <-
       grid::textGrob(label = paste0("Density Contrast: ", .coef.col,
-                                    "  |  Loadings: ", .loadings.type),
+                                    "  |  Loadings: ", if(.loadings.type == "signed") "signed" else if(.loadings.type == "de") "DE" else "Mass"),
                      gp = grid::gpar(fontsize = 11))
     
     g.final <-

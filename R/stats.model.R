@@ -3558,7 +3558,7 @@ get.specDE <-
   }
 
 
-#' NMF-based Differential Expression via Mass Factorization
+#' Mass-Diffusion NMF for Density-Contrast Differential Expression
 #'
 #' Decomposes a nonnegative, graph-smoothed, density-weighted expression matrix
 #' into additive mass programs via NMF. Unlike \code{get.specDE} (SVD on signed,
@@ -3756,7 +3756,7 @@ get.nmfDE <-
     # -------------------------------------------------------------------------
 
     if (isTRUE(x = .verbose)) {
-      message("\n=== nmfDE: NMF-based Mass Differential Expression ===")
+      message("\n=== nmfDE: Mass-Diffusion NMF for Density-Contrast DE ===")
       message("Coefficient: ", .coef.col)
     }
 
@@ -4054,7 +4054,8 @@ get.nmfDE <-
     # cor(Y, W) is always well-defined since W columns are nonneg with variance > 0.
     Y.cor.W <-
       stats::cor(x = Y,
-                 y = W)[1, ]
+                 y = W,
+                 method = "spearman")[1, ]
 
     polarity <-
       sign(x = Y.cor.W) |>

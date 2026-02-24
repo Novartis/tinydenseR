@@ -2,7 +2,7 @@
 % Please edit documentation in R/stats.model.R
 \name{get.nmfDE}
 \alias{get.nmfDE}
-\title{NMF-based Differential Expression via Mass Factorization}
+\title{Mass-Diffusion NMF for Density-Contrast Differential Expression}
 \usage{
 get.nmfDE(
   .tdr.obj,
