@@ -9,7 +9,7 @@ plotNmfDEHeatmap(
   .coef.col,
   .nmfDE.dim = 1,
   .model.name = "default",
-  .loadings.type = "de",
+  .loadings.type = "signed",
   .n.features = 50,
   .order.by = "dens.contrast",
   .add.annot = NULL,
@@ -37,8 +37,9 @@ Default 1.}
 \item{.model.name}{Character: name of the fitted model (default "default").}
 
 \item{.loadings.type}{Character: which loadings to use for feature selection.
-One of \code{"de"} (regression of centered X on signed scores; default, parallel
-to specDE loadings) or \code{"mass"} (regression of nonneg X0 on W).}
+One of \code{"signed"} (default; d\emph{h+ - d}h- from the NMF factorization),
+\code{"de"} (regression of centered X on signed scores, parallel to specDE),
+or \code{"mass"} (regression of nonneg X0 on W).}
 
 \item{.n.features}{Integer: maximum number of features to display. For RNA, features
 are ranked by absolute loading and top \code{.n.features} are shown. For cytometry,
@@ -95,7 +96,11 @@ making it easy to see which genes are up vs down-regulated along the nmfDE compo
 
 \strong{Loadings types}:
 \describe{
-\item{\code{"de"}}{(default) Regression of centered X on signed scores. Parallel to
+\item{\code{"signed"}}{(default) Derived directly from the NMF factorization:
+d_k * h+_k - d_k * h-_k. The most natural choice for nmfDE: positive means
+gene carries more mass through the positive-contrast block than the negative.
+No regression step required.}
+\item{\code{"de"}}{Regression of centered X on signed scores. Parallel to
 specDE loadings and standard DE interpretation (positive = upregulated with Y).}
 \item{\code{"mass"}}{Regression of nonneg X0 on W. Captures genes whose expression
 level scales with component mass activation (always positive for nonneg input).}

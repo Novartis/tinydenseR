@@ -4219,8 +4219,9 @@ plotNmfDE <-
 #'   Default 1.
 #' @param .model.name Character: name of the fitted model (default "default").
 #' @param .loadings.type Character: which loadings to use for feature selection.
-#'   One of \code{"de"} (regression of centered X on signed scores; default, parallel
-#'   to specDE loadings) or \code{"mass"} (regression of nonneg X0 on W).
+#'   One of \code{"signed"} (default; d*h+ - d*h- from the NMF factorization),
+#'   \code{"de"} (regression of centered X on signed scores, parallel to specDE),
+#'   or \code{"mass"} (regression of nonneg X0 on W).
 #' @param .n.features Integer: maximum number of features to display. For RNA, features
 #'   are ranked by absolute loading and top \code{.n.features} are shown. For cytometry,
 #'   all markers are shown and this parameter is ignored. Default 50.
@@ -4259,7 +4260,11 @@ plotNmfDE <-
 #'
 #' \strong{Loadings types}:
 #' \describe{
-#'   \item{\code{"de"}}{(default) Regression of centered X on signed scores. Parallel to
+#'   \item{\code{"signed"}}{(default) Derived directly from the NMF factorization:
+#'     d_k * h+_k - d_k * h-_k. The most natural choice for nmfDE: positive means
+#'     gene carries more mass through the positive-contrast block than the negative.
+#'     No regression step required.}
+#'   \item{\code{"de"}}{Regression of centered X on signed scores. Parallel to
 #'     specDE loadings and standard DE interpretation (positive = upregulated with Y).}
 #'   \item{\code{"mass"}}{Regression of nonneg X0 on W. Captures genes whose expression
 #'     level scales with component mass activation (always positive for nonneg input).}
@@ -4326,7 +4331,7 @@ plotNmfDEHeatmap <-
     .coef.col,
     .nmfDE.dim = 1,
     .model.name = "default",
-    .loadings.type = "de",
+    .loadings.type = "signed",
     .n.features = 50,
     .order.by = "dens.contrast",
     .add.annot = NULL,
@@ -4374,7 +4379,7 @@ plotNmfDEHeatmap <-
     
     .loadings.type <-
       match.arg(arg = .loadings.type,
-                choices = c("de", "mass"))
+                choices = c("signed", "de", "mass"))
     
     if (is.null(x = .tdr.obj$raw.landmarks)) {
       stop("Raw landmarks not found. Run get.landmarks() first.")
@@ -4390,7 +4395,9 @@ plotNmfDEHeatmap <-
     
     # Select loadings based on type
     loadings.mat <-
-      if (.loadings.type == "de") {
+      if (.loadings.type == "signed") {
+        nmfDE.res$gene.loadings.signed
+      } else if (.loadings.type == "de") {
         nmfDE.res$loadings.de
       } else {
         nmfDE.res$loadings.mass
@@ -4750,7 +4757,10 @@ plotNmfDEHeatmap <-
     
     # Row annotation plot (right side)
     loading.label <-
-      if (.loadings.type == "de") "loadings\n(DE)" else "loadings\n(mass)"
+      switch(.loadings.type,
+             signed = "loadings\n(signed)",
+             de     = "loadings\n(DE)",
+             mass   = "loadings\n(mass)")
     
     p.row.annot <-
       ggplot2::ggplot(row.annot.df,
