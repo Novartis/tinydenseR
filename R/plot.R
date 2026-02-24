@@ -3080,10 +3080,15 @@ plotSpecDE <-
 #' @param .n.features Integer: maximum number of features to display. For RNA, features
 #'   are ranked by absolute loading and top \code{.n.features} are shown. For cytometry,
 #'   all markers are shown and this parameter is ignored. Default 50.
-#' @param .order.by Numeric matrix with column names: custom ordering for landmarks.
-#'   If NULL (default), uses centered density contrast from \code{.coef.col}. If provided,
-#'   landmarks are sorted by columns sequentially (first column primary, etc.) and
-#'   each column is displayed as an annotation strip with the column name as legend title.
+#' @param .order.by Controls landmark ordering. One of:
+#'   \describe{
+#'     \item{\code{"dens.contrast"}}{(default) Order by centered density contrast
+#'       from \code{.coef.col}.}
+#'     \item{\code{"specDE.dim"}}{Order by the selected \code{.specDE.dim} score(s).}
+#'     \item{A numeric matrix with column names}{Landmarks are sorted by columns
+#'       sequentially (first column primary, etc.) and each column is displayed as
+#'       an annotation strip with the column name as legend title.}
+#'   }
 #' @param .add.annot Numeric matrix with column names: displayed as annotation strips.
 #'   These are added as additional annotation strips after the density contrast and before 
 #'   specDE score strips.
@@ -3154,9 +3159,9 @@ plotSpecDE <-
 #' # Order by two dimensions (e.g., to see 2D structure)
 #' plotSpecDEHeatmap(lm.obj, .coef.col = "Infection", .specDE.dim = c(1, 2))
 #'
-#' # Custom ordering by density contrast Y
+#' # Order by specDE dimension scores
 #' plotSpecDEHeatmap(lm.obj, .coef.col = "Infection", .specDE.dim = 1,
-#'                   .order.by = lm.obj$specDE$Infection$Y)
+#'                   .order.by = "specDE.dim")
 #'
 #' # More features for cytometry
 #' plotSpecDEHeatmap(lm.obj, .coef.col = "Treatment", .specDE.dim = 1,
@@ -3172,7 +3177,7 @@ plotSpecDEHeatmap <-
     .specDE.dim = 1,
     .model.name = "default",
     .n.features = 50,
-    .order.by = NULL,
+    .order.by = "dens.contrast",
     .add.annot = NULL,
     .order.decreasing = FALSE,
     .viridis.options.annot = c("cividis", "rocket", "inferno", "mako", "magma"),
@@ -3314,24 +3319,35 @@ plotSpecDEHeatmap <-
     # Landmark ordering
     # -------------------------------------------------------------------------
     
-    .user.order.by <- !is.null(x = .order.by)
     .user.add.annot <- !is.null(x = .add.annot)
+    .order.is.specDE <- FALSE
     
-    if (is.null(x = .order.by)) {
+    if (is.character(x = .order.by) && length(x = .order.by) == 1L) {
       
-      # Default: use Y
-      .order.by <-
-        matrix(data = specDE.res$Y,
-               ncol = 1,
-               dimnames = list(names(x = specDE.res$Y),
-                               "density\ncontrast\n(centered)"))
-      
-    } else {
-      
-      # Ensure matrix format with column names
-      if (!inherits(x = .order.by, what = "matrix")) {
-        stop(".order.by must be a matrix")
+      if (identical(x = .order.by, y = "dens.contrast")) {
+        
+        .user.order.by <- FALSE
+        .order.by <-
+          matrix(data = specDE.res$Y,
+                 ncol = 1,
+                 dimnames = list(names(x = specDE.res$Y),
+                                 "density\ncontrast\n(centered)"))
+        
+      } else if (identical(x = .order.by, y = "specDE.dim")) {
+        
+        .user.order.by <- TRUE
+        .order.is.specDE <- TRUE
+        .order.by <-
+          specDE.res$scores[, .specDE.dim, drop = FALSE]
+        
+      } else {
+        stop(".order.by must be \"dens.contrast\", \"specDE.dim\", ",
+             "or a numeric matrix with column names.")
       }
+      
+    } else if (inherits(x = .order.by, what = "matrix")) {
+      
+      .user.order.by <- TRUE
       
       if (is.null(x = colnames(x = .order.by))) {
         stop(".order.by must be a matrix with column names.")
@@ -3342,6 +3358,9 @@ plotSpecDEHeatmap <-
              "but has ", nrow(x = .order.by))
       }
       
+    } else {
+      stop(".order.by must be \"dens.contrast\", \"specDE.dim\", ",
+           "or a numeric matrix with column names.")
     }
     
     # Validate .add.annot (does NOT affect ordering)
@@ -3445,15 +3464,26 @@ plotSpecDEHeatmap <-
       specDE.res$scores[lm.order, .specDE.dim, drop = FALSE]
     
     # Build annotation data: .add.annot (top), then .order.by, then specDE dims, then density
+    # When .order.is.specDE, the ordering variable IS the specDE scores, so skip
+    # the separate specDE annotation to avoid duplication.
     if (isTRUE(x = .user.add.annot) && isTRUE(x = .user.order.by)) {
       
-      annot.names <- c(
-        colnames(x = .order.by),
-        "density\ncontrast\n(centered)",
-        colnames(x = .add.annot),
-        colnames(x = specDE.scores.ordered)
-      )
-      annot.mat <- cbind(.order.by, Y.ordered, .add.annot, specDE.scores.ordered)
+      if (.order.is.specDE) {
+        annot.names <- c(
+          colnames(x = .order.by),
+          "density\ncontrast\n(centered)",
+          colnames(x = .add.annot)
+        )
+        annot.mat <- cbind(.order.by, Y.ordered, .add.annot)
+      } else {
+        annot.names <- c(
+          colnames(x = .order.by),
+          "density\ncontrast\n(centered)",
+          colnames(x = .add.annot),
+          colnames(x = specDE.scores.ordered)
+        )
+        annot.mat <- cbind(.order.by, Y.ordered, .add.annot, specDE.scores.ordered)
+      }
       
     } else if (isTRUE(x = .user.add.annot) && !isTRUE(x = .user.order.by)) {
       
@@ -3466,12 +3496,20 @@ plotSpecDEHeatmap <-
       
     } else if (!isTRUE(x = .user.add.annot) && isTRUE(x = .user.order.by)) {
       
-      annot.names <- c(
-        colnames(x = .order.by),
-        "density\ncontrast\n(centered)",
-        colnames(x = specDE.scores.ordered)
-      )
-      annot.mat <- cbind(.order.by, Y.ordered, specDE.scores.ordered)
+      if (.order.is.specDE) {
+        annot.names <- c(
+          colnames(x = .order.by),
+          "density\ncontrast\n(centered)"
+        )
+        annot.mat <- cbind(.order.by, Y.ordered)
+      } else {
+        annot.names <- c(
+          colnames(x = .order.by),
+          "density\ncontrast\n(centered)",
+          colnames(x = specDE.scores.ordered)
+        )
+        annot.mat <- cbind(.order.by, Y.ordered, specDE.scores.ordered)
+      }
       
     } else {
       
@@ -3783,6 +3821,9 @@ plotSpecDEHeatmap <-
       }
     }
     
+    # Store body column count before legend columns are appended
+    n.body.cols <- ncol(x = g.final)
+    
     # --- Assemble legends column ---
     all.legends <- c(leg.annots, list(leg.row), list(leg.heat))
     # Filter out nullGrobs
@@ -3832,6 +3873,34 @@ plotSpecDEHeatmap <-
                                          l = ncol(x = g.final),
                                          b = nrow(x = g.final))
     }
+    
+    # --- Title and subtitle, centered over the heatmap body ---
+    title.grob <-
+      grid::textGrob(label = "specDE Heatmap",
+                     gp = grid::gpar(fontface = "bold",
+                                     fontsize = 14))
+    subtitle.grob <-
+      grid::textGrob(label = paste0("Density Contrast: ", .coef.col),
+                     gp = grid::gpar(fontsize = 11))
+    
+    # Prepend subtitle row, then title row (so title ends up on top)
+    g.final <-
+      gtable::gtable_add_rows(x = g.final,
+                              heights = grid::unit(x = 0.25, units = "in"),
+                              pos = 0)
+    g.final <-
+      gtable::gtable_add_grob(x = g.final,
+                              grobs = subtitle.grob,
+                              t = 1, l = 1, r = n.body.cols)
+    
+    g.final <-
+      gtable::gtable_add_rows(x = g.final,
+                              heights = grid::unit(x = 0.3, units = "in"),
+                              pos = 0)
+    g.final <-
+      gtable::gtable_add_grob(x = g.final,
+                              grobs = title.grob,
+                              t = 1, l = 1, r = n.body.cols)
     
     # Return g.final as ggplot object
     return(ggplot2::ggplot() +

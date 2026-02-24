@@ -10,7 +10,7 @@ plotSpecDEHeatmap(
   .specDE.dim = 1,
   .model.name = "default",
   .n.features = 50,
-  .order.by = NULL,
+  .order.by = "dens.contrast",
   .add.annot = NULL,
   .order.decreasing = FALSE,
   .viridis.options.annot = c("cividis", "rocket", "inferno", "mako", "magma"),
@@ -39,10 +39,15 @@ Default 1.}
 are ranked by absolute loading and top \code{.n.features} are shown. For cytometry,
 all markers are shown and this parameter is ignored. Default 50.}
 
-\item{.order.by}{Numeric matrix with column names: custom ordering for landmarks.
-If NULL (default), uses centered density contrast from \code{.coef.col}. If provided,
-landmarks are sorted by columns sequentially (first column primary, etc.) and
-each column is displayed as an annotation strip with the column name as legend title.}
+\item{.order.by}{Controls landmark ordering. One of:
+\describe{
+\item{\code{"dens.contrast"}}{(default) Order by centered density contrast
+from \code{.coef.col}.}
+\item{\code{"specDE.dim"}}{Order by the selected \code{.specDE.dim} score(s).}
+\item{A numeric matrix with column names}{Landmarks are sorted by columns
+sequentially (first column primary, etc.) and each column is displayed as
+an annotation strip with the column name as legend title.}
+}}
 
 \item{.add.annot}{Numeric matrix with column names: displayed as annotation strips.
 These are added as additional annotation strips after the density contrast and before
@@ -126,9 +131,9 @@ plotSpecDEHeatmap(lm.obj, .coef.col = "Infection", .specDE.dim = 1)
 # Order by two dimensions (e.g., to see 2D structure)
 plotSpecDEHeatmap(lm.obj, .coef.col = "Infection", .specDE.dim = c(1, 2))
 
-# Custom ordering by density contrast Y
+# Order by specDE dimension scores
 plotSpecDEHeatmap(lm.obj, .coef.col = "Infection", .specDE.dim = 1,
-                  .order.by = lm.obj$specDE$Infection$Y)
+                  .order.by = "specDE.dim")
 
 # More features for cytometry
 plotSpecDEHeatmap(lm.obj, .coef.col = "Treatment", .specDE.dim = 1,
