@@ -3062,6 +3062,787 @@ plotSpecDE <-
     
   }
 
+
+# ==========================================================================
+# Internal: Shared DE heatmap builder
+# ==========================================================================
+
+# Workhorse behind plotSpecDEHeatmap, plotNmfDEHeatmap, plotPlsDEHeatmap.
+# Each thin wrapper validates method-specific inputs, extracts
+# loadings / scores / Y, then dispatches here.
+#
+# @param .tdr.obj       tinydenseR object (needs $raw.landmarks, $config)
+# @param .coef.col      Character: density-contrast coefficient name
+# @param .loadings      Named numeric vector: loadings for the primary dim
+# @param .scores        Matrix: scores for selected dims (landmarks x dims)
+# @param .Y             Named numeric vector: density contrast (centered)
+# @param .method.name   Character: "specDE", "nmfDE", or "plsDE"
+# @param .dim.string    Character: method-specific .order.by option
+# @param .loading.label Character: legend title for the row annotation bar
+# @param .row.annot.title Character or NULL: title above the row annot bar
+# @param .subtitle.extra Character: appended to subtitle line
+# @param ... shared layout / display parameters from public wrappers
+.plotDEHeatmap <- function(
+  .tdr.obj,
+  .coef.col,
+  .loadings,
+  .scores,
+  .Y,
+  .method.name,
+  .dim.string,
+  .loading.label = "loadings",
+  .row.annot.title = NULL,
+  .subtitle.extra = "",
+  .n.features = 50,
+  .order.by = "dens.contrast",
+  .add.annot = NULL,
+  .order.decreasing = FALSE,
+  .viridis.options.annot = c("cividis", "rocket", "inferno", "mako", "magma"),
+  .annot.panel.height = 0.15,
+  .panel.width = 4,
+  .panel.height = 3,
+  .feature.font.size = 7,
+  .show.landmark.labels = FALSE
+) {
+
+  # R CMD check appeasement
+  loading <- x <- landmark <- feature <- expr <- annot_dim <- annot_value <- NULL
+
+  # -----------------------------------------------------------------------
+  # Validate raw landmarks
+  # -----------------------------------------------------------------------
+
+  if (is.null(x = .tdr.obj$raw.landmarks)) {
+    stop("Raw landmarks not found. Run get.landmarks() first.")
+  }
+
+  # -----------------------------------------------------------------------
+  # Feature selection: rank by signed loading
+  # -----------------------------------------------------------------------
+
+  loadings <- .loadings
+
+  feat.signed.order <-
+    order(loadings, decreasing = TRUE)
+
+  if (.tdr.obj$config$assay.type == "RNA") {
+
+    n.select <-
+      min(.n.features, length(x = loadings))
+
+    n.positive <- ceiling(x = n.select / 2)
+    n.negative <- floor(x = n.select / 2)
+
+    top.features <- names(x = loadings)[c(
+      head(x = feat.signed.order, n = n.positive),
+      tail(x = feat.signed.order, n = n.negative)
+    )]
+
+  } else {
+
+    top.features <-
+      names(x = loadings)[feat.signed.order]
+
+  }
+
+  top.loadings <-
+    loadings[top.features]
+
+  top.features <-
+    top.features[order(top.loadings, decreasing = TRUE)]
+
+  # -----------------------------------------------------------------------
+  # Expression matrix: normalize and subset
+  # -----------------------------------------------------------------------
+
+  if (.tdr.obj$config$assay.type == "RNA") {
+
+    lm.libsize <-
+      Matrix::rowSums(x = .tdr.obj$raw.landmarks)
+
+    X.sub <-
+      .tdr.obj$raw.landmarks[, top.features, drop = FALSE]
+
+    size.factors <-
+      lm.libsize / mean(x = lm.libsize)
+
+    X.norm <-
+      X.sub / size.factors
+
+    X.log <-
+      log2(x = as.matrix(x = X.norm) + 1)
+
+    X.centered <-
+      scale(x = X.log, center = TRUE, scale = FALSE)
+
+  } else {
+
+    X.sub <-
+      .tdr.obj$raw.landmarks[, top.features, drop = FALSE]
+
+    X.centered <-
+      scale(x = as.matrix(x = X.sub), center = TRUE, scale = FALSE)
+
+  }
+
+  expr.mat <-
+    t(x = X.centered)
+
+  # -----------------------------------------------------------------------
+  # Landmark ordering
+  # -----------------------------------------------------------------------
+
+  .user.add.annot <- !is.null(x = .add.annot)
+  .order.is.method.dim <- FALSE
+
+  if (is.character(x = .order.by) && length(x = .order.by) == 1L) {
+
+    if (identical(x = .order.by, y = "dens.contrast")) {
+
+      .user.order.by <- FALSE
+      .order.by <-
+        matrix(data = .Y,
+               ncol = 1,
+               dimnames = list(names(x = .Y),
+                               .coef.col))
+
+    } else if (identical(x = .order.by, y = .dim.string)) {
+
+      .user.order.by <- TRUE
+      .order.is.method.dim <- TRUE
+      .order.by <- .scores
+
+    } else {
+      stop(".order.by must be \"dens.contrast\", \"", .dim.string,
+           "\", or a numeric matrix with column names.")
+    }
+
+  } else if (inherits(x = .order.by, what = "matrix")) {
+
+    .user.order.by <- TRUE
+
+    if (is.null(x = colnames(x = .order.by))) {
+      stop(".order.by must be a matrix with column names.")
+    }
+
+    if (nrow(x = .order.by) != ncol(x = expr.mat)) {
+      stop(".order.by must have ", ncol(x = expr.mat),
+           " rows (one per landmark), but has ", nrow(x = .order.by))
+    }
+
+  } else {
+    stop(".order.by must be \"dens.contrast\", \"", .dim.string,
+         "\", or a numeric matrix with column names.")
+  }
+
+  # Validate .add.annot
+  if (isTRUE(x = .user.add.annot)) {
+
+    if (!inherits(x = .add.annot, what = "matrix")) {
+      stop(".add.annot must be a matrix")
+    }
+
+    if (is.null(x = colnames(x = .add.annot))) {
+      stop(".add.annot must be a matrix with column names.")
+    }
+
+    if (nrow(x = .add.annot) != ncol(x = expr.mat)) {
+      stop(".add.annot must have ", ncol(x = expr.mat),
+           " rows (one per landmark), but has ", nrow(x = .add.annot))
+    }
+
+  }
+
+  # Sort landmarks
+  order.df <-
+    as.data.frame(x = .order.by)
+
+  order.df$.idx <-
+    seq_len(length.out = nrow(x = order.df))
+
+  if (.order.decreasing) {
+    for (col in colnames(x = .order.by)) {
+      order.df[[col]] <- -order.df[[col]]
+    }
+  }
+
+  order.df <-
+    order.df[do.call(what = order,
+                     args = order.df[, colnames(x = .order.by),
+                                     drop = FALSE]), ]
+
+  lm.order <-
+    order.df$.idx
+
+  expr.mat <-
+    expr.mat[, lm.order, drop = FALSE]
+
+  .order.by <-
+    .order.by[lm.order, , drop = FALSE]
+
+  if (isTRUE(x = .user.add.annot)) {
+    .add.annot <- .add.annot[lm.order, , drop = FALSE]
+  }
+
+  # -----------------------------------------------------------------------
+  # Build heatmap data frame
+  # -----------------------------------------------------------------------
+
+  n.landmarks <-
+    ncol(x = expr.mat)
+
+  n.features.plot <-
+    nrow(x = expr.mat)
+
+  lm.labels <-
+    paste0("lm_", sprintf(fmt = "%05d",
+                          seq_len(length.out = n.landmarks)))
+
+  heat.df <-
+    data.frame(
+      landmark = rep(x = lm.labels, times = n.features.plot),
+      feature = rep(x = rownames(x = expr.mat), each = n.landmarks),
+      expr = as.vector(x = t(x = expr.mat)),
+      stringsAsFactors = FALSE
+    )
+
+  heat.df$landmark <-
+    factor(x = heat.df$landmark,
+           levels = lm.labels)
+
+  heat.df$feature <-
+    factor(x = heat.df$feature,
+           levels = rev(x = rownames(x = expr.mat)))
+
+  # -----------------------------------------------------------------------
+  # Build annotation strips
+  # -----------------------------------------------------------------------
+
+  Y.ordered <- .Y[lm.order]
+
+  scores.ordered <-
+    .scores[lm.order, , drop = FALSE]
+
+  if (isTRUE(x = .user.add.annot) && isTRUE(x = .user.order.by)) {
+
+    if (.order.is.method.dim) {
+      annot.names <- c(
+        colnames(x = .order.by),
+        .coef.col,
+        colnames(x = .add.annot)
+      )
+      annot.mat <- cbind(.order.by, Y.ordered, .add.annot)
+    } else {
+      annot.names <- c(
+        colnames(x = .order.by),
+        .coef.col,
+        colnames(x = .add.annot),
+        colnames(x = scores.ordered)
+      )
+      annot.mat <- cbind(.order.by, Y.ordered, .add.annot, scores.ordered)
+    }
+
+  } else if (isTRUE(x = .user.add.annot) &&
+             !isTRUE(x = .user.order.by)) {
+
+    annot.names <- c(
+      .coef.col,
+      colnames(x = .add.annot),
+      colnames(x = scores.ordered)
+    )
+    annot.mat <- cbind(Y.ordered, .add.annot, scores.ordered)
+
+  } else if (!isTRUE(x = .user.add.annot) &&
+             isTRUE(x = .user.order.by)) {
+
+    if (.order.is.method.dim) {
+      annot.names <- c(
+        colnames(x = .order.by),
+        .coef.col
+      )
+      annot.mat <- cbind(.order.by, Y.ordered)
+    } else {
+      annot.names <- c(
+        colnames(x = .order.by),
+        .coef.col,
+        colnames(x = scores.ordered)
+      )
+      annot.mat <- cbind(.order.by, Y.ordered, scores.ordered)
+    }
+
+  } else {
+
+    annot.names <- c(.coef.col,
+                     colnames(x = scores.ordered))
+    annot.mat <- cbind(Y.ordered, scores.ordered)
+
+  }
+
+  colnames(x = annot.mat) <- annot.names
+  n.annot <- ncol(x = annot.mat)
+
+  .viridis.options.annot <-
+    rep_len(x = .viridis.options.annot,
+            length.out = n.annot)
+
+  annot.df.list <-
+    lapply(X = seq_len(length.out = n.annot),
+           FUN = function(d) {
+             data.frame(
+               landmark = lm.labels,
+               annot_dim = annot.names[d],
+               annot_value = annot.mat[, d],
+               stringsAsFactors = FALSE
+             )
+           })
+
+  annot.df <-
+    do.call(what = rbind,
+            args = annot.df.list)
+
+  annot.df$landmark <-
+    factor(x = annot.df$landmark,
+           levels = lm.labels)
+
+  annot.df$annot_dim <-
+    factor(x = annot.df$annot_dim,
+           levels = annot.names)
+
+  # Row annotation data
+  row.annot.df <-
+    data.frame(
+      feature = rownames(x = expr.mat) |>
+        (\(x)
+         factor(x = x,
+                levels = rev(x = x))
+        )(),
+      loading = top.loadings[rownames(expr.mat)],
+      x = 1
+    )
+
+  # -----------------------------------------------------------------------
+  # Build ggplot: expression heatmap
+  # -----------------------------------------------------------------------
+
+  p.heat <-
+    ggplot2::ggplot(data = heat.df,
+                    mapping = ggplot2::aes(x = landmark,
+                                           y = feature,
+                                           fill = expr)) +
+    ggplot2::geom_raster() +
+    ggplot2::scale_fill_gradient2(
+      low = unname(obj = Color.Palette[1, 1]),
+      mid = unname(obj = Color.Palette[1, 6]),
+      high = unname(obj = Color.Palette[1, 2]),
+      midpoint = 0,
+      name = "Expression\n(centered)",
+      guide = ggplot2::guide_colorbar(
+        direction = "vertical",
+        barwidth = grid::unit(x = 0.15, units = "in"),
+        barheight = grid::unit(x = 0.5, units = "in"),
+        title.position = "top",
+        title.hjust = 0
+      )) +
+    ggplot2::labs(
+      x = "Landmarks",
+      y = "Features"
+    ) +
+    ggplot2::theme_bw() +
+    ggplot2::theme(
+      axis.text.y = ggplot2::element_text(size = I(x = .feature.font.size)),
+      legend.position = "right",
+      legend.title = ggplot2::element_text(size = 7),
+      legend.text = ggplot2::element_text(size = 6)
+    )
+
+  # Row annotation plot (right side)
+  p.row.annot <-
+    ggplot2::ggplot(row.annot.df,
+                    ggplot2::aes(x = x,
+                                 y = feature,
+                                 fill = loading)) +
+    ggplot2::geom_raster() +
+    ggplot2::scale_fill_viridis_c(
+      option = "turbo",
+      name = .loading.label,
+      guide = ggplot2::guide_colorbar(
+        direction = "vertical",
+        barwidth = grid::unit(x = 0.15, units = "in"),
+        barheight = grid::unit(x = 0.5, units = "in"),
+        title.position = "top",
+        title.hjust = 0
+      )) +
+    ggplot2::theme_void() +
+    ggplot2::theme(legend.position = "right",
+                   legend.title = ggplot2::element_text(size = 7),
+                   legend.text = ggplot2::element_text(size = 6))
+
+  if (!is.null(x = .row.annot.title)) {
+    p.row.annot <-
+      p.row.annot +
+      ggplot2::labs(title = .row.annot.title) +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(
+          size = 6,
+          hjust = 0.5,
+          vjust = -1,
+          margin = ggplot2::margin(b = 4)))
+  }
+
+  # Hide/show landmark labels
+  if (!.show.landmark.labels) {
+    p.heat <-
+      p.heat +
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank()
+      )
+  } else {
+    p.heat <-
+      p.heat +
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_text(angle = 90,
+                                            hjust = 1,
+                                            vjust = 0.5,
+                                            size = I(x = 6))
+      )
+  }
+
+  # -----------------------------------------------------------------------
+  # Build annotation strip plots
+  # -----------------------------------------------------------------------
+
+  annot.plots <-
+    seq_len(length.out = n.annot) |>
+    lapply(FUN = function(d) {
+
+      dim.name <-
+        annot.names[d]
+
+      dim.df <-
+        annot.df[annot.df$annot_dim == dim.name, ]
+
+      .option.this <-
+        if (identical(x = dim.name,
+                      y = .coef.col)) {
+          "viridis"
+        } else if (dim.name %in% colnames(x = scores.ordered)) {
+          "plasma"
+        } else {
+          .viridis.options.annot[d]
+        }
+
+      # Legend title: show "(centered)" for density contrast
+      legend.title <-
+        if (identical(x = dim.name, y = .coef.col)) {
+          paste0(.coef.col, "\n(centered)")
+        } else {
+          dim.name
+        }
+
+      ggplot2::ggplot(data = dim.df,
+                      mapping = ggplot2::aes(x = landmark,
+                                             y = 1,
+                                             fill = annot_value)) +
+        ggplot2::geom_raster() +
+        ggplot2::scale_fill_viridis_c(
+          option = .option.this,
+          name = legend.title,
+          guide = ggplot2::guide_colorbar(
+            direction = "vertical",
+            barwidth = grid::unit(x = 0.15, units = "in"),
+            barheight = grid::unit(x = 0.5, units = "in"),
+            title.position = "top",
+            title.hjust = 0
+          )) +
+        ggplot2::labs(x = NULL, y = NULL) +
+        ggplot2::theme_void() +
+        ggplot2::theme(
+          legend.position = "right",
+          legend.title = ggplot2::element_text(size = 7),
+          legend.text = ggplot2::element_text(size = 6)
+        )
+    })
+
+  # -----------------------------------------------------------------------
+  # Assemble via gtable for deterministic sizing
+  # -----------------------------------------------------------------------
+
+  .force.panel <- function(gt, w, h) {
+    panel.pos <- gt$layout[gt$layout$name == "panel", ]
+    gt$widths[panel.pos$l]  <- grid::unit(x = w, units = "in")
+    gt$heights[panel.pos$t] <- grid::unit(x = h, units = "in")
+    gt
+  }
+
+  .extract.legend <- function(gt) {
+    leg.idx <- grep(pattern = "guide-box", x = gt$layout$name)
+    if (length(x = leg.idx) == 0) {
+      return(list(body = gt, legend = grid::nullGrob()))
+    }
+    legend <- gt$grobs[[leg.idx[1]]]
+    gt$grobs[[leg.idx[1]]] <- grid::nullGrob()
+    list(body = gt, legend = legend)
+  }
+
+  # 1. Heatmap
+  g.heat <- ggplot2::ggplotGrob(x = p.heat)
+  g.heat <- .force.panel(gt = g.heat,
+                         w = .panel.width,
+                         h = .panel.height)
+  heat.parts <- .extract.legend(gt = g.heat)
+  g.heat.body <- heat.parts$body
+  leg.heat <- heat.parts$legend
+
+  # 2. Row annotation
+  g.row <- ggplot2::ggplotGrob(x = p.row.annot)
+  g.row <- .force.panel(gt = g.row,
+                        w = .annot.panel.height,
+                        h = .panel.height)
+  row.parts <- .extract.legend(gt = g.row)
+  g.row.body <- row.parts$body
+  leg.row <- row.parts$legend
+
+  # 3. Column annotation strips
+  g.annots <- lapply(X = annot.plots, FUN = function(p) {
+    gt <- ggplot2::ggplotGrob(x = p)
+    gt <- .force.panel(gt = gt,
+                       w = .panel.width,
+                       h = .annot.panel.height)
+    .extract.legend(gt = gt)
+  })
+  g.annot.bodies <- lapply(X = g.annots, FUN = `[[`, "body")
+  leg.annots <- lapply(X = g.annots, FUN = `[[`, "legend")
+
+  # Align widths for vertically-stacked panels
+  all.col.aligned <- c(g.annot.bodies, list(g.heat.body))
+  max.widths <- do.call(what = grid::unit.pmax,
+                        args = lapply(X = all.col.aligned,
+                                      FUN = function(g) g$widths))
+  g.annot.bodies <- lapply(X = g.annot.bodies, FUN = function(g) {
+    g$widths <- max.widths
+    g
+  })
+  g.heat.body$widths <- max.widths
+
+  # Align heights for horizontally-adjacent panels
+  max.heights <- grid::unit.pmax(g.row.body$heights,
+                                 g.heat.body$heights)
+  g.row.body$heights <- max.heights
+  g.heat.body$heights <- max.heights
+
+  # Zero out inner margins
+  heat.panel.col <-
+    g.heat.body$layout[g.heat.body$layout$name == "panel", "l"]
+  if (heat.panel.col < ncol(x = g.heat.body)) {
+    for (col in (heat.panel.col + 1):ncol(x = g.heat.body)) {
+      g.heat.body$widths[col] <- grid::unit(x = 0, units = "pt")
+    }
+  }
+  row.panel.col <-
+    g.row.body$layout[g.row.body$layout$name == "panel", "l"]
+  if (row.panel.col > 1) {
+    for (col in seq_len(length.out = row.panel.col - 1)) {
+      g.row.body$widths[col] <- grid::unit(x = 0, units = "pt")
+    }
+  }
+  if (row.panel.col < ncol(x = g.row.body)) {
+    for (col in (row.panel.col + 1):ncol(x = g.row.body)) {
+      g.row.body$widths[col] <- grid::unit(x = 0, units = "pt")
+    }
+  }
+
+  for (j in seq_along(along.with = g.annot.bodies)) {
+    g <- g.annot.bodies[[j]]
+    annot.panel.col <- g$layout[g$layout$name == "panel", "l"]
+    if (annot.panel.col < ncol(x = g)) {
+      for (col in (annot.panel.col + 1):ncol(x = g)) {
+        g$widths[col] <- grid::unit(x = 0, units = "pt")
+      }
+    }
+    g.annot.bodies[[j]] <- g
+  }
+
+  # Build bottom row: heatmap | row annotation
+  g.bottom <- cbind(g.heat.body, g.row.body, size = "first")
+
+  # Stack: annotation strips on top, bottom row below
+  g.annot.bodies <- lapply(X = g.annot.bodies, FUN = function(g) {
+    n.row.cols <- ncol(x = g.row.body)
+    for (i in seq_len(length.out = n.row.cols)) {
+      g <- gtable::gtable_add_cols(x = g,
+                                   widths = g.row.body$widths[i])
+    }
+    g
+  })
+
+  all.to.stack <- c(g.annot.bodies, list(g.bottom))
+  final.max.widths <- do.call(
+    what = grid::unit.pmax,
+    args = lapply(X = all.to.stack, FUN = function(g) g$widths))
+  all.to.stack <- lapply(X = all.to.stack, FUN = function(g) {
+    g$widths <- final.max.widths
+    g
+  })
+
+  g.final <- all.to.stack[[1]]
+  if (length(x = all.to.stack) > 1) {
+    for (i in 2:length(x = all.to.stack)) {
+      g.final <- rbind(g.final, all.to.stack[[i]], size = "max")
+    }
+  }
+
+  n.body.cols <- ncol(x = g.final)
+
+  # Discover heatmap panel boundaries for title centering
+  panel.layout <- g.final$layout[g.final$layout$name == "panel", , drop = FALSE]
+  if (nrow(x = panel.layout) > 0) {
+    # Filter to panels within body (before legend columns)
+    body.panels <- panel.layout[panel.layout$l <= n.body.cols, ]
+    if (nrow(x = body.panels) > 0) {
+      title.l <- min(body.panels$l)
+      title.r <- max(body.panels$r)
+    } else {
+      # Fallback: no body panels found, use full body width
+      title.l <- 1
+      title.r <- n.body.cols
+    }
+  } else {
+    # Fallback: no panels found, use full body width
+    title.l <- 1
+    title.r <- n.body.cols
+  }
+
+  # Inject left-side annotation strip labels
+  annot.labels <-
+    gsub(pattern = "\n", replacement = " ", x = annot.names)
+  n.annot.labels <- length(x = annot.labels)
+
+  if (n.annot.labels > 0) {
+    label.grobs <- lapply(X = annot.labels, FUN = function(lab) {
+      grid::textGrob(label = lab,
+                     x = grid::unit(x = 1, units = "npc"),
+                     just = "right",
+                     gp = grid::gpar(fontsize = 6))
+    })
+
+    first.panel.col <-
+      min(g.final$layout[g.final$layout$name == "panel", "l"])
+    label.col <- first.panel.col - 1L
+
+    panel.entries <-
+      g.final$layout[g.final$layout$name == "panel", , drop = FALSE]
+    panel.entries <- panel.entries[order(panel.entries$t), ]
+    for (j in seq_len(length.out = n.annot.labels)) {
+      g.final <-
+        gtable::gtable_add_grob(x = g.final,
+                                grobs = label.grobs[[j]],
+                                t = panel.entries$t[j],
+                                l = label.col,
+                                clip = "off")
+    }
+  }
+
+  # Assemble legends column
+  all.legends <- c(leg.annots, list(leg.row), list(leg.heat))
+  keep <- vapply(X = all.legends,
+                 FUN = function(lg) !inherits(x = lg, what = "nullGrob"),
+                 FUN.VALUE = logical(length = 1))
+  all.legends <- all.legends[keep]
+
+  if (length(x = all.legends) > 0) {
+    spacer.h <- grid::unit(x = 0.15, units = "in")
+    height.list <- list(grid::unit(x = 0, units = "in"))
+    for (i in seq_along(along.with = all.legends)) {
+      if (i > 1) {
+        height.list <- c(height.list, list(spacer.h))
+      }
+      h <- if (inherits(x = all.legends[[i]], what = "gtable")) {
+        sum(all.legends[[i]]$heights)
+      } else {
+        grid::unit(x = 0.5, units = "in")
+      }
+      height.list <- c(height.list, list(h))
+    }
+
+    leg.column <- gtable::gtable(
+      widths = grid::unit(x = 1, units = "in"),
+      heights = do.call(what = grid::unit.c, args = height.list)
+    )
+
+    # Left-align legend grobs within the column
+    for (i in seq_along(along.with = all.legends)) {
+      if (inherits(x = all.legends[[i]], what = "gtable")) {
+        all.legends[[i]]$vp <-
+          grid::viewport(x = grid::unit(x = 0, units = "npc"),
+                         just = c("left", "top"))
+      }
+    }
+
+    row.idx <- seq(from = 1, by = 2,
+                   length.out = length(x = all.legends))
+    for (i in seq_along(along.with = all.legends)) {
+      leg.column <-
+        gtable::gtable_add_grob(x = leg.column,
+                                grobs = all.legends[[i]],
+                                t = row.idx[i], l = 1)
+    }
+
+    g.final <-
+      gtable::gtable_add_cols(x = g.final,
+                              widths = grid::unit(x = 0.1, units = "in"))
+    g.final <-
+      gtable::gtable_add_cols(x = g.final,
+                              widths = grid::unit(x = 1, units = "in"))
+    g.final <-
+      gtable::gtable_add_grob(x = g.final,
+                              grobs = leg.column,
+                              t = 1,
+                              l = ncol(x = g.final),
+                              b = nrow(x = g.final))
+  }
+
+  # Title and subtitle
+  title.text <-
+    paste0(.method.name, " Heatmap")
+  subtitle.text <-
+    paste0("Density Contrast: ", .coef.col, .subtitle.extra)
+
+  title.grob <-
+    grid::textGrob(label = title.text,
+                   just = "center",
+                   gp = grid::gpar(fontface = "bold",
+                                   fontsize = 14))
+  subtitle.grob <-
+    grid::textGrob(label = subtitle.text,
+                   just = "center",
+                   gp = grid::gpar(fontsize = 11))
+
+  g.final <-
+    gtable::gtable_add_rows(x = g.final,
+                            heights = grid::unit(x = 0.25, units = "in"),
+                            pos = 0)
+  g.final <-
+    gtable::gtable_add_grob(x = g.final,
+                            grobs = subtitle.grob,
+                            t = 1, l = title.l, r = title.r)
+
+  g.final <-
+    gtable::gtable_add_rows(x = g.final,
+                            heights = grid::unit(x = 0.3, units = "in"),
+                            pos = 0)
+  g.final <-
+    gtable::gtable_add_grob(x = g.final,
+                            grobs = title.grob,
+                            t = 1, l = title.l, r = title.r)
+
+  return(ggplot2::ggplot() +
+           ggplot2::annotation_custom(grob = g.final) +
+           ggplot2::theme_void())
+
+}
+
+
 #' Plot specDE Expression Heatmap
 #'
 #' Creates an efficient expression heatmap with landmarks as columns and top-loaded
@@ -3095,7 +3876,7 @@ plotSpecDE <-
 #' @param .order.decreasing Logical: sort landmarks in decreasing order? Default FALSE.
 #' @param .viridis.options.annot Character vector: viridis color options for annotation
 #'   strips (density contrast + specDE dimensions + .order.by columns). Cycled if fewer
-#'   options than strips. Default \code{c("viridis", "plasma", "cividis")}.
+#'   options than strips. Default \code{c("cividis", "rocket", "inferno", "mako", "magma")}.
 #' @param .annot.panel.width Numeric: width of annotation strips in inches. Default 4.
 #' @param .annot.panel.height Numeric: height of each annotation strip in inches. Default 0.15.
 #' @param .panel.width Numeric: width of expression heatmap panel in inches. Default 4.
