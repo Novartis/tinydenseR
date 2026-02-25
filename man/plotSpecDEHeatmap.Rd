@@ -57,7 +57,7 @@ specDE score strips.}
 
 \item{.viridis.options.annot}{Character vector: viridis color options for annotation
 strips (density contrast + specDE dimensions + .order.by columns). Cycled if fewer
-options than strips. Default \code{c("viridis", "plasma", "cividis")}.}
+options than strips. Default \code{c("cividis", "rocket", "inferno", "mako", "magma")}.}
 
 \item{.annot.panel.width}{Numeric: width of annotation strips in inches. Default 4.}
 
