@@ -4381,3 +4381,625 @@ get.nmfDE <-
     return(.tdr.obj)
 
   }
+
+
+#' Graph-Diffused, Density Contrast-Aligned PLS for Differential Expression
+#'
+#' Decomposes the density-contrast interaction matrix M.local via NIPALS PLS1
+#' against the density-contrast vector Y. plsDE maximizes covariance between
+#' graph-smoothed expression and the density contrast Y, prioritizing Y-alignment
+#' over variance explained.
+#'
+#' @details
+#' plsDE answers: "What gene programs in M.local = P diag(Y) Xc most covary
+#' with the condition contrast Y?" The interaction term diag(Y) bakes the
+#' density contrast into the data matrix (preserving sensitivity to pure DE
+#' without DA), while the PLS objective ensures every component's landmark
+#' scores track Y (high Ak by construction).
+#'
+#' The method:
+#' \enumerate{
+#'   \item Extracts the density contrast vector Y (coefficients from \code{get.lm})
+#'   \item Prepares centered expression matrix Xc (size-factor normalized + log2 for RNA;
+#'         raw for cyto; then centered)
+#'   \item Builds random-walk normalized graph P from SNN (with optional degree
+#'         regularization and lazy walk)
+#'   \item Constructs M.local = P \%*\% diag(Y) \%*\% Xc (centered by columns):
+#'         the graph-diffused, density-weighted expression interaction matrix
+#'   \item Runs NIPALS PLS1: iteratively finds gene weights w maximizing
+#'         cov(M.local w, Y), with deflation of both M.local and Y
+#'   \item Applies sign convention: positive scores = aligned with Y
+#'   \item Computes gene loadings via OLS regression of centered Xc on each component's scores
+#'   \item Computes Laplacian smoothness (Sk) for each component
+#' }
+#'
+#' \strong{Diagnostic metrics (Ak, Sk):}
+#'
+#' \strong{Ak (Y-alignment):} Measures how strongly component scores covary with
+#' density contrast Y. Ak is high by construction for the leading components:
+#' NIPALS PLS1 maximizes covariance with Y at every deflation step. Components
+#' are ordered by extraction (plsDE1 = highest covariance with Y).
+#'
+#' \strong{Sk (graph smoothness):} Derived from the normalized Laplacian applied to
+#' score vectors. High Sk indicates large-scale, graph-smooth structure.
+#'
+#' \strong{About Y appearing on both sides:}
+#' Y appears in both the data matrix (via diag(Y) in M.local) and the PLS objective
+#' (maximize covariance with Y). This is not circular because the expression matrix
+#' Xc sits between: the product is large only when genes exist whose Y-weighted,
+#' graph-smoothed expression genuinely covaries with Y. With permuted Y, Ak collapses.
+#'
+#' @param .tdr.obj A tinydenseR object after \code{get.lm()}.
+#' @param .coef.col Character: column name in model coefficients to use as density contrast Y.
+#'   Must be a valid column in \code{.tdr.obj$map$lm[[.model.name]]$fit$coefficients}.
+#' @param .model.name Character: name of the fitted model to use (default "default").
+#' @param .ncomp Integer: number of PLS components. Defaults to
+#'   \code{ncol(.tdr.obj$pca$embed)}, matching the number of PCs from \code{get.landmarks}.
+#' @param .min.prop Numeric: for RNA, minimum proportion of landmarks where a gene must be
+#'   detected (>0) to be included. Default 0.005 (0.5 percent).
+#' @param .store.M Logical: if TRUE, store M.local in output. Default FALSE
+#'   (saves memory; can be large for RNA).
+#' @param .degree.reg Logical: if TRUE, apply degree regularization by adding
+#'   tau * I (self-loops) to SNN before row-normalizing. Default FALSE.
+#' @param .tau.mult Numeric: multiplier for tau when .degree.reg = TRUE.
+#'   tau = .tau.mult * mean(degree). Default 1.
+#' @param .lazy.alpha Numeric in (0, 1]: mixing parameter for lazy random walk.
+#'   P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'
+#' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$plsDE[[.coef.col]]}:
+#'   \describe{
+#'     \item{scores}{Matrix (landmarks x K): PLS scores (oriented so positive = aligned with Y)}
+#'     \item{gene.weights}{Matrix (genes x K): PLS gene weight vectors w (unit-norm)}
+#'     \item{x.loadings}{Matrix (genes x K): PLS deflation loadings p}
+#'     \item{y.loadings}{Numeric vector (K): PLS Y-loadings q (scalar per component)}
+#'     \item{loadings}{Matrix (genes x K): OLS regression of centered Xc on each component score;
+#'       positive = upregulated with Y, negative = downregulated}
+#'     \item{Y.alignment}{Numeric vector (K): |cor(Y, score_k)| per component}
+#'     \item{smoothness}{Numeric vector (K): Laplacian smoothness per score vector}
+#'     \item{Y}{Numeric vector: the centered density contrast used}
+#'     \item{M.local}{Matrix (optional): the interaction matrix (if .store.M = TRUE)}
+#'     \item{params}{List: parameters used}
+#'   }
+#'
+#' @seealso \code{\link{get.lm}} (required predecessor),
+#'   \code{\link{get.specDE}} (specDE: SVD-based peer method),
+#'   \code{\link{get.nmfDE}} (nmfDE: NMF-based peer method),
+#'   \code{\link{plotPlsDE}} (visualization), \code{\link{plotPlsDEHeatmap}} (heatmap)
+#'
+#' @examples
+#' \dontrun{
+#' # After fitting linear model
+#' lm.obj <- get.lm(lm.obj, .design = design)
+#'
+#' # Run plsDE for "Infection" coefficient
+#' lm.obj <- get.plsDE(lm.obj, .coef.col = "Infection")
+#'
+#' # Access results
+#' lm.obj$plsDE$Infection$scores[, "plsDE1"]      # PLS scores (Y-aligned)
+#' lm.obj$plsDE$Infection$loadings[, "plsDE1"]     # gene loadings (regression)
+#' lm.obj$plsDE$Infection$gene.weights[, "plsDE1"] # PLS gene weights
+#'
+#' # Diagnostic table
+#' data.frame(
+#'   component = colnames(lm.obj$plsDE$Infection$scores),
+#'   Ak = lm.obj$plsDE$Infection$Y.alignment,
+#'   Sk = lm.obj$plsDE$Infection$smoothness
+#' )
+#' }
+#'
+#' @export
+#'
+get.plsDE <-
+  function(.tdr.obj,
+           .coef.col,
+           .model.name = "default",
+           .ncomp = NULL,
+           .min.prop = 0.005,
+           .store.M = FALSE,
+           .degree.reg = FALSE,
+           .tau.mult = 1,
+           .lazy.alpha = 1,
+           .verbose = TRUE) {
+
+    # -------------------------------------------------------------------------
+    # Input validation
+    # -------------------------------------------------------------------------
+
+    if (is.null(x = .tdr.obj$map$lm[[.model.name]])) {
+      stop("Model '", .model.name, "' not found. Run get.lm() first.")
+    }
+
+    coef.mat <-
+      .tdr.obj$map$lm[[.model.name]]$fit$coefficients
+
+    if (!(.coef.col %in% colnames(x = coef.mat))) {
+      stop("Coefficient '", .coef.col, "' not found in model coefficients.\n",
+           "Available: ", paste(colnames(x = coef.mat), collapse = ", "))
+    }
+
+    if (is.null(x = .tdr.obj$graph$snn)) {
+      stop("SNN graph not found. Run get.graph() first.")
+    }
+
+    if (!Matrix::isSymmetric(object = .tdr.obj$graph$snn)) {
+      stop("SNN graph not symmetric.")
+    }
+
+    if (is.null(x = .tdr.obj$raw.landmarks)) {
+      stop("Raw landmarks not found. Run get.landmarks() first.")
+    }
+
+    if (is.null(x = .tdr.obj$pca$embed)) {
+      stop("PCA embedding not found. Run get.landmarks() first.")
+    }
+
+    # Default .ncomp to number of PCs from get.landmarks
+    if (is.null(x = .ncomp)) {
+      .ncomp <-
+        ncol(x = .tdr.obj$pca$embed)
+    }
+
+    if (!is.numeric(x = .ncomp) || length(x = .ncomp) != 1 || .ncomp < 1) {
+      stop(".ncomp must be a positive integer.")
+    }
+
+    .ncomp <-
+      as.integer(x = .ncomp)
+
+    # -------------------------------------------------------------------------
+    # Extract Y: density contrast vector (centered)
+    # -------------------------------------------------------------------------
+
+    if (isTRUE(x = .verbose)) {
+      message("\n=== plsDE: Graph-Diffused, Density Contrast-Aligned PLS for Differential Expression ===")
+      message("Coefficient: ", .coef.col)
+    }
+
+    Y <-
+      coef.mat[, .coef.col] |>
+      (\(x)
+       x - mean(x = x)
+      )()
+
+    # -------------------------------------------------------------------------
+    # Prepare expression matrix X (centered)
+    # -------------------------------------------------------------------------
+
+    if (isTRUE(x = .verbose)) {
+      message("Preparing expression matrix...")
+    }
+
+    if (.tdr.obj$config$assay.type == "RNA") {
+
+      # Filter genes: detected in at least min.prop of landmarks
+      X <-
+        .tdr.obj$raw.landmarks |>
+        (\(x)
+         x[, Matrix::colSums(x = x > 0) > (nrow(x = x) * .min.prop)]
+        )()
+
+      if (isTRUE(x = .verbose)) {
+        message("  Genes after filtering (>", .min.prop * 100, "% detection): ",
+                ncol(x = X), " / ", ncol(x = .tdr.obj$raw.landmarks))
+      }
+
+      # Size factor normalization
+      X <-
+        X |>
+        Matrix::t() |>
+        (\(x)
+         x / (Matrix::rowSums(x = x) / mean(x = Matrix::rowSums(x = x)))
+        )() |>
+        Matrix::t()
+
+      # Log2 transform (in-place for sparse matrix efficiency)
+      X@x <-
+        log2(x = X@x + 1)
+
+    } else {
+
+      # Cytometry: use raw landmarks directly
+      X <-
+        .tdr.obj$raw.landmarks
+
+    }
+
+    # Center expression (genes/markers)
+    Xc <-
+      X |>
+      (\(x)
+       Matrix::t(x = x) - Matrix::colMeans(x = x)
+      )() |>
+      Matrix::t()
+
+    n.landmarks <-
+      nrow(x = Xc)
+
+    n.genes <-
+      ncol(x = Xc)
+
+    gene.names <-
+      colnames(x = Xc)
+
+    # -------------------------------------------------------------------------
+    # Build random-walk normalized graph P (with optional degree regularization + lazy walk)
+    # -------------------------------------------------------------------------
+
+    if (isTRUE(x = .verbose)) {
+      message("Building random-walk normalized graph...")
+    }
+
+    # Validate lazy.alpha
+    if (!is.numeric(x = .lazy.alpha) || .lazy.alpha <= 0 || .lazy.alpha > 1) {
+      stop(".lazy.alpha must be in (0, 1]")
+    }
+
+    SNN <-
+      .tdr.obj$graph$snn
+
+    # Check for disconnected nodes
+    d <-
+      Matrix::rowSums(x = SNN)
+
+    if (any(d == 0)) {
+      n.disconnected <- sum(d == 0)
+      stop("Graph contains ", n.disconnected, " disconnected node(s) (degree = 0). ",
+           "Cannot compute random-walk matrix. Check graph construction or increase k.")
+    }
+
+    # Degree regularization: add self-loops W_tau = W + tau*I, then row-normalize
+    if (isTRUE(x = .degree.reg)) {
+      tau <- .tau.mult * mean(x = d)
+      W.tau <- SNN + tau * Matrix::Diagonal(n = nrow(x = SNN))
+      d.tau <- Matrix::rowSums(x = W.tau)
+      D.inv <- Matrix::Diagonal(x = 1 / d.tau)
+      P <- D.inv %*% W.tau
+      if (isTRUE(x = .verbose)) {
+        message("  Degree regularization: tau = ", round(x = tau, digits = 2),
+                " (tau.mult = ", .tau.mult, ")")
+      }
+    } else {
+      D.inv <- Matrix::Diagonal(x = 1 / d)
+      P <- D.inv %*% SNN
+    }
+
+    # Set dimnames
+    P <-
+      `dimnames<-`(x = P,
+                   value = dimnames(x = SNN))
+
+    # Lazy random walk: P_lazy = (1 - alpha) * I + alpha * P
+    if (.lazy.alpha < 1) {
+      I.mat <- Matrix::Diagonal(n = nrow(x = P))
+      P <- (1 - .lazy.alpha) * I.mat + .lazy.alpha * P
+      if (isTRUE(x = .verbose)) {
+        message("  Lazy walk: alpha = ", .lazy.alpha)
+      }
+    }
+
+    # -------------------------------------------------------------------------
+    # Construct M.local = P %*% diag(Y) %*% Xc (centered)
+    # -------------------------------------------------------------------------
+
+    if (isTRUE(x = .verbose)) {
+      message("Computing density-weighted expression (M.local)...")
+    }
+
+    # Y-weighted expression: diag(Y) %*% Xc
+    YX.interaction <-
+      (Matrix::Diagonal(x = Y) %*% Xc) |>
+      (\(x)
+       `dimnames<-`(x = x,
+                    value = dimnames(x = Xc))
+      )()
+
+    # Graph-smooth and center
+    M.local <-
+      (P %*% YX.interaction) |>
+      (\(x)
+       Matrix::t(x = x) - Matrix::colMeans(x = x)
+      )() |>
+      Matrix::t()
+
+    # -------------------------------------------------------------------------
+    # NIPALS PLS1: M.local vs Y
+    # -------------------------------------------------------------------------
+
+    if (isTRUE(x = .verbose)) {
+      message("Running NIPALS PLS1 (", .ncomp, " components)...")
+    }
+
+    # Dense copy for deflation (deflation breaks sparsity on first step)
+    Z.work <-
+      as.matrix(x = M.local)
+
+    Y.work <-
+      Y
+
+    # Pre-allocate storage
+    W.mat <-
+      matrix(data = 0,
+             nrow = n.genes,
+             ncol = .ncomp)
+
+    T.mat <-
+      matrix(data = 0,
+             nrow = n.landmarks,
+             ncol = .ncomp)
+
+    P.mat <-
+      matrix(data = 0,
+             nrow = n.genes,
+             ncol = .ncomp)
+
+    Q.vec <-
+      numeric(length = .ncomp)
+
+    for (k in seq_len(length.out = .ncomp)) {
+
+      # Gene weight: w = Z'Y / ||Z'Y||
+      ZtY <-
+        crossprod(x = Z.work,
+                  y = Y.work) |>
+        as.numeric()
+
+      w.norm <-
+        sqrt(x = sum(ZtY^2))
+
+      if (w.norm < .Machine$double.eps) {
+        if (isTRUE(x = .verbose)) {
+          message("  Component ", k, ": Z'Y norm ~ 0, stopping early.")
+        }
+        .ncomp <- k - 1L
+        break
+      }
+
+      w <-
+        ZtY / w.norm
+
+      # Score: t = Z w
+      t.score <-
+        (Z.work %*% w) |>
+        as.numeric()
+
+      # Deflation loading: p = Z't / (t't)
+      tt <-
+        sum(t.score^2)
+
+      p.load <-
+        (crossprod(x = Z.work,
+                   y = t.score) |>
+           as.numeric()) / tt
+
+      # Y loading: q = Y't / (t't)
+      q.load <-
+        sum(Y.work * t.score) / tt
+
+      # Deflate Z and Y
+      Z.work <-
+        Z.work - tcrossprod(x = t.score,
+                            y = p.load)
+
+      Y.work <-
+        Y.work - t.score * q.load
+
+      # Store
+      W.mat[, k] <-
+        w
+
+      T.mat[, k] <-
+        t.score
+
+      P.mat[, k] <-
+        p.load
+
+      Q.vec[k] <-
+        q.load
+
+      if (isTRUE(x = .verbose)) {
+        Ak <-
+          abs(x = stats::cor(x = Y, y = t.score))
+        message(sprintf("  plsDE%d: cov = %.2f, Ak = %.4f, q = %.4f, resid.var(Y) = %.4f",
+                        k,
+                        abs(x = sum(t.score * Y)),
+                        Ak,
+                        q.load,
+                        stats::var(x = Y.work) / stats::var(x = Y)))
+      }
+    }
+
+    # Trim if stopped early
+    if (.ncomp < ncol(x = W.mat)) {
+      W.mat <- W.mat[, seq_len(length.out = .ncomp), drop = FALSE]
+      T.mat <- T.mat[, seq_len(length.out = .ncomp), drop = FALSE]
+      P.mat <- P.mat[, seq_len(length.out = .ncomp), drop = FALSE]
+      Q.vec <- Q.vec[seq_len(length.out = .ncomp)]
+    }
+
+    # -------------------------------------------------------------------------
+    # Sign convention: positive scores = aligned with Y
+    # -------------------------------------------------------------------------
+
+    Y.cor <-
+      stats::cor(x = Y,
+                 y = T.mat)[1, ]
+
+    sign.flip <-
+      sign(x = Y.cor)
+
+    # Handle zero correlation (default to +1)
+    sign.flip[sign.flip == 0] <-
+      1
+
+    # Flip scores, weights, and loadings
+    T.mat <-
+      t(x = t(x = T.mat) * sign.flip)
+
+    W.mat <-
+      t(x = t(x = W.mat) * sign.flip)
+
+    P.mat <-
+      t(x = t(x = P.mat) * sign.flip)
+
+    Q.vec <-
+      Q.vec * sign.flip
+
+    Y.alignment <-
+      abs(x = Y.cor)
+
+    # -------------------------------------------------------------------------
+    # Name everything
+    # -------------------------------------------------------------------------
+
+    comp.names <-
+      paste0("plsDE", seq_len(length.out = .ncomp))
+
+    colnames(x = W.mat) <-
+      colnames(x = T.mat) <-
+      colnames(x = P.mat) <-
+      names(x = Q.vec) <-
+      names(x = Y.alignment) <-
+      comp.names
+
+    rownames(x = W.mat) <-
+      rownames(x = P.mat) <-
+      gene.names
+
+    rownames(x = T.mat) <-
+      rownames(x = Xc)
+
+    if (isTRUE(x = .verbose)) {
+      message("Y-alignment (top 5): ",
+              paste(sprintf("%.3f", utils::head(x = Y.alignment, n = 5)), collapse = ", "))
+    }
+
+    # -------------------------------------------------------------------------
+    # Compute loadings via OLS regression (Xc ~ score_k)
+    # -------------------------------------------------------------------------
+
+    if (isTRUE(x = .verbose)) {
+      message("Computing gene/marker loadings...")
+    }
+
+    loadings <-
+      seq_len(length.out = .ncomp) |>
+      stats::setNames(nm = comp.names) |>
+      lapply(FUN = function(k) {
+
+        score.k <-
+          T.mat[, k] - mean(x = T.mat[, k])
+
+        denom <-
+          Matrix::crossprod(x = score.k) |>
+          as.numeric()
+
+        if (denom < .Machine$double.eps) return(rep(x = NA_real_, times = n.genes))
+
+        beta <-
+          (Matrix::crossprod(x = score.k,
+                             y = Xc) |>
+             as.numeric()) /
+          denom
+
+        return(beta)
+
+      }) |>
+      do.call(what = cbind)
+
+    rownames(x = loadings) <-
+      gene.names
+
+    # -------------------------------------------------------------------------
+    # Laplacian smoothness (Sk)
+    # -------------------------------------------------------------------------
+
+    if (isTRUE(x = .verbose)) {
+      message("Computing Laplacian smoothness...")
+    }
+
+    # Normalized Laplacian: L_sym = I - D^{-1/2} W D^{-1/2}
+    D.vec <-
+      Matrix::rowSums(x = SNN)
+
+    D.inv.sqrt <-
+      Matrix::Diagonal(x = 1 / sqrt(x = D.vec))
+
+    L.sym <-
+      Matrix::Diagonal(n = nrow(x = SNN)) -
+      (D.inv.sqrt %*% SNN %*% D.inv.sqrt)
+
+    smoothness <-
+      seq_len(length.out = .ncomp) |>
+      sapply(FUN = function(k) {
+
+        s <-
+          T.mat[, k] |>
+          (\(x)
+           x - mean(x = x)
+          )()
+
+        # Laplacian Dirichlet energy
+        energy <-
+          as.numeric(x = t(x = s) %*% L.sym %*% s) /
+          sum(s^2)
+
+        # Smoothness = 1 - energy (capped at 1 for normalized Laplacian)
+        1 - pmin(pmax(energy, 0), 2) / 2
+      })
+
+    names(x = smoothness) <-
+      comp.names
+
+    if (isTRUE(x = .verbose)) {
+      message("Smoothness (top 5): ",
+              paste(sprintf("%.3f", utils::head(x = smoothness, n = 5)), collapse = ", "))
+    }
+
+    # -------------------------------------------------------------------------
+    # Store results
+    # -------------------------------------------------------------------------
+
+    if (is.null(x = .tdr.obj$plsDE)) {
+      .tdr.obj$plsDE <-
+        list()
+    }
+
+    .tdr.obj$plsDE[[.coef.col]] <-
+      list(
+        scores = T.mat,
+        gene.weights = W.mat,
+        x.loadings = P.mat,
+        y.loadings = Q.vec,
+        loadings = loadings,
+        Y.alignment = Y.alignment,
+        smoothness = smoothness,
+        Y = Y,
+        params = list(
+          model.name = .model.name,
+          coef.col = .coef.col,
+          ncomp = .ncomp,
+          min.prop = .min.prop,
+          degree.reg = .degree.reg,
+          tau.mult = .tau.mult,
+          lazy.alpha = .lazy.alpha
+        )
+      )
+
+    if (isTRUE(x = .store.M)) {
+      .tdr.obj$plsDE[[.coef.col]]$M.local <-
+        M.local
+    }
+
+    if (isTRUE(x = .verbose)) {
+      message("\nResults stored in: .tdr.obj$plsDE$", .coef.col)
+      message("  $scores       : ", n.landmarks, " landmarks x ", .ncomp, " components")
+      message("  $gene.weights : ", n.genes, " features x ", .ncomp, " components (PLS w)")
+      message("  $loadings     : ", n.genes, " features x ", .ncomp, " components (regression)")
+      message("  $Y.alignment  : Ak (|cor(Y, score)|)")
+      message("  $smoothness   : Sk (Laplacian smoothness)")
+    }
+
+    return(.tdr.obj)
+
+  }
