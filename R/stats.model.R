@@ -3960,7 +3960,7 @@ get.nmfDE <-
     # Transpose so that landmarks are "samples" (columns) and genes are "features" (rows).
     A.t <-
       Matrix::t(x = A) |>
-      as("dgCMatrix")
+      methods::as(Class = "CsparseMatrix")
 
     if (isTRUE(x = .verbose)) {
       message("Running NMF (k = ", .k, ", tol = ", .tol,
