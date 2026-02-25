@@ -3981,10 +3981,10 @@ plotSpecDEHeatmap <-
       stop("specDE results for '", .coef.col, "' not found.\n",
            "Available: ", avail)
     }
-    
+
     specDE.res <-
       .tdr.obj$specDE[[.coef.col]]
-    
+
     # Validate .specDE.dim
     if (!is.numeric(x = .specDE.dim) ||
         any(.specDE.dim < 1) ||
@@ -4455,14 +4455,8 @@ plotNmfDEHeatmap <-
     .feature.font.size = 7,
     .show.landmark.labels = FALSE
   ) {
-    
-    # R CMD check appeasement
-    loading <- x <- landmark <- feature <- expr <- annot_dim <- annot_value <- NULL
-    
-    # -------------------------------------------------------------------------
-    # Input validation
-    # -------------------------------------------------------------------------
-    
+
+    # Validate nmfDE results
     if (is.null(x = .tdr.obj$nmfDE[[.coef.col]])) {
       avail <-
         if (is.null(x = .tdr.obj$nmfDE)) {
@@ -4473,10 +4467,10 @@ plotNmfDEHeatmap <-
       stop("nmfDE results for '", .coef.col, "' not found.\n",
            "Available: ", avail)
     }
-    
+
     nmfDE.res <-
       .tdr.obj$nmfDE[[.coef.col]]
-    
+
     # Validate .nmfDE.dim
     if (!is.numeric(x = .nmfDE.dim) ||
         any(.nmfDE.dim < 1) ||
@@ -4484,26 +4478,14 @@ plotNmfDEHeatmap <-
       stop(".nmfDE.dim must be integer(s) between 1 and ",
            ncol(x = nmfDE.res$signed.scores))
     }
-    
+
     .nmfDE.dim <-
       as.integer(x = .nmfDE.dim)
-    
+
     .loadings.type <-
       match.arg(arg = .loadings.type,
                 choices = c("signed", "de", "mass"))
-    
-    if (is.null(x = .tdr.obj$raw.landmarks)) {
-      stop("Raw landmarks not found. Run get.landmarks() first.")
-    }
-    
-    # -------------------------------------------------------------------------
-    # Feature selection: rank by signed loading
-    # -------------------------------------------------------------------------
-    
-    # Use the first .nmfDE.dim for feature ranking
-    loading.dim <-
-      .nmfDE.dim[1]
-    
+
     # Select loadings based on type
     loadings.mat <-
       if (.loadings.type == "signed") {
@@ -4513,658 +4495,499 @@ plotNmfDEHeatmap <-
       } else {
         nmfDE.res$loadings.mass
       }
-    
+
     loadings <-
-      loadings.mat[, loading.dim]
-    
+      loadings.mat[, .nmfDE.dim[1]]
+
     names(x = loadings) <-
       rownames(x = loadings.mat)
-    
-    # Sort by signed loading (most positive first)
-    feat.signed.order <-
-      order(loadings, decreasing = TRUE)
-    
-    if (.tdr.obj$config$assay.type == "RNA") {
-      
-      # RNA: select half from top positive, half from top negative loadings
-      n.select <-
-        min(.n.features, length(x = loadings))
-      
-      n.positive <- ceiling(x = n.select / 2)
-      n.negative <- floor(x = n.select / 2)
-      
-      top.features <- names(x = loadings)[c(
-        head(x = feat.signed.order, n = n.positive),
-        tail(x = feat.signed.order, n = n.negative)
-      )]
-      
-    } else {
-      
-      # Cytometry: use all markers (sorted by signed loading)
-      top.features <-
-        names(x = loadings)[feat.signed.order]
-      
-    }
-    
-    # Order selected features by signed loading (high to low)
-    top.loadings <-
-      loadings[top.features]
-    
-    top.features <-
-      top.features[order(top.loadings, decreasing = TRUE)]
-    
-    # -------------------------------------------------------------------------
-    # Expression matrix: normalize and subset
-    # -------------------------------------------------------------------------
-    
-    if (.tdr.obj$config$assay.type == "RNA") {
-      
-      # Step 1: Get row (landmark) sums from full matrix BEFORE subsetting
-      lm.libsize <-
-        Matrix::rowSums(x = .tdr.obj$raw.landmarks)
-      
-      # Step 2: Subset to top features (raw.landmarks is landmarks x features)
-      X.sub <-
-        .tdr.obj$raw.landmarks[, top.features, drop = FALSE]
-      
-      # Step 3: Size factor normalization using pre-computed library sizes
-      size.factors <-
-        lm.libsize / mean(x = lm.libsize)
-      
-      X.norm <-
-        X.sub / size.factors
-      
-      # Step 4: Log2 transform
-      X.log <-
-        log2(x = as.matrix(x = X.norm) + 1)
-      
-      # Step 5: Center each feature (column) to mean 0
-      X.centered <-
-        scale(x = X.log, center = TRUE, scale = FALSE)
-      
-    } else {
-      
-      # Cytometry: use raw landmarks directly, just center
-      X.sub <-
-        .tdr.obj$raw.landmarks[, top.features, drop = FALSE]
-      
-      X.centered <-
-        scale(x = as.matrix(x = X.sub), center = TRUE, scale = FALSE)
-      
-    }
-    
-    # Transpose for heatmap: features x landmarks -> we want features as rows
-    expr.mat <-
-      t(x = X.centered)
-    
-    # -------------------------------------------------------------------------
-    # Landmark ordering
-    # -------------------------------------------------------------------------
-    
-    .user.add.annot <- !is.null(x = .add.annot)
-    .order.is.nmfDE <- FALSE
-    
-    if (is.character(x = .order.by) && length(x = .order.by) == 1L) {
-      
-      if (identical(x = .order.by, y = "dens.contrast")) {
-        
-        .user.order.by <- FALSE
-        .order.by <-
-          matrix(data = nmfDE.res$Y,
-                 ncol = 1,
-                 dimnames = list(names(x = nmfDE.res$Y),
-                                 "density\ncontrast\n(centered)"))
-        
-      } else if (identical(x = .order.by, y = "nmfDE.dim")) {
-        
-        .user.order.by <- TRUE
-        .order.is.nmfDE <- TRUE
-        .order.by <-
-          nmfDE.res$signed.scores[, .nmfDE.dim, drop = FALSE]
-        
-      } else {
-        stop(".order.by must be \"dens.contrast\", \"nmfDE.dim\", ",
-             "or a numeric matrix with column names.")
-      }
-      
-    } else if (inherits(x = .order.by, what = "matrix")) {
-      
-      .user.order.by <- TRUE
-      
-      if (is.null(x = colnames(x = .order.by))) {
-        stop(".order.by must be a matrix with column names.")
-      }
-      
-      if (nrow(x = .order.by) != ncol(x = expr.mat)) {
-        stop(".order.by must have ", ncol(x = expr.mat), " rows (one per landmark), ",
-             "but has ", nrow(x = .order.by))
-      }
-      
-    } else {
-      stop(".order.by must be \"dens.contrast\", \"nmfDE.dim\", ",
-           "or a numeric matrix with column names.")
-    }
-    
-    # Validate .add.annot (does NOT affect ordering)
-    if (isTRUE(x = .user.add.annot)) {
-      
-      if (!inherits(x = .add.annot, what = "matrix")) {
-        stop(".add.annot must be a matrix")
-      }
-      
-      if (is.null(x = colnames(x = .add.annot))) {
-        stop(".add.annot must be a matrix with column names.")
-      }
-      
-      if (nrow(x = .add.annot) != ncol(x = expr.mat)) {
-        stop(".add.annot must have ", ncol(x = expr.mat), " rows (one per landmark), ",
-             "but has ", nrow(x = .add.annot))
-      }
-      
-    }
-    
-    # Sort landmarks by .order.by columns sequentially
-    order.df <-
-      as.data.frame(x = .order.by)
-    
-    order.df$.idx <-
-      seq_len(length.out = nrow(x = order.df))
-    
-    if (.order.decreasing) {
-      for (col in colnames(x = .order.by)) {
-        order.df[[col]] <- -order.df[[col]]
-      }
-    }
-    
-    order.df <-
-      order.df[do.call(what = order,
-                       args = order.df[, colnames(x = .order.by), drop = FALSE]), ]
-    
-    lm.order <-
-      order.df$.idx
-    
-    # Reorder expression matrix columns
-    expr.mat <-
-      expr.mat[, lm.order, drop = FALSE]
-    
-    # Reorder .order.by for annotation
-    .order.by <-
-      .order.by[lm.order, , drop = FALSE]
-    
-    # Reorder .add.annot for annotation
-    if (isTRUE(x = .user.add.annot)) {
-      .add.annot <- .add.annot[lm.order, , drop = FALSE]
-    }
-    
-    # -------------------------------------------------------------------------
-    # Build heatmap data frame for geom_raster
-    # -------------------------------------------------------------------------
-    
-    n.landmarks <-
-      ncol(x = expr.mat)
-    
-    n.features.plot <-
-      nrow(x = expr.mat)
-    
-    lm.labels <-
-      paste0("lm_", sprintf(fmt = "%05d", seq_len(length.out = n.landmarks)))
-    
-    heat.df <-
-      data.frame(
-        landmark = rep(x = lm.labels, times = n.features.plot),
-        feature = rep(x = rownames(x = expr.mat), each = n.landmarks),
-        expr = as.vector(x = t(x = expr.mat)),
-        stringsAsFactors = FALSE
-      )
-    
-    heat.df$landmark <-
-      factor(x = heat.df$landmark,
-             levels = lm.labels)
-    
-    heat.df$feature <-
-      factor(x = heat.df$feature,
-             levels = rev(x = rownames(x = expr.mat)))
-    
-    # -------------------------------------------------------------------------
-    # Build annotation strips
-    # -------------------------------------------------------------------------
-    
-    # Get Y (density contrast) - always centered
-    Y.ordered <- nmfDE.res$Y[lm.order]
-    
-    # Get nmfDE signed scores for selected dimensions, reordered
-    nmfDE.scores.ordered <-
-      nmfDE.res$signed.scores[lm.order, .nmfDE.dim, drop = FALSE]
-    
-    # Build annotation data
-    if (isTRUE(x = .user.add.annot) && isTRUE(x = .user.order.by)) {
-      
-      if (.order.is.nmfDE) {
-        annot.names <- c(
-          colnames(x = .order.by),
-          "density\ncontrast\n(centered)",
-          colnames(x = .add.annot)
-        )
-        annot.mat <- cbind(.order.by, Y.ordered, .add.annot)
-      } else {
-        annot.names <- c(
-          colnames(x = .order.by),
-          "density\ncontrast\n(centered)",
-          colnames(x = .add.annot),
-          colnames(x = nmfDE.scores.ordered)
-        )
-        annot.mat <- cbind(.order.by, Y.ordered, .add.annot, nmfDE.scores.ordered)
-      }
-      
-    } else if (isTRUE(x = .user.add.annot) && !isTRUE(x = .user.order.by)) {
-      
-      annot.names <- c(
-        "density\ncontrast\n(centered)",
-        colnames(x = .add.annot),
-        colnames(x = nmfDE.scores.ordered)
-      )
-      annot.mat <- cbind(Y.ordered, .add.annot, nmfDE.scores.ordered)
-      
-    } else if (!isTRUE(x = .user.add.annot) && isTRUE(x = .user.order.by)) {
-      
-      if (.order.is.nmfDE) {
-        annot.names <- c(
-          colnames(x = .order.by),
-          "density\ncontrast\n(centered)"
-        )
-        annot.mat <- cbind(.order.by, Y.ordered)
-      } else {
-        annot.names <- c(
-          colnames(x = .order.by),
-          "density\ncontrast\n(centered)",
-          colnames(x = nmfDE.scores.ordered)
-        )
-        annot.mat <- cbind(.order.by, Y.ordered, nmfDE.scores.ordered)
-      }
-      
-    } else {
-      
-      annot.names <- c("density\ncontrast\n(centered)", colnames(x = nmfDE.scores.ordered))
-      annot.mat <- cbind(Y.ordered , nmfDE.scores.ordered)
-      
-    }
-    
-    colnames(x = annot.mat) <- annot.names
-    n.annot <- ncol(x = annot.mat)
-    
-    .viridis.options.annot <-
-      rep_len(x = .viridis.options.annot,
-              length.out = n.annot)
-    
-    annot.df.list <-
-      lapply(X = seq_len(length.out = n.annot),
-             FUN = function(d) {
-               data.frame(
-                 landmark = lm.labels,
-                 annot_dim = annot.names[d],
-                 annot_value = annot.mat[, d],
-                 stringsAsFactors = FALSE
-               )
-             })
-    
-    annot.df <-
-      do.call(what = rbind,
-              args = annot.df.list)
-    
-    annot.df$landmark <-
-      factor(x = annot.df$landmark,
-             levels = lm.labels)
-    
-    annot.df$annot_dim <-
-      factor(x = annot.df$annot_dim,
-             levels = annot.names)
-    
-    # Row annotation data (signed loadings)
-    row.annot.df <- 
-      data.frame(
-        feature = rownames(x = expr.mat) |> 
-          (\(x)
-           factor(x = x,
-                  levels = rev(x = x))
-          )(),
-        loading = top.loadings[rownames(expr.mat)],
-        x = 1
-      )
-    
-    # -------------------------------------------------------------------------
-    # Build ggplot: expression heatmap
-    # -------------------------------------------------------------------------
-    
-    p.heat <-
-      ggplot2::ggplot(data = heat.df,
-                      mapping = ggplot2::aes(x = landmark,
-                                             y = feature,
-                                             fill = expr)) +
-      ggplot2::geom_raster() +
-      ggplot2::scale_fill_gradient2(low = unname(obj = Color.Palette[1, 1]),
-                                    mid = unname(obj = Color.Palette[1, 6]),
-                                    high = unname(obj = Color.Palette[1, 2]),
-                                    midpoint = 0,
-                                    name = "Expression\n(centered)",
-                                    guide = ggplot2::guide_colorbar(
-                                      direction = "vertical",
-                                      barwidth = grid::unit(x = 0.15, units = "in"),
-                                      barheight = grid::unit(x = 0.5, units = "in"),
-                                      title.position = "top",
-                                      title.hjust = 0
-                                    )) +
-      ggplot2::labs(
-        x = "Landmarks",
-        y = "Features"
-      ) +
-      ggplot2::theme_bw() +
-      ggplot2::theme(
-        axis.text.y = ggplot2::element_text(size = I(x = .feature.font.size)),
-        legend.position = "right",
-        legend.title = ggplot2::element_text(size = 7),
-        legend.text = ggplot2::element_text(size = 6)
-      )
-    
-    
-    # Row annotation plot (right side)
+
     loading.label <-
       switch(.loadings.type,
              signed = "loadings\n(signed)",
              de     = "loadings\n(DE)",
              mass   = "loadings\n(mass)")
-    
-    p.row.annot <-
-      ggplot2::ggplot(row.annot.df,
-                      ggplot2::aes(x = x, 
-                                   y = feature, 
-                                   fill = loading)) +
-      ggplot2::geom_raster() +
-      ggplot2::scale_fill_viridis_c(
-        option = "turbo",
-        name = loading.label,
-        guide = ggplot2::guide_colorbar(
-          direction = "vertical",
-          barwidth = grid::unit(x = 0.15, units = "in"),
-          barheight = grid::unit(x = 0.5, units = "in"),
-          title.position = "top",
-          title.hjust = 0
-        )) +
-      ggplot2::theme_void() +
-      ggplot2::theme(legend.position = "right",
-                     legend.title = ggplot2::element_text(size = 7),
-                     legend.text = ggplot2::element_text(size = 6))
-    
-    # Hide landmark labels if requested
-    if (!.show.landmark.labels) {
-      p.heat <-
-        p.heat +
-        ggplot2::theme(
-          axis.text.x = ggplot2::element_blank(),
-          axis.ticks.x = ggplot2::element_blank()
-        )
-    } else {
-      p.heat <-
-        p.heat +
-        ggplot2::theme(
-          axis.text.x = ggplot2::element_text(angle = 90,
-                                              hjust = 1,
-                                              vjust = 0.5,
-                                              size = I(x = 6))
-        )
-    }
-    
-    # -------------------------------------------------------------------------
-    # Build annotation strips (one per annotation)
-    # -------------------------------------------------------------------------
-    
-    annot.plots <-
-      seq_len(length.out = n.annot) |>
-      lapply(FUN = function(d) {
-        
-        dim.name <-
-          annot.names[d]
-        
-        dim.df <-
-          annot.df[annot.df$annot_dim == dim.name, ]
-        
-        .option.this <-
-          if (identical(x = dim.name, y = "density\ncontrast\n(centered)")) {
-            "viridis"
-          } else if (dim.name %in% colnames(x = nmfDE.scores.ordered)) {
-            "plasma"
-          } else {
-            .viridis.options.annot[d]
-          }
-        
-        ggplot2::ggplot(data = dim.df,
-                        mapping = ggplot2::aes(x = landmark,
-                                               y = 1,
-                                               fill = annot_value)) +
-          ggplot2::geom_raster() +
-          ggplot2::scale_fill_viridis_c(option = .option.this,
-                                        name = dim.name,
-                                        guide = ggplot2::guide_colorbar(
-                                          direction = "vertical",
-                                          barwidth = grid::unit(x = 0.15, units = "in"),
-                                          barheight = grid::unit(x = 0.5, units = "in"),
-                                          title.position = "top",
-                                          title.hjust = 0
-                                        )) +
-          ggplot2::labs(x = NULL, y = NULL) +
-          ggplot2::theme_void() +
-          ggplot2::theme(
-            legend.position = "right",
-            legend.title = ggplot2::element_text(size = 7),
-            legend.text = ggplot2::element_text(size = 6)
-          )
-      })
-    
-    # -------------------------------------------------------------------------
-    # Assemble via gtable for deterministic sizing
-    # -------------------------------------------------------------------------
-    
-    # --- Helper: force panel size in a gtable ---
-    .force.panel <- function(gt, w, h) {
-      panel.pos <- gt$layout[gt$layout$name == "panel", ]
-      gt$widths[panel.pos$l]  <- grid::unit(x = w, units = "in")
-      gt$heights[panel.pos$t] <- grid::unit(x = h, units = "in")
-      gt
-    }
-    
-    # --- Helper: extract legend from gtable, return list(gt.no.leg, legend) ---
-    .extract.legend <- function(gt) {
-      leg.idx <- grep(pattern = "guide-box", x = gt$layout$name)
-      if (length(x = leg.idx) == 0) {
-        return(list(body = gt, legend = grid::nullGrob()))
-      }
-      legend <- gt$grobs[[leg.idx[1]]]
-      gt$grobs[[leg.idx[1]]] <- grid::nullGrob()
-      list(body = gt, legend = legend)
-    }
-    
-    # --- Convert all plots to gtables and force panel sizes ---
-    
-    # 1. Heatmap
-    g.heat <- ggplot2::ggplotGrob(x = p.heat)
-    g.heat <- .force.panel(gt = g.heat,
-                           w = .panel.width,
-                           h = .panel.height)
-    heat.parts <- .extract.legend(gt = g.heat)
-    g.heat.body <- heat.parts$body
-    leg.heat <- heat.parts$legend
-    
-    # 2. Row annotation
-    g.row <- ggplot2::ggplotGrob(x = p.row.annot)
-    g.row <- .force.panel(gt = g.row,
-                          w = .annot.panel.height,
-                          h = .panel.height)
-    row.parts <- .extract.legend(gt = g.row)
-    g.row.body <- row.parts$body
-    leg.row <- row.parts$legend
-    
-    # 3. Column annotation strips
-    g.annots <- lapply(X = annot.plots, FUN = function(p) {
-      gt <- ggplot2::ggplotGrob(x = p)
-      gt <- .force.panel(gt = gt,
-                         w = .panel.width,
-                         h = .annot.panel.height)
-      .extract.legend(gt = gt)
-    })
-    g.annot.bodies <- lapply(X = g.annots, FUN = `[[`, "body")
-    leg.annots <- lapply(X = g.annots, FUN = `[[`, "legend")
-    
-    # --- Align widths for vertically-stacked panels (annotation strips + heatmap) ---
-    all.col.aligned <- c(g.annot.bodies, list(g.heat.body))
-    max.widths <- do.call(what = grid::unit.pmax,
-                          args = lapply(X = all.col.aligned,
-                                        FUN = function(g) g$widths))
-    g.annot.bodies <- lapply(X = g.annot.bodies, FUN = function(g) {
-      g$widths <- max.widths
-      g
-    })
-    g.heat.body$widths <- max.widths
-    
-    # --- Align heights for horizontally-adjacent panels (row annot + heatmap) ---
-    max.heights <- grid::unit.pmax(g.row.body$heights, g.heat.body$heights)
-    g.row.body$heights <- max.heights
-    g.heat.body$heights <- max.heights
-    
-    # --- Zero out inner margins so heatmap + row annotation sit flush ---
-    heat.panel.col <- g.heat.body$layout[g.heat.body$layout$name == "panel", "l"]
-    if (heat.panel.col < ncol(x = g.heat.body)) {
-      for (col in (heat.panel.col + 1):ncol(x = g.heat.body)) {
-        g.heat.body$widths[col] <- grid::unit(x = 0, units = "pt")
-      }
-    }
-    row.panel.col <- g.row.body$layout[g.row.body$layout$name == "panel", "l"]
-    if (row.panel.col > 1) {
-      for (col in seq_len(length.out = row.panel.col - 1)) {
-        g.row.body$widths[col] <- grid::unit(x = 0, units = "pt")
-      }
-    }
-    if (row.panel.col < ncol(x = g.row.body)) {
-      for (col in (row.panel.col + 1):ncol(x = g.row.body)) {
-        g.row.body$widths[col] <- grid::unit(x = 0, units = "pt")
-      }
-    }
-    
-    for (j in seq_along(along.with = g.annot.bodies)) {
-      g <- g.annot.bodies[[j]]
-      annot.panel.col <- g$layout[g$layout$name == "panel", "l"]
-      if (annot.panel.col < ncol(x = g)) {
-        for (col in (annot.panel.col + 1):ncol(x = g)) {
-          g$widths[col] <- grid::unit(x = 0, units = "pt")
-        }
-      }
-      g.annot.bodies[[j]] <- g
-    }
-    
-    # --- Build bottom row: heatmap | row annotation ---
-    g.bottom <- cbind(g.heat.body, g.row.body, size = "first")
-    
-    # --- Stack: annotation strips on top, bottom row below ---
-    g.annot.bodies <- lapply(X = g.annot.bodies, FUN = function(g) {
-      n.row.cols <- ncol(x = g.row.body)
-      for (i in seq_len(length.out = n.row.cols)) {
-        g <- gtable::gtable_add_cols(x = g,
-                                     widths = g.row.body$widths[i])
-      }
-      g
-    })
-    
-    all.to.stack <- c(g.annot.bodies, list(g.bottom))
-    final.max.widths <- do.call(what = grid::unit.pmax,
-                                args = lapply(X = all.to.stack,
-                                              FUN = function(g) g$widths))
-    all.to.stack <- lapply(X = all.to.stack, FUN = function(g) {
-      g$widths <- final.max.widths
-      g
-    })
-    
-    g.final <- all.to.stack[[1]]
-    if (length(x = all.to.stack) > 1) {
-      for (i in 2:length(x = all.to.stack)) {
-        g.final <- rbind(g.final, all.to.stack[[i]], size = "max")
-      }
-    }
-    
-    n.body.cols <- ncol(x = g.final)
-    
-    # --- Assemble legends column ---
-    all.legends <- c(leg.annots, list(leg.row), list(leg.heat))
-    keep <- vapply(X = all.legends,
-                   FUN = function(lg) !inherits(x = lg, what = "nullGrob"),
-                   FUN.VALUE = logical(length = 1))
-    all.legends <- all.legends[keep]
-    
-    if (length(x = all.legends) > 0) {
-      spacer.h <- grid::unit(x = 0.15, units = "in")
-      height.list <- vector(mode = "list")
-      for (i in seq_along(along.with = all.legends)) {
-        if (i > 1) {
-          height.list <- c(height.list, list(spacer.h))
-        }
-        h <- if (inherits(x = all.legends[[i]], what = "gtable")) {
-          sum(all.legends[[i]]$heights)
-        } else {
-          grid::unit(x = 0.5, units = "in")
-        }
-        height.list <- c(height.list, list(h))
-      }
-      
-      leg.column <- gtable::gtable(
-        widths = grid::unit(x = 1, units = "in"),
-        heights = do.call(what = grid::unit.c, args = height.list)
-      )
-      
-      row.idx <- seq(from = 1, by = 2, length.out = length(x = all.legends))
-      for (i in seq_along(along.with = all.legends)) {
-        leg.column <- gtable::gtable_add_grob(x = leg.column,
-                                              grobs = all.legends[[i]],
-                                              t = row.idx[i], l = 1)
-      }
-      
-      g.final <- gtable::gtable_add_cols(x = g.final,
-                                         widths = grid::unit(x = 0.1, units = "in"))
-      g.final <- gtable::gtable_add_cols(x = g.final,
-                                         widths = grid::unit(x = 1, units = "in"))
-      g.final <- gtable::gtable_add_grob(x = g.final,
-                                         grobs = leg.column,
-                                         t = 1,
-                                         l = ncol(x = g.final),
-                                         b = nrow(x = g.final))
-    }
-    
-    # --- Title and subtitle ---
-    title.grob <-
-      grid::textGrob(label = "nmfDE Heatmap",
-                     gp = grid::gpar(fontface = "bold",
-                                     fontsize = 14))
-    subtitle.grob <-
-      grid::textGrob(label = paste0("Density Contrast: ", .coef.col,
-                                    "  |  Loadings: ", if(.loadings.type == "signed") "signed" else if(.loadings.type == "de") "DE" else "Mass"),
-                     gp = grid::gpar(fontsize = 11))
-    
-    g.final <-
-      gtable::gtable_add_rows(x = g.final,
-                              heights = grid::unit(x = 0.25, units = "in"),
-                              pos = 0)
-    g.final <-
-      gtable::gtable_add_grob(x = g.final,
-                              grobs = subtitle.grob,
-                              t = 1, l = 1, r = n.body.cols)
-    
-    g.final <-
-      gtable::gtable_add_rows(x = g.final,
-                              heights = grid::unit(x = 0.3, units = "in"),
-                              pos = 0)
-    g.final <-
-      gtable::gtable_add_grob(x = g.final,
-                              grobs = title.grob,
-                              t = 1, l = 1, r = n.body.cols)
-    
-    return(ggplot2::ggplot() +
-             ggplot2::annotation_custom(grob = g.final) +
-             ggplot2::theme_void())
-    
+
+    subtitle.extra <-
+      paste0("  |  Loadings: ",
+             if (.loadings.type == "signed") "signed"
+             else if (.loadings.type == "de") "DE"
+             else "Mass")
+
+    # Dispatch to shared builder
+    .plotDEHeatmap(
+      .tdr.obj = .tdr.obj,
+      .coef.col = .coef.col,
+      .loadings = loadings,
+      .scores = nmfDE.res$signed.scores[, .nmfDE.dim, drop = FALSE],
+      .Y = nmfDE.res$Y,
+      .method.name = "nmfDE",
+      .dim.string = "nmfDE.dim",
+      .loading.label = loading.label,
+      .subtitle.extra = subtitle.extra,
+      .n.features = .n.features,
+      .order.by = .order.by,
+      .add.annot = .add.annot,
+      .order.decreasing = .order.decreasing,
+      .viridis.options.annot = .viridis.options.annot,
+      .annot.panel.height = .annot.panel.height,
+      .panel.width = .panel.width,
+      .panel.height = .panel.height,
+      .feature.font.size = .feature.font.size,
+      .show.landmark.labels = .show.landmark.labels
+    )
+
   }
+
+
+
+#' Plot plsDE Scores (Diagnostic and Component Views)
+#'
+#' Visualize plsDE results: either a diagnostic overview of all components
+#' or a detailed component-level view showing embedding and Y-vs-score scatter.
+#'
+#' @param .tdr.obj A tinydenseR object after \code{get.plsDE()}.
+#' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$plsDE}.
+#' @param .plsDE.dim Integer or NULL: component to visualize (1-indexed). If NULL,
+#'   plots Ak vs Sk diagnostic scatter for all components.
+#' @param .embed Character: either \code{"umap"} or \code{"pca"}. Default "umap".
+#' @param .point.size Numeric: point size for scatter plots. Default 1.
+#' @param .label.size Numeric: label size for diagnostic scatter plots. Default 3.
+#'   Applies only if .plsDE.dim is NULL.
+#' @param .panel.size Numeric: panel size in inches. Default 2.
+#' @param .seed Integer: random seed for point ordering. Default 123.
+#'
+#' @return A ggplot2 object (if \code{.plsDE.dim = NULL}) or a patchwork composition
+#'   (if \code{.plsDE.dim} is integer).
+#'
+#' @details
+#' \strong{Component view} (\code{.plsDE.dim = integer}):
+#' \itemize{
+#'   \item Left panel: UMAP (or PCA) embedding colored by PLS scores (diverging scale)
+#'   \item Right panel: Scatter of Y vs PLS scores (essential for interpretation)
+#' }
+#'
+#' \strong{Diagnostic view} (\code{.plsDE.dim = NULL}):
+#' \itemize{
+#'   \item X-axis: Smoothness (Sk); higher = large-scale graph-smooth structure
+#'   \item Y-axis: Y-alignment (Ak); higher = stronger density coupling
+#'   \item Color: |q_k| (Y-loading magnitude; larger = more Y variance captured)
+#'   \item Labels: Component indices (1, 2, ...)
+#' }
+#'
+#' Ak is high by construction for early components: NIPALS PLS1 maximizes
+#' covariance with Y at every deflation step. The diagnostic scatter is most
+#' useful for identifying which components are also graph-smooth (high Sk).
+#'
+#' @seealso \code{\link{get.plsDE}} for computing plsDE, \code{\link{plotPlsDEHeatmap}}
+#'   for expression heatmaps
+#'
+#' @examples
+#' \dontrun{
+#' # After running plsDE
+#' lm.obj <- get.plsDE(lm.obj, .coef.col = "Infection")
+#'
+#' # Diagnostic overview
+#' plotPlsDE(lm.obj, .coef.col = "Infection", .plsDE.dim = NULL)
+#'
+#' # Visualize first component
+#' plotPlsDE(lm.obj, .coef.col = "Infection", .plsDE.dim = 1)
+#' }
+#'
+#' @export
+#'
+plotPlsDE <-
+  function(
+    .tdr.obj,
+    .coef.col,
+    .plsDE.dim = NULL,
+    .embed = "umap",
+    .point.size = 1,
+    .label.size = 3,
+    .panel.size = 2,
+    .seed = 123
+  ) {
+
+    # R CMD check appeasement
+    Sk <- Ak <- qk <- component <- PC1 <- PC2 <- umap.1 <- umap.2 <- Y <- score <- NULL
+
+    # -------------------------------------------------------------------------
+    # Input validation
+    # -------------------------------------------------------------------------
+
+    .embed <-
+      match.arg(arg = .embed,
+                choices = c(
+                  "umap",
+                  "pca"
+                ))
+
+    if (is.null(x = .tdr.obj$plsDE[[.coef.col]])) {
+      avail <-
+        if (is.null(x = .tdr.obj$plsDE)) {
+          "none (run get.plsDE() first)"
+        } else {
+          paste(names(x = .tdr.obj$plsDE), collapse = ", ")
+        }
+      stop("plsDE results for '", .coef.col, "' not found.\n",
+           "Available: ", avail)
+    }
+
+    plsDE.res <-
+      .tdr.obj$plsDE[[.coef.col]]
+
+    # -------------------------------------------------------------------------
+    # Diagnostic view: Sk x Ak scatter, colored by |q_k|
+    # -------------------------------------------------------------------------
+
+    if (is.null(x = .plsDE.dim)) {
+
+      diag.df <-
+        data.frame(
+          component = gsub(pattern = "plsDE",
+                           replacement = "",
+                           x = names(x = plsDE.res$smoothness)),
+          Sk = plsDE.res$smoothness,
+          Ak = plsDE.res$Y.alignment,
+          qk = abs(x = plsDE.res$y.loadings)
+        )
+
+      p <-
+        ggplot2::ggplot(data = diag.df,
+                        mapping = ggplot2::aes(x = Sk,
+                                               y = Ak,
+                                               color = qk,
+                                               label = component)) +
+        ggplot2::geom_point(size = I(x = .point.size)) +
+        ggrepel::geom_text_repel(size = I(x = .label.size),
+                                 max.overlaps = 20,
+                                 seed = .seed) +
+        ggplot2::scale_color_gradient(low = unname(obj = Color.Palette[1,1]),
+                                      high = unname(obj = Color.Palette[1,2]),
+                                      name = expression("|" * q[k] * "|")) +
+        ggplot2::labs(
+          title = paste0("plsDE diagnostics: ", .coef.col),
+          x = "Smoothness (Sk)",
+          y = "Y-alignment (Ak)"
+        ) +
+        ggplot2::theme_bw() +
+        ggplot2::theme(
+          plot.title = ggplot2::element_text(hjust = 0.5),
+          plot.subtitle = ggplot2::element_text(hjust = 0.5)
+        ) +
+        ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
+                                                  units = "in"),
+                                cols = grid::unit(x = .panel.size,
+                                                  units = "in"))
+
+      return(p)
+
+    }
+
+    # -------------------------------------------------------------------------
+    # Component view: embedding + Y-vs-score scatter
+    # -------------------------------------------------------------------------
+
+    if (!is.numeric(x = .plsDE.dim) ||
+        length(x = .plsDE.dim) != 1 ||
+        .plsDE.dim < 1 ||
+        .plsDE.dim > ncol(x = plsDE.res$scores)) {
+      stop(".plsDE.dim must be an integer between 1 and ", ncol(x = plsDE.res$scores))
+    }
+
+    .plsDE.dim <-
+      as.integer(x = .plsDE.dim)
+
+    comp.name <-
+      colnames(x = plsDE.res$scores)[.plsDE.dim]
+
+    score.vec <-
+      plsDE.res$scores[, .plsDE.dim]
+
+    # Check UMAP exists
+    if (.embed == "umap" && is.null(x = .tdr.obj$graph$uwot$embedding)) {
+      stop("UMAP embedding not found. Run get.graph() first.")
+    }
+
+    # Build data frames
+    old.seed <- .Random.seed
+    on.exit(expr = assign(x = ".Random.seed",
+                          value = old.seed,
+                          envir = .GlobalEnv),
+            add = TRUE)
+    set.seed(seed = .seed)
+
+    embed.df <-
+      (if(.embed == "umap"){
+        as.data.frame(x = .tdr.obj$graph$uwot$embedding)
+      } else {
+        as.data.frame(x = .tdr.obj$pca$embed)
+      }) |>
+      cbind(score = score.vec) |>
+      (\(x)
+       x[sample(x = nrow(x = x)), ]
+      )()
+
+    # Get Y (centered)
+    Y.vec <- plsDE.res$Y
+
+    scatter.df <-
+      data.frame(
+        Y = Y.vec,
+        score = score.vec,
+        col = .tdr.obj$map$lm[[plsDE.res$params$model.name]]$fit$coefficients[, plsDE.res$params$coef.col]
+      )
+
+    # Panel 1: Embedding colored by PLS scores (diverging scale, centered at 0)
+    p.embed <-
+      ggplot2::ggplot(data = embed.df,
+                      mapping = ggplot2::aes(x = if(.embed == "umap") umap.1 else PC1,
+                                             y = if(.embed == "umap") umap.2 else PC2,
+                                             color = score)) +
+      ggplot2::guides(color = ggplot2::guide_colorbar(title.position = "top",
+                                                      title.hjust = 0.5)) +
+      ggplot2::geom_point(size = I(x = .point.size)) +
+      ggplot2::scale_color_gradient2(
+        low = unname(obj = Color.Palette[1, 1]),
+        mid = unname(obj = Color.Palette[1, 6]),
+        high = unname(obj = Color.Palette[1, 2]),
+        midpoint = 0,
+        name = comp.name
+      ) +
+      ggplot2::labs(
+        title = comp.name,
+        x = if(.embed == "umap") "umap.1" else "PC1",
+        y = if(.embed == "umap") "umap.2" else "PC2"
+      ) +
+      ggplot2::theme_bw() +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(hjust = 0.5),
+        legend.position = "bottom",
+        legend.margin = ggplot2::margin(t = -0.1,
+                                        unit = "in")
+      ) +
+      ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
+                                                units = "in"),
+                              cols = grid::unit(x = .panel.size,
+                                                units = "in"))
+
+    # Panel 2: Y vs score scatter
+    p.scatter <-
+      ggplot2::ggplot(data = scatter.df,
+                      mapping = ggplot2::aes(x = Y,
+                                             y = score,
+                                             color = col)) +
+      ggplot2::guides(color = ggplot2::guide_colorbar(title.position = "top",
+                                                      title.hjust = 0.5)) +
+      ggplot2::scale_color_gradient2(low = unname(obj = Color.Palette[1,1]),
+                                     mid = unname(obj = Color.Palette[1,6]),
+                                     high = unname(obj = Color.Palette[1,2]),
+                                     midpoint = 0)+
+      ggplot2::geom_vline(xintercept = 0,
+                          color = "black",
+                          linetype = "dashed",
+                          linewidth = I(x = 1/2)) +
+      ggplot2::geom_hline(yintercept = 0,
+                          color = "black",
+                          linetype = "dashed",
+                          linewidth = I(x = 1/2)) +
+      ggplot2::geom_point(size = I(x = .point.size)) +
+      ggplot2::labs(
+        title = paste0(.coef.col, " vs ", comp.name),
+        subtitle = sprintf("Ak = %.2f, Sk = %.2f, q = %.4f",
+                           plsDE.res$Y.alignment[.plsDE.dim],
+                           plsDE.res$smoothness[.plsDE.dim],
+                           plsDE.res$y.loadings[.plsDE.dim]),
+        x = paste0("Density contrast", "\n(centered ", .coef.col, ")"),
+        y = comp.name,
+        color = paste0(.coef.col,
+                       " (raw)")
+      ) +
+      ggplot2::theme_bw() +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(hjust = 0.5),
+        plot.subtitle = ggplot2::element_text(hjust = 0.5)
+      ) +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(hjust = 0.5),
+        legend.position = "bottom",
+        legend.margin = ggplot2::margin(t = -0.1,
+                                        unit = "in")
+      ) +
+      ggh4x::force_panelsizes(rows = grid::unit(x = .panel.size,
+                                                units = "in"),
+                              cols = grid::unit(x = .panel.size,
+                                                units = "in"))
+
+    # Combine with patchwork
+    p.embed + p.scatter +
+      patchwork::plot_layout(ncol = 2)
+
+  }
+
+
+#' Plot plsDE Expression Heatmap
+#'
+#' Creates an expression heatmap with landmarks as columns and top-loaded
+#' features as rows. Landmarks are ordered by plsDE scores (or custom ordering),
+#' and features are ranked by absolute regression loading. For RNA data,
+#' expression is properly normalized, log-transformed, and centered.
+#'
+#' @param .tdr.obj A tinydenseR object after \code{get.plsDE()}.
+#' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$plsDE}.
+#' @param .plsDE.dim Integer or integer vector: plsDE component(s) to use for:
+#'   (1) ranking features by absolute loading, and (2) ordering landmarks (if
+#'   \code{.order.by = NULL}). If vector (e.g., \code{c(1, 2)}), the first dimension
+#'   is used for feature ranking, and landmarks are sorted by all dimensions sequentially.
+#'   Default 1.
+#' @param .model.name Character: name of the fitted model (default "default").
+#' @param .n.features Integer: maximum number of features to display. For RNA, features
+#'   are ranked by absolute loading and top \code{.n.features} are shown (half from
+#'   positive loadings, half from negative). For cytometry, all markers are shown.
+#'   Default 50.
+#' @param .order.by Controls landmark ordering. One of:
+#'   \describe{
+#'     \item{\code{"dens.contrast"}}{(default) Order by centered density contrast
+#'       from \code{.coef.col}.}
+#'     \item{\code{"plsDE.dim"}}{Order by the selected \code{.plsDE.dim} score(s).}
+#'     \item{A numeric matrix with column names}{Landmarks are sorted by columns
+#'       sequentially (first column primary, etc.) and each column is displayed as
+#'       an annotation strip with the column name as legend title.}
+#'   }
+#' @param .add.annot Numeric matrix with column names: displayed as annotation strips.
+#'   These are added as additional annotation strips after the density contrast and before
+#'   plsDE score strips.
+#' @param .order.decreasing Logical: sort landmarks in decreasing order? Default FALSE.
+#' @param .viridis.options.annot Character vector: viridis color options for annotation
+#'   strips. Cycled if fewer options than strips.
+#'   Default \code{c("cividis", "rocket", "inferno", "mako", "magma")}.
+#' @param .annot.panel.width Numeric: width of annotation strips in inches. Default 4.
+#' @param .annot.panel.height Numeric: height of each annotation strip in inches. Default 0.15.
+#' @param .panel.width Numeric: width of expression heatmap panel in inches. Default 4.
+#' @param .panel.height Numeric: height of expression heatmap panel in inches. Default 3.
+#' @param .feature.font.size Numeric: font size for feature labels. Default 7.
+#' @param .show.landmark.labels Logical: show landmark IDs on x-axis? Default FALSE.
+#'
+#' @return A ggplot2 object (gtable composition with annotation strips).
+#'
+#' @details
+#' \strong{Feature selection and ordering}:
+#' Features are \emph{selected} by absolute regression loading for the first element of
+#' \code{.plsDE.dim}. For RNA, the top \code{.n.features/2} positive and top
+#' \code{.n.features/2} negative-loaded features are selected. Selected features are
+#' then \emph{ordered} by signed loading (highest positive at top, most negative at bottom).
+#'
+#' \strong{Loadings}:
+#' Uses OLS regression loadings (Xc ~ score_k): each loading is the slope of a
+#' per-gene regression on the component score, capturing marker-component association.
+#' Positive loadings = genes upregulated with Y; negative = downregulated.
+#'
+#' \strong{Expression normalization} (RNA only):
+#' \enumerate{
+#'   \item Computes row sums (per-landmark library size) from full \code{raw.landmarks}
+#'   \item Subsets to top features
+#'   \item Applies size factor normalization
+#'   \item Log2-transforms: \code{log2(x + 1)}
+#'   \item Centers each feature (row) to mean 0
+#' }
+#'
+#' \strong{Annotation strips}:
+#' \enumerate{
+#'   \item Density contrast (centered Y)
+#'   \item plsDE scores for all dimensions in \code{.plsDE.dim}
+#'   \item Custom annotations (\code{.order.by} matrix columns, \code{.add.annot} columns)
+#' }
+#'
+#' @seealso \code{\link{get.plsDE}} for computing plsDE, \code{\link{plotPlsDE}}
+#'   for score visualization
+#'
+#' @examples
+#' \dontrun{
+#' # After running plsDE
+#' lm.obj <- get.plsDE(lm.obj, .coef.col = "Infection")
+#'
+#' # Basic heatmap using plsDE1
+#' plotPlsDEHeatmap(lm.obj, .coef.col = "Infection", .plsDE.dim = 1)
+#'
+#' # Order by plsDE dimension scores
+#' plotPlsDEHeatmap(lm.obj, .coef.col = "Infection", .plsDE.dim = 1,
+#'                  .order.by = "plsDE.dim")
+#' }
+#'
+#' @export
+#'
+plotPlsDEHeatmap <-
+  function(
+    .tdr.obj,
+    .coef.col,
+    .plsDE.dim = 1,
+    .model.name = "default",
+    .n.features = 50,
+    .order.by = "dens.contrast",
+    .add.annot = NULL,
+    .order.decreasing = FALSE,
+    .viridis.options.annot = c("cividis", "rocket", "inferno", "mako", "magma"),
+    .annot.panel.width = 4,
+    .annot.panel.height = 0.15,
+    .panel.width = 4,
+    .panel.height = 3,
+    .feature.font.size = 7,
+    .show.landmark.labels = FALSE
+  ) {
+
+    # Validate plsDE results
+    if (is.null(x = .tdr.obj$plsDE[[.coef.col]])) {
+      avail <-
+        if (is.null(x = .tdr.obj$plsDE)) {
+          "none (run get.plsDE() first)"
+        } else {
+          paste(names(x = .tdr.obj$plsDE), collapse = ", ")
+        }
+      stop("plsDE results for '", .coef.col, "' not found.\n",
+           "Available: ", avail)
+    }
+
+    plsDE.res <-
+      .tdr.obj$plsDE[[.coef.col]]
+
+    # Validate .plsDE.dim
+    if (!is.numeric(x = .plsDE.dim) ||
+        any(.plsDE.dim < 1) ||
+        any(.plsDE.dim > ncol(x = plsDE.res$scores))) {
+      stop(".plsDE.dim must be integer(s) between 1 and ",
+           ncol(x = plsDE.res$scores))
+    }
+
+    .plsDE.dim <-
+      as.integer(x = .plsDE.dim)
+
+    loadings <-
+      plsDE.res$loadings[, .plsDE.dim[1]]
+
+    names(x = loadings) <-
+      rownames(x = plsDE.res$loadings)
+
+    # Dispatch to shared builder
+    .plotDEHeatmap(
+      .tdr.obj = .tdr.obj,
+      .coef.col = .coef.col,
+      .loadings = loadings,
+      .scores = plsDE.res$scores[, .plsDE.dim, drop = FALSE],
+      .Y = plsDE.res$Y,
+      .method.name = "plsDE",
+      .dim.string = "plsDE.dim",
+      .row.annot.title = "loadings",
+      .n.features = .n.features,
+      .order.by = .order.by,
+      .add.annot = .add.annot,
+      .order.decreasing = .order.decreasing,
+      .viridis.options.annot = .viridis.options.annot,
+      .annot.panel.height = .annot.panel.height,
+      .panel.width = .panel.width,
+      .panel.height = .panel.height,
+      .feature.font.size = .feature.font.size,
+      .show.landmark.labels = .show.landmark.labels
+    )
+
+  }
+
