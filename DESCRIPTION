@@ -47,6 +47,7 @@ Imports:
     patchwork,
     pheatmap,
     qvalue,
+    RcppML,
     RhpcBLASctl,
     rlang,
     scales,
