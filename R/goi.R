@@ -135,8 +135,9 @@ goi.summary <-
         }
         
         # Filter to cells belonging to specified cluster/celltype IDs
+        .id.from.slot <- paste0(.id.from, ".ids")
         .id.idx <-
-          lapply(X = .tdr.obj$map[[.id.from]]$ids,
+          lapply(X = .tdr_get_map_slot_all(.tdr.obj, .id.from.slot),
                  FUN = function(smpl){
                    which(x = smpl %in% .id)
                  })
@@ -144,8 +145,9 @@ goi.summary <-
       } else {
         
         # Use all cells (default behavior)
+        .id.from.slot <- paste0(.id.from, ".ids")
         .id.idx <-
-          lapply(X = .tdr.obj$map[[.id.from]]$ids,
+          lapply(X = .tdr_get_map_slot_all(.tdr.obj, .id.from.slot),
                  FUN = seq_along)
         
       }
@@ -153,7 +155,7 @@ goi.summary <-
       
       # Filter to cells mapped to a specific landmark index
       .id.idx <-
-        lapply(X = .tdr.obj$map$nearest.landmarks,
+        lapply(X = .tdr_get_map_slot_all(.tdr.obj, "nearest.landmarks"),
                FUN = function(smpl.knn)
                  which(x = smpl.knn[,1] == .id.idx))
       
@@ -183,13 +185,15 @@ goi.summary <-
           as.matrix(x = goi.exprs.mat > 0)
         
         # Create cluster ID matrix for all cells × genes combinations
+        .smpl.name <- names(x = .tdr.obj$cells)[cells.elem]
+        .smpl.cl.ids <- .tdr_get_map_slot(.tdr.obj, "clustering.ids", .smpl.name)
         ids <-
-          .tdr.obj$map$clustering$ids[[cells.elem]][.id.idx[[cells.elem]]] |>
+          .smpl.cl.ids[.id.idx[[cells.elem]]] |>
           rep(times = length(x = .goi)) |>
           matrix(byrow = FALSE,
                  nrow = length(x = .id.idx[[cells.elem]]),
                  ncol = length(x = .goi),
-                 dimnames = list(names(x = .tdr.obj$map$clustering$ids[[cells.elem]][.id.idx[[cells.elem]]]),
+                 dimnames = list(names(x = .smpl.cl.ids[.id.idx[[cells.elem]]]),
                                  .goi))
         
         # Add "pos." prefix for expressing cells, "neg." for non-expressing
@@ -202,15 +206,18 @@ goi.summary <-
                  ids[!all.goi.detected])
         
         # Repeat same process for cell type labels (if available)
-        if(!is.null(x = .tdr.obj$map$celltyping)){
+        .has.celltyping <- !is.null(x = .tdr.obj$map$celltyping$cell.count) ||
+          (!is.null(.tdr.obj$map$.cache) && !is.null(.tdr.obj$map$.cache$manifests$celltyping.ids))
+        if(isTRUE(x = .has.celltyping)){
           
+          .smpl.ct.ids <- .tdr_get_map_slot(.tdr.obj, "celltyping.ids", .smpl.name)
           ct.ids <-
-            .tdr.obj$map$celltyping$ids[[cells.elem]][.id.idx[[cells.elem]]] |>
+            .smpl.ct.ids[.id.idx[[cells.elem]]] |>
             rep(times = length(x = .goi)) |>
             matrix(byrow = FALSE,
                    nrow = length(x = .id.idx[[cells.elem]]),
                    ncol = length(x = .goi),
-                   dimnames = list(names(x = .tdr.obj$map$celltyping$ids[[cells.elem]][.id.idx[[cells.elem]]]),
+                   dimnames = list(names(x = .smpl.ct.ids[.id.idx[[cells.elem]]]),
                                    .goi))
           
           ct.ids[all.goi.detected] <-
@@ -253,7 +260,7 @@ goi.summary <-
               unlist(use.names = TRUE) |>
               matrix(nrow = length(x = .id.idx[[cells.elem]]),
                      ncol = length(x = .goi),
-                     dimnames = list(names(x = .tdr.obj$map$clustering$ids[[cells.elem]][.id.idx[[cells.elem]]]),
+                     dimnames = list(names(x = .smpl.cl.ids[.id.idx[[cells.elem]]]),
                                      .goi)) |>
               as.data.frame() |>
               as.list()
@@ -325,7 +332,9 @@ goi.summary <-
                  (goi.elem$clustering$cell.count * 100) /
                  Matrix::rowSums(x = goi.elem$clustering$cell.count)
                
-               if(!is.null(x = .tdr.obj$map$celltyping)){
+               .has.ct <- !is.null(x = .tdr.obj$map$celltyping$cell.count) ||
+                 (!is.null(.tdr.obj$map$.cache) && !is.null(.tdr.obj$map$.cache$manifests$celltyping.ids))
+               if(isTRUE(x = .has.ct)){
                  
                  # Same process for cell type labels
                  goi.elem$celltyping$cell.count <-

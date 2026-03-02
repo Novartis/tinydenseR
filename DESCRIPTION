@@ -16,6 +16,7 @@ Depends:
 LazyData: true
 Suggests: 
     testthat (>= 3.0.0),
+    filelock,
     ggiraph,
     rmarkdown,
     ggpubr,

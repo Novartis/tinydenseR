@@ -623,6 +623,19 @@ get.graph <-
 #' @param .seed Integer seed for reproducibility (default 123).
 #' @param .label.confidence Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
 #'   to assign a cell to a landmark‑derived cluster/celltype label.
+#' @param .cache.on.disk Logical (default TRUE). When \code{TRUE}, four large per-sample
+#'   slots (\code{clustering$ids}, \code{celltyping$ids}, \code{nearest.landmarks},
+#'   \code{fuzzy.graph}) are serialized to disk as uncompressed RDS files and evicted
+#'   from memory. Downstream accessors (e.g.\ in \code{get.pbDE}, \code{goi.summary})
+#'   read them back lazily on a per-sample basis. Set to \code{FALSE} to keep everything
+#'   in memory (original behaviour).
+#' @param .cache.dir Character path to the directory where cached slot files are stored.
+#'   Default \code{NULL}: a \code{tdr_cache/<run_key>/} subdirectory is created inside
+#'   the same parent directory that holds the per-sample expression RDS files
+#'   (\code{dirname(.tdr.obj$cells[[1]])}). Set to a persistent path (e.g.
+#'   \code{"/scratch/my_project/cache"}) if you plan to \code{saveRDS} the object
+#'   and reload it in a future session or if the expression RDS files reside in
+#'   \code{tempdir()} (which is deleted when the R session ends).
 #'   
 #' @return Updated \code{.tdr.obj} with \code{$map} component containing:
 #'   \itemize{
@@ -648,6 +661,10 @@ get.graph <-
 #'       for all cells from UMAP transform.
 #'     \item \code{cl.ct.to.ign}: Character value recording which cluster/cell type was excluded 
 #'       from statistics (NULL if none).
+#'     \item \code{.cache}: (When \code{.cache.on.disk = TRUE}) List with \code{root} (cache
+#'       directory path), \code{on.disk} flag, \code{schema_v}, and \code{manifests} holding
+#'       per-sample file metadata for each cached slot. The four large slots above are set
+#'       to \code{NULL} in memory. Use \code{tdr_cache_cleanup()} to remove cached files.
 #'   }
 #'   If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with list containing \code{$ids} 
 #'   (factor of cell type assignments for landmarks), \code{$median.exprs} (matrix of mean expression 
@@ -705,7 +722,9 @@ get.map <-
            .cl.ct.to.ign = NULL,
            .verbose = TRUE,
            .seed = 123,
-           .label.confidence = 0.8){
+           .label.confidence = 0.8,
+           .cache.on.disk = TRUE,
+           .cache.dir = NULL){
     
     # R CMD check appeasement for non-standard evaluation in dplyr and collapse
     cell.pop <- id <- value <- ri <- i <- j <- landmark <- cell <- label <- x <- confidence <-
@@ -818,6 +837,37 @@ get.map <-
     }
     
     set.seed(seed = .seed)
+    
+    # ── Set up on-disk cache directory ──
+    .cache.meta <- NULL
+    if (isTRUE(x = .cache.on.disk)) {
+      if (is.null(x = .cache.dir)) {
+        .cache.dir <- file.path(dirname(.tdr.obj$cells[[1]]), "tdr_cache")
+      }
+      .run_key <- .tdr_make_run_key()
+      .run_cache_dir <- file.path(.cache.dir, .run_key)
+      dir.create(.run_cache_dir, recursive = TRUE, showWarnings = FALSE)
+      .tdr_cache_sweep_orphans(.run_cache_dir)
+      .cache.meta <- list(
+        root    = .run_cache_dir,
+        on.disk = TRUE,
+        schema_v = .TDR_CACHE_SCHEMA_VERSION,
+        manifests = list(
+          clustering.ids      = vector("list", length(.tdr.obj$cells)),
+          celltyping.ids      = vector("list", length(.tdr.obj$cells)),
+          nearest.landmarks   = vector("list", length(.tdr.obj$cells)),
+          fuzzy.graph          = vector("list", length(.tdr.obj$cells))
+        )
+      )
+      names(.cache.meta$manifests$clustering.ids)    <- names(.tdr.obj$cells)
+      names(.cache.meta$manifests$celltyping.ids)    <- names(.tdr.obj$cells)
+      names(.cache.meta$manifests$nearest.landmarks) <- names(.tdr.obj$cells)
+      names(.cache.meta$manifests$fuzzy.graph)       <- names(.tdr.obj$cells)
+      
+      if (isTRUE(x = .verbose)) {
+        message("-> On-disk caching enabled: ", .run_cache_dir)
+      }
+    }
     
     # Process each sample: load data, normalize, project to UMAP, assign labels
     if(isTRUE(x = .verbose)){
@@ -1075,6 +1125,85 @@ get.map <-
           
         }
         
+        # ── Compute this sample's fdens column (before eviction) ──
+        smpl.name <- names(x = .tdr.obj$cells)[cells.idx]
+        
+        smpl.fdens <-
+          if(ncol(x = res2$fgraph) == nrow(x = .tdr.obj$landmarks)){
+            Matrix::colSums(x = res2$fgraph[
+              if(length(x = .cl.to.keep) !=
+                 (levels(x = .tdr.obj$graph$clustering$ids) |>
+                  length())){
+                (res2$cell.clustering %in% .cl.to.keep)
+              } else {
+                if(!is.null(x = .ct.to.keep)){
+                  (res2$cell.celltyping %in% .ct.to.keep)
+                } else {
+                  1:nrow(x = res2$fgraph)
+                }
+              },])
+          } else {
+            Matrix::rowSums(x = res2$fgraph[,
+              if(length(x = .cl.to.keep) !=
+                 (levels(x = .tdr.obj$graph$clustering$ids) |>
+                  length())){
+                (res2$cell.clustering %in% .cl.to.keep)
+              } else {
+                if(!is.null(x = .ct.to.keep)){
+                  (res2$cell.celltyping %in% .ct.to.keep)
+                } else {
+                  1:nrow(x = res2$fgraph)
+                }
+              }])
+          }
+        
+        smpl.n.cells <- nrow(x = res2$embedding)
+        
+        # ── Compute streaming cell.count for this sample ──
+        smpl.cl.count <-
+          table(res2$cell.clustering) |>
+          (\(x) stats::setNames(as.vector(x), names(x)))()
+        
+        smpl.ct.count <-
+          if(!is.null(x = res2$cell.celltyping)){
+            table(res2$cell.celltyping) |>
+              (\(x) stats::setNames(as.vector(x), names(x)))()
+          } else {
+            NULL
+          }
+        
+        # ── Cache large slots to disk or keep in-memory ──
+        smpl.cache.records <- NULL
+        if (isTRUE(x = .cache.on.disk)) {
+          
+          smpl.cache.records <- list(
+            clustering.ids = .tdr_cache_write(
+              object = res2$cell.clustering,
+              cache_dir = .run_cache_dir,
+              slot_name = "clustering.ids",
+              sample_name = smpl.name),
+            nearest.landmarks = .tdr_cache_write(
+              object = res2$nn$euclidean$idx,
+              cache_dir = .run_cache_dir,
+              slot_name = "nearest.landmarks",
+              sample_name = smpl.name),
+            fuzzy.graph = .tdr_cache_write(
+              object = res2$fgraph,
+              cache_dir = .run_cache_dir,
+              slot_name = "fuzzy.graph",
+              sample_name = smpl.name)
+          )
+          
+          if(!is.null(x = res2$cell.celltyping)){
+            smpl.cache.records$celltyping.ids <- .tdr_cache_write(
+              object = res2$cell.celltyping,
+              cache_dir = .run_cache_dir,
+              slot_name = "celltyping.ids",
+              sample_name = smpl.name)
+          }
+          
+        }
+        
         if(isTRUE(x = .verbose)){
           .show_progress(current = cells.idx, 
                          total = length(.tdr.obj$cells),
@@ -1082,7 +1211,19 @@ get.map <-
                          start_time = .map_start)
         }
         
-        return(res2)
+        # Return lightweight result (large objects are on disk if caching enabled)
+        list(
+          fdens.col      = smpl.fdens,
+          n.cells        = smpl.n.cells,
+          cl.count       = smpl.cl.count,
+          ct.count       = smpl.ct.count,
+          cell.clustering  = res2$cell.clustering,
+          cell.celltyping  = res2$cell.celltyping,
+          lm.celltyping    = res2$lm.celltyping,
+          fgraph           = res2$fgraph,
+          nn.idx           = res2$nn$euclidean$idx,
+          cache.records    = smpl.cache.records
+        )
         
       })
     
@@ -1168,113 +1309,85 @@ get.map <-
       
     }
     
+    # ── Assemble fdens from pre-computed per-sample columns ──
     fdens <-
-      seq_along(along.with = res) |>
-      stats::setNames(nm = names(x = res)) |>
-      lapply(FUN = function(smpl.idx){
-        
-        if(ncol(x = res[[smpl.idx]]$fgraph) == nrow(x = .tdr.obj$landmarks)){ # NOT IDEAL! This if/else usage was only introduced to avoid bug in uwot reported in https://github.com/jlmelville/uwot/issues/129
-          Matrix::colSums(x = res[[smpl.idx]]$fgraph[
-            if(length(x = .cl.to.keep) !=
-               (levels(x = .tdr.obj$graph$clustering$ids) |>
-                length())){
-              (res[[smpl.idx]]$cell.clustering %in% .cl.to.keep)
-            } else {
-              if(!is.null(x = .ct.to.keep)){
-                (res[[smpl.idx]]$cell.celltyping %in% .ct.to.keep)
-              } else {
-                1:nrow(x = res[[smpl.idx]]$fgraph)
-              }
-            },])
-        } else {
-          Matrix::rowSums(x = res[[smpl.idx]]$fgraph[,
-                                                     if(length(x = .cl.to.keep) !=
-                                                        (levels(x = .tdr.obj$graph$clustering$ids) |>
-                                                         length())){
-                                                       (res[[smpl.idx]]$cell.clustering %in% .cl.to.keep)
-                                                     } else {
-                                                       if(!is.null(x = .ct.to.keep)){
-                                                         (res[[smpl.idx]]$cell.celltyping %in% .ct.to.keep)
-                                                       } else {
-                                                         1:nrow(x = res[[smpl.idx]]$fgraph)
-                                                       }
-                                                     }])
-        }
-        
-      }) |>
+      lapply(X = res, FUN = `[[`, "fdens.col") |>
       do.call(what = cbind) |>
       (\(x)
        `rownames<-`(x = x,
                     value = rownames(x = .tdr.obj$landmarks))
       )() |>
       Matrix::t() |>
-      (\(x)
-       seq_along(along.with = res) |>
-         stats::setNames(nm = names(x = res)) |>
-         lapply(FUN = function(smpl.idx){
-           nrow(x = res[[smpl.idx]]$embedding)
-         }) |>
-         unlist() |>
-         (\(n.cells)
-          x / (n.cells / mean(x = n.cells))
-         )()
-      )() |>
+      (\(x) {
+        n.cells <- vapply(res, `[[`, numeric(1), "n.cells")
+        x / (n.cells / mean(n.cells))
+      })() |>
       Matrix::t()
     
     # Compute log2-transformed landmark densities for statistical modeling
-    # Store as uppercase Y to distinguish from downstream modeling uses
     Y <-
       log2(x = fdens + 0.5)
     
-    cell.fg <-
-      lapply(X = res,
-             FUN = function(smpl){
-               smpl$fgraph
-             })
-    
-    cell.nlmn <-
-      lapply(X = res,
-             FUN = function(smpl){
-               smpl$nn$euclidean$idx
-             })
-    
-    cell.clustering <-
-      lapply(X = res,
-             FUN = function(smpl){
-               smpl$cell.clustering
-             })
-    
-    if(!is.null(x = .tdr.obj$graph$celltyping)){
+    # ── Assemble $map: cache-aware ──
+    if (isTRUE(x = .cache.on.disk)) {
       
-      cell.celltyping <-
-        lapply(X = res,
-               FUN = function(smpl){
-                 smpl$cell.celltyping
-               })
+      # Populate cache manifest from per-sample records
+      for (sn in names(res)) {
+        recs <- res[[sn]]$cache.records
+        .cache.meta$manifests$clustering.ids[[sn]]    <- recs$clustering.ids
+        .cache.meta$manifests$nearest.landmarks[[sn]] <- recs$nearest.landmarks
+        .cache.meta$manifests$fuzzy.graph[[sn]]       <- recs$fuzzy.graph
+        if (!is.null(recs$celltyping.ids)) {
+          .cache.meta$manifests$celltyping.ids[[sn]]  <- recs$celltyping.ids
+        }
+      }
+      
+      # Remove empty celltyping manifest entries if no celltyping was performed
+      if (all(vapply(.cache.meta$manifests$celltyping.ids, is.null, logical(1)))) {
+        .cache.meta$manifests$celltyping.ids <- NULL
+      }
+      
+      .tdr.obj$map <-
+        list(fdens = fdens,
+             Y = Y,
+             clustering = list(ids = NULL),
+             celltyping = list(ids = NULL),
+             nearest.landmarks = NULL,
+             fuzzy.graph = NULL,
+             .cache = .cache.meta)
       
     } else {
-      cell.celltyping <- NULL
+      
+      # In-memory path (original behaviour)
+      cell.fg <-
+        lapply(X = res, FUN = `[[`, "fgraph")
+      
+      cell.nlmn <-
+        lapply(X = res, FUN = `[[`, "nn.idx")
+      
+      cell.clustering <-
+        lapply(X = res, FUN = `[[`, "cell.clustering")
+      
+      if(!is.null(x = .tdr.obj$graph$celltyping)){
+        cell.celltyping <-
+          lapply(X = res, FUN = `[[`, "cell.celltyping")
+      } else {
+        cell.celltyping <- NULL
+      }
+      
+      .tdr.obj$map <-
+        list(fdens = fdens,
+             Y = Y,
+             clustering = list(ids = cell.clustering),
+             celltyping = list(ids = cell.celltyping),
+             nearest.landmarks = cell.nlmn,
+             fuzzy.graph = cell.fg)
     }
     
-    .tdr.obj$map <-
-      list(fdens = fdens,
-           Y = Y,
-           clustering = list(ids = cell.clustering),
-           celltyping = list(ids = cell.celltyping),
-           nearest.landmarks = cell.nlmn,
-           fuzzy.graph = cell.fg)
-    
+    # ── Compute cell.count / cell.perc from streaming counts ──
     .tdr.obj$map$clustering$cell.count <-
-      seq_along(along.with = .tdr.obj$map$clustering$ids) |>
-      stats::setNames(nm = names(x = .tdr.obj$map$clustering$ids)) |>
-      lapply(FUN = function(smpl.idx){
-        
-        table(.tdr.obj$map$clustering$ids[[smpl.idx]]) |>
-          (\(x)
-           stats::setNames(object = as.vector(x = x),
-                           nm = names(x = x))
-          )()
-      }) |>
+      lapply(X = res, FUN = `[[`, "cl.count") |>
+      stats::setNames(nm = names(res)) |>
       dplyr::bind_rows(.id = "sample") |>
       as.data.frame() |>
       (\(x)
@@ -1300,18 +1413,8 @@ get.map <-
     if(!is.null(x = .tdr.obj$graph$celltyping)){
       
       .tdr.obj$map$celltyping$cell.count <-
-        seq_along(along.with = .tdr.obj$map$celltyping$ids) |>
-        stats::setNames(nm = names(x = .tdr.obj$map$celltyping$ids)) |>
-        lapply(X = ,
-               FUN = function(smpl.idx){
-                 
-                 table(.tdr.obj$map$celltyping$ids[[smpl.idx]]) |>
-                   (\(x)
-                    stats::setNames(object = as.vector(x = x),
-                                    nm = names(x = x))
-                   )()
-                 
-               }) |>
+        lapply(X = res, FUN = `[[`, "ct.count") |>
+        stats::setNames(nm = names(res)) |>
         dplyr::bind_rows(.id = "sample") |>
         as.data.frame() |>
         (\(x)

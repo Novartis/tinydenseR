@@ -11,7 +11,9 @@ get.map(
   .cl.ct.to.ign = NULL,
   .verbose = TRUE,
   .seed = 123,
-  .label.confidence = 0.8
+  .label.confidence = 0.8,
+  .cache.on.disk = TRUE,
+  .cache.dir = NULL
 )
 }
 \arguments{
@@ -35,6 +37,21 @@ calculations. Only one value allowed; merge multiple populations first via \code
 
 \item{.label.confidence}{Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
 to assign a cell to a landmark‑derived cluster/celltype label.}
+
+\item{.cache.on.disk}{Logical (default TRUE). When \code{TRUE}, four large per-sample
+slots (\code{clustering$ids}, \code{celltyping$ids}, \code{nearest.landmarks},
+\code{fuzzy.graph}) are serialized to disk as uncompressed RDS files and evicted
+from memory. Downstream accessors (e.g.\ in \code{get.pbDE}, \code{goi.summary})
+read them back lazily on a per-sample basis. Set to \code{FALSE} to keep everything
+in memory (original behaviour).}
+
+\item{.cache.dir}{Character path to the directory where cached slot files are stored.
+Default \code{NULL}: a \code{tdr_cache/<run_key>/} subdirectory is created inside
+the same parent directory that holds the per-sample expression RDS files
+(\code{dirname(.tdr.obj$cells[[1]])}). Set to a persistent path (e.g.
+\code{"/scratch/my_project/cache"}) if you plan to \code{saveRDS} the object
+and reload it in a future session or if the expression RDS files reside in
+\code{tempdir()} (which is deleted when the R session ends).}
 }
 \value{
 Updated \code{.tdr.obj} with \code{$map} component containing:
@@ -61,6 +78,10 @@ cell type per sample. Used for "traditional" compositional statistics.
 for all cells from UMAP transform.
 \item \code{cl.ct.to.ign}: Character value recording which cluster/cell type was excluded
 from statistics (NULL if none).
+\item \code{.cache}: (When \code{.cache.on.disk = TRUE}) List with \code{root} (cache
+directory path), \code{on.disk} flag, \code{schema_v}, and \code{manifests} holding
+per-sample file metadata for each cached slot. The four large slots above are set
+to \code{NULL} in memory. Use \code{tdr_cache_cleanup()} to remove cached files.
 }
 If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with list containing \code{$ids}
 (factor of cell type assignments for landmarks), \code{$median.exprs} (matrix of mean expression
