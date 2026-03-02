@@ -507,7 +507,7 @@ benchmark_miloR <- function(query_obj, run_id, n_cells) {
                                       transposed = TRUE)
         
         # Make neighborhoods
-        milo_obj <- miloR::makeNhoods(milo_obj, refined = TRUE, )
+        milo_obj <- miloR::makeNhoods(milo_obj, refined = TRUE, refinement_scheme = "graph")
         
         # Count cells in neighborhoods
         milo_obj <- miloR::countCells(milo_obj,
