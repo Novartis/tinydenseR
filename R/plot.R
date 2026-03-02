@@ -2384,9 +2384,7 @@ plotPbDE <-
           0.5, 
           na.rm = TRUE),
           units = "in"),
-        rows = grid::unit(x = pmax((unique(x = dat.df$marker) |> length()) * .row.space.scaler,
-                                   3.5, 
-                                   na.rm = TRUE),
+        rows = grid::unit(x = (unique(x = dat.df$marker) |> length()) * .row.space.scaler,
                           units = "in"))
     
     return(other.plot)
@@ -3430,27 +3428,26 @@ plotSpecDE <-
                                            y = feature,
                                            fill = expr)) +
     ggplot2::geom_raster() +
-    ggplot2::scale_fill_gradient2(
-      low = unname(obj = Color.Palette[1, 1]),
-      mid = unname(obj = Color.Palette[1, 6]),
-      high = unname(obj = Color.Palette[1, 2]),
-      midpoint = 0,
+    ggplot2::scale_fill_viridis_c(
+      option = "viridis",
       name = "Expression\n(centered)",
       guide = ggplot2::guide_colorbar(
         direction = "vertical",
         barwidth = grid::unit(x = 0.15, units = "in"),
         barheight = grid::unit(x = 0.5, units = "in"),
         title.position = "top",
-        title.hjust = 0
-      )) +
+        title.hjust = 0)) +
     ggplot2::labs(
       x = "Landmarks",
       y = "Features"
     ) +
-    ggplot2::theme_bw() +
+    ggplot2::theme_void() +
     ggplot2::theme(
       axis.text.y = ggplot2::element_text(size = I(x = .feature.font.size)),
+      axis.title.x = ggplot2::element_text(size = 10,
+                                           margin = ggplot2::margin(t = 5)),
       legend.position = "right",
+      legend.justification = "left",
       legend.title = ggplot2::element_text(size = 7),
       legend.text = ggplot2::element_text(size = 6)
     )
@@ -3474,6 +3471,7 @@ plotSpecDE <-
       )) +
     ggplot2::theme_void() +
     ggplot2::theme(legend.position = "right",
+                   legend.justification = "left",
                    legend.title = ggplot2::element_text(size = 7),
                    legend.text = ggplot2::element_text(size = 6))
 
@@ -3523,10 +3521,7 @@ plotSpecDE <-
         annot.df[annot.df$annot_dim == dim.name, ]
 
       .option.this <-
-        if (identical(x = dim.name,
-                      y = .coef.col)) {
-          "viridis"
-        } else if (dim.name %in% colnames(x = scores.ordered)) {
+        if (dim.name %in% colnames(x = scores.ordered)) {
           "plasma"
         } else {
           .viridis.options.annot[d]
@@ -3545,20 +3540,39 @@ plotSpecDE <-
                                              y = 1,
                                              fill = annot_value)) +
         ggplot2::geom_raster() +
-        ggplot2::scale_fill_viridis_c(
-          option = .option.this,
-          name = legend.title,
-          guide = ggplot2::guide_colorbar(
-            direction = "vertical",
-            barwidth = grid::unit(x = 0.15, units = "in"),
-            barheight = grid::unit(x = 0.5, units = "in"),
-            title.position = "top",
-            title.hjust = 0
-          )) +
+        {
+          if(identical(x = dim.name,
+                       y = .coef.col)) {
+            ggplot2::scale_fill_gradient2(
+              low = unname(obj = Color.Palette[1, 1]),
+              mid = unname(obj = Color.Palette[1, 6]),
+              high = unname(obj = Color.Palette[1, 2]),
+              midpoint = 0,
+              name = legend.title,
+              guide = ggplot2::guide_colorbar(
+                direction = "vertical",
+                barwidth = grid::unit(x = 0.15, units = "in"),
+                barheight = grid::unit(x = 0.5, units = "in"),
+                title.position = "top",
+                title.hjust = 0
+              ))
+          } else {
+            ggplot2::scale_fill_viridis_c(
+              option = .option.this,
+              name = legend.title,
+              guide = ggplot2::guide_colorbar(
+                direction = "vertical",
+                barwidth = grid::unit(x = 0.15, units = "in"),
+                barheight = grid::unit(x = 0.5, units = "in"),
+                title.position = "top",
+                title.hjust = 0))
+            }
+          } +
         ggplot2::labs(x = NULL, y = NULL) +
         ggplot2::theme_void() +
         ggplot2::theme(
           legend.position = "right",
+          legend.justification = "left",
           legend.title = ggplot2::element_text(size = 7),
           legend.text = ggplot2::element_text(size = 6)
         )
@@ -3594,7 +3608,18 @@ plotSpecDE <-
   g.heat.body <- heat.parts$body
   leg.heat <- heat.parts$legend
 
-  # 2. Row annotation
+  # Left-align legend by collapsing padding columns on the right
+  if (inherits(x = leg.heat, what = "gtable")) {
+    # Find the rightmost column with any content
+    max_col_used <- max(leg.heat$layout$r)
+    # Zero out any columns beyond that (the padding)
+    if (max_col_used < ncol(x = leg.heat)) {
+      for (j in (max_col_used + 1L):ncol(x = leg.heat)) {
+        leg.heat$widths[j] <- grid::unit(x = 0, units = "pt")
+      }
+    }
+  }
+
   g.row <- ggplot2::ggplotGrob(x = p.row.annot)
   g.row <- .force.panel(gt = g.row,
                         w = .annot.panel.height,
@@ -3752,7 +3777,7 @@ plotSpecDE <-
 
   if (length(x = all.legends) > 0) {
     spacer.h <- grid::unit(x = 0.15, units = "in")
-    height.list <- list(grid::unit(x = 0, units = "in"))
+    height.list <- list()
     for (i in seq_along(along.with = all.legends)) {
       if (i > 1) {
         height.list <- c(height.list, list(spacer.h))
@@ -3766,17 +3791,29 @@ plotSpecDE <-
     }
 
     leg.column <- gtable::gtable(
-      widths = grid::unit(x = 1, units = "in"),
+      widths = grid::unit(x = 0.5, units = "in"),
       heights = do.call(what = grid::unit.c, args = height.list)
     )
 
     # Left-align legend grobs within the column
+    # Wrap each legend gtable in a grobTree with a shrink-to-fit viewport
+    # anchored at top-left. Setting $vp directly on a gtable does not work
+    # because the cell viewport is always full-width (gtable fills it).
+    .left_wrap <- function(g) {
+      grid::grobTree(
+        g,
+        vp = grid::viewport(
+          x = grid::unit(x = 0, units = "npc"),
+          y = grid::unit(x = 1, units = "npc"),
+          just = c("left", "top"),
+          width  = grid::grobWidth(x = g),
+          height = grid::grobHeight(x = g)
+        )
+      )
+    }
+
     for (i in seq_along(along.with = all.legends)) {
-      if (inherits(x = all.legends[[i]], what = "gtable")) {
-        all.legends[[i]]$vp <-
-          grid::viewport(x = grid::unit(x = 0, units = "npc"),
-                         just = c("left", "top"))
-      }
+      all.legends[[i]] <- .left_wrap(g = all.legends[[i]])
     }
 
     row.idx <- seq(from = 1, by = 2,
@@ -3785,21 +3822,24 @@ plotSpecDE <-
       leg.column <-
         gtable::gtable_add_grob(x = leg.column,
                                 grobs = all.legends[[i]],
-                                t = row.idx[i], l = 1)
+                                t = row.idx[i], 
+                                l = 1,
+                                clip = "off")
     }
 
     g.final <-
       gtable::gtable_add_cols(x = g.final,
-                              widths = grid::unit(x = 0.1, units = "in"))
+                              widths = grid::unit(x = 0.25, units = "in"))
+    
+    # Measure actual legend column width (max width of its content)
+    leg.width <- max(leg.column$widths)
     g.final <-
       gtable::gtable_add_cols(x = g.final,
-                              widths = grid::unit(x = 1, units = "in"))
-    g.final <-
-      gtable::gtable_add_grob(x = g.final,
-                              grobs = leg.column,
-                              t = 1,
-                              l = ncol(x = g.final),
-                              b = nrow(x = g.final))
+                              widths = leg.width)
+    
+    # Store legend column and col index for later addition (after titles)
+    .leg.column <- leg.column
+    .leg.col.idx <- ncol(x = g.final)
   }
 
   # Title and subtitle
@@ -3835,6 +3875,16 @@ plotSpecDE <-
     gtable::gtable_add_grob(x = g.final,
                             grobs = title.grob,
                             t = 1, l = title.l, r = title.r)
+
+  # Add legend column after titles, flush with title row
+  if (exists(x = ".leg.column")) {
+    g.final <-
+      gtable::gtable_add_grob(x = g.final,
+                              grobs = .leg.column,
+                              t = 1,
+                              l = .leg.col.idx,
+                              b = nrow(x = g.final))
+  }
 
   return(ggplot2::ggplot() +
            ggplot2::annotation_custom(grob = g.final) +
@@ -4442,7 +4492,7 @@ plotNmfDEHeatmap <-
     .coef.col,
     .nmfDE.dim = 1,
     .model.name = "default",
-    .loadings.type = "signed",
+    .loadings.type = c("de", "signed", "mass"),
     .n.features = 50,
     .order.by = "dens.contrast",
     .add.annot = NULL,
@@ -4484,7 +4534,7 @@ plotNmfDEHeatmap <-
 
     .loadings.type <-
       match.arg(arg = .loadings.type,
-                choices = c("signed", "de", "mass"))
+                choices = c("de", "signed", "mass"))
 
     # Select loadings based on type
     loadings.mat <-
@@ -4747,11 +4797,8 @@ plotPlsDE <-
       ggplot2::guides(color = ggplot2::guide_colorbar(title.position = "top",
                                                       title.hjust = 0.5)) +
       ggplot2::geom_point(size = I(x = .point.size)) +
-      ggplot2::scale_color_gradient2(
-        low = unname(obj = Color.Palette[1, 1]),
-        mid = unname(obj = Color.Palette[1, 6]),
-        high = unname(obj = Color.Palette[1, 2]),
-        midpoint = 0,
+      ggplot2::scale_color_viridis_c(
+        option = "magma",
         name = comp.name
       ) +
       ggplot2::labs(

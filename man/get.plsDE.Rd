@@ -14,6 +14,8 @@ get.plsDE(
   .degree.reg = FALSE,
   .tau.mult = 1,
   .lazy.alpha = 1,
+  .YX.interaction = TRUE,
+  .loading.method = c("pearson", "ols", "spearman"),
   .verbose = TRUE
 )
 }
@@ -43,17 +45,36 @@ tau = .tau.mult * mean(degree). Default 1.}
 \item{.lazy.alpha}{Numeric in (0, 1]: mixing parameter for lazy random walk.
 P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).}
 
+\item{.YX.interaction}{Logical: if TRUE (default), construct
+M.local = P diag(Y) Xc (Y-weighted interaction). Loadings capture features
+driving the density contrast through both differential abundance (population
+markers) and differential expression. If FALSE, construct M.local = P Xc
+(graph-smoothed expression only; Y appears only on the response side).
+The FALSE mode is less comprehensive — it misses DA markers unless their
+expression independently covaries with Y.}
+
+\item{.loading.method}{Character: method for computing feature loadings.
+\code{"pearson"} computes Pearson correlation between component scores
+and centered expression (scale-invariant, fast sparse-BLAS path).
+\code{"ols"} computes OLS regression coefficients of centered Xc on component
+scores (same sparse-BLAS path; preserves magnitude information but is
+scale-dependent, so high-variance features rank higher). \code{"spearman"}
+computes Spearman rank correlation via a sparse-aware implementation
+(robust to outliers and nonlinearity; slower, O(nnz * log(m_g) * K)).}
+
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
 The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$plsDE[[.coef.col]]}:
 \describe{
 \item{scores}{Matrix (landmarks x K): PLS scores (oriented so positive = aligned with Y)}
-\item{gene.weights}{Matrix (genes x K): PLS gene weight vectors w (unit-norm)}
+\item{feature.weights}{Matrix (genes x K): PLS feature weight vectors w (unit-norm)}
 \item{x.loadings}{Matrix (genes x K): PLS deflation loadings p}
 \item{y.loadings}{Numeric vector (K): PLS Y-loadings q (scalar per component)}
-\item{loadings}{Matrix (genes x K): OLS regression of centered Xc on each component score;
-positive = upregulated with Y, negative = downregulated}
+\item{loadings}{Matrix (genes x K): feature loadings per component (Pearson r,
+OLS regression, or Spearman rank correlation, depending on
+\code{.loading.method}); positive = upregulated with Y,
+negative = downregulated}
 \item{Y.alignment}{Numeric vector (K): |cor(Y, score_k)| per component}
 \item{smoothness}{Numeric vector (K): Laplacian smoothness per score vector}
 \item{Y}{Numeric vector: the centered density contrast used}
@@ -62,17 +83,35 @@ positive = upregulated with Y, negative = downregulated}
 }
 }
 \description{
-Decomposes the density-contrast interaction matrix M.local via NIPALS PLS1
-against the density-contrast vector Y. plsDE maximizes covariance between
-graph-smoothed expression and the density contrast Y, prioritizing Y-alignment
-over variance explained.
+Decomposes an expression interaction matrix M.local via NIPALS PLS1
+against the density-contrast vector Y. plsDE identifies features that drive
+the density contrast — including population markers (DA), differentially
+expressed genes (DE), and their mixture — by maximizing covariance between
+graph-smoothed expression and Y.
 }
 \details{
-plsDE answers: "What gene programs in M.local = P diag(Y) Xc most covary
-with the condition contrast Y?" The interaction term diag(Y) bakes the
-density contrast into the data matrix (preserving sensitivity to pure DE
-without DA), while the PLS objective ensures every component's landmark
-scores track Y (high Ak by construction).
+plsDE is an \strong{interpretive decomposition}, not a formal hypothesis test.
+It answers: "What features — through expression patterns, population identity,
+or both — explain the density contrast?" Loadings reflect this combined signal:
+markers of depleted populations carry negative loadings (high expression where
+density is low), DE genes carry signed loadings tracking their direction of
+change, and mixed DA/DE features appear alongside both.
+
+When \code{.YX.interaction = TRUE} (default), the interaction term diag(Y)
+bakes the density contrast into the data matrix:
+M.local = P \\%\emph{\\% diag(Y) \\%}\\% Xc. This gives plsDE comprehensive scope:
+it captures DA markers, DE genes, and their interplay in a single
+decomposition. The interaction amplifies expression signal in landmarks
+with strong density contrast, making the method sensitive even to subtle DE
+in the absence of DA.
+
+When \code{.YX.interaction = FALSE}, M.local = P \\%*\\% Xc (graph-smoothed
+centered expression without Y-weighting). Y appears only on the response
+side, so loadings reflect only features whose graph-smoothed expression
+independently covaries with Y. This mode is less comprehensive — it misses
+DA markers unless their expression happens to correlate with Y through
+smoothed space — but serves as a useful diagnostic comparator: features
+that rank high in both modes are robust.
 
 The method:
 \enumerate{
@@ -81,12 +120,14 @@ The method:
 raw for cyto; then centered)
 \item Builds random-walk normalized graph P from SNN (with optional degree
 regularization and lazy walk)
-\item Constructs M.local = P \\%\emph{\\% diag(Y) \\%}\\% Xc (centered by columns):
-the graph-diffused, density-weighted expression interaction matrix
-\item Runs NIPALS PLS1: iteratively finds gene weights w maximizing
+\item Constructs M.local: if \code{.YX.interaction = TRUE},
+M.local = P \\%\emph{\\% diag(Y) \\%}\\% Xc (density-weighted); if FALSE,
+M.local = P \\%*\\% Xc (graph-smoothed only). Both are centered by columns.
+\item Runs NIPALS PLS1: iteratively finds feature weights w maximizing
 cov(M.local w, Y), with deflation of both M.local and Y
 \item Applies sign convention: positive scores = aligned with Y
-\item Computes gene loadings via OLS regression of centered Xc on each component's scores
+\item Computes feature loadings (Pearson r, OLS regression, or Spearman rank
+correlation)
 \item Computes Laplacian smoothness (Sk) for each component
 }
 
@@ -100,11 +141,24 @@ are ordered by extraction (plsDE1 = highest covariance with Y).
 \strong{Sk (graph smoothness):} Derived from the normalized Laplacian applied to
 score vectors. High Sk indicates large-scale, graph-smooth structure.
 
-\strong{About Y appearing on both sides:}
+\strong{About Y appearing on both sides (when .YX.interaction = TRUE):}
 Y appears in both the data matrix (via diag(Y) in M.local) and the PLS objective
-(maximize covariance with Y). This is not circular because the expression matrix
-Xc sits between: the product is large only when genes exist whose Y-weighted,
-graph-smoothed expression genuinely covaries with Y. With permuted Y, Ak collapses.
+(maximize covariance with Y). This is intentional: it gives plsDE comprehensive
+sensitivity to features driving density changes. The design is not circular
+because the expression matrix Xc sits between: the product is large only when
+features exist whose Y-weighted, graph-smoothed expression genuinely covaries
+with Y. With permuted Y, Ak collapses. Setting \code{.YX.interaction = FALSE}
+removes Y from the data matrix entirely, providing a diagnostic comparator.
+}
+\note{
+plsDE is designed as an exploratory tool to help interpret density
+changes in terms of the features driving them. It does not provide
+gene-level p-values or formal multiple testing correction. For rigorous
+differential expression testing with p-values following field standards,
+use \code{\link{get.pbDE}} (pseudobulk DE via edgeR/limma) or
+\code{\link{get.markerDE}} (marker-level DE). plsDE complements these
+methods by providing a multivariate, graph-aware decomposition that
+captures joint DA/DE patterns not visible in gene-by-gene tests.
 }
 \examples{
 \dontrun{
@@ -116,8 +170,7 @@ lm.obj <- get.plsDE(lm.obj, .coef.col = "Infection")
 
 # Access results
 lm.obj$plsDE$Infection$scores[, "plsDE1"]      # PLS scores (Y-aligned)
-lm.obj$plsDE$Infection$loadings[, "plsDE1"]     # gene loadings (regression)
-lm.obj$plsDE$Infection$gene.weights[, "plsDE1"] # PLS gene weights
+lm.obj$plsDE$Infection$loadings[, "plsDE1"]     # gene loadings (Pearson, OLS or Spearman)
 
 # Diagnostic table
 data.frame(

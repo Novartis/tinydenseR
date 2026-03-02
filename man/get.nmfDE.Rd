@@ -14,6 +14,7 @@ get.nmfDE(
   .degree.reg = FALSE,
   .tau.mult = 1,
   .lazy.alpha = 1,
+  .loading.method = c("pearson", "ols", "spearman"),
   .L1 = c(0, 0),
   .tol = 1e-04,
   .maxit = 100L,
@@ -46,6 +47,12 @@ tau = .tau.mult * mean(degree). Default 1.}
 
 \item{.lazy.alpha}{Numeric in (0, 1]: mixing parameter for lazy random walk.
 P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).}
+
+\item{.loading.method}{Character: method for computing feature loadings
+(both mass-semantic and DE-semantic variants). \code{"pearson"} computes
+Pearson correlation (scale-invariant). \code{"ols"} computes OLS regression
+coefficients (preserves magnitude). \code{"spearman"} computes Spearman
+rank correlation (robust to outliers). Default \code{"pearson"}.}
 
 \item{.L1}{Numeric vector of length 2: L1/LASSO penalties for w and h in
 \code{RcppML::nmf}. Values in [0, 1]. Default c(0, 0).

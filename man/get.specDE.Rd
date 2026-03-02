@@ -14,6 +14,7 @@ get.specDE(
   .degree.reg = FALSE,
   .tau.mult = 1,
   .lazy.alpha = 1,
+  .loading.method = c("pearson", "ols", "spearman"),
   .verbose = TRUE
 )
 }
@@ -46,6 +47,13 @@ to avoid over-damping on well-behaved graphs.}
 \item{.lazy.alpha}{Numeric in (0, 1]: mixing parameter for lazy random walk.
 P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).
 Values < 1 damp oscillations on sparse/irregular graphs.}
+
+\item{.loading.method}{Character: method for computing feature loadings.
+\code{"pearson"} computes Pearson correlation between component scores
+and expression (scale-invariant, fast sparse-BLAS path).
+\code{"ols"} computes OLS regression coefficients (preserves magnitude;
+scale-dependent). \code{"spearman"} computes Spearman rank correlation
+(robust to outliers and nonlinearity; slower). Default \code{"pearson"}.}
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 }

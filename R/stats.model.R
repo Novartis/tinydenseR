@@ -152,6 +152,12 @@ get.lm <-
     .seed = 123){
     
     # -------------------------------------------------------------------------
+    # Validate on-disk cache (if active) before proceeding
+    # -------------------------------------------------------------------------
+    
+    .tdr_cache_validate_quiet(.tdr.obj)
+    
+    # -------------------------------------------------------------------------
     # Check if slot already exists
     # -------------------------------------------------------------------------
     
@@ -838,6 +844,12 @@ get.pbDE <-
     }
     
     # -------------------------------------------------------------------------
+    # Validate on-disk cache (if active) before proceeding
+    # -------------------------------------------------------------------------
+    
+    .tdr_cache_validate_quiet(.tdr.obj)
+    
+    # -------------------------------------------------------------------------
     # Check if slot already exists
     # -------------------------------------------------------------------------
     
@@ -903,7 +915,7 @@ get.pbDE <-
         "in"
       
       .lm.idx <-
-        lapply(X = .tdr.obj$map$fuzzy.graph,
+        lapply(X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graph"),
                FUN = function(smpl) {
                  
                  in.and.out <-
@@ -932,7 +944,7 @@ get.pbDE <-
                       
                       label
                       
-                    }
+                   }
                    )()
                  
                  which(x = in.and.out == "in")
@@ -972,7 +984,7 @@ get.pbDE <-
             readRDS(file = .tdr.obj$cells[[smpl]])[,.lm.idx[[smpl]]]
           
           wcl <- 
-            .tdr.obj$map$fuzzy.graph[[smpl]][.lm.idx[[smpl]],,drop = FALSE]
+            .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[.lm.idx[[smpl]],,drop = FALSE]
           
           # get weighted sum
           wsum <-
@@ -1141,7 +1153,7 @@ get.pbDE <-
             exprs.mat[.lm.idx[[smpl]],colnames(x = .tdr.obj$landmarks)]
           
           wcl <- 
-            .tdr.obj$map$fuzzy.graph[[smpl]][.lm.idx[[smpl]],,drop=FALSE]
+            .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[.lm.idx[[smpl]],,drop=FALSE]
           
           # get weighted sum
           wsum <-
@@ -1535,7 +1547,7 @@ get.markerDE <-
         "in"
       
       .lm1.idx <-
-        lapply(X = .tdr.obj$map$fuzzy.graph,
+        lapply(X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graph"),
                FUN = function(smpl) {
                  
                  in.and.out <-
@@ -1564,7 +1576,7 @@ get.markerDE <-
                       
                       label
                       
-                    }
+                   }
                    )()
                  
                  which(x = in.and.out == "in")
@@ -1584,8 +1596,8 @@ get.markerDE <-
         seq_along(along.with = .lm1.idx) |>
         stats::setNames(nm = names(x = .lm1.idx)) |>
         lapply(FUN = function(smpl){
-                 seq_len(length.out = .tdr.obj$config$sampling$n.cells[smpl])[-.lm1.idx[[smpl]]]
-               })
+          seq_len(length.out = .tdr.obj$config$sampling$n.cells[smpl])[-.lm1.idx[[smpl]]]
+        })
       
     } else {
       
@@ -1615,7 +1627,7 @@ get.markerDE <-
           "in"
         
         .lm2.idx <-
-          lapply(X = .tdr.obj$map$fuzzy.graph,
+          lapply(X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graph"),
                  FUN = function(smpl) {
                    
                    in.and.out <-
@@ -1644,7 +1656,7 @@ get.markerDE <-
                         
                         label
                         
-                      }
+                     }
                      )()
                    
                    which(x = in.and.out == "in")
@@ -1729,7 +1741,7 @@ get.markerDE <-
                 cell.idx <- .lm1.idx[[smpl]]
                 
                 wcl <- 
-                  .tdr.obj$map$fuzzy.graph[[smpl]][cell.idx,,drop = FALSE]
+                  .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx,,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -1775,7 +1787,7 @@ get.markerDE <-
                 cell.idx <- .lm2.idx[[smpl]]
                 
                 wcl <- 
-                  .tdr.obj$map$fuzzy.graph[[smpl]][cell.idx,,drop = FALSE]
+                  .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx,,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -1926,7 +1938,7 @@ get.markerDE <-
                 cell.idx <- .lm1.idx[[smpl]]
                 
                 wcl <- 
-                  .tdr.obj$map$fuzzy.graph[[smpl]][cell.idx,,drop = FALSE]
+                  .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx,,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -1975,7 +1987,7 @@ get.markerDE <-
                 cell.idx <- .lm2.idx[[smpl]]
                 
                 wcl <- 
-                  .tdr.obj$map$fuzzy.graph[[smpl]][cell.idx,,drop = FALSE]
+                  .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx,,drop = FALSE]
                 
                 # get weighted sum
                 wsum <-
@@ -2995,6 +3007,352 @@ get.embedding <-
     
   }
 
+
+# =============================================================================
+# Internal helpers shared by get.specDE, get.nmfDE, get.plsDE
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# .validate.DE.inputs
+# Validates common preconditions for all *DE methods.
+# Returns coef.mat (the coefficient matrix from the fitted model).
+# -----------------------------------------------------------------------------
+
+.validate.DE.inputs <-
+  function(.tdr.obj,
+           .model.name,
+           .coef.col) {
+    
+    # Validate on-disk cache (if active) before proceeding
+    .tdr_cache_validate_quiet(.tdr.obj)
+    
+    if (is.null(x = .tdr.obj$map$lm[[.model.name]])) {
+      stop("Model '", .model.name, "' not found. Run get.lm() first.")
+    }
+    
+    coef.mat <-
+      .tdr.obj$map$lm[[.model.name]]$fit$coefficients
+    
+    if (!(.coef.col %in% colnames(x = coef.mat))) {
+      stop("Coefficient '", .coef.col, "' not found in model coefficients.\n",
+           "Available: ", paste(colnames(x = coef.mat), collapse = ", "))
+    }
+    
+    if (is.null(x = .tdr.obj$graph$snn)) {
+      stop("SNN graph not found. Run get.graph() first.")
+    }
+    
+    if (!Matrix::isSymmetric(object = .tdr.obj$graph$snn)) {
+      stop("SNN graph not symmetric.")
+    }
+    
+    if (is.null(x = .tdr.obj$raw.landmarks)) {
+      stop("Raw landmarks not found. Run get.landmarks() first.")
+    }
+    
+    if (is.null(x = .tdr.obj$pca$embed)) {
+      stop("PCA embedding not found. Run get.landmarks() first.")
+    }
+    
+    return(coef.mat)
+    
+  }
+
+
+# -----------------------------------------------------------------------------
+# .build.P
+# Builds the random-walk normalized transition matrix from SNN, with optional
+# degree regularization and lazy walk.  Returns P (sparse matrix).
+# -----------------------------------------------------------------------------
+
+.build.P <-
+  function(SNN,
+           .degree.reg = FALSE,
+           .tau.mult = 1,
+           .lazy.alpha = 1,
+           .verbose = TRUE) {
+    
+    # Validate lazy.alpha
+    if (!is.numeric(x = .lazy.alpha) || .lazy.alpha <= 0 || .lazy.alpha > 1) {
+      stop(".lazy.alpha must be in (0, 1]")
+    }
+    
+    # Check for disconnected nodes
+    d <-
+      Matrix::rowSums(x = SNN)
+    
+    if (any(d == 0)) {
+      n.disconnected <- sum(d == 0)
+      stop("Graph contains ", n.disconnected, " disconnected node(s) (degree = 0). ",
+           "Cannot compute random-walk matrix. Check graph construction or increase k.")
+    }
+    
+    # Degree regularization: add self-loops W_tau = W + tau*I, then row-normalize
+    if (isTRUE(x = .degree.reg)) {
+      tau <- .tau.mult * mean(x = d)
+      W.tau <- SNN + tau * Matrix::Diagonal(n = nrow(x = SNN))
+      d.tau <- Matrix::rowSums(x = W.tau)
+      D.inv <- Matrix::Diagonal(x = 1 / d.tau)
+      P <- D.inv %*% W.tau
+      if (isTRUE(x = .verbose)) {
+        message("  Degree regularization: tau = ", round(x = tau, digits = 2),
+                " (tau.mult = ", .tau.mult, ")")
+      }
+    } else {
+      D.inv <- Matrix::Diagonal(x = 1 / d)
+      P <- D.inv %*% SNN
+    }
+    
+    # Set dimnames
+    P <-
+      `dimnames<-`(x = P,
+                   value = dimnames(x = SNN))
+    
+    # Lazy random walk: P_lazy = (1 - alpha) * I + alpha * P
+    if (.lazy.alpha < 1) {
+      I.mat <- Matrix::Diagonal(n = nrow(x = P))
+      P <- (1 - .lazy.alpha) * I.mat + .lazy.alpha * P
+      if (isTRUE(x = .verbose)) {
+        message("  Lazy walk: alpha = ", .lazy.alpha)
+      }
+    }
+    
+    return(P)
+    
+  }
+
+
+# -----------------------------------------------------------------------------
+# .prepare.X
+# Filters, normalizes (size-factor + log2 for RNA), and centers the expression
+# matrix.  Returns a list with:
+#   $X  — pre-centering (sparse; useful for sparse-aware loadings and nmfDE mass)
+#   $Xc — column-centered (sparse; needed for M.local and DE-semantic loadings)
+# -----------------------------------------------------------------------------
+
+.prepare.X <-
+  function(.tdr.obj,
+           .min.prop = 0.005,
+           .verbose = TRUE) {
+    
+    if (.tdr.obj$config$assay.type == "RNA") {
+      
+      # Filter genes: detected in at least min.prop of landmarks
+      X <-
+        .tdr.obj$raw.landmarks |>
+        (\(x)
+         x[, Matrix::colSums(x = x > 0) > (nrow(x = x) * .min.prop)]
+        )()
+      
+      if (isTRUE(x = .verbose)) {
+        message("  Genes after filtering (>", .min.prop * 100, "% detection): ",
+                ncol(x = X), " / ", ncol(x = .tdr.obj$raw.landmarks))
+      }
+      
+      # Size factor normalization
+      X <-
+        X |>
+        Matrix::t() |>
+        (\(x)
+         x / (Matrix::rowSums(x = x) / mean(x = Matrix::rowSums(x = x)))
+        )() |>
+        Matrix::t()
+      
+      # Log2 transform (in-place for sparse matrix efficiency)
+      X@x <-
+        log2(x = X@x + 1)
+      
+    } else {
+      
+      # Cytometry: use raw landmarks directly
+      X <-
+        .tdr.obj$raw.landmarks
+      
+    }
+    
+    # Center expression (genes/markers)
+    Xc <-
+      X |>
+      (\(x)
+       Matrix::t(x = x) - Matrix::colMeans(x = x)
+      )() |>
+      Matrix::t()
+    
+    return(list(X = X, Xc = Xc))
+    
+  }
+
+
+# -----------------------------------------------------------------------------
+# .compute.Sk
+# Laplacian smoothness for each column of a score matrix.
+# Uses the normalized Laplacian: L_sym = I - D^{-1/2} W D^{-1/2}.
+# Smoothness_k = 1 - energy_k / 2, where energy_k is the Dirichlet energy
+# of the centered score vector against L_sym.
+# Returns: named numeric vector of smoothness values.
+# -----------------------------------------------------------------------------
+
+.compute.Sk <-
+  function(scores,
+           SNN) {
+    
+    D.vec <-
+      Matrix::rowSums(x = SNN)
+    
+    D.inv.sqrt <-
+      Matrix::Diagonal(x = 1 / sqrt(x = D.vec))
+    
+    L.sym <-
+      Matrix::Diagonal(n = nrow(x = SNN)) -
+      (D.inv.sqrt %*% SNN %*% D.inv.sqrt)
+    
+    smoothness <-
+      seq_len(length.out = ncol(x = scores)) |>
+      sapply(FUN = function(k) {
+        
+        s <-
+          scores[, k] |>
+          (\(x)
+           x - mean(x = x)
+          )()
+        
+        # Laplacian Dirichlet energy
+        energy <-
+          as.numeric(x = t(x = s) %*% L.sym %*% s) /
+          sum(s^2)
+        
+        # Smoothness = 1 - energy (capped at 1 for normalized Laplacian)
+        1 - pmin(pmax(energy, 0), 2) / 2
+      })
+    
+    names(x = smoothness) <-
+      colnames(x = scores)
+    
+    return(smoothness)
+    
+  }
+
+
+# -----------------------------------------------------------------------------
+# .compute.loadings
+# Compute feature loadings for each score column against an expression matrix.
+#   .method = "pearson"  — Pearson correlation (scale-invariant, sparse path)
+#   .method = "ols"      — OLS regression beta (preserves magnitude, sparse path)
+#   .method = "spearman" — Spearman rank correlation (robust, calls .sparse.spearman)
+# X.sparse: pre-centering sparse expression matrix (exploits structural zeros).
+# scores:   matrix (landmarks x K).
+# Returns: matrix (genes x K).
+# -----------------------------------------------------------------------------
+
+.compute.loadings <-
+  function(scores,
+           X.sparse,
+           .method = c("pearson", "ols", "spearman")) {
+    
+    .method <-
+      match.arg(arg = .method,
+                choices = c("pearson", "ols", "spearman"))
+    
+    n <- nrow(x = scores)
+    n.genes <- ncol(x = X.sparse)
+    comp.names <- colnames(x = scores)
+    ncomp <- ncol(x = scores)
+    
+    if (.method == "pearson") {
+      
+      # Gene-level sufficient statistics (sparse-efficient: X^2 stays sparse)
+      col.sums <-
+        Matrix::colSums(x = X.sparse) |>
+        as.numeric()
+      
+      col.sum.sq <-
+        Matrix::colSums(x = X.sparse^2) |>
+        as.numeric()
+      
+      gene.sd <-
+        sqrt(x = pmax(col.sum.sq - (col.sums^2) / n, 0) /
+               (n - 1))
+      
+      loadings <-
+        seq_len(length.out = ncomp) |>
+        stats::setNames(nm = comp.names) |>
+        lapply(FUN = function(k) {
+          
+          score.k <-
+            scores[, k] - mean(x = scores[, k])
+          
+          sd.score <-
+            sqrt(x = sum(score.k^2) / (n - 1))
+          
+          if (sd.score < .Machine$double.eps) return(rep(x = NA_real_, times = n.genes))
+          
+          # crossprod on sparse X: touches only nonzero entries
+          num <-
+            (Matrix::crossprod(x = score.k,
+                               y = X.sparse) |>
+               as.numeric()) / (n - 1)
+          
+          r <-
+            num / (sd.score * gene.sd)
+          
+          # Genes with zero variance: set to 0 (no information)
+          r[gene.sd < .Machine$double.eps] <-
+            0
+          
+          return(r)
+          
+        }) |>
+        do.call(what = cbind)
+      
+    } else if (.method == "spearman") {
+      
+      loadings <-
+        seq_len(length.out = ncomp) |>
+        stats::setNames(nm = comp.names) |>
+        lapply(FUN = function(k) {
+          .sparse.spearman(s = scores[, k],
+                           X.sparse = X.sparse)
+        }) |>
+        do.call(what = cbind)
+      
+    } else {
+      
+      # OLS regression: with centered score, crossprod on sparse X gives same
+      # result as on centered Xc (centering term vanishes when sum(score.k) = 0)
+      loadings <-
+        seq_len(length.out = ncomp) |>
+        stats::setNames(nm = comp.names) |>
+        lapply(FUN = function(k) {
+          
+          score.k <-
+            scores[, k] - mean(x = scores[, k])
+          
+          denom <-
+            sum(score.k^2)
+          
+          if (denom < .Machine$double.eps) return(rep(x = NA_real_, times = n.genes))
+          
+          beta <-
+            (Matrix::crossprod(x = score.k,
+                               y = X.sparse) |>
+               as.numeric()) /
+            denom
+          
+          return(beta)
+          
+        }) |>
+        do.call(what = cbind)
+      
+    }
+    
+    rownames(x = loadings) <-
+      colnames(x = X.sparse)
+    
+    return(loadings)
+    
+  }
+
+
 #' Spectral Differential Expression (specDE)
 #'
 #' Decomposes gene/marker expression into latent programs that covary with a
@@ -3063,6 +3421,12 @@ get.embedding <-
 #' @param .lazy.alpha Numeric in (0, 1]: mixing parameter for lazy random walk.
 #'   P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).
 #'   Values < 1 damp oscillations on sparse/irregular graphs.
+#' @param .loading.method Character: method for computing feature loadings.
+#'   \code{"pearson"} computes Pearson correlation between component scores
+#'   and expression (scale-invariant, fast sparse-BLAS path).
+#'   \code{"ols"} computes OLS regression coefficients (preserves magnitude;
+#'   scale-dependent). \code{"spearman"} computes Spearman rank correlation
+#'   (robust to outliers and nonlinearity; slower). Default \code{"pearson"}.
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #'
 #' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$specDE[[.coef.col]]}:
@@ -3112,39 +3476,23 @@ get.specDE <-
            .degree.reg = FALSE,
            .tau.mult = 1,
            .lazy.alpha = 1,
+           .loading.method = c("pearson", "ols", "spearman"),
            .verbose = TRUE) {
     
     # -------------------------------------------------------------------------
     # Input validation
     # -------------------------------------------------------------------------
     
-    if (is.null(x = .tdr.obj$map$lm[[.model.name]])) {
-      stop("Model '", .model.name, "' not found. Run get.lm() first.")
-    }
+    .loading.method <-
+      match.arg(arg = .loading.method,
+                choices = c("pearson",
+                            "ols",
+                            "spearman"))
     
     coef.mat <-
-      .tdr.obj$map$lm[[.model.name]]$fit$coefficients
-    
-    if (!(.coef.col %in% colnames(x = coef.mat))) {
-      stop("Coefficient '", .coef.col, "' not found in model coefficients.\n",
-           "Available: ", paste(colnames(x = coef.mat), collapse = ", "))
-    }
-    
-    if (is.null(x = .tdr.obj$graph$snn)) {
-      stop("SNN graph not found. Run get.graph() first.")
-    }
-    
-    if(!Matrix::isSymmetric(object = .tdr.obj$graph$snn)){
-      stop("SNN graph not symmetric.")
-    }
-    
-    if (is.null(x = .tdr.obj$raw.landmarks)) {
-      stop("Raw landmarks not found. Run get.landmarks() first.")
-    }
-    
-    if (is.null(x = .tdr.obj$pca$embed)) {
-      stop("PCA embedding not found. Run get.landmarks() first.")
-    }
+      .validate.DE.inputs(.tdr.obj = .tdr.obj,
+                          .model.name = .model.name,
+                          .coef.col = .coef.col)
     
     # Default .nv to number of PCs from get.landmarks
     if (is.null(x = .nv)) {
@@ -3175,112 +3523,38 @@ get.specDE <-
       )()
     
     # -------------------------------------------------------------------------
-    # Prepare expression matrix X
+    # Prepare expression matrix
     # -------------------------------------------------------------------------
     
     if (isTRUE(x = .verbose)) {
       message("Preparing expression matrix...")
     }
     
-    if (.tdr.obj$config$assay.type == "RNA") {
-      
-      # Filter genes: detected in at least min.prop of landmarks
-      X <-
-        .tdr.obj$raw.landmarks |>
-        (\(x)
-         x[, Matrix::colSums(x = x > 0) > (nrow(x = x) * .min.prop)]
-        )()
-      
-      if (isTRUE(x = .verbose)) {
-        message("  Genes after filtering (>", .min.prop * 100, "% detection): ",
-                ncol(x = X), " / ", ncol(x = .tdr.obj$raw.landmarks))
-      }
-      
-      # Size factor normalization
-      X <-
-        X |>
-        Matrix::t() |>
-        (\(x)
-         x / (Matrix::rowSums(x = x) / mean(x = Matrix::rowSums(x = x)))
-        )() |>
-        Matrix::t()
-      
-      # Log2 transform (in-place for sparse matrix efficiency)
-      X@x <-
-        log2(x = X@x + 1)
-      
-    } else {
-      
-      # Cytometry: use raw landmarks directly
-      X <-
-        .tdr.obj$raw.landmarks
-      
-    }
+    prep <-
+      .prepare.X(.tdr.obj = .tdr.obj,
+                 .min.prop = .min.prop,
+                 .verbose = .verbose)
     
-    # Center expression (genes/markers)
-    X <-
-      X |>
-      (\(x)
-       Matrix::t(x = x) - Matrix::colMeans(x = x)
-      )() |>
-      Matrix::t()
+    X  <- prep$X
+    Xc <- prep$Xc
     
     # -------------------------------------------------------------------------
-    # Build random-walk normalized graph P (with optional degree regularization + lazy walk)
+    # Build random-walk normalized graph P
     # -------------------------------------------------------------------------
     
     if (isTRUE(x = .verbose)) {
       message("Building random-walk normalized graph...")
     }
     
-    # Validate lazy.alpha
-    if (!is.numeric(x = .lazy.alpha) || .lazy.alpha <= 0 || .lazy.alpha > 1) {
-      stop(".lazy.alpha must be in (0, 1]")
-    }
-    
     SNN <-
       .tdr.obj$graph$snn
     
-    # Check for disconnected nodes
-    d <-
-      Matrix::rowSums(x = SNN)
-    
-    if (any(d == 0)) {
-      n.disconnected <- sum(d == 0)
-      stop("Graph contains ", n.disconnected, " disconnected node(s) (degree = 0). ",
-           "Cannot compute random-walk matrix. Check graph construction or increase k.")
-    }
-    
-    # Degree regularization: add self-loops W_tau = W + tau*I, then row-normalize
-    # This keeps P as a proper Markov operator (rowSums = 1) while stabilizing low-degree nodes
-    if (isTRUE(x = .degree.reg)) {
-      tau <- .tau.mult * mean(x = d)
-      W.tau <- SNN + tau * Matrix::Diagonal(n = nrow(x = SNN))
-      d.tau <- Matrix::rowSums(x = W.tau)  # = d + tau
-      D.inv <- Matrix::Diagonal(x = 1 / d.tau)
-      P <- D.inv %*% W.tau
-      if (isTRUE(x = .verbose)) {
-        message("  Degree regularization: tau = ", round(x = tau, digits = 2),
-                " (tau.mult = ", .tau.mult, ")")
-      }
-    } else {
-      D.inv <- Matrix::Diagonal(x = 1 / d)
-      P <- D.inv %*% SNN
-    }
-    
-    # Set dimnames
     P <-
-      `dimnames<-`(x = P,
-                   value = dimnames(x = SNN))
-    
-    # Lazy random walk: P_lazy = (1 - alpha) * I + alpha * P
-    if (.lazy.alpha < 1) {
-      I.mat <- Matrix::Diagonal(n = nrow(x = P))
-      P <- (1 - .lazy.alpha) * I.mat + .lazy.alpha * P
-      if (isTRUE(x = .verbose)) {
-        message("  Lazy walk: alpha = ", .lazy.alpha)
-      }
-    }
+      .build.P(SNN = SNN,
+               .degree.reg = .degree.reg,
+               .tau.mult = .tau.mult,
+               .lazy.alpha = .lazy.alpha,
+               .verbose = .verbose)
     
     # -------------------------------------------------------------------------
     # Y-X interaction and graph smoothing
@@ -3290,12 +3564,12 @@ get.specDE <-
       message("Computing density-weighted expression (M.local)...")
     }
     
-    # Y-weighted expression: diag(Y) %*% X
+    # Y-weighted expression: diag(Y) %*% Xc
     YX.interaction <-
-      (Matrix::Diagonal(x = Y) %*% X) |>
+      (Matrix::Diagonal(x = Y) %*% Xc) |>
       (\(x)
        `dimnames<-`(x = x,
-                    value = dimnames(x = X))
+                    value = dimnames(x = Xc))
       )()
     
     # Graph-smooth and center
@@ -3383,7 +3657,7 @@ get.specDE <-
       as.matrix() |>
       (\(x)
        `dimnames<-`(x = x,
-                    value = list(rownames(x = X),
+                    value = list(rownames(x = Xc),
                                  paste0("specDE", 
                                         seq_len(length.out = ncol(x = x)))))
       )()
@@ -3408,40 +3682,17 @@ get.specDE <-
     }
     
     # -------------------------------------------------------------------------
-    # Compute loadings via regression
+    # Compute loadings
     # -------------------------------------------------------------------------
     
     if (isTRUE(x = .verbose)) {
-      message("Computing gene/marker loadings...")
+      message("Computing gene/marker loadings (", .loading.method, ")...")
     }
     
     loadings <-
-      seq_len(length.out = ncol(x = scores)) |>
-      stats::setNames(nm = colnames(x = scores)) |>
-      lapply(FUN = function(k) {
-        
-        score.k <-
-          scores[, k] - mean(x = scores[, k])
-        
-        denom <-
-          Matrix::crossprod(x = score.k) |>
-          as.numeric()
-        
-        if (denom < .Machine$double.eps) return(rep(x = NA_real_, times = ncol(X)))
-        
-        beta <-
-          (Matrix::crossprod(x = score.k, 
-                             y = X) |> 
-             as.numeric()) / 
-          denom
-        
-        return(beta)
-        
-      }) |>
-      do.call(what = cbind)
-    
-    rownames(x = loadings) <-
-      colnames(x = X)
+      .compute.loadings(scores = scores,
+                        X.sparse = X,
+                        .method = .loading.method)
     
     # -------------------------------------------------------------------------
     # Variance explained
@@ -3472,38 +3723,9 @@ get.specDE <-
       message("Computing Laplacian smoothness...")
     }
     
-    # Normalized Laplacian: L_sym = I - D^{-1/2} W D^{-1/2}
-    D.vec <-
-      Matrix::rowSums(x = SNN)
-    
-    D.inv.sqrt <-
-      Matrix::Diagonal(x = 1 / sqrt(x = D.vec))
-    
-    L.sym <-
-      Matrix::Diagonal(n = nrow(x = SNN)) -
-      (D.inv.sqrt %*% SNN %*% D.inv.sqrt)
-    
     smoothness <-
-      seq_len(length.out = ncol(x = scores)) |>
-      sapply(FUN = function(k) {
-        
-        s <-
-          scores[, k] |>
-          (\(x)
-           x - mean(x = x)
-          )()
-        
-        # Laplacian Dirichlet energy
-        energy <-
-          as.numeric(x = t(x = s) %*% L.sym %*% s) /
-          sum(s^2)
-        
-        # Smoothness = 1 - energy (capped at 1 for normalized Laplacian)
-        1 - pmin(pmax(energy, 0), 2) / 2
-      })
-    
-    names(x = smoothness) <-
-      colnames(x = scores)
+      .compute.Sk(scores = scores,
+                  SNN = SNN)
     
     if (isTRUE(x = .verbose)) {
       message("Smoothness (top 5): ",
@@ -3535,7 +3757,8 @@ get.specDE <-
           min.prop = .min.prop,
           degree.reg = .degree.reg,
           tau.mult = .tau.mult,
-          lazy.alpha = .lazy.alpha
+          lazy.alpha = .lazy.alpha,
+          loading.method = .loading.method
         )
       )
     
@@ -3547,7 +3770,7 @@ get.specDE <-
     if (isTRUE(x = .verbose)) {
       message("\nResults stored in: .tdr.obj$specDE$", .coef.col)
       message("  $scores       : ", nrow(x = scores), " landmarks x ", ncol(x = scores), " components")
-      message("  $loadings     : ", nrow(x = loadings), " features x ", ncol(x = loadings), " components")
+      message("  $loadings     : ", nrow(x = loadings), " features x ", ncol(x = loadings), " components (", .loading.method, ")")
       message("  $var.explained: Vk (proportion of variance)")
       message("  $Y.alignment  : Ak (|cor(Y, score)|)")
       message("  $smoothness   : Sk (Laplacian smoothness)")
@@ -3619,6 +3842,11 @@ get.specDE <-
 #'   tau = .tau.mult * mean(degree). Default 1.
 #' @param .lazy.alpha Numeric in (0, 1]: mixing parameter for lazy random walk.
 #'   P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).
+#' @param .loading.method Character: method for computing feature loadings
+#'   (both mass-semantic and DE-semantic variants). \code{"pearson"} computes
+#'   Pearson correlation (scale-invariant). \code{"ols"} computes OLS regression
+#'   coefficients (preserves magnitude). \code{"spearman"} computes Spearman
+#'   rank correlation (robust to outliers). Default \code{"pearson"}.
 #' @param .L1 Numeric vector of length 2: L1/LASSO penalties for w and h in
 #'   \code{RcppML::nmf}. Values in \[0, 1\]. Default c(0, 0).
 #'   Increase for sparser, more interpretable programs.
@@ -3687,247 +3915,153 @@ get.nmfDE <-
            .degree.reg = FALSE,
            .tau.mult = 1,
            .lazy.alpha = 1,
+           .loading.method = c("pearson", "ols", "spearman"),
            .L1 = c(0, 0),
            .tol = 1e-4,
            .maxit = 100L,
            .seed = 42L,
            .verbose = TRUE) {
-
+    
     # -------------------------------------------------------------------------
     # Dependency check
     # -------------------------------------------------------------------------
-
+    
     if (!requireNamespace("RcppML", quietly = TRUE)) {
       stop("Package 'RcppML' is required for get.nmfDE(). ",
            "Install it with: install.packages('RcppML')")
     }
-
+    
     # -------------------------------------------------------------------------
     # Input validation
     # -------------------------------------------------------------------------
-
-    if (is.null(x = .tdr.obj$map$lm[[.model.name]])) {
-      stop("Model '", .model.name, "' not found. Run get.lm() first.")
-    }
-
+    
+    .loading.method <-
+      match.arg(arg = .loading.method,
+                choices = c("pearson",
+                            "ols",
+                            "spearman"))
+    
     coef.mat <-
-      .tdr.obj$map$lm[[.model.name]]$fit$coefficients
-
-    if (!(.coef.col %in% colnames(x = coef.mat))) {
-      stop("Coefficient '", .coef.col, "' not found in model coefficients.\n",
-           "Available: ", paste(colnames(x = coef.mat), collapse = ", "))
-    }
-
-    if (is.null(x = .tdr.obj$graph$snn)) {
-      stop("SNN graph not found. Run get.graph() first.")
-    }
-
-    if (!Matrix::isSymmetric(object = .tdr.obj$graph$snn)) {
-      stop("SNN graph not symmetric.")
-    }
-
-    if (is.null(x = .tdr.obj$raw.landmarks)) {
-      stop("Raw landmarks not found. Run get.landmarks() first.")
-    }
-
-    if (is.null(x = .tdr.obj$pca$embed)) {
-      stop("PCA embedding not found. Run get.landmarks() first.")
-    }
-
+      .validate.DE.inputs(.tdr.obj = .tdr.obj,
+                          .model.name = .model.name,
+                          .coef.col = .coef.col)
+    
     # Default .k to number of PCs from get.landmarks
     if (is.null(x = .k)) {
       .k <-
         ncol(x = .tdr.obj$pca$embed)
     }
-
+    
     if (!is.numeric(x = .k) || length(x = .k) != 1 || .k < 1) {
       stop(".k must be a positive integer.")
     }
-
+    
     .k <-
       as.integer(x = .k)
-
+    
     if (length(x = .L1) != 2 || any(.L1 < 0) || any(.L1 > 1)) {
       stop(".L1 must be a numeric vector of length 2 with values in [0, 1].")
     }
-
+    
     # -------------------------------------------------------------------------
     # Extract Y: density contrast vector (centered)
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
       message("\n=== nmfDE: Mass-Diffusion NMF for Density-Contrast DE ===")
       message("Coefficient: ", .coef.col)
     }
-
+    
     Y <-
       coef.mat[, .coef.col] |>
       (\(x)
        x - mean(x = x)
       )()
-
+    
     # -------------------------------------------------------------------------
-    # Prepare nonneg expression matrix X0 (NO centering — preserves mass)
+    # Prepare expression matrix
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
-      message("Preparing nonneg expression matrix (no centering)...")
+      message("Preparing expression matrix...")
     }
-
-    if (.tdr.obj$config$assay.type == "RNA") {
-
-      # Filter genes: detected in at least min.prop of landmarks
-      X0 <-
-        .tdr.obj$raw.landmarks |>
-        (\(x)
-         x[, Matrix::colSums(x = x > 0) > (nrow(x = x) * .min.prop)]
-        )()
-
-      if (isTRUE(x = .verbose)) {
-        message("  Genes after filtering (>", .min.prop * 100, "% detection): ",
-                ncol(x = X0), " / ", ncol(x = .tdr.obj$raw.landmarks))
-      }
-
-      # Size factor normalization
-      X0 <-
-        X0 |>
-        Matrix::t() |>
-        (\(x)
-         x / (Matrix::rowSums(x = x) / mean(x = Matrix::rowSums(x = x)))
-        )() |>
-        Matrix::t()
-
-      # Log2 transform (in-place for sparse matrix efficiency)
-      X0@x <-
-        log2(x = X0@x + 1)
-
-    } else {
-
-      # Cytometry: use raw landmarks directly (already nonneg)
-      X0 <-
-        .tdr.obj$raw.landmarks
-
-    }
-
-    # NOTE: X0 is NOT centered. This is the key difference from specDE.
-    # Centering would destroy nonnegativity and mass conservation.
-
-    # Also prepare centered X for DE-semantic regression loadings (same as specDE)
-    Xc <-
-      X0 |>
-      (\(x)
-       Matrix::t(x = x) - Matrix::colMeans(x = x)
-      )() |>
-      Matrix::t()
-
+    
+    prep <-
+      .prepare.X(.tdr.obj = .tdr.obj,
+                 .min.prop = .min.prop,
+                 .verbose = .verbose)
+    
+    X0 <- prep$X
+    
     n.landmarks <-
       nrow(x = X0)
-
+    
     n.genes <-
       ncol(x = X0)
-
+    
     gene.names <-
       colnames(x = X0)
-
+    
     # -------------------------------------------------------------------------
     # Build random-walk normalized graph P
-    # (identical to specDE: degree reg + lazy walk)
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
       message("Building random-walk normalized graph...")
     }
-
-    # Validate lazy.alpha
-    if (!is.numeric(x = .lazy.alpha) || .lazy.alpha <= 0 || .lazy.alpha > 1) {
-      stop(".lazy.alpha must be in (0, 1]")
-    }
-
+    
     SNN <-
       .tdr.obj$graph$snn
-
-    # Check for disconnected nodes
-    d <-
-      Matrix::rowSums(x = SNN)
-
-    if (any(d == 0)) {
-      n.disconnected <- sum(d == 0)
-      stop("Graph contains ", n.disconnected, " disconnected node(s) (degree = 0). ",
-           "Cannot compute random-walk matrix. Check graph construction or increase k.")
-    }
-
-    # Degree regularization: add self-loops W_tau = W + tau*I, then row-normalize
-    if (isTRUE(x = .degree.reg)) {
-      tau <- .tau.mult * mean(x = d)
-      W.tau <- SNN + tau * Matrix::Diagonal(n = nrow(x = SNN))
-      d.tau <- Matrix::rowSums(x = W.tau)
-      D.inv <- Matrix::Diagonal(x = 1 / d.tau)
-      P <- D.inv %*% W.tau
-      if (isTRUE(x = .verbose)) {
-        message("  Degree regularization: tau = ", round(x = tau, digits = 2),
-                " (tau.mult = ", .tau.mult, ")")
-      }
-    } else {
-      D.inv <- Matrix::Diagonal(x = 1 / d)
-      P <- D.inv %*% SNN
-    }
-
-    # Set dimnames
+    
     P <-
-      `dimnames<-`(x = P,
-                   value = dimnames(x = SNN))
-
-    # Lazy random walk: P_lazy = (1 - alpha) * I + alpha * P
-    if (.lazy.alpha < 1) {
-      I.mat <- Matrix::Diagonal(n = nrow(x = P))
-      P <- (1 - .lazy.alpha) * I.mat + .lazy.alpha * P
-      if (isTRUE(x = .verbose)) {
-        message("  Lazy walk: alpha = ", .lazy.alpha)
-      }
-    }
-
+      .build.P(SNN = SNN,
+               .degree.reg = .degree.reg,
+               .tau.mult = .tau.mult,
+               .lazy.alpha = .lazy.alpha,
+               .verbose = .verbose)
+    
     # -------------------------------------------------------------------------
     # Split Y into positive/negative components and build mass matrices
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
       message("Computing nonneg mass matrices M+ and M-...")
     }
-
+    
     Y.pos <-
       pmax(Y, 0)
-
+    
     Y.neg <-
       pmax(-Y, 0)
-
+    
     # M+ = P %*% diag(Y+) %*% X0: mass flowing through positive-contrast landmarks
     M.pos <-
       P %*% (Matrix::Diagonal(x = Y.pos) %*% X0)
-
+    
     # M- = P %*% diag(Y-) %*% X0: mass flowing through negative-contrast landmarks
     M.neg <-
       P %*% (Matrix::Diagonal(x = Y.neg) %*% X0)
-
+    
     # -------------------------------------------------------------------------
     # Block balancing: scale so ||M+||_F ~ ||M-||_F
     # Prevents NMF from trivially separating blocks by magnitude
     # -------------------------------------------------------------------------
-
+    
     frob.pos <-
       sqrt(x = sum(M.pos^2))
-
+    
     frob.neg <-
       sqrt(x = sum(M.neg^2))
-
+    
     if (isTRUE(x = .verbose)) {
       message("  ||M+||_F = ", sprintf("%.2f", frob.pos),
               ", ||M-||_F = ", sprintf("%.2f", frob.neg))
     }
-
+    
     # Scale both blocks to geometric mean of their Frobenius norms
     frob.geomean <-
       sqrt(x = frob.pos * frob.neg)
-
+    
     if (frob.pos > .Machine$double.eps) {
       M.pos.balanced <-
         M.pos * (frob.geomean / frob.pos)
@@ -3935,7 +4069,7 @@ get.nmfDE <-
       M.pos.balanced <-
         M.pos
     }
-
+    
     if (frob.neg > .Machine$double.eps) {
       M.neg.balanced <-
         M.neg * (frob.geomean / frob.neg)
@@ -3943,25 +4077,25 @@ get.nmfDE <-
       M.neg.balanced <-
         M.neg
     }
-
+    
     if (isTRUE(x = .verbose)) {
       message("  Block-balanced to geometric mean: ", sprintf("%.2f", frob.geomean))
     }
-
+    
     # -------------------------------------------------------------------------
     # Concatenate A = [M+_balanced | M-_balanced] and run NMF
     # -------------------------------------------------------------------------
-
+    
     A <-
       cbind(M.pos.balanced, M.neg.balanced)
-
+    
     # RcppML::nmf expects features-by-samples (columns = observations),
     # but our A is landmarks-by-genes (rows = landmarks).
     # Transpose so that landmarks are "samples" (columns) and genes are "features" (rows).
     A.t <-
       Matrix::t(x = A) |>
       methods::as(Class = "CsparseMatrix")
-
+    
     if (isTRUE(x = .verbose)) {
       message("Running NMF (k = ", .k, ", tol = ", .tol,
               ", maxit = ", .maxit, ", seed = ", .seed, ")...")
@@ -3969,7 +4103,7 @@ get.nmfDE <-
         message("  L1 penalties: w = ", .L1[1], ", h = ", .L1[2])
       }
     }
-
+    
     nmf.res <-
       RcppML::nmf(A = A.t,
                   k = .k,
@@ -3980,12 +4114,12 @@ get.nmfDE <-
                   seed = .seed,
                   diag = TRUE,
                   nonneg = TRUE)
-
+    
     if (isTRUE(x = .verbose)) {
       message("  NMF converged at tol = ", sprintf("%.2e", nmf.res$tol),
               " after ", nmf.res$iter, " iterations")
     }
-
+    
     # RcppML::nmf returns:  A.t ~ w %*% diag(d) %*% h
     #   w: (2G x K) — feature factor matrix (rows = genes in [pos|neg] block, cols = components)
     #   d: (K)      — scaling diagonal
@@ -3996,59 +4130,59 @@ get.nmfDE <-
     #   H_full = t(w)    — gene templates in concatenated space (K x 2G)
     #   H_pos = H_full[, 1:G]       — positive-block gene templates
     #   H_neg = H_full[, (G+1):2G]  — negative-block gene templates
-
+    
     W <-
       t(x = nmf.res$h)
-
+    
     nmf.d <-
       nmf.res$d
-
+    
     H.full <-
       t(x = nmf.res$w)
-
+    
     H.pos <-
       H.full[, seq_len(length.out = n.genes), drop = FALSE]
-
+    
     H.neg <-
       H.full[, n.genes + seq_len(length.out = n.genes), drop = FALSE]
-
+    
     colnames(x = H.pos) <-
       gene.names
-
+    
     colnames(x = H.neg) <-
       gene.names
-
+    
     if (isTRUE(x = .verbose)) {
       message("  W: ", nrow(x = W), " landmarks x ", ncol(x = W), " components")
       message("  H+, H-: ", nrow(x = H.pos), " components x ", ncol(x = H.pos), " features each")
     }
-
+    
     # -------------------------------------------------------------------------
     # Scale templates by d to get effective component strength
     # RcppML::nmf(diag=TRUE) normalizes w/h to sum to 1, pushing all scale
     # into d. Without scaling, net.mass and gene.loadings.signed would treat
     # a dominant and negligible component equally.
     # -------------------------------------------------------------------------
-
+    
     H.pos.scaled <-
       as.matrix(x = Matrix::Diagonal(x = nmf.d) %*% H.pos)
-
+    
     H.neg.scaled <-
       as.matrix(x = Matrix::Diagonal(x = nmf.d) %*% H.neg)
-
+    
     # -------------------------------------------------------------------------
     # Derive polarity and signed scores
     # -------------------------------------------------------------------------
-
+    
     # Signed gene loadings: (d * h+) - (d * h-) (derived, not a factor of the nonneg model)
     H.signed <-
       H.pos.scaled - H.neg.scaled
-
+    
     # Net mass per component: ||d_k * h+_k||_1 - ||d_k * h-_k||_1
     # Positive net mass -> component carries more positive-contrast expression
     net.mass <-
       rowSums(x = H.pos.scaled) - rowSums(x = H.neg.scaled)
-
+    
     # Polarity: use direct cor(Y, W) -- more stable than cor(Y, W*net.mass)
     # When net.mass approx 0 the product W*net.mass -> 0 and correlation becomes noise.
     # cor(Y, W) is always well-defined since W columns are nonneg with variance > 0.
@@ -4056,275 +4190,200 @@ get.nmfDE <-
       stats::cor(x = Y,
                  y = W,
                  method = "spearman")[1, ]
-
+    
     polarity <-
       sign(x = Y.cor.W) |>
       as.integer()
-
+    
     # Handle zero correlation (default to +1)
     polarity[polarity == 0L] <-
       1L
-
+    
     # Signed scores: W * polarity (oriented by Y-alignment)
     # net.mass is stored as a separate descriptor, not baked into scores
     signed.scores <-
       t(x = t(x = W) * polarity)
-
+    
     # -------------------------------------------------------------------------
     # Order by Y-alignment (|cor(Y, signed.scores)|, descending)
     # -------------------------------------------------------------------------
-
+    
     Y.alignment.raw <-
       abs(x = Y.cor.W)
-
+    
     comp.ord <-
       order(Y.alignment.raw, decreasing = TRUE)
-
+    
     # Reorder all per-component outputs
     W <-
       W[, comp.ord, drop = FALSE]
-
+    
     signed.scores <-
       signed.scores[, comp.ord, drop = FALSE]
-
+    
     nmf.d <-
       nmf.d[comp.ord]
-
+    
     H.pos <-
       H.pos[comp.ord, , drop = FALSE]
-
+    
     H.neg <-
       H.neg[comp.ord, , drop = FALSE]
-
+    
     H.signed <-
       H.signed[comp.ord, , drop = FALSE]
-
+    
     polarity <-
       polarity[comp.ord]
-
+    
     net.mass <-
       net.mass[comp.ord]
-
+    
     Y.alignment <-
       Y.alignment.raw[comp.ord]
-
+    
     # Set names
     comp.names <-
       paste0("nmfDE", seq_len(length.out = .k))
-
+    
     colnames(x = W) <-
       comp.names
-
+    
     rownames(x = W) <-
       rownames(x = X0)
-
+    
     colnames(x = signed.scores) <-
       comp.names
-
+    
     rownames(x = signed.scores) <-
       rownames(x = X0)
-
+    
     names(x = nmf.d) <-
       comp.names
-
+    
     rownames(x = H.pos) <-
       comp.names
-
+    
     rownames(x = H.neg) <-
       comp.names
-
+    
     rownames(x = H.signed) <-
       comp.names
-
+    
     names(x = polarity) <-
       comp.names
-
+    
     names(x = net.mass) <-
       comp.names
-
+    
     names(x = Y.alignment) <-
       comp.names
-
+    
     if (isTRUE(x = .verbose)) {
       message("Y-alignment (top 5): ",
               paste(sprintf("%.3f", utils::head(x = Y.alignment, n = 5)), collapse = ", "))
     }
-
+    
     # -------------------------------------------------------------------------
-    # Compute loadings via regression (two variants)
+    # Compute loadings (two semantic variants)
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
-      message("Computing gene/marker loadings...")
+      message("Computing gene/marker loadings (", .loading.method, ")...")
     }
-
-    # Variant 1: Mass semantics -- regress nonneg X0 on W
+    
+    # Variant 1: Mass semantics -- loadings of nonneg X0 on W
     # Interpretation: genes whose expression increases with component mass activation
     loadings.mass <-
-      seq_len(length.out = .k) |>
-      stats::setNames(nm = comp.names) |>
-      lapply(FUN = function(k) {
-
-        w.k <-
-          W[, k] - mean(x = W[, k])
-
-        denom <-
-          Matrix::crossprod(x = w.k) |>
-          as.numeric()
-
-        if (denom < .Machine$double.eps) return(rep(x = NA_real_, times = n.genes))
-
-        beta <-
-          (Matrix::crossprod(x = w.k,
-                             y = X0) |>
-             as.numeric()) /
-          denom
-
-        return(beta)
-
-      }) |>
-      do.call(what = cbind)
-
-    rownames(x = loadings.mass) <-
-      gene.names
-
-    # Variant 2: DE semantics -- regress centered X on signed scores
+      .compute.loadings(scores = W,
+                        X.sparse = X0,
+                        .method = .loading.method)
+    
+    # Variant 2: DE semantics -- loadings of centered X on signed scores
     # Interpretation: genes associated with net positive vs negative mass along contrast
     loadings.de <-
-      seq_len(length.out = .k) |>
-      stats::setNames(nm = comp.names) |>
-      lapply(FUN = function(k) {
-
-        s.k <-
-          signed.scores[, k] - mean(x = signed.scores[, k])
-
-        denom <-
-          Matrix::crossprod(x = s.k) |>
-          as.numeric()
-
-        if (denom < .Machine$double.eps) return(rep(x = NA_real_, times = n.genes))
-
-        beta <-
-          (Matrix::crossprod(x = s.k,
-                             y = Xc) |>
-             as.numeric()) /
-          denom
-
-        return(beta)
-
-      }) |>
-      do.call(what = cbind)
-
-    rownames(x = loadings.de) <-
-      gene.names
-
+      .compute.loadings(scores = signed.scores,
+                        X.sparse = X0,
+                        .method = .loading.method)
+    
     # -------------------------------------------------------------------------
     # Reconstruction quality (global, not per-component)
     # Uses Frobenius identity to avoid materializing the dense (2G x L) A-hat:
     #   ||A - A-hat||^2 = ||A||^2 - 2 tr(A^T A-hat) + ||A-hat||^2
     # All terms computed via KxK intermediaries + one (LxK) product.
     # -------------------------------------------------------------------------
-
+    
     # ||A.t||^2_F -- efficient for sparse dgCMatrix (sum of squared nonzero slots)
     A.t.frob2 <-
       sum(A.t@x^2)
-
+    
     # tr(A.t^T A-hat) = tr(A.t^T w D h) = sum(Q * t(Dh))
     #   where Q = A.t^T w (LxK), Dh = diag(d) h (KxL)
     Q <-
       Matrix::crossprod(x = A.t, y = nmf.res$w)  # L x K
-
+    
     Dh <-
       nmf.res$d * nmf.res$h  # K x L (d recycled over rows)
-
+    
     trAtAhat <-
       sum(Q * Matrix::t(x = Dh))  # sum of element-wise product, L x K
-
+    
     # ||A-hat||^2_F = sum_{ij} ((wDh)_{ij})^2 via KxK Hadamard:
     #   = sum( (d_i d_j w^Tw_{ij}) * (hh^T)_{ij} )
     WtW <-
       Matrix::crossprod(x = nmf.res$w)  # K x K
-
+    
     DWtWD <-
       (nmf.res$d %o% nmf.res$d) * as.matrix(x = WtW)  # K x K
-
+    
     HHt <-
       Matrix::tcrossprod(x = nmf.res$h)  # K x K
-
+    
     Ahat.frob2 <-
       sum(DWtWD * as.matrix(x = HHt))  # trace via Hadamard product
-
+    
     # ||A.t - A-hat||^2_F = ||A.t||^2 - 2 tr(A^T A-hat) + ||A-hat||^2
     resid.frob2 <-
       A.t.frob2 - 2 * trAtAhat + Ahat.frob2
-
+    
     reconstruction <-
       if (A.t.frob2 > .Machine$double.eps) {
         1 - max(resid.frob2, 0) / A.t.frob2
       } else {
         NA_real_
       }
-
+    
     if (isTRUE(x = .verbose)) {
       message("Reconstruction quality (1 - ||residual||^2/||A||^2): ",
               sprintf("%.4f", reconstruction))
     }
-
+    
     # -------------------------------------------------------------------------
-    # Laplacian smoothness (Sk) -- same as specDE, computed on W columns
+    # Laplacian smoothness (Sk) -- computed on W columns
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
       message("Computing Laplacian smoothness...")
     }
-
-    # Normalized Laplacian: L_sym = I - D^{-1/2} W_graph D^{-1/2}
-    D.vec <-
-      Matrix::rowSums(x = SNN)
-
-    D.inv.sqrt <-
-      Matrix::Diagonal(x = 1 / sqrt(x = D.vec))
-
-    L.sym <-
-      Matrix::Diagonal(n = nrow(x = SNN)) -
-      (D.inv.sqrt %*% SNN %*% D.inv.sqrt)
-
+    
     smoothness <-
-      seq_len(length.out = .k) |>
-      sapply(FUN = function(k) {
-
-        s <-
-          W[, k] |>
-          (\(x)
-           x - mean(x = x)
-          )()
-
-        # Laplacian Dirichlet energy
-        energy <-
-          as.numeric(x = t(x = s) %*% L.sym %*% s) /
-          sum(s^2)
-
-        # Smoothness = 1 - energy (capped at 1 for normalized Laplacian)
-        1 - pmin(pmax(energy, 0), 2) / 2
-      })
-
-    names(x = smoothness) <-
-      comp.names
-
+      .compute.Sk(scores = W,
+                  SNN = SNN)
+    
     if (isTRUE(x = .verbose)) {
       message("Smoothness (top 5): ",
               paste(sprintf("%.3f", utils::head(x = smoothness, n = 5)), collapse = ", "))
     }
-
+    
     # -------------------------------------------------------------------------
     # Store results
     # -------------------------------------------------------------------------
-
+    
     if (is.null(x = .tdr.obj$nmfDE)) {
       .tdr.obj$nmfDE <-
         list()
     }
-
+    
     .tdr.obj$nmfDE[[.coef.col]] <-
       list(
         scores = W,
@@ -4350,20 +4409,21 @@ get.nmfDE <-
           degree.reg = .degree.reg,
           tau.mult = .tau.mult,
           lazy.alpha = .lazy.alpha,
+          loading.method = .loading.method,
           L1 = .L1,
           tol = .tol,
           maxit = .maxit,
           seed = .seed
         )
       )
-
+    
     if (isTRUE(x = .store.M)) {
       .tdr.obj$nmfDE[[.coef.col]]$M.pos <-
         M.pos
       .tdr.obj$nmfDE[[.coef.col]]$M.neg <-
         M.neg
     }
-
+    
     if (isTRUE(x = .verbose)) {
       message("\nResults stored in: .tdr.obj$nmfDE$", .coef.col)
       message("  $scores              : ", nrow(x = W), " landmarks x ", .k, " components (nonneg W)")
@@ -4371,31 +4431,49 @@ get.nmfDE <-
       message("  $d                   : scaling diagonal (", .k, ")")
       message("  $h.pos, $h.neg       : ", .k, " x ", n.genes, " gene templates (nonneg)")
       message("  $gene.loadings.signed: ", n.genes, " x ", .k, " (h+ - h-, derived)")
-      message("  $loadings.mass       : ", n.genes, " x ", .k, " (regression X0 ~ W)")
-      message("  $loadings.de         : ", n.genes, " x ", .k, " (regression Xc ~ signed.scores)")
+      message("  $loadings.mass       : ", n.genes, " x ", .k, " (", .loading.method, ", X0 ~ W)")
+      message("  $loadings.de         : ", n.genes, " x ", .k, " (", .loading.method, ", Xc ~ signed.scores)")
       message("  $Y.alignment         : Ak (|cor(Y, signed.score)|)")
       message("  $reconstruction      : Rk (global, 1 - ||resid||^2/||A||^2)")
       message("  $smoothness          : Sk (Laplacian smoothness on W)")
     }
-
+    
     return(.tdr.obj)
-
+    
   }
 
 
 #' Graph-Diffused, Density Contrast-Aligned PLS for Differential Expression
 #'
-#' Decomposes the density-contrast interaction matrix M.local via NIPALS PLS1
-#' against the density-contrast vector Y. plsDE maximizes covariance between
-#' graph-smoothed expression and the density contrast Y, prioritizing Y-alignment
-#' over variance explained.
+#' Decomposes an expression interaction matrix M.local via NIPALS PLS1
+#' against the density-contrast vector Y. plsDE identifies features that drive
+#' the density contrast — including population markers (DA), differentially
+#' expressed genes (DE), and their mixture — by maximizing covariance between
+#' graph-smoothed expression and Y.
 #'
 #' @details
-#' plsDE answers: "What gene programs in M.local = P diag(Y) Xc most covary
-#' with the condition contrast Y?" The interaction term diag(Y) bakes the
-#' density contrast into the data matrix (preserving sensitivity to pure DE
-#' without DA), while the PLS objective ensures every component's landmark
-#' scores track Y (high Ak by construction).
+#' plsDE is an \strong{interpretive decomposition}, not a formal hypothesis test.
+#' It answers: "What features — through expression patterns, population identity,
+#' or both — explain the density contrast?" Loadings reflect this combined signal:
+#' markers of depleted populations carry negative loadings (high expression where
+#' density is low), DE genes carry signed loadings tracking their direction of
+#' change, and mixed DA/DE features appear alongside both.
+#'
+#' When \code{.YX.interaction = TRUE} (default), the interaction term diag(Y)
+#' bakes the density contrast into the data matrix:
+#' M.local = P \%*\% diag(Y) \%*\% Xc. This gives plsDE comprehensive scope:
+#' it captures DA markers, DE genes, and their interplay in a single
+#' decomposition. The interaction amplifies expression signal in landmarks
+#' with strong density contrast, making the method sensitive even to subtle DE
+#' in the absence of DA.
+#'
+#' When \code{.YX.interaction = FALSE}, M.local = P \%*\% Xc (graph-smoothed
+#' centered expression without Y-weighting). Y appears only on the response
+#' side, so loadings reflect only features whose graph-smoothed expression
+#' independently covaries with Y. This mode is less comprehensive — it misses
+#' DA markers unless their expression happens to correlate with Y through
+#' smoothed space — but serves as a useful diagnostic comparator: features
+#' that rank high in both modes are robust.
 #'
 #' The method:
 #' \enumerate{
@@ -4404,12 +4482,14 @@ get.nmfDE <-
 #'         raw for cyto; then centered)
 #'   \item Builds random-walk normalized graph P from SNN (with optional degree
 #'         regularization and lazy walk)
-#'   \item Constructs M.local = P \%*\% diag(Y) \%*\% Xc (centered by columns):
-#'         the graph-diffused, density-weighted expression interaction matrix
-#'   \item Runs NIPALS PLS1: iteratively finds gene weights w maximizing
+#'   \item Constructs M.local: if \code{.YX.interaction = TRUE},
+#'         M.local = P \%*\% diag(Y) \%*\% Xc (density-weighted); if FALSE,
+#'         M.local = P \%*\% Xc (graph-smoothed only). Both are centered by columns.
+#'   \item Runs NIPALS PLS1: iteratively finds feature weights w maximizing
 #'         cov(M.local w, Y), with deflation of both M.local and Y
 #'   \item Applies sign convention: positive scores = aligned with Y
-#'   \item Computes gene loadings via OLS regression of centered Xc on each component's scores
+#'   \item Computes feature loadings (Pearson r, OLS regression, or Spearman rank
+#'         correlation)
 #'   \item Computes Laplacian smoothness (Sk) for each component
 #' }
 #'
@@ -4423,11 +4503,23 @@ get.nmfDE <-
 #' \strong{Sk (graph smoothness):} Derived from the normalized Laplacian applied to
 #' score vectors. High Sk indicates large-scale, graph-smooth structure.
 #'
-#' \strong{About Y appearing on both sides:}
+#' \strong{About Y appearing on both sides (when .YX.interaction = TRUE):}
 #' Y appears in both the data matrix (via diag(Y) in M.local) and the PLS objective
-#' (maximize covariance with Y). This is not circular because the expression matrix
-#' Xc sits between: the product is large only when genes exist whose Y-weighted,
-#' graph-smoothed expression genuinely covaries with Y. With permuted Y, Ak collapses.
+#' (maximize covariance with Y). This is intentional: it gives plsDE comprehensive
+#' sensitivity to features driving density changes. The design is not circular
+#' because the expression matrix Xc sits between: the product is large only when
+#' features exist whose Y-weighted, graph-smoothed expression genuinely covaries
+#' with Y. With permuted Y, Ak collapses. Setting \code{.YX.interaction = FALSE}
+#' removes Y from the data matrix entirely, providing a diagnostic comparator.
+#'
+#' @note plsDE is designed as an exploratory tool to help interpret density
+#'   changes in terms of the features driving them. It does not provide
+#'   gene-level p-values or formal multiple testing correction. For rigorous
+#'   differential expression testing with p-values following field standards,
+#'   use \code{\link{get.pbDE}} (pseudobulk DE via edgeR/limma) or
+#'   \code{\link{get.markerDE}} (marker-level DE). plsDE complements these
+#'   methods by providing a multivariate, graph-aware decomposition that
+#'   captures joint DA/DE patterns not visible in gene-by-gene tests.
 #'
 #' @param .tdr.obj A tinydenseR object after \code{get.lm()}.
 #' @param .coef.col Character: column name in model coefficients to use as density contrast Y.
@@ -4445,16 +4537,33 @@ get.nmfDE <-
 #'   tau = .tau.mult * mean(degree). Default 1.
 #' @param .lazy.alpha Numeric in (0, 1]: mixing parameter for lazy random walk.
 #'   P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).
+#' @param .YX.interaction Logical: if TRUE (default), construct
+#'   M.local = P diag(Y) Xc (Y-weighted interaction). Loadings capture features
+#'   driving the density contrast through both differential abundance (population
+#'   markers) and differential expression. If FALSE, construct M.local = P Xc
+#'   (graph-smoothed expression only; Y appears only on the response side).
+#'   The FALSE mode is less comprehensive — it misses DA markers unless their
+#'   expression independently covaries with Y.
+#' @param .loading.method Character: method for computing feature loadings. 
+#'   \code{"pearson"} computes Pearson correlation between component scores
+#'   and centered expression (scale-invariant, fast sparse-BLAS path).
+#'   \code{"ols"} computes OLS regression coefficients of centered Xc on component
+#'   scores (same sparse-BLAS path; preserves magnitude information but is
+#'   scale-dependent, so high-variance features rank higher). \code{"spearman"}
+#'   computes Spearman rank correlation via a sparse-aware implementation
+#'   (robust to outliers and nonlinearity; slower, O(nnz * log(m_g) * K)).
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #'
 #' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$plsDE[[.coef.col]]}:
 #'   \describe{
 #'     \item{scores}{Matrix (landmarks x K): PLS scores (oriented so positive = aligned with Y)}
-#'     \item{gene.weights}{Matrix (genes x K): PLS gene weight vectors w (unit-norm)}
+#'     \item{feature.weights}{Matrix (genes x K): PLS feature weight vectors w (unit-norm)}
 #'     \item{x.loadings}{Matrix (genes x K): PLS deflation loadings p}
 #'     \item{y.loadings}{Numeric vector (K): PLS Y-loadings q (scalar per component)}
-#'     \item{loadings}{Matrix (genes x K): OLS regression of centered Xc on each component score;
-#'       positive = upregulated with Y, negative = downregulated}
+#'     \item{loadings}{Matrix (genes x K): feature loadings per component (Pearson r,
+#'       OLS regression, or Spearman rank correlation, depending on
+#'       \code{.loading.method}); positive = upregulated with Y,
+#'       negative = downregulated}
 #'     \item{Y.alignment}{Numeric vector (K): |cor(Y, score_k)| per component}
 #'     \item{smoothness}{Numeric vector (K): Laplacian smoothness per score vector}
 #'     \item{Y}{Numeric vector: the centered density contrast used}
@@ -4477,8 +4586,7 @@ get.nmfDE <-
 #'
 #' # Access results
 #' lm.obj$plsDE$Infection$scores[, "plsDE1"]      # PLS scores (Y-aligned)
-#' lm.obj$plsDE$Infection$loadings[, "plsDE1"]     # gene loadings (regression)
-#' lm.obj$plsDE$Infection$gene.weights[, "plsDE1"] # PLS gene weights
+#' lm.obj$plsDE$Infection$loadings[, "plsDE1"]     # gene loadings (Pearson, OLS or Spearman)
 #'
 #' # Diagnostic table
 #' data.frame(
@@ -4500,253 +4608,182 @@ get.plsDE <-
            .degree.reg = FALSE,
            .tau.mult = 1,
            .lazy.alpha = 1,
+           .YX.interaction = TRUE,
+           .loading.method = c("pearson", "ols", "spearman"),
            .verbose = TRUE) {
-
+    
     # -------------------------------------------------------------------------
     # Input validation
     # -------------------------------------------------------------------------
-
-    if (is.null(x = .tdr.obj$map$lm[[.model.name]])) {
-      stop("Model '", .model.name, "' not found. Run get.lm() first.")
+    
+    if (!is.logical(x = .YX.interaction) || length(x = .YX.interaction) != 1) {
+      stop(".YX.interaction must be TRUE or FALSE.")
     }
 
+    .loading.method <-
+      match.arg(arg = .loading.method,
+                choices = c("pearson",
+                            "ols",
+                            "spearman"))
+    
     coef.mat <-
-      .tdr.obj$map$lm[[.model.name]]$fit$coefficients
-
-    if (!(.coef.col %in% colnames(x = coef.mat))) {
-      stop("Coefficient '", .coef.col, "' not found in model coefficients.\n",
-           "Available: ", paste(colnames(x = coef.mat), collapse = ", "))
-    }
-
-    if (is.null(x = .tdr.obj$graph$snn)) {
-      stop("SNN graph not found. Run get.graph() first.")
-    }
-
-    if (!Matrix::isSymmetric(object = .tdr.obj$graph$snn)) {
-      stop("SNN graph not symmetric.")
-    }
-
-    if (is.null(x = .tdr.obj$raw.landmarks)) {
-      stop("Raw landmarks not found. Run get.landmarks() first.")
-    }
-
-    if (is.null(x = .tdr.obj$pca$embed)) {
-      stop("PCA embedding not found. Run get.landmarks() first.")
-    }
-
+      .validate.DE.inputs(.tdr.obj = .tdr.obj,
+                          .model.name = .model.name,
+                          .coef.col = .coef.col)
+    
     # Default .ncomp to number of PCs from get.landmarks
     if (is.null(x = .ncomp)) {
       .ncomp <-
         ncol(x = .tdr.obj$pca$embed)
     }
-
+    
     if (!is.numeric(x = .ncomp) || length(x = .ncomp) != 1 || .ncomp < 1) {
       stop(".ncomp must be a positive integer.")
     }
-
+    
     .ncomp <-
       as.integer(x = .ncomp)
-
+    
     # -------------------------------------------------------------------------
     # Extract Y: density contrast vector (centered)
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
       message("\n=== plsDE: Graph-Diffused, Density Contrast-Aligned PLS for Differential Expression ===")
       message("Coefficient: ", .coef.col)
     }
-
+    
     Y <-
       coef.mat[, .coef.col] |>
       (\(x)
        x - mean(x = x)
       )()
-
+    
     # -------------------------------------------------------------------------
-    # Prepare expression matrix X (centered)
+    # Prepare expression matrix
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
       message("Preparing expression matrix...")
     }
-
-    if (.tdr.obj$config$assay.type == "RNA") {
-
-      # Filter genes: detected in at least min.prop of landmarks
-      X <-
-        .tdr.obj$raw.landmarks |>
-        (\(x)
-         x[, Matrix::colSums(x = x > 0) > (nrow(x = x) * .min.prop)]
-        )()
-
-      if (isTRUE(x = .verbose)) {
-        message("  Genes after filtering (>", .min.prop * 100, "% detection): ",
-                ncol(x = X), " / ", ncol(x = .tdr.obj$raw.landmarks))
-      }
-
-      # Size factor normalization
-      X <-
-        X |>
-        Matrix::t() |>
-        (\(x)
-         x / (Matrix::rowSums(x = x) / mean(x = Matrix::rowSums(x = x)))
-        )() |>
-        Matrix::t()
-
-      # Log2 transform (in-place for sparse matrix efficiency)
-      X@x <-
-        log2(x = X@x + 1)
-
-    } else {
-
-      # Cytometry: use raw landmarks directly
-      X <-
-        .tdr.obj$raw.landmarks
-
-    }
-
-    # Center expression (genes/markers)
-    Xc <-
-      X |>
-      (\(x)
-       Matrix::t(x = x) - Matrix::colMeans(x = x)
-      )() |>
-      Matrix::t()
-
+    
+    prep <-
+      .prepare.X(.tdr.obj = .tdr.obj,
+                 .min.prop = .min.prop,
+                 .verbose = .verbose)
+    
+    X  <- prep$X
+    Xc <- prep$Xc
+    
     n.landmarks <-
       nrow(x = Xc)
-
+    
     n.genes <-
       ncol(x = Xc)
-
+    
     gene.names <-
       colnames(x = Xc)
-
+    
     # -------------------------------------------------------------------------
-    # Build random-walk normalized graph P (with optional degree regularization + lazy walk)
+    # Build random-walk normalized graph P
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
       message("Building random-walk normalized graph...")
     }
-
-    # Validate lazy.alpha
-    if (!is.numeric(x = .lazy.alpha) || .lazy.alpha <= 0 || .lazy.alpha > 1) {
-      stop(".lazy.alpha must be in (0, 1]")
-    }
-
+    
     SNN <-
       .tdr.obj$graph$snn
-
-    # Check for disconnected nodes
-    d <-
-      Matrix::rowSums(x = SNN)
-
-    if (any(d == 0)) {
-      n.disconnected <- sum(d == 0)
-      stop("Graph contains ", n.disconnected, " disconnected node(s) (degree = 0). ",
-           "Cannot compute random-walk matrix. Check graph construction or increase k.")
-    }
-
-    # Degree regularization: add self-loops W_tau = W + tau*I, then row-normalize
-    if (isTRUE(x = .degree.reg)) {
-      tau <- .tau.mult * mean(x = d)
-      W.tau <- SNN + tau * Matrix::Diagonal(n = nrow(x = SNN))
-      d.tau <- Matrix::rowSums(x = W.tau)
-      D.inv <- Matrix::Diagonal(x = 1 / d.tau)
-      P <- D.inv %*% W.tau
-      if (isTRUE(x = .verbose)) {
-        message("  Degree regularization: tau = ", round(x = tau, digits = 2),
-                " (tau.mult = ", .tau.mult, ")")
-      }
-    } else {
-      D.inv <- Matrix::Diagonal(x = 1 / d)
-      P <- D.inv %*% SNN
-    }
-
-    # Set dimnames
+    
     P <-
-      `dimnames<-`(x = P,
-                   value = dimnames(x = SNN))
-
-    # Lazy random walk: P_lazy = (1 - alpha) * I + alpha * P
-    if (.lazy.alpha < 1) {
-      I.mat <- Matrix::Diagonal(n = nrow(x = P))
-      P <- (1 - .lazy.alpha) * I.mat + .lazy.alpha * P
+      .build.P(SNN = SNN,
+               .degree.reg = .degree.reg,
+               .tau.mult = .tau.mult,
+               .lazy.alpha = .lazy.alpha,
+               .verbose = .verbose)
+    
+    # -------------------------------------------------------------------------
+    # Construct M.local
+    # -------------------------------------------------------------------------
+    
+    if (isTRUE(x = .YX.interaction)) {
+      
+      # M.local = P %*% diag(Y) %*% Xc (density-weighted interaction)
       if (isTRUE(x = .verbose)) {
-        message("  Lazy walk: alpha = ", .lazy.alpha)
+        message("Computing density-weighted expression (M.local = P diag(Y) Xc)...")
       }
+      
+      YX.term <-
+        (Matrix::Diagonal(x = Y) %*% Xc) |>
+        (\(x)
+         `dimnames<-`(x = x,
+                      value = dimnames(x = Xc))
+        )()
+      
+    } else {
+      
+      # M.local = P %*% Xc (graph-smoothed expression, no Y-weighting)
+      if (isTRUE(x = .verbose)) {
+        message("Computing graph-smoothed expression (M.local = P Xc)...")
+      }
+      
+      YX.term <- Xc
+      
     }
-
-    # -------------------------------------------------------------------------
-    # Construct M.local = P %*% diag(Y) %*% Xc (centered)
-    # -------------------------------------------------------------------------
-
-    if (isTRUE(x = .verbose)) {
-      message("Computing density-weighted expression (M.local)...")
-    }
-
-    # Y-weighted expression: diag(Y) %*% Xc
-    YX.interaction <-
-      (Matrix::Diagonal(x = Y) %*% Xc) |>
-      (\(x)
-       `dimnames<-`(x = x,
-                    value = dimnames(x = Xc))
-      )()
-
+    
     # Graph-smooth and center
     M.local <-
-      (P %*% YX.interaction) |>
+      (P %*% YX.term) |>
       (\(x)
        Matrix::t(x = x) - Matrix::colMeans(x = x)
       )() |>
       Matrix::t()
-
+    
     # -------------------------------------------------------------------------
     # NIPALS PLS1: M.local vs Y
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
       message("Running NIPALS PLS1 (", .ncomp, " components)...")
     }
-
+    
     # Dense copy for deflation (deflation breaks sparsity on first step)
     Z.work <-
       as.matrix(x = M.local)
-
+    
     Y.work <-
       Y
-
+    
     # Pre-allocate storage
     W.mat <-
       matrix(data = 0,
              nrow = n.genes,
              ncol = .ncomp)
-
+    
     T.mat <-
       matrix(data = 0,
              nrow = n.landmarks,
              ncol = .ncomp)
-
+    
     P.mat <-
       matrix(data = 0,
              nrow = n.genes,
              ncol = .ncomp)
-
+    
     Q.vec <-
       numeric(length = .ncomp)
-
+    
     for (k in seq_len(length.out = .ncomp)) {
-
+      
       # Gene weight: w = Z'Y / ||Z'Y||
       ZtY <-
         crossprod(x = Z.work,
                   y = Y.work) |>
         as.numeric()
-
+      
       w.norm <-
         sqrt(x = sum(ZtY^2))
-
+      
       if (w.norm < .Machine$double.eps) {
         if (isTRUE(x = .verbose)) {
           message("  Component ", k, ": Z'Y norm ~ 0, stopping early.")
@@ -4754,49 +4791,49 @@ get.plsDE <-
         .ncomp <- k - 1L
         break
       }
-
+      
       w <-
         ZtY / w.norm
-
+      
       # Score: t = Z w
       t.score <-
         (Z.work %*% w) |>
         as.numeric()
-
+      
       # Deflation loading: p = Z't / (t't)
       tt <-
         sum(t.score^2)
-
+      
       p.load <-
         (crossprod(x = Z.work,
                    y = t.score) |>
            as.numeric()) / tt
-
+      
       # Y loading: q = Y't / (t't)
       q.load <-
         sum(Y.work * t.score) / tt
-
+      
       # Deflate Z and Y
       Z.work <-
         Z.work - tcrossprod(x = t.score,
                             y = p.load)
-
+      
       Y.work <-
         Y.work - t.score * q.load
-
+      
       # Store
       W.mat[, k] <-
         w
-
+      
       T.mat[, k] <-
         t.score
-
+      
       P.mat[, k] <-
         p.load
-
+      
       Q.vec[k] <-
         q.load
-
+      
       if (isTRUE(x = .verbose)) {
         Ak <-
           abs(x = stats::cor(x = Y, y = t.score))
@@ -4808,7 +4845,7 @@ get.plsDE <-
                         stats::var(x = Y.work) / stats::var(x = Y)))
       }
     }
-
+    
     # Trim if stopped early
     if (.ncomp < ncol(x = W.mat)) {
       W.mat <- W.mat[, seq_len(length.out = .ncomp), drop = FALSE]
@@ -4816,155 +4853,103 @@ get.plsDE <-
       P.mat <- P.mat[, seq_len(length.out = .ncomp), drop = FALSE]
       Q.vec <- Q.vec[seq_len(length.out = .ncomp)]
     }
-
+    
     # -------------------------------------------------------------------------
     # Sign convention: positive scores = aligned with Y
     # -------------------------------------------------------------------------
-
+    
     Y.cor <-
       stats::cor(x = Y,
                  y = T.mat)[1, ]
-
+    
     sign.flip <-
       sign(x = Y.cor)
-
+    
     # Handle zero correlation (default to +1)
     sign.flip[sign.flip == 0] <-
       1
-
+    
     # Flip scores, weights, and loadings
     T.mat <-
       t(x = t(x = T.mat) * sign.flip)
-
+    
     W.mat <-
       t(x = t(x = W.mat) * sign.flip)
-
+    
     P.mat <-
       t(x = t(x = P.mat) * sign.flip)
-
+    
     Q.vec <-
       Q.vec * sign.flip
-
+    
     Y.alignment <-
       abs(x = Y.cor)
-
+    
     # -------------------------------------------------------------------------
     # Name everything
     # -------------------------------------------------------------------------
-
+    
     comp.names <-
       paste0("plsDE", seq_len(length.out = .ncomp))
-
+    
     colnames(x = W.mat) <-
       colnames(x = T.mat) <-
       colnames(x = P.mat) <-
       names(x = Q.vec) <-
       names(x = Y.alignment) <-
       comp.names
-
+    
     rownames(x = W.mat) <-
       rownames(x = P.mat) <-
       gene.names
-
+    
     rownames(x = T.mat) <-
       rownames(x = Xc)
-
+    
     if (isTRUE(x = .verbose)) {
       message("Y-alignment (top 5): ",
               paste(sprintf("%.3f", utils::head(x = Y.alignment, n = 5)), collapse = ", "))
     }
-
+    
     # -------------------------------------------------------------------------
-    # Compute loadings via OLS regression (Xc ~ score_k)
+    # Compute loadings
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
-      message("Computing gene/marker loadings...")
+      message("Computing gene/marker loadings (", .loading.method, ")...")
     }
-
+    
     loadings <-
-      seq_len(length.out = .ncomp) |>
-      stats::setNames(nm = comp.names) |>
-      lapply(FUN = function(k) {
-
-        score.k <-
-          T.mat[, k] - mean(x = T.mat[, k])
-
-        denom <-
-          Matrix::crossprod(x = score.k) |>
-          as.numeric()
-
-        if (denom < .Machine$double.eps) return(rep(x = NA_real_, times = n.genes))
-
-        beta <-
-          (Matrix::crossprod(x = score.k,
-                             y = Xc) |>
-             as.numeric()) /
-          denom
-
-        return(beta)
-
-      }) |>
-      do.call(what = cbind)
-
-    rownames(x = loadings) <-
-      gene.names
-
+      .compute.loadings(scores = T.mat,
+                        X.sparse = X,
+                        .method = .loading.method)
+    
     # -------------------------------------------------------------------------
     # Laplacian smoothness (Sk)
     # -------------------------------------------------------------------------
-
+    
     if (isTRUE(x = .verbose)) {
       message("Computing Laplacian smoothness...")
     }
-
-    # Normalized Laplacian: L_sym = I - D^{-1/2} W D^{-1/2}
-    D.vec <-
-      Matrix::rowSums(x = SNN)
-
-    D.inv.sqrt <-
-      Matrix::Diagonal(x = 1 / sqrt(x = D.vec))
-
-    L.sym <-
-      Matrix::Diagonal(n = nrow(x = SNN)) -
-      (D.inv.sqrt %*% SNN %*% D.inv.sqrt)
-
+    
     smoothness <-
-      seq_len(length.out = .ncomp) |>
-      sapply(FUN = function(k) {
-
-        s <-
-          T.mat[, k] |>
-          (\(x)
-           x - mean(x = x)
-          )()
-
-        # Laplacian Dirichlet energy
-        energy <-
-          as.numeric(x = t(x = s) %*% L.sym %*% s) /
-          sum(s^2)
-
-        # Smoothness = 1 - energy (capped at 1 for normalized Laplacian)
-        1 - pmin(pmax(energy, 0), 2) / 2
-      })
-
-    names(x = smoothness) <-
-      comp.names
-
+      .compute.Sk(scores = T.mat,
+                  SNN = SNN)
+    
     if (isTRUE(x = .verbose)) {
       message("Smoothness (top 5): ",
               paste(sprintf("%.3f", utils::head(x = smoothness, n = 5)), collapse = ", "))
     }
-
+    
     # -------------------------------------------------------------------------
     # Store results
     # -------------------------------------------------------------------------
-
+    
     if (is.null(x = .tdr.obj$plsDE)) {
       .tdr.obj$plsDE <-
         list()
     }
-
+    
     .tdr.obj$plsDE[[.coef.col]] <-
       list(
         scores = T.mat,
@@ -4982,24 +4967,115 @@ get.plsDE <-
           min.prop = .min.prop,
           degree.reg = .degree.reg,
           tau.mult = .tau.mult,
-          lazy.alpha = .lazy.alpha
+          lazy.alpha = .lazy.alpha,
+          YX.interaction = .YX.interaction,
+          loading.method = .loading.method
         )
       )
-
+    
     if (isTRUE(x = .store.M)) {
       .tdr.obj$plsDE[[.coef.col]]$M.local <-
         M.local
     }
-
+    
     if (isTRUE(x = .verbose)) {
       message("\nResults stored in: .tdr.obj$plsDE$", .coef.col)
       message("  $scores       : ", n.landmarks, " landmarks x ", .ncomp, " components")
       message("  $gene.weights : ", n.genes, " features x ", .ncomp, " components (PLS w)")
-      message("  $loadings     : ", n.genes, " features x ", .ncomp, " components (regression)")
+      message("  $loadings     : ", n.genes, " features x ", .ncomp, " components (", .loading.method, ")")
       message("  $Y.alignment  : Ak (|cor(Y, score)|)")
       message("  $smoothness   : Sk (Laplacian smoothness)")
     }
-
+    
     return(.tdr.obj)
+    
+  }
 
+
+# =============================================================================
+# Internal: Sparse-aware Spearman correlation
+# =============================================================================
+
+# Spearman rank correlation between a dense score vector and each column of a
+# sparse matrix.  Exploits the fact that after log2(x+1) transformation,
+# structural zeros are the column minimum.  Their midranks are known
+# analytically, so only the nonzero entries need sorting.
+#
+# Args:
+#   s        - numeric vector (length n): dense score (e.g. PLS component)
+#   X.sparse - dgCMatrix (n x p): sparse expression matrix where structural
+#              zeros are the column-minimum value (pre-centering)
+#
+# Value:
+#   numeric vector (length p): Spearman rho for each column vs s
+
+.sparse.spearman <-
+  function(s, X.sparse) {
+    
+    if(is.na(x = X.sparse) |>
+       any()) {
+      stop("NAs found in normalized expression matrix")
+    }
+    
+    X.sparse <-
+      Matrix::drop0(x = X.sparse)
+    
+    if(min(X.sparse) < 0) {
+      stop("X.sparse contains zeros")
+    }
+    
+    n <- length(x = s)
+    mid <- (n + 1) / 2
+    
+    # Rank the score vector once -- O(n log n)
+    r.s <- rank(x = s)
+    r.s.c <- r.s - mid                        # centered ranks
+    ss.rs <- sum(r.s.c^2)                      # score-side denominator (scalar)
+    
+    # CSC slot access
+    p.ptr <- X.sparse@p
+    x.vals <- X.sparse@x
+    i.idx <- X.sparse@i                        # 0-based row indices
+    
+    n.genes <- ncol(x = X.sparse)
+    rho <- numeric(length = n.genes)
+    
+    for (g in seq_len(length.out = n.genes)) {
+      
+      idx.start <- p.ptr[g] + 1L               # 1-based start in x.vals / i.idx
+      idx.end <- p.ptr[g + 1L]                 # 1-based end (inclusive)
+      m.g <- idx.end - idx.start + 1L          # number of nonzeros
+      z.g <- n - m.g                            # number of structural zeros
+      
+      if (m.g == 0L) next                       # all-zero gene: rho stays 0
+      
+      # Midrank for the zero group
+      r0 <- (1 + z.g) / 2
+      
+      # Ranks of nonzero values within themselves, shifted to full-vector position
+      nz.idx <- idx.start:idx.end
+      nz.ranks <- rank(x = x.vals[nz.idx]) + z.g     # z.g+1 .. n
+      
+      # Centered score ranks for the nonzero rows
+      nz.rows <- i.idx[nz.idx] + 1L            # 1-based row indices
+      nz.r.s.c <- r.s.c[nz.rows]
+      
+      # Numerator:
+      #   sum_all r.s.c * r.g.c
+      # = sum_nnz r.s.c * (nz.rank - mid) + sum_zero r.s.c * (r0 - mid)
+      # Since sum_all r.s.c = 0:  sum_zero r.s.c = -sum_nnz r.s.c
+      sum.nz.rs <- sum(nz.r.s.c)
+      num <- sum(nz.r.s.c * (nz.ranks - mid)) +
+        (r0 - mid) * (-sum.nz.rs)
+      
+      # Denominator (gene-side sum of squared centered ranks)
+      ss.rg <- z.g * (r0 - mid)^2 +
+        sum((nz.ranks - mid)^2)
+      
+      denom <- sqrt(x = ss.rs * ss.rg)
+      
+      if (denom > 0) rho[g] <- num / denom
+    }
+    
+    rho
   }

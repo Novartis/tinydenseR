@@ -9,7 +9,7 @@ plotNmfDEHeatmap(
   .coef.col,
   .nmfDE.dim = 1,
   .model.name = "default",
-  .loadings.type = "signed",
+  .loadings.type = c("de", "signed", "mass"),
   .n.features = 50,
   .order.by = "dens.contrast",
   .add.annot = NULL,
