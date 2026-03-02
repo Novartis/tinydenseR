@@ -679,6 +679,50 @@ We chose to analyze the 0.5 SD shift in detail because:
 - **Demonstrates sensitivity**: If tinydenseR works for 0.5 SD, it will work for larger shifts
 - **Clinical relevance**: Small expression changes can have significant functional impact
 
+## Managing On-Disk Caching
+
+When working with large datasets, `get.map()` stores four large per-sample
+slots (clustering IDs, celltyping IDs, nearest landmarks, and fuzzy graphs)
+on disk rather than in memory.  This is enabled by default via
+`.cache.on.disk = TRUE` and is transparent to downstream analysis.
+
+### Inspecting the cache
+
+```{r cache-info, eval=FALSE}
+tdr_cache_info(lm.cells)
+```
+
+### Validating cache integrity
+
+Cache files are validated automatically each time you call `get.lm()`,
+`get.pbDE()`, or any DE method.  You can also validate explicitly:
+
+```{r cache-validate, eval=FALSE}
+# Quick file-existence check
+tdr_cache_validate(lm.cells)
+
+# Full MD5-checksum verification
+tdr_cache_validate(lm.cells, .verify.checksum = TRUE)
+```
+
+### Cleaning up
+
+Remove cached files when analysis is complete:
+
+```{r cache-cleanup, eval=FALSE}
+lm.cells <- tdr_cache_cleanup(lm.cells)
+```
+
+After cleanup, re-run `get.map()` if you need the large slots again.
+
+### Disabling caching
+
+For small datasets that fit in memory:
+
+```{r cache-disable, eval=FALSE}
+lm.cells <- get.map(lm.cells, .cache.on.disk = FALSE)
+```
+
 ## Summary
 
 In this vignette, we demonstrated how to:

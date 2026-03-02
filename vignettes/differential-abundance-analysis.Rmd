@@ -662,6 +662,60 @@ We chose to analyze the 0.5% setting in detail because:
 
 The ground truth analysis confirms that all three settings (0.5%, 5%, 50%) show the expected 2-fold depletion, validating our simulation design.
 
+## Managing On-Disk Caching
+
+When working with large datasets, `get.map()` stores four large per-sample
+slots (clustering IDs, celltyping IDs, nearest landmarks, and fuzzy graphs)
+on disk rather than in memory.  This is enabled by default via
+`.cache.on.disk = TRUE` and usually requires no user action.
+
+### Inspecting the cache
+
+```{r cache-info, eval=FALSE}
+# After get.map(), check what is cached and where
+tdr_cache_info(lm.cells)
+# On-disk cache: ACTIVE
+# Directory:     /data/tdr_cache/run_20260302_143012_a7f3c1b2
+# Schema:        v1
+# Slots:         clustering.ids, celltyping.ids, nearest.landmarks, fuzzy.graph
+# Samples:       6
+# Files:         24  (4 slots x 6 samples)
+# Total size:    142.3 MB
+```
+
+### Validating cache integrity
+
+Cache files are validated automatically each time you call `get.lm()`,
+`get.pbDE()`, or any DE method.  You can also validate manually:
+
+```{r cache-validate, eval=FALSE}
+# Quick file-existence check
+tdr_cache_validate(lm.cells)
+
+# Full MD5-checksum verification (slower but detects silent corruption)
+tdr_cache_validate(lm.cells, .verify.checksum = TRUE)
+```
+
+### Cleaning up
+
+When you no longer need the cached files (e.g., analysis is finished and
+you have saved your plots/tables), remove them to reclaim disk space:
+
+```{r cache-cleanup, eval=FALSE}
+lm.cells <- tdr_cache_cleanup(lm.cells)
+```
+
+After cleanup, the large slots become `NULL`.  Re-run `get.map()` to
+regenerate them if needed.
+
+### Disabling caching
+
+For small datasets that fit comfortably in memory, skip on-disk caching:
+
+```{r cache-disable, eval=FALSE}
+lm.cells <- get.map(lm.cells, .cache.on.disk = FALSE)
+```
+
 ## Summary
 
 In this vignette, we demonstrated how to:
