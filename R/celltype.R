@@ -112,11 +112,11 @@ celltyping <-
                   "\nEach cluster can only belong to one cell type."))
     }
     
-    if(any(!(unique(x = .tdr.obj$graph$clustering$ids) %in%
+    if(any(!(unique(x = .tdr.obj@graph$clustering$ids) %in%
              cls.in.map))){
       stop(paste0("Every cluster must be mapped to a cell type. Unmapped clusters: ",
-                  paste(unique(x = .tdr.obj$graph$clustering$ids)[
-                    !(unique(x = .tdr.obj$graph$clustering$ids) %in%
+                  paste(unique(x = .tdr.obj@graph$clustering$ids)[
+                    !(unique(x = .tdr.obj@graph$clustering$ids) %in%
                         cls.in.map)],
                     collapse = ", "),
                   "\nAdd these to .celltyping.map or merge them with existing clusters."))
@@ -124,23 +124,23 @@ celltyping <-
     }
     
     if(!all(cls.in.map %in%
-            unique(x = .tdr.obj$graph$clustering$ids))){
+            unique(x = .tdr.obj@graph$clustering$ids))){
       stop(paste0("Invalid cluster ID(s) in .celltyping.map: ",
                   paste(cls.in.map[!(cls.in.map %in%
-                                       unique(x = .tdr.obj$graph$clustering$ids))],
+                                       unique(x = .tdr.obj@graph$clustering$ids))],
                         collapse = ", "),
                   "\nThese clusters do not exist in .tdr.obj$graph$clustering$ids.",
                   "\nRun lm.cluster() to see available cluster IDs."))
     }
     
-    .tdr.obj$graph$celltyping <-
+    .tdr.obj@graph$celltyping <-
       vector(mode = "list")
     
     # Create cell type labels by:
     # 1. Inverting the map: cluster IDs -> cell type names
     # 2. Indexing by cluster IDs to get corresponding cell type for each landmark
     # 3. Converting to factor to maintain consistency with clustering$ids
-    .tdr.obj$graph$celltyping$ids <-
+    .tdr.obj@graph$celltyping$ids <-
       .celltyping.map |>
       (\(x)
        stats::setNames(
@@ -150,17 +150,17 @@ celltyping <-
                  unlist(use.names = FALSE)),
          nm = unlist(x = x,
                      use.names = FALSE))[
-                       as.character(x = .tdr.obj$graph$clustering$ids)]
+                       as.character(x = .tdr.obj@graph$clustering$ids)]
       )() |>
       as.factor()
     
     # For RNA: select top PC-loading genes for heatmap visualization
     # Takes top 3 positive and top 3 negative loadings per PC to capture
     # genes that drive the major axes of variation
-    if(.tdr.obj$config$assay.type == "RNA") {
+    if(.tdr.obj@config$assay.type == "RNA") {
       
       top <-
-        apply(X = .tdr.obj$pca$rotation,
+        apply(X = .tdr.obj@pca$rotation,
               MARGIN = 2,
               FUN = function(PC.rot){
                 
@@ -176,16 +176,16 @@ celltyping <-
               }) |>
         as.vector() |> 
         (\(x)
-         rownames(x = .tdr.obj$pca$rotation)[x]
+         rownames(x = .tdr.obj@pca$rotation)[x]
         )() |>
         unique()
       
     }
     
-    .tdr.obj$graph$celltyping$median.exprs <-
-      (if(.tdr.obj$config$assay.type == "RNA") .tdr.obj$scaled.landmarks[,top] else .tdr.obj$landmarks) |>
+    .tdr.obj@graph$celltyping$median.exprs <-
+      (if(.tdr.obj@config$assay.type == "RNA") .tdr.obj@scaled.landmarks[,top] else .tdr.obj@landmarks) |>
       dplyr::as_tibble() |>
-      cbind(cell.pop = as.character(x = .tdr.obj$graph$celltyping$ids)) |>
+      cbind(cell.pop = as.character(x = .tdr.obj@graph$celltyping$ids)) |>
       dplyr::group_by(cell.pop) |>
       dplyr::summarize_all(.funs = mean) |>
       as.data.frame() |>
@@ -195,8 +195,8 @@ celltyping <-
       )() |>
       as.matrix()
     
-    .tdr.obj$graph$celltyping$pheatmap <-
-      pheatmap::pheatmap(mat = .tdr.obj$graph$celltyping$median.exprs,
+    .tdr.obj@graph$celltyping$pheatmap <-
+      pheatmap::pheatmap(mat = .tdr.obj@graph$celltyping$median.exprs,
                          color = grDevices::colorRampPalette(
                            unname(obj =
                                     Color.Palette[1,c(1,6,2)]))(100),

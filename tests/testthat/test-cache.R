@@ -108,7 +108,7 @@ test_that("tdr_cache_cleanup removes directory and strips metadata", {
   saveRDS("test", file.path(cache_dir, "clustering.ids", "s1.rds"))
   
   # Build a mock .tdr.obj
-  mock_obj <- list(
+  mock_obj <- TDRObj(
     map = list(
       fdens = matrix(1, 2, 2),
       .cache = list(
@@ -137,7 +137,7 @@ test_that(".tdr_get_map_slot reads from cache when on.disk = TRUE", {
   obj <- c(a = "cluster.01", b = "cluster.02")
   meta <- .tdr_cache_write(obj, cache_dir, "clustering.ids", "sample1")
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       clustering = list(ids = NULL),
       .cache = list(
@@ -156,7 +156,7 @@ test_that(".tdr_get_map_slot reads from cache when on.disk = TRUE", {
 test_that(".tdr_get_map_slot falls back to in-memory when no cache", {
   obj <- c(a = "cluster.01", b = "cluster.02")
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       clustering = list(ids = list(sample1 = obj)),
       .cache = NULL
@@ -176,7 +176,7 @@ test_that(".tdr_get_map_slot_all reads all samples from cache", {
   m1 <- .tdr_cache_write(obj1, cache_dir, "clustering.ids", "s1")
   m2 <- .tdr_cache_write(obj2, cache_dir, "clustering.ids", "s2")
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       clustering = list(ids = NULL),
       .cache = list(
@@ -196,7 +196,7 @@ test_that(".tdr_get_map_slot_all reads all samples from cache", {
 test_that(".tdr_get_map_slot_all falls back to in-memory", {
   obj_list <- list(s1 = c(a = "cl.01"), s2 = c(b = "cl.02"))
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       clustering = list(ids = obj_list),
       .cache = NULL
@@ -208,7 +208,7 @@ test_that(".tdr_get_map_slot_all falls back to in-memory", {
 })
 
 test_that(".tdr_get_map_slot errors on unknown slot_name", {
-  mock_tdr <- list(map = list(.cache = NULL))
+  mock_tdr <- TDRObj(map = list(.cache = NULL))
   expect_error(.tdr_get_map_slot(mock_tdr, "nonexistent", "s1"),
                "Unknown slot_name")
 })
@@ -345,7 +345,7 @@ test_that(".tdr_cache_write sets schema_v to .TDR_CACHE_SCHEMA_VERSION", {
 # ── tdr_cache_validate ───────────────────────────────────────────────
 
 test_that("tdr_cache_validate returns invisibly when no cache", {
-  mock_tdr <- list(map = list(.cache = NULL))
+  mock_tdr <- TDRObj(map = list(.cache = NULL))
   expect_message(
     result <- tdr_cache_validate(mock_tdr),
     "No on-disk cache active"
@@ -362,7 +362,7 @@ test_that("tdr_cache_validate passes on valid cache", {
   m1 <- .tdr_cache_write(obj1, cache_dir, "clustering.ids", "s1")
   m2 <- .tdr_cache_write(obj2, cache_dir, "clustering.ids", "s2")
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk = TRUE,
@@ -390,7 +390,7 @@ test_that("tdr_cache_validate errors on missing file", {
   # Delete the file
   file.remove(m1$path)
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk = TRUE,
@@ -414,7 +414,7 @@ test_that("tdr_cache_validate with .verify.checksum catches corruption", {
   # Corrupt the file
   saveRDS("bad_data", m1$path)
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk = TRUE,
@@ -440,7 +440,7 @@ test_that("tdr_cache_validate with .verify.checksum catches corruption", {
 })
 
 test_that("tdr_cache_validate errors on schema mismatch", {
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk = TRUE,
@@ -459,7 +459,7 @@ test_that("tdr_cache_validate verbose = FALSE suppresses messages", {
   
   m1 <- .tdr_cache_write("data", cache_dir, "clustering.ids", "s1")
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk = TRUE,
@@ -482,7 +482,7 @@ test_that(".tdr_cache_validate_quiet is silent on valid cache", {
   
   m1 <- .tdr_cache_write("data", cache_dir, "clustering.ids", "s1")
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk = TRUE,
@@ -498,7 +498,7 @@ test_that(".tdr_cache_validate_quiet is silent on valid cache", {
 })
 
 test_that(".tdr_cache_validate_quiet is silent when no cache", {
-  mock_tdr <- list(map = list(.cache = NULL))
+  mock_tdr <- TDRObj(map = list(.cache = NULL))
   expect_silent(.tdr_cache_validate_quiet(mock_tdr))
 })
 
@@ -509,7 +509,7 @@ test_that(".tdr_cache_validate_quiet errors on missing file", {
   m1 <- .tdr_cache_write("data", cache_dir, "nearest.landmarks", "s1")
   file.remove(m1$path)
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk = TRUE,
@@ -627,7 +627,7 @@ test_that("tdr_cache_validate checks across all 4 slot types", {
   m_nl  <- .tdr_cache_write("nl",  cache_dir, "nearest.landmarks", "s1")
   m_fg  <- .tdr_cache_write("fg",  cache_dir, "fuzzy.graph",       "s1")
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk = TRUE,
@@ -665,7 +665,7 @@ test_that("tdr_cache_validate reports multiple missing files", {
   file.remove(m_cl$path)
   file.remove(m_fg$path)
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk = TRUE,
@@ -690,7 +690,7 @@ test_that("tdr_cache_validate reports multiple missing files", {
 # ──────────────────────────────────────────────────────────────────────
 
 test_that("tdr_cache_info reports INACTIVE when no cache", {
-  mock_tdr <- list(map = list(.cache = NULL))
+  mock_tdr <- TDRObj(map = list(.cache = NULL))
   
   expect_message(
     result <- tdr_cache_info(mock_tdr),
@@ -710,7 +710,7 @@ test_that("tdr_cache_info reports ACTIVE with correct stats", {
   m_fg2 <- .tdr_cache_write(Matrix::rsparsematrix(10, 5, 0.3),
                              cache_dir, "fuzzy.graph", "s2")
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk  = TRUE,
@@ -744,7 +744,7 @@ test_that("tdr_cache_info prints human-readable size", {
   
   m1 <- .tdr_cache_write("small", cache_dir, "clustering.ids", "s1")
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk  = TRUE,
@@ -767,7 +767,7 @@ test_that("tdr_cache_info skips NULL slot manifests", {
   
   m1 <- .tdr_cache_write("data", cache_dir, "clustering.ids", "s1")
   
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk  = TRUE,
@@ -791,7 +791,7 @@ test_that("tdr_cache_info skips NULL slot manifests", {
 })
 
 test_that("tdr_cache_info handles empty cache map", {
-  mock_tdr <- list(
+  mock_tdr <- TDRObj(
     map = list(
       .cache = list(
         on.disk = TRUE,

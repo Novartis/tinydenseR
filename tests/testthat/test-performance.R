@@ -70,7 +70,7 @@ test_that("functions handle large datasets", {
 
 test_that("plotting functions handle different data sizes", {
   # Test with minimal data
-  .tdr.obj_small <- list(
+  .tdr.obj_small <- TDRObj(
     graph = list(
       uwot = list(embedding = matrix(runif(4), ncol=2)),
       clustering = list(ids = factor(c("A", "B")))
@@ -81,7 +81,7 @@ test_that("plotting functions handle different data sizes", {
   expect_true("ggplot" %in% class(result_small))
   
   # Test with larger data
-  .tdr.obj_large <- list(
+  .tdr.obj_large <- TDRObj(
     graph = list(
       uwot = list(embedding = matrix(runif(2000), ncol=2)),
       clustering = list(ids = factor(sample(letters[1:5], 1000, replace = TRUE)))
@@ -98,7 +98,7 @@ test_that("functions handle edge cases", {
   expect_error(get.pbDE(.tdr.obj = NULL))
   
   # Test plotting functions with minimal valid data
-  minimal_obj <- list(
+  minimal_obj <- TDRObj(
     graph = list(
       uwot = list(embedding = matrix(c(1, 2, 3, 4), ncol=2)),
       clustering = list(ids = factor(c("A", "B")))

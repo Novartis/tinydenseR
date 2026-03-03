@@ -94,19 +94,19 @@ goi.summary <-
     .verbose = TRUE
   ){
     
-    if(!all(.goi %in% colnames(x = .tdr.obj$raw.landmarks))){
+    if(!all(.goi %in% colnames(x = .tdr.obj@raw.landmarks))){
       stop("Gene(s) not found in data: ",
-           paste(.goi[!(.goi %in% colnames(x = .tdr.obj$raw.landmarks))],
+           paste(.goi[!(.goi %in% colnames(x = .tdr.obj@raw.landmarks))],
                  collapse = ", "),
            "\nCheck gene names (case-sensitive) or use colnames(.tdr.obj$raw.landmarks) to see available genes.")
     }
     
-    if(.tdr.obj$config$assay.type != "RNA"){
+    if(.tdr.obj@config$assay.type != "RNA"){
       stop("goi.summary() only supports RNA assay data.\n",
-           "Current assay type: ", .tdr.obj$config$assay.type)
+           "Current assay type: ", .tdr.obj@config$assay.type)
     }
     
-    if(is.null(x = .tdr.obj$map)){
+    if(is.null(x = .tdr.obj@map) || length(.tdr.obj@map) == 0L){
       stop("Cell mapping not found. Run get.graph() and get.map() before calling goi.summary().")
     }
     
@@ -125,10 +125,10 @@ goi.summary <-
                     choices = c("clustering",
                                 "celltyping"))
         
-        if(!all(.id %in% unique(x = .tdr.obj$graph[[.id.from]]$ids))){
+        if(!all(.id %in% unique(x = .tdr.obj@graph[[.id.from]]$ids))){
           
           stop("Invalid ", .id.from, " ID(s): ",
-               paste(.id[!(.id %in% unique(x = .tdr.obj$graph[[.id.from]]$ids))],
+               paste(.id[!(.id %in% unique(x = .tdr.obj@graph[[.id.from]]$ids))],
                      collapse = ", "),
                "\nThese IDs were not found. Use unique(.tdr.obj$graph$", .id.from, "$ids) to see valid IDs.")
           
@@ -163,18 +163,18 @@ goi.summary <-
     
     # Process each sample: extract expression, label cells as pos./neg. for each gene
     if(isTRUE(x = .verbose)){
-      message("-> Processing ", length(.tdr.obj$cells), " samples for GOI summary...")
+      message("-> Processing ", length(.tdr.obj@cells), " samples for GOI summary...")
       .goi_start <- Sys.time()
     }
     
     goi <-
-      seq_along(along.with = .tdr.obj$cells) |>
-      stats::setNames(nm = names(x = .tdr.obj$cells)) |>
+      seq_along(along.with = .tdr.obj@cells) |>
+      stats::setNames(nm = names(x = .tdr.obj@cells)) |>
       lapply(FUN = function(cells.elem){
         
         # Load expression data for selected cells and genes
         goi.exprs.mat <-
-          readRDS(file = .tdr.obj$cells[[cells.elem]]) |> 
+          readRDS(file = .tdr.obj@cells[[cells.elem]]) |> 
           (\(x)
            x[.goi,.id.idx[[cells.elem]],drop = FALSE]
           )() |>
@@ -185,7 +185,7 @@ goi.summary <-
           as.matrix(x = goi.exprs.mat > 0)
         
         # Create cluster ID matrix for all cells × genes combinations
-        .smpl.name <- names(x = .tdr.obj$cells)[cells.elem]
+        .smpl.name <- names(x = .tdr.obj@cells)[cells.elem]
         .smpl.cl.ids <- .tdr_get_map_slot(.tdr.obj, "clustering.ids", .smpl.name)
         ids <-
           .smpl.cl.ids[.id.idx[[cells.elem]]] |>
@@ -206,8 +206,8 @@ goi.summary <-
                  ids[!all.goi.detected])
         
         # Repeat same process for cell type labels (if available)
-        .has.celltyping <- !is.null(x = .tdr.obj$map$celltyping$cell.count) ||
-          (!is.null(.tdr.obj$map$.cache) && !is.null(.tdr.obj$map$.cache$manifests$celltyping.ids))
+        .has.celltyping <- !is.null(x = .tdr.obj@map$celltyping$cell.count) ||
+          (!is.null(.tdr.obj@map$.cache) && !is.null(.tdr.obj@map$.cache$manifests$celltyping.ids))
         if(isTRUE(x = .has.celltyping)){
           
           .smpl.ct.ids <- .tdr_get_map_slot(.tdr.obj, "celltyping.ids", .smpl.name)
@@ -236,8 +236,8 @@ goi.summary <-
         
         if(isTRUE(x = .verbose)){
           .show_progress(current = cells.elem, 
-                         total = length(.tdr.obj$cells),
-                         item_label = names(x = .tdr.obj$cells)[cells.elem],
+                         total = length(.tdr.obj@cells),
+                         item_label = names(x = .tdr.obj@cells)[cells.elem],
                          start_time = .goi_start)
         }
         
@@ -332,8 +332,8 @@ goi.summary <-
                  (goi.elem$clustering$cell.count * 100) /
                  Matrix::rowSums(x = goi.elem$clustering$cell.count)
                
-               .has.ct <- !is.null(x = .tdr.obj$map$celltyping$cell.count) ||
-                 (!is.null(.tdr.obj$map$.cache) && !is.null(.tdr.obj$map$.cache$manifests$celltyping.ids))
+               .has.ct <- !is.null(x = .tdr.obj@map$celltyping$cell.count) ||
+                 (!is.null(.tdr.obj@map$.cache) && !is.null(.tdr.obj@map$.cache$manifests$celltyping.ids))
                if(isTRUE(x = .has.ct)){
                  
                  # Same process for cell type labels

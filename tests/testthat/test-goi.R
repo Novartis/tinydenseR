@@ -21,7 +21,7 @@ library(tinydenseR)
 
 test_that("goi.summary validates gene names correctly", {
   # Mock lm.obj with minimal structure
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 5,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3", "Gene4", "Gene5"))),
     config = list(assay.type = "RNA"),
@@ -42,7 +42,7 @@ test_that("goi.summary validates gene names correctly", {
 })
 
 test_that("goi.summary requires RNA assay type", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Marker1", "Marker2", "Marker3"))),
     config = list(assay.type = "cyto"),
@@ -56,11 +56,11 @@ test_that("goi.summary requires RNA assay type", {
 })
 
 test_that("goi.summary requires cell mapping", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
-    map = NULL
+    map = list()
   )
   
   expect_error(
@@ -70,7 +70,7 @@ test_that("goi.summary requires cell mapping", {
 })
 
 test_that("goi.summary validates .id parameter", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
@@ -92,7 +92,7 @@ test_that("goi.summary validates .id parameter", {
 })
 
 test_that("goi.summary validates .id.from parameter", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
@@ -114,7 +114,7 @@ test_that("goi.summary validates .id.from parameter", {
 })
 
 test_that("goi.summary handles case-sensitive gene names", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
@@ -129,7 +129,7 @@ test_that("goi.summary handles case-sensitive gene names", {
 })
 
 test_that("goi.summary accepts multiple genes", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 5,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3", "Gene4", "Gene5"))),
     config = list(assay.type = "RNA"),
@@ -144,7 +144,7 @@ test_that("goi.summary accepts multiple genes", {
 })
 
 test_that("goi.summary error messages are informative", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
@@ -159,7 +159,7 @@ test_that("goi.summary error messages are informative", {
 })
 
 test_that("goi.summary handles cytometry assay type correctly", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("CD4", "CD8", "CD19"))),
     config = list(assay.type = "cyto"),
@@ -173,7 +173,7 @@ test_that("goi.summary handles cytometry assay type correctly", {
 })
 
 test_that("goi.summary validates .id.idx parameter type", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
@@ -183,8 +183,7 @@ test_that("goi.summary validates .id.idx parameter type", {
     ),
     graph = list(
       clustering = list(ids = factor(x = c("1", "2", "3")))
-    ),
-    lm = matrix(data = 0, nrow = 5, ncol = 3)
+    )
   )
   
   # .id.idx should filter cells correctly when provided as integer
@@ -198,7 +197,7 @@ test_that("goi.summary returns structure with clustering, celltyping, and all", 
   # Testing the expected return structure components
   
   # Create minimal mock that would pass validation
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
@@ -227,7 +226,7 @@ test_that("goi.summary handles .verbose parameter", {
 })
 
 test_that("goi.summary handles empty gene vector", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
@@ -256,7 +255,7 @@ test_that("goi.summary pos/neg prefix logic would work correctly", {
 })
 
 test_that("goi.summary validates that genes exist in raw.landmarks colnames", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 5,
                     dimnames = list(NULL, c("ACTB", "GAPDH", "CD3D", "CD19", "MS4A1"))),
     config = list(assay.type = "RNA"),
@@ -271,7 +270,7 @@ test_that("goi.summary validates that genes exist in raw.landmarks colnames", {
 })
 
 test_that("goi.summary ID validation works for celltyping", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
@@ -296,7 +295,7 @@ test_that("goi.summary ID validation works for celltyping", {
 })
 
 test_that("goi.summary suggestion message includes available genes", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),

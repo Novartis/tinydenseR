@@ -20,7 +20,7 @@ library(tinydenseR)
 # Test for celltyping
 
 test_that("celltyping validates input mapping", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     graph = list(clustering = list(ids = factor(c("cluster.01", "cluster.02"))))
   )
   
@@ -42,7 +42,7 @@ test_that("celltyping validates input mapping", {
 })
 
 test_that("celltyping requires named list", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     graph = list(clustering = list(ids = factor(c("cluster.01"))))
   )
   

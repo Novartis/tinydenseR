@@ -35,7 +35,7 @@ test_that("plotting functions validate input types", {
 
 test_that("plotUMAP works with minimal valid structure", {
   # Test plotUMAP with minimal required structure
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     graph = list(
       uwot = list(embedding = matrix(c(1, 2, 3, 4), ncol=2)),
       clustering = list(ids = factor(c("A", "B")))
@@ -65,13 +65,13 @@ test_that("plotting functions handle mismatched dimensions", {
 
 test_that("plotting functions validate required fields", {
   # Test plotUMAP missing required fields
-  incomplete_obj1 <- list(graph = list())
+  incomplete_obj1 <- TDRObj(graph = list())
   expect_error(plotUMAP(.tdr.obj = incomplete_obj1))
   
-  incomplete_obj2 <- list(graph = list(uwot = list()))
+  incomplete_obj2 <- TDRObj(graph = list(uwot = list()))
   expect_error(plotUMAP(.tdr.obj = incomplete_obj2))
   
-  incomplete_obj3 <- list(graph = list(uwot = list(embedding = matrix(c(1,2), ncol=2))))
+  incomplete_obj3 <- TDRObj(graph = list(uwot = list(embedding = matrix(c(1,2), ncol=2))))
   expect_error(plotUMAP(.tdr.obj = incomplete_obj3))  # Missing clustering
 })
 
