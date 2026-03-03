@@ -7,7 +7,7 @@ Plot UMAP}
 \usage{
 plotUMAP(
   .tdr.obj,
-  .feature = .tdr.obj$graph$clustering$ids,
+  .feature = .tdr.obj@graph$clustering$ids,
   .cat.feature.color = Color.Palette[1, 1:5],
   .panel.size = 2,
   .midpoint = NULL,

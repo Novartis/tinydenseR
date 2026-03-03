@@ -7,12 +7,12 @@
 get.graph(
   .tdr.obj,
   .k = 20,
-  .scale = if (.tdr.obj$config$assay.type == "RNA") FALSE else TRUE,
+  .scale = if (.tdr.obj@config$assay.type == "RNA") FALSE else TRUE,
   .verbose = TRUE,
   .seed = 123,
   .cl.method = "snn",
   .cl.resolution.parameter = 0.8,
-  .small.size = floor(x = nrow(x = .tdr.obj$landmarks)/200)
+  .small.size = floor(x = nrow(x = .tdr.obj@landmarks)/200)
 )
 }
 \arguments{

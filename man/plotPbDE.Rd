@@ -11,7 +11,7 @@ plotPbDE(
   .population.name = "all",
   .coefs = NULL,
   .order.by = "none",
-  .markers = .tdr.obj$config$markers,
+  .markers = .tdr.obj@config$markers,
   .q = 0.1,
   .row.space.scaler = 0.2,
   .col.space.scaler = 0.065,

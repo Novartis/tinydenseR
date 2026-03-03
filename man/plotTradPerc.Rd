@@ -6,7 +6,7 @@
 \usage{
 plotTradPerc(
   .tdr.obj,
-  .x.split = colnames(x = .tdr.obj$metadata)[1],
+  .x.split = colnames(x = .tdr.obj@metadata)[1],
   .x.split.subset = NULL,
   .pop = NULL,
   .pop.from = "clustering",

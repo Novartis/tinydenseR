@@ -8,7 +8,7 @@ plotPCA(
   .tdr.obj,
   .PC.x = 1,
   .PC.y = 2,
-  .feature = .tdr.obj$graph$clustering$ids,
+  .feature = .tdr.obj@graph$clustering$ids,
   .cat.feature.color = Color.Palette[1, 1:5],
   .panel.size = if (is.numeric(x = .feature)) 2 else 3,
   .midpoint = NULL,

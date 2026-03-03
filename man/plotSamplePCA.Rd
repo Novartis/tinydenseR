@@ -6,12 +6,12 @@
 \usage{
 plotSamplePCA(
   .tdr.obj,
-  .labels.from = colnames(x = .tdr.obj$metadata)[1],
+  .labels.from = colnames(x = .tdr.obj@metadata)[1],
   .cat.feature.color = Color.Palette[1, 1:5],
   .point.size = 1,
   .panel.size = 2,
-  .midpoint = if (is.numeric(x = .tdr.obj$metadata[[.labels.from]])) stats::median(x =
-    .tdr.obj$metadata[[.labels.from]]) else NA
+  .midpoint = if (is.numeric(x = .tdr.obj@metadata[[.labels.from]])) stats::median(x =
+    .tdr.obj@metadata[[.labels.from]]) else NA
 )
 }
 \arguments{

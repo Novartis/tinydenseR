@@ -6,7 +6,7 @@
 \usage{
 plotDensity(
   .tdr.obj,
-  .x.split = colnames(x = .tdr.obj$metadata)[1],
+  .x.split = colnames(x = .tdr.obj@metadata)[1],
   .pop = NULL,
   .pop.from = "clustering",
   .subject.id = NULL,
