@@ -32,7 +32,7 @@ test_that("setup.tdr.obj integration works", {
     .verbose = FALSE
   )
   
-  expect_type(object = .tdr.obj, type = "list")
+  expect_true(is.TDRObj(.tdr.obj))
   expect_true("cells" %in% names(x = .tdr.obj))
   expect_true("metadata" %in% names(x = .tdr.obj))
   expect_true("config" %in% names(x = .tdr.obj))

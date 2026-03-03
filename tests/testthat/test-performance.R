@@ -61,7 +61,7 @@ test_that("functions handle large datasets", {
     .verbose = FALSE
   )
   
-  expect_type(object = result, type = "list")
+  expect_true(is.TDRObj(result))
   expect_true(length(result$cells) == 3)
   
   # Clean up

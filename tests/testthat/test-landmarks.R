@@ -54,7 +54,7 @@ test_that("setup.tdr.obj returns a list with correct names", {
                          .markers = c("CD3", "CD4", "CD8"),
                          .assay.type = "cyto",
                          .verbose = FALSE)
-  expect_type(object = result, type = "list")
+  expect_true(is.TDRObj(result))
   expect_true(all(c("cells",
                     "landmarks",
                     "scaled.landmarks",

@@ -92,7 +92,7 @@ test_that("get.graph adds graph to .tdr.obj", {
                         .scale = FALSE,
                         .verbose = FALSE,
                         .seed = 42)
-  expect_type(object = result, type = "list")
+  expect_true(is.TDRObj(result))
   expect_true("graph" %in% names(x = result))
   expect_true("uwot" %in% names(x = result$graph))
 })
@@ -141,7 +141,7 @@ test_that("get.map adds mapping info to .tdr.obj", {
                          .scale = FALSE,
                          .verbose = FALSE,
                          .seed = 42)
-  expect_type(object = result, type = "list")
+  expect_true(is.TDRObj(result))
 })
 
 # Test for get.lm.features.stats
@@ -188,7 +188,7 @@ test_that("get.lm.features.stats returns a list of feature stats", {
                          .scale = FALSE,
                          .verbose = FALSE,
                          .seed = 42)
-  expect_type(object = result, type = "list")
+  expect_true(is.TDRObj(result))
   result <- get.lm.features.stats(.tdr.obj = result)
-  expect_type(object = result, type = "list")
+  expect_true(is.TDRObj(result))
 })

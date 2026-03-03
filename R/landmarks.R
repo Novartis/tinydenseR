@@ -227,39 +227,18 @@ setup.tdr.obj <-
            "Current value: ", .prop.landmarks)
     }
     
-    .tdr.obj.nm <-
-      c("cells",
-        "landmarks",
-        "scaled.landmarks",
-        "raw.landmarks",
-        "metadata",
-        "config",
-        "integration",
-        "pca",
-        "graph",
-        "map",
-        "specDE",
-        "pbDE",
-        "markerDE",
-        "interact.plot")
-    
-    .tdr.obj <- vector(mode = "list",
-                      length = length(x = .tdr.obj.nm)) |>
-      stats::setNames(nm = .tdr.obj.nm)
-    
-    # Initialize config sub-list
-    .tdr.obj$config <- list(
-      key = NULL,
-      sampling = NULL,
-      assay.type = .assay.type,
-      markers = NULL,
-      n.threads = .n.threads
-    )
-    
-    # Initialize integration sub-list
-    .tdr.obj$integration <- list(
-      harmony.var = NULL,
-      harmony.obj = NULL
+    .tdr.obj <- TDRObj(
+      config = list(
+        key = NULL,
+        sampling = NULL,
+        assay.type = .assay.type,
+        markers = NULL,
+        n.threads = .n.threads
+      ),
+      integration = list(
+        harmony.var = NULL,
+        harmony.obj = NULL
+      )
     )
     
     if(lapply(X = .cells,
@@ -505,30 +484,22 @@ get.landmarks <-
     
     set.seed(seed = .seed)
     
-    if(names(x = .tdr.obj) |>
-       is.null()){
-      stop("Invalid .tdr.obj: missing structure.\n",
-           "Initialize with setup.tdr.obj() first.")
-    }
-    
-    if(!identical(
-      x = names(x = .tdr.obj), 
-      y = c("cells",
-            "landmarks",
-            "scaled.landmarks",
-            "raw.landmarks",
-            "metadata",
-            "config",
-            "integration",
-            "pca",
-            "graph",
-            "map",
-            "specDE",
-            "pbDE",
-            "markerDE",
-            "interact.plot"))){
-      stop("Invalid .tdr.obj structure.\n",
-           "Ensure it was created with setup.tdr.obj() and not manually modified.")
+    if(!inherits(x = .tdr.obj, what = "TDRObj")){
+      # Fallback: accept legacy lists with correct structure
+      if(is.list(.tdr.obj) && !is.null(names(.tdr.obj))){
+        expected_names <- c("cells","landmarks","scaled.landmarks","raw.landmarks",
+                            "metadata","config","integration","pca","graph","map",
+                            "specDE","pbDE","markerDE","interact.plot")
+        if(identical(x = names(x = .tdr.obj), y = expected_names)){
+          .tdr.obj <- as(.tdr.obj, "TDRObj")
+        } else {
+          stop("Invalid .tdr.obj structure.\n",
+               "Ensure it was created with setup.tdr.obj() and not manually modified.")
+        }
+      } else {
+        stop("Invalid .tdr.obj: missing structure.\n",
+             "Initialize with setup.tdr.obj() first.")
+      }
     }
     
     if(any(.nPC > min(.tdr.obj$metadata$n.cells))){

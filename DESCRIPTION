@@ -9,6 +9,20 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
+Collate: 
+    'TDRObj-class.R'
+    'Color.Palette.R'
+    'cache.R'
+    'celltype.R'
+    'elbow.finder.R'
+    'goi.R'
+    'landmarks.R'
+    'lm.graph.embed.R'
+    'plot.R'
+    'preprocess.R'
+    'process.sim.trajectory.R'
+    'stats.model.R'
+    'tinydenseR-package.R'
 VignetteBuilder: knitr
 Depends: 
     R (>= 4.1),
