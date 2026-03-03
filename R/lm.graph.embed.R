@@ -1513,7 +1513,7 @@ lm.cluster <-
     
     set.seed(seed = .seed)
     
-    if(is.null(.tdr.obj@graph)){
+    if(is.null(.tdr.obj@graph) || length(.tdr.obj@graph) == 0L){
       stop("Graph component missing. Run get.graph() before clustering.")
     }
     

@@ -21,9 +21,10 @@ library(tinydenseR)
 
 test_that("get.lm validates input correctly", {
   # Test error when design matrix doesn't match cells
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     cells = list(sample1 = "path1", sample2 = "path2"),
-    map = list(fdens = matrix(runif(20), nrow = 10, ncol = 2))
+    map = list(fdens = matrix(runif(20), nrow = 10, ncol = 2)),
+    config = list(assay.type = "cyto")
   )
   .design <- matrix(1, nrow = 3, ncol = 1)  # Wrong number of rows
   
@@ -32,7 +33,7 @@ test_that("get.lm validates input correctly", {
 })
 
 test_that("get.lm requires map", {
-  .tdr.obj <- list(cells = list(sample1 = "path1"))
+  .tdr.obj <- TDRObj(cells = list(sample1 = "path1"), config = list(assay.type = "cyto"))
   .design <- matrix(1, nrow = 1, ncol = 1)
   
   expect_error(get.lm(.tdr.obj = .tdr.obj, .design = .design),
@@ -43,7 +44,7 @@ test_that("get.lm requires map", {
 
 test_that("get.pbDE validates input correctly", {
   # Test error when design matrix doesn't match cells
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     cells = list(sample1 = "path1", sample2 = "path2"),
     config = list(assay.type = "RNA")
   )
@@ -54,7 +55,7 @@ test_that("get.pbDE validates input correctly", {
 })
 
 test_that("get.pbDE validates geneset.ls for RNA", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     cells = list(sample1 = "path1"),
     config = list(assay.type = "cyto")
   )
@@ -68,7 +69,7 @@ test_that("get.pbDE validates geneset.ls for RNA", {
 # Test for get.markerDE
 
 test_that("get.markerDE validates geneset.ls correctly", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     config = list(assay.type = "cyto"),
     graph = list(clustering = list(ids = factor(c("A", "B"))))
   )
@@ -79,7 +80,7 @@ test_that("get.markerDE validates geneset.ls correctly", {
 })
 
 test_that("get.markerDE requires valid id parameters", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     cells = list(sample1 = "path1"),
     config = list(assay.type = "RNA"),
     graph = list(clustering = list(ids = factor(c("A", "B"))))
@@ -93,7 +94,7 @@ test_that("get.markerDE requires valid id parameters", {
 })
 
 test_that("get.marker is deprecated", {
-  .tdr.obj <- list(
+  .tdr.obj <- TDRObj(
     config = list(assay.type = "cyto"),
     graph = list(clustering = list(ids = factor(c("A", "B"))))
   )
