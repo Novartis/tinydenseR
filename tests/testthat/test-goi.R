@@ -214,8 +214,8 @@ test_that("goi.summary returns structure with clustering, celltyping, and all", 
   
   # Would need full implementation to test actual return structure
   # For now, testing that the function expects proper structure
-  expect_true(object = !is.null(x = .tdr.obj$map$clustering))
-  expect_true(object = is.null(x = .tdr.obj$map$celltyping))
+  expect_true(object = !is.null(x = .tdr.obj@map$clustering))
+  expect_true(object = is.null(x = .tdr.obj@map$celltyping))
 })
 
 test_that("goi.summary handles .verbose parameter", {

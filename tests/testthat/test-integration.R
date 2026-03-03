@@ -36,7 +36,7 @@ test_that("setup.tdr.obj integration works", {
   expect_true("cells" %in% names(x = .tdr.obj))
   expect_true("metadata" %in% names(x = .tdr.obj))
   expect_true("config" %in% names(x = .tdr.obj))
-  expect_equal(.tdr.obj$config$assay.type, "cyto")
+  expect_equal(.tdr.obj@config$assay.type, "cyto")
   
   # Clean up temp files
   cleanup_test_files(test_data)
