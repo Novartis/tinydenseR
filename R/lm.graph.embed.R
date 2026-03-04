@@ -85,11 +85,11 @@ leiden.cluster <-
     # Determine initialization embedding: LE > PCA > computed from similarity
     .init.embed <- 
       if(!is.null(x = .tdr.obj)){
-        if(is.na(x = .tdr.obj@graph$LE$embed[1,1])) {
+        if(is.null(.tdr.obj@landmark.embed$le$coord) || isTRUE(is.na(x = .tdr.obj@landmark.embed$le$coord[1,1]))) {
           # Fallback to PCA if LE not available
-          .tdr.obj@pca$embed[,1:min(3, ncol(x = .tdr.obj@pca$embed)), drop = FALSE]
+          .tdr.obj@landmark.embed$pca$coord[,1:min(3, ncol(x = .tdr.obj@landmark.embed$pca$coord)), drop = FALSE]
         } else {
-          .tdr.obj@graph$LE$embed
+          .tdr.obj@landmark.embed$le$coord
         }
       } else {
         # No lm.obj: compute 3D embedding from similarity matrix
@@ -432,7 +432,7 @@ get.graph <-
            .seed = 123,
            .cl.method = "snn",
            .cl.resolution.parameter = 0.8,
-           .small.size = floor(x = nrow(x = .tdr.obj@landmarks) / 200)){
+           .small.size = floor(x = nrow(x = .tdr.obj@assay$expr) / 200)){
     
     # Validate clustering method
     .cl.method <-
@@ -441,8 +441,8 @@ get.graph <-
     
     # Compute UMAP embedding with k-NN graph
     set.seed(seed = .seed)
-    .tdr.obj@graph$uwot <-
-      uwot::umap(X = if(!is.null(x = .tdr.obj@integration$harmony.obj) || .tdr.obj@config$assay.type == "RNA") .tdr.obj@pca$embed else .tdr.obj@landmarks,
+    .tdr.obj@integration$umap.model <-
+      uwot::umap(X = if(!is.null(x = .tdr.obj@integration$harmony.obj) || .tdr.obj@config$assay.type == "RNA") .tdr.obj@landmark.embed$pca$coord else .tdr.obj@assay$expr,
                  n_neighbors = .k,
                  n_components = 2,           # 2D for visualization
                  n_epochs = 500,             # Training iterations
@@ -458,22 +458,26 @@ get.graph <-
                  ret_extra = c("fgraph",     # Fuzzy graph (for optional clustering)
                                "nn"))         # Nearest neighbors
     
-    colnames(x = .tdr.obj@graph$uwot$embedding) <-
+    # Extract embedding and fuzzy graph from the uwot result into their new slots
+    .tdr.obj@landmark.embed$umap <- list(coord = .tdr.obj@integration$umap.model$embedding)
+    .tdr.obj@graphs$fgraph <- .tdr.obj@integration$umap.model$fgraph
+    
+    colnames(x = .tdr.obj@landmark.embed$umap$coord) <-
       c("umap.1",
         "umap.2")
     
     # Convert k-NN indices to sparse adjacency matrix
-    .tdr.obj@graph$adj.matrix <-
-      get.adj.matrix(.nn.idx = .tdr.obj@graph$uwot$nn$euclidean$idx)
+    .tdr.obj@graphs$adj.matrix <-
+      get.adj.matrix(.nn.idx = .tdr.obj@integration$umap.model$nn$euclidean$idx)
     
     # Compute SNN graph via Jaccard similarity of neighbor overlaps
-    .tdr.obj@graph$snn <-
-      fast.jaccard.r(.adj.matrix = .tdr.obj@graph$adj.matrix,
+    .tdr.obj@graphs$snn <-
+      fast.jaccard.r(.adj.matrix = .tdr.obj@graphs$adj.matrix,
                      .prune = 1/15) |>
       (\(x)
        `dimnames<-`(x = x,
-                    value = list(rownames(x = .tdr.obj@landmarks),
-                                 rownames(x = .tdr.obj@landmarks)))
+                    value = list(rownames(x = .tdr.obj@assay$expr),
+                                 rownames(x = .tdr.obj@assay$expr)))
       )()
     
     if(isTRUE(x = .verbose)){
@@ -482,44 +486,44 @@ get.graph <-
     
     # Symmetrize adjacency: W[i,j] = 1 if i is NN of j OR j is NN of i
     # See uwot implementation: https://github.com/jlmelville/uwot/blob/f9e576e97d9df44d48be2cc559412282838dc4a5/R/init.R
-    .tdr.obj@graph$LE$W.sym <-
-      (((.tdr.obj@graph$adj.matrix > 0) |
-          (Matrix::t(x = .tdr.obj@graph$adj.matrix) > 0)) * 1) |>
+    .tdr.obj@landmark.embed$le$W.sym <-
+      (((.tdr.obj@graphs$adj.matrix > 0) |
+          (Matrix::t(x = .tdr.obj@graphs$adj.matrix) > 0)) * 1) |>
       Matrix::Matrix(sparse = TRUE)
     
     # Target dimensions: match PCA dimensionality
     target_k <-
-      ncol(x = .tdr.obj@pca$embed)
+      ncol(x = .tdr.obj@landmark.embed$pca$coord)
     nv <-
       min(target_k, 
-          nrow(x = .tdr.obj@pca$embed) - 1L) # Eigenspectrum limited to n-1
+          nrow(x = .tdr.obj@landmark.embed$pca$coord) - 1L) # Eigenspectrum limited to n-1
     stopifnot(nv >= 2L)
     
     # Form modified graph Laplacian: L = D^(-1/2) (D - W) D^(-1/2)
-    .tdr.obj@graph$LE <- 
-      c(.tdr.obj@graph$LE,
-        form_modified_laplacian(A = .tdr.obj@graph$LE$W.sym,
+    .tdr.obj@landmark.embed$le <- 
+      c(.tdr.obj@landmark.embed$le,
+        form_modified_laplacian(A = .tdr.obj@landmark.embed$le$W.sym,
                                 ret_d = TRUE))
     
     # Compute truncated SVD of Laplacian for nv components
-    .tdr.obj@graph$LE <-
-      c(.tdr.obj@graph$LE,
-        irlba_spectral_tsvd(L = .tdr.obj@graph$LE$L, 
+    .tdr.obj@landmark.embed$le <-
+      c(.tdr.obj@landmark.embed$le,
+        irlba_spectral_tsvd(L = .tdr.obj@landmark.embed$le$L, 
                             n = nv))
     
     # Verify convergence and valid eigenvectors
     ok <-
       all(c("vectors", "values", "converged") %in% 
-            names(x = .tdr.obj@graph$LE)) &&
-      is.matrix(x = .tdr.obj@graph$LE$vectors) &&
-      (ncol(x = .tdr.obj@graph$LE$vectors) >= nv) &&
-      isTRUE(x = .tdr.obj@graph$LE$converged)
+            names(x = .tdr.obj@landmark.embed$le)) &&
+      is.matrix(x = .tdr.obj@landmark.embed$le$vectors) &&
+      (ncol(x = .tdr.obj@landmark.embed$le$vectors) >= nv) &&
+      isTRUE(x = .tdr.obj@landmark.embed$le$converged)
     
     if(!ok) {
       
       message("Laplacian Eigenmap failed to converge.")
       
-      .tdr.obj@graph$LE$embed <- 
+      .tdr.obj@landmark.embed$le$coord <- 
         matrix(data = NA_real_,
                nrow = 1,
                ncol = 1)
@@ -528,14 +532,14 @@ get.graph <-
       
       # Filter out trivial eigenvalues (near-zero, correspond to disconnected components)
       tol <- 1e-6
-      .tdr.obj@graph$LE$nontriv <-
-        which(x = .tdr.obj@graph$LE$values > tol)
+      .tdr.obj@landmark.embed$le$nontriv <-
+        which(x = .tdr.obj@landmark.embed$le$values > tol)
       
-      if(length(x = .tdr.obj@graph$LE$nontriv) == 0L) {
+      if(length(x = .tdr.obj@landmark.embed$le$nontriv) == 0L) {
         
         message("No non-trivial Laplacian eigenvalues found (graph may be empty or singular).")
         
-        .tdr.obj@graph$LE$embed <- 
+        .tdr.obj@landmark.embed$le$coord <- 
           matrix(data = NA_real_,
                  nrow = 1,
                  ncol = 1)
@@ -543,34 +547,34 @@ get.graph <-
       } else {
         
         # Determine embedding dimensionality via elbow detection
-        if(length(x = .tdr.obj@graph$LE$nontriv) < 4L){
+        if(length(x = .tdr.obj@landmark.embed$le$nontriv) < 4L){
           
-          k <- length(x = .tdr.obj@graph$LE$nontriv)  # Too few for elbow, use all
+          k <- length(x = .tdr.obj@landmark.embed$le$nontriv)  # Too few for elbow, use all
           
         } else {
           
-          .tdr.obj@graph$LE$elbow <-
-            elbow.sec.deriv(x = .tdr.obj@graph$LE$values[.tdr.obj@graph$LE$nontriv],
+          .tdr.obj@landmark.embed$le$elbow <-
+            elbow.sec.deriv(x = .tdr.obj@landmark.embed$le$values[.tdr.obj@landmark.embed$le$nontriv],
                             smooth = TRUE,
                             df = NULL,
                             sort.order = "asc")$index
           
           # Use elbow dimensions, bounded by target and available eigenvectors
           k <- 
-            min(.tdr.obj@graph$LE$elbow, 
+            min(.tdr.obj@landmark.embed$le$elbow, 
                 target_k, 
-                length(x = .tdr.obj@graph$LE$nontriv)) |>
+                length(x = .tdr.obj@landmark.embed$le$nontriv)) |>
             max(2L)
           
         }
         
         # Extract first k non-trivial eigenvectors
-        .tdr.obj@graph$LE$keep <-
-          .tdr.obj@graph$LE$nontriv[seq_len(length.out = k)]
+        .tdr.obj@landmark.embed$le$keep <-
+          .tdr.obj@landmark.embed$le$nontriv[seq_len(length.out = k)]
         
         # Normalize eigenvectors: multiply by D^(-1/2) and L2-normalize columns
-        .tdr.obj@graph$LE$embed <-
-          (.tdr.obj@graph$LE$Disqrt * .tdr.obj@graph$LE$vectors[,.tdr.obj@graph$LE$keep, drop = FALSE]) |> 
+        .tdr.obj@landmark.embed$le$coord <-
+          (.tdr.obj@landmark.embed$le$Disqrt * .tdr.obj@landmark.embed$le$vectors[,.tdr.obj@landmark.embed$le$keep, drop = FALSE]) |> 
           (\(x)
            sweep(x = x, 
                  MARGIN = 2, 
@@ -580,7 +584,7 @@ get.graph <-
           )() |>
           (\(x)
            `dimnames<-`(x = x,
-                        value = list(rownames(x = .tdr.obj@pca$embed),
+                        value = list(rownames(x = .tdr.obj@landmark.embed$pca$coord),
                                      paste0("LE", 1:ncol(x = x))))
           )()
       }
@@ -769,21 +773,21 @@ get.map <-
         message("building Annoy index for Symphony reference object")
       }
       
-      .tdr.obj@symphony.obj <-
+      .tdr.obj@integration$symphony.obj <-
         .ref.obj
       
       # Build k-NN index on reference embeddings for fast query lookup
       set.seed(seed = .seed)
-      .tdr.obj@symphony.obj$ref.knn.idx <-
-        Matrix::t(x = .tdr.obj@symphony.obj$Z_corr) |>
+      .tdr.obj@integration$symphony.obj$ref.knn.idx <-
+        Matrix::t(x = .tdr.obj@integration$symphony.obj$Z_corr) |>
         annoy_build(metric = "euclidean", 
                     n_trees = 50,
                     verbose = .verbose)
       
-      .tdr.obj@symphony.obj$celltype.col.name <-
+      .tdr.obj@integration$symphony.obj$celltype.col.name <-
         .celltype.col.name
       
-      .tdr.obj@graph$celltyping <- NULL
+      .tdr.obj@landmark.annot$celltyping <- NULL
       
     }
     
@@ -795,23 +799,23 @@ get.map <-
       }
       
       # Check if specified population exists in clustering, celltyping, or reference
-      if(!(.cl.ct.to.ign %in% levels(x = .tdr.obj@graph$clustering$ids)) &
-         !((.cl.ct.to.ign %in% levels(x = .tdr.obj@graph$celltyping$ids)) |
+      if(!(.cl.ct.to.ign %in% levels(x = .tdr.obj@landmark.annot$clustering$ids)) &
+         !((.cl.ct.to.ign %in% levels(x = .tdr.obj@landmark.annot$celltyping$ids)) |
            ((.cl.ct.to.ign %in% .ref.obj$meta_data[[.celltype.col.name]])))){
         stop("The cluster or cell type '", .cl.ct.to.ign, "' was not found.\nCheck clustering IDs, celltyping IDs, or reference metadata.")
       }
       
       # Build keep lists excluding the ignored population
       .cl.to.keep <-
-        levels(x = .tdr.obj@graph$clustering$ids)[
-          !(levels(x = .tdr.obj@graph$clustering$ids) %in%
+        levels(x = .tdr.obj@landmark.annot$clustering$ids)[
+          !(levels(x = .tdr.obj@landmark.annot$clustering$ids) %in%
               .cl.ct.to.ign)
         ]
       
       .ct.to.keep <-
         if(is.null(x = .ref.obj)){
-          levels(x = .tdr.obj@graph$celltyping$ids)[
-            !(levels(x = .tdr.obj@graph$celltyping$ids) %in%
+          levels(x = .tdr.obj@landmark.annot$celltyping$ids)[
+            !(levels(x = .tdr.obj@landmark.annot$celltyping$ids) %in%
                 .cl.ct.to.ign)
           ]
         } else {
@@ -825,11 +829,11 @@ get.map <-
       
       # Keep all populations
       .cl.to.keep <-
-        levels(x = .tdr.obj@graph$clustering$ids)
+        levels(x = .tdr.obj@landmark.annot$clustering$ids)
       
       .ct.to.keep <-
         if(is.null(x = .ref.obj)){
-          levels(x = .tdr.obj@graph$celltyping$ids)
+          levels(x = .tdr.obj@landmark.annot$celltyping$ids)
         } else {
           unique(x = .ref.obj$meta_data[[.celltype.col.name]])
         }
@@ -893,7 +897,7 @@ get.map <-
              # size factor normalization, taking into consideration size factor of landmarks
              (x / (Matrix::rowSums(x = x) /
                      mean(x = Matrix::rowSums(x = x)))) * 
-               (mean(x = Matrix::rowSums(x = x)) / mean(x = Matrix::rowSums(x = .tdr.obj@raw.landmarks)))
+               (mean(x = Matrix::rowSums(x = x)) / mean(x = Matrix::rowSums(x = .tdr.obj@assay$raw)))
             )()
           
           mat.exprs@x <-
@@ -915,13 +919,13 @@ get.map <-
         }
         
         cells.of.interest <-
-          !(temp.cell.names %in% rownames(x = .tdr.obj@landmarks))
+          !(temp.cell.names %in% rownames(x = .tdr.obj@assay$expr))
         
         if(!is.null(x = .tdr.obj@integration$harmony.obj)){
           
           # Map query
           mat.exprs <-
-            symphony::mapQuery(exp_query = Matrix::t(x = mat.exprs[,.tdr.obj@pca$HVG]),
+            symphony::mapQuery(exp_query = Matrix::t(x = mat.exprs[,.tdr.obj@landmark.embed$pca$HVG]),
                                metadata_query = matrix(data = 1,
                                                        nrow = nrow(x = mat.exprs),
                                                        ncol = 2),
@@ -939,10 +943,10 @@ get.map <-
         } else if(.tdr.obj@config$assay.type == "RNA"){
           
           mat.exprs <-
-            (((Matrix::t(x = mat.exprs[,.tdr.obj@pca$HVG]) - .tdr.obj@pca$center) /
-                .tdr.obj@pca$scale) |>
+            (((Matrix::t(x = mat.exprs[,.tdr.obj@landmark.embed$pca$HVG]) - .tdr.obj@landmark.embed$pca$center) /
+                .tdr.obj@landmark.embed$pca$scale) |>
                Matrix::t()) %*%
-            .tdr.obj@pca$rotation
+            .tdr.obj@landmark.embed$pca$rotation
           
         }
         
@@ -958,7 +962,7 @@ get.map <-
         res2 <-
           uwot::umap_transform(
             X = mat.exprs,
-            model = .tdr.obj@graph$uwot,
+            model = .tdr.obj@integration$umap.model,
             init_weighted = TRUE,
             search_k = NULL,
             tmpdir = tempdir(),
@@ -984,7 +988,7 @@ get.map <-
           Matrix::summary(object = res2$fgraph) |>
           dplyr::rename(cell = i,
                         landmark = j) |>
-          dplyr::mutate(label = as.character(x = .tdr.obj@graph$clustering$ids[landmark])) |>
+          dplyr::mutate(label = as.character(x = .tdr.obj@landmark.annot$clustering$ids[landmark])) |>
           dplyr::select(-landmark) |>
           collapse::fgroup_by(cell,
                               label,
@@ -1010,9 +1014,9 @@ get.map <-
           }
           )()
         
-        if(is.null(x = .tdr.obj@symphony.obj)){
+        if(is.null(x = .tdr.obj@integration$symphony.obj)){
           
-          if(!is.null(x = .tdr.obj@graph$celltyping)){
+          if(!is.null(x = .tdr.obj@landmark.annot$celltyping)){
             
             if(isTRUE(x = .verbose)){
               
@@ -1024,7 +1028,7 @@ get.map <-
               Matrix::summary(object = res2$fgraph) |>
               dplyr::rename(cell = i,
                             landmark = j) |>
-              dplyr::mutate(label = as.character(x = .tdr.obj@graph$celltyping$ids[landmark])) |>
+              dplyr::mutate(label = as.character(x = .tdr.obj@landmark.annot$celltyping$ids[landmark])) |>
               dplyr::select(-landmark) |>
               collapse::fgroup_by(cell,
                                   label,
@@ -1067,7 +1071,7 @@ get.map <-
                                metadata_query = matrix(data = 1,
                                                        nrow = ncol(x = raw.exprs),
                                                        ncol = 2),
-                               ref_obj = .tdr.obj@symphony.obj,
+                               ref_obj = .tdr.obj@integration$symphony.obj,
                                vars = NULL,
                                verbose = FALSE,
                                do_normalize = TRUE,
@@ -1078,7 +1082,7 @@ get.map <-
             annoy_search(
               X = query,
               k = 1,
-              ann = .tdr.obj@symphony.obj$ref.knn.idx,
+              ann = .tdr.obj@integration$symphony.obj$ref.knn.idx,
               #search_k = search_k,
               #prep_data = TRUE,
               #tmpdir = tmpdir,
@@ -1088,14 +1092,14 @@ get.map <-
             )
           
           res2$cell.celltyping <-
-            as.character(x = .tdr.obj@symphony.obj$meta_data[[
-              .tdr.obj@symphony.obj$celltype.col.name
+            as.character(x = .tdr.obj@integration$symphony.obj$meta_data[[
+              .tdr.obj@integration$symphony.obj$celltype.col.name
             ]])[nn$idx[,1,drop = TRUE]] |>
             stats::setNames(nm = colnames(x = raw.exprs))  
           
           res2$lm.celltyping <-
-            as.character(x = .tdr.obj@symphony.obj$meta_data[[
-              .tdr.obj@symphony.obj$celltype.col.name
+            as.character(x = .tdr.obj@integration$symphony.obj$meta_data[[
+              .tdr.obj@integration$symphony.obj$celltype.col.name
             ]])[nn$idx[!cells.of.interest,1,drop = TRUE]] |>
             stats::setNames(nm = colnames(x = raw.exprs)[!cells.of.interest])  
           
@@ -1129,10 +1133,10 @@ get.map <-
         smpl.name <- names(x = .tdr.obj@cells)[cells.idx]
         
         smpl.fdens <-
-          if(ncol(x = res2$fgraph) == nrow(x = .tdr.obj@landmarks)){
+          if(ncol(x = res2$fgraph) == nrow(x = .tdr.obj@assay$expr)){
             Matrix::colSums(x = res2$fgraph[
               if(length(x = .cl.to.keep) !=
-                 (levels(x = .tdr.obj@graph$clustering$ids) |>
+                 (levels(x = .tdr.obj@landmark.annot$clustering$ids) |>
                   length())){
                 (res2$cell.clustering %in% .cl.to.keep)
               } else {
@@ -1145,7 +1149,7 @@ get.map <-
           } else {
             Matrix::rowSums(x = res2$fgraph[,
               if(length(x = .cl.to.keep) !=
-                 (levels(x = .tdr.obj@graph$clustering$ids) |>
+                 (levels(x = .tdr.obj@landmark.annot$clustering$ids) |>
                   length())){
                 (res2$cell.clustering %in% .cl.to.keep)
               } else {
@@ -1227,13 +1231,13 @@ get.map <-
         
       })
     
-    if(!is.null(x = .tdr.obj@symphony.obj)){
+    if(!is.null(x = .tdr.obj@integration$symphony.obj)){
       
-      .tdr.obj@graph$celltyping <-
+      .tdr.obj@landmark.annot$celltyping <-
         vector(mode = "list",
                length = 0)
       
-      .tdr.obj@graph$celltyping$ids <-
+      .tdr.obj@landmark.annot$celltyping$ids <-
         seq_along(along.with = res) |>
         stats::setNames(nm = names(x = res)) |>
         lapply(FUN = function(smpl.idx){
@@ -1241,7 +1245,7 @@ get.map <-
         }) |>
         unlist(use.names = FALSE)
       
-      names(x = .tdr.obj@graph$celltyping$ids) <-
+      names(x = .tdr.obj@landmark.annot$celltyping$ids) <-
         seq_along(along.with = res) |>
         stats::setNames(nm = names(x = res)) |>
         lapply(FUN = function(smpl.idx){
@@ -1249,14 +1253,14 @@ get.map <-
         }) |>
         unlist(use.names = FALSE)
       
-      .tdr.obj@graph$celltyping$ids <-
-        .tdr.obj@graph$celltyping$ids[
-          rownames(x = .tdr.obj@landmarks)
+      .tdr.obj@landmark.annot$celltyping$ids <-
+        .tdr.obj@landmark.annot$celltyping$ids[
+          rownames(x = .tdr.obj@assay$expr)
         ] |>
         as.factor()
       
       top <-
-        apply(X = .tdr.obj@pca$rotation,
+        apply(X = .tdr.obj@landmark.embed$pca$rotation,
               MARGIN = 2,
               FUN = function(PC.rot){
                 
@@ -1272,14 +1276,14 @@ get.map <-
               }) |>
         as.vector() |> 
         (\(x)
-         rownames(x = .tdr.obj@pca$rotation)[x]
+         rownames(x = .tdr.obj@landmark.embed$pca$rotation)[x]
         )() |>
         unique()
       
-      .tdr.obj@graph$celltyping$median.exprs <-
-        (if(.tdr.obj@config$assay.type == "RNA") .tdr.obj@scaled.landmarks[,top] else .tdr.obj@landmarks) |>
+      .tdr.obj@results$celltyping$median.exprs <-
+        (if(.tdr.obj@config$assay.type == "RNA") .tdr.obj@assay$scaled[,top] else .tdr.obj@assay$expr) |>
         dplyr::as_tibble() |>
-        cbind(cell.pop = as.character(x = .tdr.obj@graph$celltyping$ids)) |>
+        cbind(cell.pop = as.character(x = .tdr.obj@landmark.annot$celltyping$ids)) |>
         dplyr::group_by(cell.pop) |>
         dplyr::summarize_all(.funs = stats::median) |>
         as.data.frame() |>
@@ -1289,8 +1293,8 @@ get.map <-
         )() |>
         as.matrix()
       
-      .tdr.obj@graph$celltyping$pheatmap <-
-        pheatmap::pheatmap(mat = .tdr.obj@graph$celltyping$median.exprs,
+      .tdr.obj@results$celltyping$pheatmap <-
+        pheatmap::pheatmap(mat = .tdr.obj@results$celltyping$median.exprs,
                            color = grDevices::colorRampPalette(
                              unname(obj =
                                       Color.Palette[1,c(1,6,2)]))(100),
@@ -1315,7 +1319,7 @@ get.map <-
       do.call(what = cbind) |>
       (\(x)
        `rownames<-`(x = x,
-                    value = rownames(x = .tdr.obj@landmarks))
+                    value = rownames(x = .tdr.obj@assay$expr))
       )() |>
       Matrix::t() |>
       (\(x) {
@@ -1347,14 +1351,13 @@ get.map <-
         .cache.meta$manifests$celltyping.ids <- NULL
       }
       
-      .tdr.obj@map <-
-        list(fdens = fdens,
-             Y = Y,
-             clustering = list(ids = NULL),
-             celltyping = list(ids = NULL),
-             nearest.landmarks = NULL,
-             fuzzy.graph = NULL,
-             .cache = .cache.meta)
+      .tdr.obj@density$fdens <- fdens
+      .tdr.obj@density$Y <- Y
+      .tdr.obj@cellmap$cluster.ids <- NULL
+      .tdr.obj@cellmap$celltype.ids <- NULL
+      .tdr.obj@cellmap$nearest.lm <- NULL
+      .tdr.obj@cellmap$fuzzy.graph <- NULL
+      .tdr.obj@density$.cache <- .cache.meta
       
     } else {
       
@@ -1368,24 +1371,23 @@ get.map <-
       cell.clustering <-
         lapply(X = res, FUN = `[[`, "cell.clustering")
       
-      if(!is.null(x = .tdr.obj@graph$celltyping)){
+      if(!is.null(x = .tdr.obj@landmark.annot$celltyping)){
         cell.celltyping <-
           lapply(X = res, FUN = `[[`, "cell.celltyping")
       } else {
         cell.celltyping <- NULL
       }
       
-      .tdr.obj@map <-
-        list(fdens = fdens,
-             Y = Y,
-             clustering = list(ids = cell.clustering),
-             celltyping = list(ids = cell.celltyping),
-             nearest.landmarks = cell.nlmn,
-             fuzzy.graph = cell.fg)
+      .tdr.obj@density$fdens <- fdens
+      .tdr.obj@density$Y <- Y
+      .tdr.obj@cellmap$cluster.ids <- cell.clustering
+      .tdr.obj@cellmap$celltype.ids <- cell.celltyping
+      .tdr.obj@cellmap$nearest.lm <- cell.nlmn
+      .tdr.obj@cellmap$fuzzy.graph <- cell.fg
     }
     
     # ── Compute cell.count / cell.perc from streaming counts ──
-    .tdr.obj@map$clustering$cell.count <-
+    .tdr.obj@density$composition$clustering$cell.count <-
       lapply(X = res, FUN = `[[`, "cl.count") |>
       stats::setNames(nm = names(res)) |>
       dplyr::bind_rows(.id = "sample") |>
@@ -1402,17 +1404,17 @@ get.map <-
        x[,!(colnames(x = x) %in% .cl.ct.to.ign)]
       )()
     
-    .tdr.obj@map$clustering$cell.count[
-      is.na(x = .tdr.obj@map$clustering$cell.count)
+    .tdr.obj@density$composition$clustering$cell.count[
+      is.na(x = .tdr.obj@density$composition$clustering$cell.count)
     ] <- 0
     
-    .tdr.obj@map$clustering$cell.perc <-
-      (.tdr.obj@map$clustering$cell.count * 100) /
-      Matrix::rowSums(x = .tdr.obj@map$clustering$cell.count)
+    .tdr.obj@density$composition$clustering$cell.perc <-
+      (.tdr.obj@density$composition$clustering$cell.count * 100) /
+      Matrix::rowSums(x = .tdr.obj@density$composition$clustering$cell.count)
     
-    if(!is.null(x = .tdr.obj@graph$celltyping)){
+    if(!is.null(x = .tdr.obj@landmark.annot$celltyping)){
       
-      .tdr.obj@map$celltyping$cell.count <-
+      .tdr.obj@density$composition$celltyping$cell.count <-
         lapply(X = res, FUN = `[[`, "ct.count") |>
         stats::setNames(nm = names(res)) |>
         dplyr::bind_rows(.id = "sample") |>
@@ -1429,17 +1431,17 @@ get.map <-
          x[,!(colnames(x = x) %in% .cl.ct.to.ign)]
         )()
       
-      .tdr.obj@map$celltyping$cell.count[
-        is.na(x = .tdr.obj@map$celltyping$cell.count)
+      .tdr.obj@density$composition$celltyping$cell.count[
+        is.na(x = .tdr.obj@density$composition$celltyping$cell.count)
       ] <- 0
       
-      .tdr.obj@map$celltyping$cell.perc <-
-        (.tdr.obj@map$celltyping$cell.count * 100) /
-        Matrix::rowSums(x = .tdr.obj@map$celltyping$cell.count)
+      .tdr.obj@density$composition$celltyping$cell.perc <-
+        (.tdr.obj@density$composition$celltyping$cell.count * 100) /
+        Matrix::rowSums(x = .tdr.obj@density$composition$celltyping$cell.count)
       
     }
     
-    .tdr.obj@map$cl.ct.to.ign <-
+    .tdr.obj@density$ignored <-
       .cl.ct.to.ign
     
     return(.tdr.obj)
@@ -1513,7 +1515,7 @@ lm.cluster <-
     
     set.seed(seed = .seed)
     
-    if(is.null(.tdr.obj@graph) || length(.tdr.obj@graph) == 0L){
+    if(is.null(.tdr.obj@graphs$adj.matrix)){
       stop("Graph component missing. Run get.graph() before clustering.")
     }
     
@@ -1522,18 +1524,18 @@ lm.cluster <-
       match.arg(arg = .cl.method,
                 choices = c("fgraph","snn"))
     
-    .tdr.obj@graph$clustering <-
+    .tdr.obj@results$clustering <-
       vector(mode = "list")
     
     # Run Leiden clustering on selected similarity matrix
-    .tdr.obj@graph$clustering$ids <-
+    .tdr.obj@landmark.annot$clustering$ids <-
       leiden.cluster(
         .tdr.obj = .tdr.obj,
         .sim.matrix = if(.cl.method == "fgraph"){
-          Matrix::drop0(x = .tdr.obj@graph$uwot$fgraph,   # Prune weak fuzzy edges
+          Matrix::drop0(x = .tdr.obj@graphs$fgraph,   # Prune weak fuzzy edges
                         tol = 1/20)
         } else {
-          .tdr.obj@graph$snn                              # Use SNN graph
+          .tdr.obj@graphs$snn                              # Use SNN graph
         },
         .resolution.parameter = .cl.resolution.parameter * 1e-3,  # Scale for CPM
         .small.size = .small.size,
@@ -1547,7 +1549,7 @@ lm.cluster <-
     if(.tdr.obj@config$assay.type == "RNA"){
       
       top <-
-        apply(X = .tdr.obj@pca$rotation,
+        apply(X = .tdr.obj@landmark.embed$pca$rotation,
               MARGIN = 2,
               FUN = function(PC.rot){
                 
@@ -1563,17 +1565,17 @@ lm.cluster <-
               }) |>
         as.vector() |> 
         (\(x)
-         rownames(x = .tdr.obj@pca$rotation)[x]
+         rownames(x = .tdr.obj@landmark.embed$pca$rotation)[x]
         )() |>
         unique()
       
     }
     
     # Compute median expression per cluster
-    .tdr.obj@graph$clustering$median.exprs <-
-      (if(.tdr.obj@config$assay.type == "RNA") .tdr.obj@scaled.landmarks[,top] else .tdr.obj@landmarks) |>
+    .tdr.obj@results$clustering$median.exprs <-
+      (if(.tdr.obj@config$assay.type == "RNA") .tdr.obj@assay$scaled[,top] else .tdr.obj@assay$expr) |>
       dplyr::as_tibble() |>
-      cbind(cell.pop = as.character(x = .tdr.obj@graph$clustering$ids)) |>
+      cbind(cell.pop = as.character(x = .tdr.obj@landmark.annot$clustering$ids)) |>
       dplyr::group_by(cell.pop) |>
       dplyr::summarize_all(.funs = stats::median) |>
       as.data.frame() |>
@@ -1584,8 +1586,8 @@ lm.cluster <-
       as.matrix()
     
     # Generate heatmap of cluster profiles
-    .tdr.obj@graph$clustering$pheatmap <-
-      pheatmap::pheatmap(mat = .tdr.obj@graph$clustering$median.exprs,
+    .tdr.obj@results$clustering$pheatmap <-
+      pheatmap::pheatmap(mat = .tdr.obj@results$clustering$median.exprs,
                          color = grDevices::colorRampPalette(
                            unname(obj =
                                     Color.Palette[1,c(1,6,2)]))(100),
@@ -1594,7 +1596,7 @@ lm.cluster <-
                          border_color = NA,
                          scale = "none",
                          angle_col = 90,
-                         cluster_rows = if(nrow(x = .tdr.obj@graph$clustering$median.exprs) > 1) TRUE else FALSE,
+                         cluster_rows = if(nrow(x = .tdr.obj@results$clustering$median.exprs) > 1) TRUE else FALSE,
                          cluster_cols = TRUE,
                          cellwidth = 20,
                          cellheight = 20,
@@ -1660,7 +1662,7 @@ get.lm.features.stats <-
     
     # Identify the top (dominant) PC for each landmark
     top.comp <-
-      .tdr.obj@pca$embed |>
+      .tdr.obj@landmark.embed$pca$coord |>
       abs() |>
       as.matrix() |>
       (\(x)
@@ -1675,12 +1677,12 @@ get.lm.features.stats <-
     
     # Get sign of each landmark's score in its top PC
     top.comp.sign <-
-      diag(x = .tdr.obj@pca$embed[,top.comp]) |>
+      diag(x = .tdr.obj@landmark.embed$pca$coord[,top.comp]) |>
       sign()
     
     # Signed feature loadings: rotation × sign for each landmark's top PC
     coefs <-
-      ((Matrix::t(x = .tdr.obj@pca$rotation[,top.comp]) * top.comp.sign) |>
+      ((Matrix::t(x = .tdr.obj@landmark.embed$pca$rotation[,top.comp]) * top.comp.sign) |>
          Matrix::t())
     
     # Find top 10 features for each landmark (by signed loading)
@@ -1697,9 +1699,9 @@ get.lm.features.stats <-
     
     # Build result list: one data frame per landmark
     res <-
-      nrow(x = .tdr.obj@landmarks) |>
+      nrow(x = .tdr.obj@assay$expr) |>
       seq_len() |>
-      stats::setNames(nm = rownames(x = .tdr.obj@landmarks)) |>
+      stats::setNames(nm = rownames(x = .tdr.obj@assay$expr)) |>
       lapply(FUN = function(lm.idx){
         
         coefs[hits$row[hits$col == lm.idx],            # Features for this landmark
@@ -1719,7 +1721,7 @@ get.lm.features.stats <-
              FUN = knitr::kable,
              format = "html")
     
-    .tdr.obj@interact.plot$lm.features <-
+    .tdr.obj@results$features$lm.features <-
       list(res = res,
            html = html)
     
