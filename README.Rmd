@@ -115,7 +115,8 @@ bioc_pkgs <-
                               (installed.packages() |>
                                  rownames())]]
 if (length(bioc_pkgs) > 0) {
-  BiocManager::install(pkgs = bioc_pkgs)
+  BiocManager::install(pkgs = bioc_pkgs,
+                       update = FALSE)
 }
 
 unlink(temp_file)
