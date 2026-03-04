@@ -29,7 +29,7 @@
 #' @param .PC.x Integer specifying x-axis principal component (default 1).
 #' @param .PC.y Integer specifying y-axis principal component (default 2).
 #' @param .feature Numeric vector or factor of length \code{nrow(.tdr.obj$landmarks)} to color points by. 
-#'   Defaults to cluster IDs from \code{$graph$clustering$ids}. Can be:
+#'   Defaults to cluster IDs from \code{$landmark.annot$clustering$ids}. Can be:
 #'   \itemize{
 #'     \item Numeric: gene expression, fold changes, statistics (uses diverging color scale)
 #'     \item Factor: clusters, cell types, conditions (uses discrete color palette)
@@ -245,7 +245,7 @@ plotPCA <-
 #'
 #' @param .tdr.obj A tinydenseR object with UMAP computed via \code{get.graph()}.
 #' @param .feature Numeric vector or factor of length \code{nrow(.tdr.obj$landmarks)} to color points by. 
-#'   Defaults to cluster IDs from \code{$graph$clustering$ids}. Can be:
+#'   Defaults to cluster IDs from \code{$landmark.annot$clustering$ids}. Can be:
 #'   \itemize{
 #'     \item Numeric: gene expression, fold changes, statistics (uses diverging color scale)
 #'     \item Factor: clusters, cell types, conditions (uses discrete color palette)
@@ -677,7 +677,7 @@ plotBeeswarm <-
         
         if(is.null(x = .tdr.obj@landmark.annot$celltyping$ids)){
           
-          stop(".tdr.obj$graph$celltyping$ids could not be found")
+          stop(".tdr.obj$landmark.annot$celltyping$ids could not be found")
           
         }
         
@@ -891,7 +891,7 @@ plot2Markers <-
       } else if(.id.from == "celltyping"){
         
         if(is.null(x = .tdr.obj@landmark.annot$celltyping$ids)){
-          stop(".tdr.obj$graph$celltyping$ids could not be found")
+          stop(".tdr.obj$landmark.annot$celltyping$ids could not be found")
         }
         .id <- .tdr.obj@landmark.annot$celltyping$ids == .id
       }
@@ -2584,7 +2584,7 @@ plotMarkerDE <- function(
 #' # Plot PC1 vs PC2 colored by cluster
 #' scatterPlot(.x.feature = lm.cells$pca$embed[,"PC1"],
 #'             .y.feature = lm.cells$pca$embed[,"PC2"],
-#'             .color.feature = lm.cells$graph$clustering$ids,
+#'             .color.feature = lm.cells$landmark.annot$clustering$ids,
 #'             .x.label = "PC1", .y.label = "PC2",
 #'             .color.label = "Cluster")
 #' 
@@ -2598,7 +2598,7 @@ plotMarkerDE <- function(
 #' # Laplacian Eigenmap coordinates
 #' scatterPlot(.x.feature = lm.cells$graph$LE$embed[,1],
 #'             .y.feature = lm.cells$graph$LE$embed[,2],
-#'             .color.feature = lm.cells$graph$clustering$ids,
+#'             .color.feature = lm.cells$landmark.annot$clustering$ids,
 #'             .x.label = "LE1", .y.label = "LE2")
 #' }
 #' 

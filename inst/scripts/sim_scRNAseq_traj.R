@@ -214,7 +214,7 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells,
 
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells,
-  .feature = lm.cells$graph$clustering$ids,
+  .feature = lm.cells$landmark.annot$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
   .panel.size = 2) |> 

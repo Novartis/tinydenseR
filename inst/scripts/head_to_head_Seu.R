@@ -304,7 +304,7 @@ covid.lm.cells <-
 
 tinydenseR::plotUMAP(
   .tdr.obj = covid.lm.cells,
-  .feature = covid.lm.cells$graph$celltyping$ids,
+  .feature = covid.lm.cells$landmark.annot$celltyping$ids,
   .panel.size = 2
 )
 
@@ -508,8 +508,8 @@ tinydenseR::plotBeeswarm(
   ggplot2::labs(subtitle = "COVID.19 vs normal")
 
 
-table(covid.lm.cells$graph$clustering$ids,
-      covid.lm.cells$graph$celltyping$ids) |>
+table(covid.lm.cells$landmark.annot$clustering$ids,
+      covid.lm.cells$landmark.annot$celltyping$ids) |>
   as.data.frame.matrix() |> 
   (\(x)
    dplyr::mutate(.data = x,

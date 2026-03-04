@@ -424,7 +424,7 @@ The landmark cells are automatically clustered for visualization and traditional
 ```{r viz-clustering}
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells.DA.0.5,
-  .feature = lm.cells.DA.0.5$graph$clustering$ids,,
+  .feature = lm.cells.DA.0.5$landmark.annot$clustering$ids,,
   .plot.title = "Landmarks",
   .point.size = 2,
   .panel.size = 2

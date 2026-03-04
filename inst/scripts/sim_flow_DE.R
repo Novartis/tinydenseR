@@ -486,7 +486,7 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.0.5,
 
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells.DE.0.5,
-  .feature = lm.cells.DE.0.5$graph$clustering$ids,
+  .feature = lm.cells.DE.0.5$landmark.annot$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
   .panel.size = 2) |> 
@@ -829,7 +829,7 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.1,
 
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells.DE.1,
-  .feature = lm.cells.DE.1$graph$clustering$ids,
+  .feature = lm.cells.DE.1$landmark.annot$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
   .panel.size = 2) |> 
@@ -1170,7 +1170,7 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.2,
 
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells.DE.2,
-  .feature = lm.cells.DE.2$graph$clustering$ids,
+  .feature = lm.cells.DE.2$landmark.annot$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
   .panel.size = 2) |> 

@@ -28,7 +28,7 @@ plotPCA(
 \item{.PC.y}{Integer specifying y-axis principal component (default 2).}
 
 \item{.feature}{Numeric vector or factor of length \code{nrow(.tdr.obj$landmarks)} to color points by.
-Defaults to cluster IDs from \code{$graph$clustering$ids}. Can be:
+Defaults to cluster IDs from \code{$landmark.annot$clustering$ids}. Can be:
 \itemize{
 \item Numeric: gene expression, fold changes, statistics (uses diverging color scale)
 \item Factor: clusters, cell types, conditions (uses discrete color palette)

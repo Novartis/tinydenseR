@@ -88,7 +88,7 @@ lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 # Plot PC1 vs PC2 colored by cluster
 scatterPlot(.x.feature = lm.cells$pca$embed[,"PC1"],
             .y.feature = lm.cells$pca$embed[,"PC2"],
-            .color.feature = lm.cells$graph$clustering$ids,
+            .color.feature = lm.cells$landmark.annot$clustering$ids,
             .x.label = "PC1", .y.label = "PC2",
             .color.label = "Cluster")
 
@@ -102,7 +102,7 @@ scatterPlot(.x.feature = lm.cells$scaled.landmarks[,"CD4"],
 # Laplacian Eigenmap coordinates
 scatterPlot(.x.feature = lm.cells$graph$LE$embed[,1],
             .y.feature = lm.cells$graph$LE$embed[,2],
-            .color.feature = lm.cells$graph$clustering$ids,
+            .color.feature = lm.cells$landmark.annot$clustering$ids,
             .x.label = "LE1", .y.label = "LE2")
 }
 

@@ -346,7 +346,7 @@ Let's visualize the landmark cells:
 ```{r viz-clustering}
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells.DE.0.5,
-  .feature = lm.cells.DE.0.5$graph$clustering$ids,
+  .feature = lm.cells.DE.0.5$landmark.annot$clustering$ids,
   .plot.title = "Landmarks",
   .point.size = 2,
   .panel.size = 2

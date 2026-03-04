@@ -53,8 +53,8 @@ test_that("full pipeline is reproducible with fixed seed", {
   # Assert bit-identical results
   expect_identical(rownames(result1$landmarks), rownames(result2$landmarks))  # Same landmarks
   expect_equal(result1$graph$uwot$embedding, result2$graph$uwot$embedding)  # Same UMAP
-  expect_identical(as.character(result1$graph$clustering$ids), 
-                   as.character(result2$graph$clustering$ids))  # Same clusters
+  expect_identical(as.character(result1$landmark.annot$clustering$ids), 
+                   as.character(result2$landmark.annot$clustering$ids))  # Same clusters
   expect_equal(result1$map$fdens, result2$map$fdens, tolerance = 1e-14)  # Same densities
   
   cleanup_test_files(test_data)
