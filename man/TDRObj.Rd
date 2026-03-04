@@ -7,7 +7,8 @@
 TDRObj(...)
 }
 \arguments{
-\item{...}{Named arguments corresponding to TDRObj slots.}
+\item{...}{Named arguments corresponding to TDRObj slots.
+Legacy (17-slot) slot names are automatically mapped to new 13-slot paths.}
 }
 \value{
 A \code{TDRObj} object.

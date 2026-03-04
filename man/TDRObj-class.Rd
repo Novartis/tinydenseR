@@ -25,38 +25,37 @@ graph structure, and differential expression results.
 \section{Slots}{
 
 \describe{
-\item{\code{cells}}{list. Named list of file paths to expression matrices.}
-
-\item{\code{landmarks}}{ANY. Processed landmark expression matrix (NULL initially).}
-
-\item{\code{scaled.landmarks}}{ANY. Z-scored landmark expression matrix (NULL initially).}
-
-\item{\code{raw.landmarks}}{ANY. Raw counts matrix for landmarks (NULL initially).}
+\item{\code{cells}}{list. Named list of per-sample file paths to expression matrices.}
 
 \item{\code{metadata}}{data.frame. Sample-level metadata.}
 
-\item{\code{config}}{list. Configuration parameters (key, sampling, assay.type, markers, n.threads).}
+\item{\code{config}}{list. Run parameters: key, sampling, assay.type, markers, n.threads.}
 
-\item{\code{integration}}{list. Integration/batch correction results (harmony.var, harmony.obj).}
+\item{\code{integration}}{list. Trained projection models and batch variables
+(harmony.var, harmony.obj, symphony.obj, umap.model).}
 
-\item{\code{pca}}{list. PCA results (embed, rotation, center, scale, sdev, HVG, u, v, d).}
+\item{\code{assay}}{list. Landmark expression layers (L x features matrices):
+raw (raw counts), expr (normalized/log expression), scaled (Z-scored).}
 
-\item{\code{graph}}{list. Graph structure (uwot, adj.matrix, snn, LE, clustering, celltyping).}
+\item{\code{landmark.embed}}{list. Landmark-space coordinate matrices; each entry
+has a $coord slot. Contains pca, le, and umap sub-lists.}
 
-\item{\code{map}}{list. Mapping results (fdens, Y, clustering, celltyping, nearest.landmarks, fuzzy.graph, cl.ct.to.ign, lm).}
+\item{\code{landmark.annot}}{list. Per-landmark categorical annotations (factor, length L).
+Contains clustering and celltyping sub-lists, each with an $ids factor.}
 
-\item{\code{specDE}}{ANY. Spectral DE results (NULL initially).}
+\item{\code{graphs}}{list. Landmark-landmark connectivity matrices: adj.matrix, snn, fgraph.}
 
-\item{\code{pbDE}}{ANY. Pseudo-bulk DE results (NULL initially).}
+\item{\code{density}}{list. fdens-centric sample-level analytics (L x N matrices):
+fdens, Y, composition (clustering/celltyping cell counts/percentages),
+ignored, .cache.}
 
-\item{\code{markerDE}}{ANY. Marker DE results (NULL initially).}
+\item{\code{sample.embed}}{list. Sample-level embeddings (N x k matrices), each with $coord.
+Contains pca, traj, and pepc sub-lists.}
 
-\item{\code{interact.plot}}{ANY. Interactive plot data (NULL initially).}
+\item{\code{cellmap}}{list. Per-cell, per-sample cached lists: cluster.ids, celltype.ids,
+nearest.lm, fuzzy.graph.}
 
-\item{\code{symphony.obj}}{ANY. Symphony reference object for cell typing (NULL initially).}
-
-\item{\code{nmfDE}}{ANY. NMF-based DE results (NULL initially).}
-
-\item{\code{plsDE}}{ANY. PLS-based DE results (NULL initially).}
+\item{\code{results}}{list. All statistical outputs: lm, pb, marker, spec, nmf, pls,
+clustering, celltyping, features.}
 }}
 

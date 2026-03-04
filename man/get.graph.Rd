@@ -12,7 +12,7 @@ get.graph(
   .seed = 123,
   .cl.method = "snn",
   .cl.resolution.parameter = 0.8,
-  .small.size = floor(x = nrow(x = .tdr.obj@landmarks)/200)
+  .small.size = floor(x = nrow(x = .tdr.obj@assay$expr)/200)
 )
 }
 \arguments{
