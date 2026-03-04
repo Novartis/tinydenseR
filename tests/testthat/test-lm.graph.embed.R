@@ -93,8 +93,8 @@ test_that("get.graph adds graph to .tdr.obj", {
                         .verbose = FALSE,
                         .seed = 42)
   expect_true(is.TDRObj(result))
-  expect_true("graph" %in% names(x = result))
-  expect_true("uwot" %in% names(x = result$graph))
+  expect_true(!is.null(result@graphs))
+  expect_true(!is.null(result@integration$umap.model))
 })
 
 # Test for get.map

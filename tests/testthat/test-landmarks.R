@@ -56,19 +56,17 @@ test_that("setup.tdr.obj returns a list with correct names", {
                          .verbose = FALSE)
   expect_true(is.TDRObj(result))
   expect_true(all(c("cells",
-                    "landmarks",
-                    "scaled.landmarks",
-                    "raw.landmarks",
                     "metadata",
                     "config",
                     "integration",
-                    "pca",
-                    "graph",
-                    "map",
-                    "specDE",
-                    "pbDE",
-                    "markerDE",
-                    "interact.plot") %in% names(x = result)))
+                    "assay",
+                    "landmark.embed",
+                    "landmark.annot",
+                    "graphs",
+                    "density",
+                    "sample.embed",
+                    "cellmap",
+                    "results") %in% names(x = result)))
   # Check nested config structure
   expect_true(all(c("key", "sampling", "assay.type", "markers", "n.threads") %in% names(x = result$config)))
   # Check nested integration structure

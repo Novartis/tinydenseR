@@ -48,13 +48,24 @@ create_test_lm_obj <- function(n_cells = 10, n_markers = 3, n_samples = 2) {
 
 #' Create a mock .tdr.obj with graph data for plotting tests
 create_mock_graph_obj <- function(n_points = 20, n_clusters = 3) {
-  list(
-    graph = list(
-      uwot = list(embedding = matrix(runif(n_points * 2), ncol = 2)),
-      clustering = list(ids = factor(sample(1:n_clusters, n_points, replace = TRUE)))
+  TDRObj(
+    config = list(assay.type = "RNA"),
+    landmark.embed = list(
+      pca  = list(coord = matrix(
+        runif(n_points * 2), ncol = 2,
+        dimnames = list(NULL, c("PC1", "PC2"))
+      )),
+      umap = list(coord = matrix(runif(n_points * 2), ncol = 2)),
+      le   = list()
     ),
-    pca = list(embed = matrix(runif(n_points * 2), ncol = 2, dimnames = list(NULL, c("PC1", "PC2")))),
-    lm = matrix(runif(n_points * 2), ncol = 2)
+    landmark.annot = list(
+      clustering = list(
+        ids = factor(sample(seq_len(n_clusters), n_points, replace = TRUE))
+      )
+    ),
+    graphs = list(adj.matrix = NULL, snn = NULL, fgraph = NULL),
+    density = list(),
+    results = list()
   )
 }
 
