@@ -917,7 +917,9 @@ get.map <-
             mat.exprs[,.tdr.obj@config$markers]
           
           temp.cell.names <-
-            rownames(x = mat.exprs)
+            paste0(names(x = .tdr.obj@cells)[cells.idx],
+                   "_",
+                   rownames(x = mat.exprs))
           
         }
         
@@ -1109,27 +1111,24 @@ get.map <-
         }
         
         
-        if(.tdr.obj@config$assay.type == "RNA"){
-          
-          names(x = res2$cell.clustering) <-
+        # Prefix cell names with sample name for both RNA and cyto
+        names(x = res2$cell.clustering) <-
+          paste0(names(x = .tdr.obj@cells)[cells.idx],
+                 "_",
+                 names(x = res2$cell.clustering))
+        
+        if(!is.null(x = res2$cell.celltyping)){
+          names(x = res2$cell.celltyping) <-
             paste0(names(x = .tdr.obj@cells)[cells.idx],
                    "_",
-                   names(x = res2$cell.clustering))
-          
-          if(!is.null(x = res2$cell.celltyping)){
-            names(x = res2$cell.celltyping) <-
-              paste0(names(x = .tdr.obj@cells)[cells.idx],
-                     "_",
-                     names(x = res2$cell.celltyping))
-          }
-          
-          if(!is.null(x = res2$lm.celltyping)){
-            names(x = res2$lm.celltyping) <-
-              paste0(names(x = .tdr.obj@cells)[cells.idx],
-                     "_",
-                     names(x = res2$lm.celltyping))
-          }
-          
+                   names(x = res2$cell.celltyping))
+        }
+        
+        if(!is.null(x = res2$lm.celltyping)){
+          names(x = res2$lm.celltyping) <-
+            paste0(names(x = .tdr.obj@cells)[cells.idx],
+                   "_",
+                   names(x = res2$lm.celltyping))
         }
         
         # ── Compute this sample's fdens column (before eviction) ──

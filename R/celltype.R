@@ -48,14 +48,24 @@
 #' @param .tdr.obj A list object initialized with \code{setup.tdr.obj} and processed 
 #'   with \code{get.landmarks} and \code{get.graph}. Must contain 
 #'   \code{.tdr.obj$landmark.annot$clustering$ids}.
-#' @param .celltyping.map A named list mapping cell types to cluster IDs. 
-#'   List names are cell type labels (e.g., "CD4.T.cells"), and each element 
-#'   is a character vector of cluster IDs (e.g., c("cluster.01", "cluster.02")) 
-#'   that belong to that cell type. Requirements:
-#'   \itemize{
-#'     \item Each cell type name must be unique
-#'     \item Each cluster can only map to one cell type
-#'     \item All clusters in \code{.tdr.obj$landmark.annot$clustering$ids} must be mapped
+#' @param .celltyping.map Cell type assignments, supplied in one of two
+#'   mutually exclusive formats:
+#'   \describe{
+#'     \item{Mode A — cluster map (named \code{list})}{
+#'       List names are cell-type labels (e.g., \code{"CD4.T.cells"}), and
+#'       each element is a character vector of cluster IDs
+#'       (e.g., \code{c("cluster.01", "cluster.02")}) that belong to that
+#'       cell type.  Every cluster in
+#'       \code{.tdr.obj$landmark.annot$clustering$ids} must appear in exactly
+#'       one element.
+#'     }
+#'     \item{Mode B — per-cell labels (named \code{character} vector)}{
+#'       A named character vector where \code{names()} are the original cell
+#'       IDs (before the \code{paste0(sample, "_", ...)} prefix added by
+#'       tinydenseR) and values are cell-type labels.  The vector must cover
+#'       **all** cells across all samples; landmark-only labels are extracted
+#'       automatically.  Duplicate names are not allowed.
+#'     }
 #'   }
 #' @param .verbose Logical; if \code{TRUE}, print progress messages when
 #'   refreshing downstream slots (default \code{TRUE}).
@@ -81,13 +91,21 @@
 #'   get.graph() |>
 #'   get.map() |>
 #'   celltyping(celltype_map)
+#'
+#' # Mode B — per-cell labels (named character vector)
+#' # cell_labels is a named character vector: names = original cell IDs,
+#' # values = cell-type labels, covering ALL cells across all samples.
+#' lm.cells <- celltyping(lm.cells, cell_labels)
 #' }
 #' @return The \code{.tdr.obj} with the following updated fields:
 #'   \describe{
 #'     \item{\code{$landmark.annot$celltyping$ids}}{Factor vector of cell type labels 
 #'       for each landmark}
-#'     \item{\code{$landmark.annot$celltyping$map}}{The \code{.celltyping.map}
-#'       list used to create the labels (stored for provenance)}
+#'     \item{\code{$landmark.annot$celltyping$map}}{Mode A only: the
+#'       \code{.celltyping.map} list (stored for provenance).
+#'       \code{NULL} in Mode B.}
+#'     \item{\code{$landmark.annot$celltyping$mode}}{\code{"cluster_map"}
+#'       (Mode A) or \code{"cell_labels"} (Mode B)}
 #'     \item{\code{$results$celltyping$median.exprs}}{Matrix of median expression 
 #'       values per cell type (rows) by features (columns). For RNA data, 
 #'       displays z-scored expression of top PC-loading genes. For cytometry 
@@ -120,83 +138,171 @@ celltyping <-
     
     cell.pop <- NULL
     
-    if(names(x = .celltyping.map) |>
-       is.null()){
-      stop("Cell type names are missing. Each element in .celltyping.map must have a name.\n",
-           "Example: list(\"CD4.T.cells\" = c(\"cluster.01\"), \"CD8.T.cells\" = c(\"cluster.02\"))")
+    # ── Mode dispatch ────────────────────────────────────────────────
+    if (is.list(.celltyping.map)) {
+      # → Mode A: cluster-to-label mapping (existing behavior)
+      .tdr.obj <- .celltyping_mode_a(.tdr.obj, .celltyping.map)
+    } else if (is.character(.celltyping.map) && !is.null(names(.celltyping.map))) {
+      # → Mode B: per-cell labels (new path)
+      .tdr.obj <- .celltyping_mode_b(.tdr.obj, .celltyping.map)
+    } else {
+      stop("`.celltyping.map` must be either:\n",
+           "  - A named list (cluster->label mapping), or\n",
+           "  - A named character vector (cell->label mapping).")
     }
     
-    if(names(x = .celltyping.map) |>
-       duplicated() |>
-       any()){
-      stop(paste0("Duplicate cell type names detected: ",
-                  paste(names(.celltyping.map)[duplicated(names(.celltyping.map))],
-                        collapse = ", "),
-                  "\nEach cell type must have a unique name."))
-    }
-    
-    cls.in.map <-
-      unlist(x = .celltyping.map,
-             use.names = FALSE)
-    
-    if(anyDuplicated(x = cls.in.map)){
-      stop(paste0("Cluster(s) mapped to multiple cell types: ",
-                  paste(cls.in.map[duplicated(x = cls.in.map)],
-                        collapse = ", "),
-                  "\nEach cluster can only belong to one cell type."))
-    }
-    
-    if(any(!(unique(x = .tdr.obj@landmark.annot$clustering$ids) %in%
-             cls.in.map))){
-      stop(paste0("Every cluster must be mapped to a cell type. Unmapped clusters: ",
-                  paste(unique(x = .tdr.obj@landmark.annot$clustering$ids)[
-                    !(unique(x = .tdr.obj@landmark.annot$clustering$ids) %in%
-                        cls.in.map)],
-                    collapse = ", "),
-                  "\nAdd these to .celltyping.map or merge them with existing clusters."))
-      
-    }
-    
-    if(!all(cls.in.map %in%
-            unique(x = .tdr.obj@landmark.annot$clustering$ids))){
-      stop(paste0("Invalid cluster ID(s) in .celltyping.map: ",
-                  paste(cls.in.map[!(cls.in.map %in%
-                                       unique(x = .tdr.obj@landmark.annot$clustering$ids))],
-                        collapse = ", "),
-                  "\nThese clusters do not exist in .tdr.obj$landmark.annot$clustering$ids.",
-                  "\nRun lm.cluster() to see available cluster IDs."))
-    }
-    
-    .tdr.obj@landmark.annot$celltyping <-
-      vector(mode = "list")
-    
-    # Create cell type labels by:
-    # 1. Inverting the map: cluster IDs -> cell type names
-    # 2. Indexing by cluster IDs to get corresponding cell type for each landmark
-    # 3. Converting to factor to maintain consistency with clustering$ids
-    .tdr.obj@landmark.annot$celltyping$ids <-
-      .celltyping.map |>
-      (\(x)
-       stats::setNames(
-         object = names(x = x) |>
-           rep(times = lapply(X = x,
-                              length) |>
-                 unlist(use.names = FALSE)),
-         nm = unlist(x = x,
-                     use.names = FALSE))[
-                       as.character(x = .tdr.obj@landmark.annot$clustering$ids)]
-      )() |>
-      as.factor()
-    
-    # Store the map for provenance / reproducibility
-    .tdr.obj@landmark.annot$celltyping$map <- .celltyping.map
-    
-    # Refresh all celltyping-dependent slots
+    # Refresh all celltyping-dependent slots (shared by both modes)
     .tdr.obj <- .refresh_celltyping(.tdr.obj, .verbose = .verbose)
     
     return(.tdr.obj)
     
   }
+
+# ──────────────────────────────────────────────────────────────────────
+# Mode A: cluster-to-label mapping (original behavior)
+# ──────────────────────────────────────────────────────────────────────
+.celltyping_mode_a <- function(.tdr.obj, .celltyping.map) {
+  
+  if(names(x = .celltyping.map) |>
+     is.null()){
+    stop("Cell type names are missing. Each element in .celltyping.map must have a name.\n",
+         "Example: list(\"CD4.T.cells\" = c(\"cluster.01\"), \"CD8.T.cells\" = c(\"cluster.02\"))")
+  }
+  
+  if(names(x = .celltyping.map) |>
+     duplicated() |>
+     any()){
+    stop(paste0("Duplicate cell type names detected: ",
+                paste(names(.celltyping.map)[duplicated(names(.celltyping.map))],
+                      collapse = ", "),
+                "\nEach cell type must have a unique name."))
+  }
+  
+  cls.in.map <-
+    unlist(x = .celltyping.map,
+           use.names = FALSE)
+  
+  if(anyDuplicated(x = cls.in.map)){
+    stop(paste0("Cluster(s) mapped to multiple cell types: ",
+                paste(cls.in.map[duplicated(x = cls.in.map)],
+                      collapse = ", "),
+                "\nEach cluster can only belong to one cell type."))
+  }
+  
+  if(any(!(unique(x = .tdr.obj@landmark.annot$clustering$ids) %in%
+           cls.in.map))){
+    stop(paste0("Every cluster must be mapped to a cell type. Unmapped clusters: ",
+                paste(unique(x = .tdr.obj@landmark.annot$clustering$ids)[
+                  !(unique(x = .tdr.obj@landmark.annot$clustering$ids) %in%
+                      cls.in.map)],
+                  collapse = ", "),
+                "\nAdd these to .celltyping.map or merge them with existing clusters."))
+    
+  }
+  
+  if(!all(cls.in.map %in%
+          unique(x = .tdr.obj@landmark.annot$clustering$ids))){
+    stop(paste0("Invalid cluster ID(s) in .celltyping.map: ",
+                paste(cls.in.map[!(cls.in.map %in%
+                                     unique(x = .tdr.obj@landmark.annot$clustering$ids))],
+                      collapse = ", "),
+                "\nThese clusters do not exist in .tdr.obj$landmark.annot$clustering$ids.",
+                "\nRun lm.cluster() to see available cluster IDs."))
+  }
+  
+  .tdr.obj@landmark.annot$celltyping <-
+    vector(mode = "list")
+  
+  # Create cell type labels by:
+  # 1. Inverting the map: cluster IDs -> cell type names
+  # 2. Indexing by cluster IDs to get corresponding cell type for each landmark
+  # 3. Converting to factor to maintain consistency with clustering$ids
+  .tdr.obj@landmark.annot$celltyping$ids <-
+    .celltyping.map |>
+    (\(x)
+     stats::setNames(
+       object = names(x = x) |>
+         rep(times = lapply(X = x,
+                            length) |>
+               unlist(use.names = FALSE)),
+       nm = unlist(x = x,
+                   use.names = FALSE))[
+                     as.character(x = .tdr.obj@landmark.annot$clustering$ids)]
+    )() |>
+    as.factor()
+  
+  # Store provenance
+  .tdr.obj@landmark.annot$celltyping$map  <- .celltyping.map
+  .tdr.obj@landmark.annot$celltyping$mode <- "cluster_map"
+  
+  .tdr.obj
+}
+
+# ──────────────────────────────────────────────────────────────────────
+# Mode B: per-cell labels (new)
+# ──────────────────────────────────────────────────────────────────────
+.celltyping_mode_b <- function(.tdr.obj, .celltyping.map) {
+  
+  # --- Validate: no duplicate cell names ---
+  if (anyDuplicated(names(.celltyping.map))) {
+    dupes <- unique(names(.celltyping.map)[duplicated(names(.celltyping.map))])
+    stop("Duplicate cell IDs in names(.celltyping.map): ",
+         paste(head(dupes, 5), collapse = ", "),
+         if (length(dupes) > 5) paste0(" ... (", length(dupes), " total)"),
+         "\nEach cell must appear exactly once.")
+  }
+  
+  # --- Validate: length matches total cell count ---
+  expected_n <- sum(.tdr.obj@config$sampling$n.cells)
+  if (length(.celltyping.map) != expected_n) {
+    stop("Length of .celltyping.map (", length(.celltyping.map),
+         ") does not match total cell count (", expected_n, ").")
+  }
+  
+  # --- Get landmark row names from the assay matrix ---
+  lm_names <- rownames(.tdr.obj@assay$expr)
+  
+  # --- Strip the sample prefix to recover original cell IDs ---
+  # All landmarks use: paste0(sample_name, "_", original_cell_id)
+  sample_prefixes <- paste0("^",
+                            unique(names(.tdr.obj@config$key)),
+                            "_")
+  original_ids <- sub(
+    pattern     = paste0(sample_prefixes, collapse = "|"),
+    replacement = "",
+    x           = lm_names
+  )
+  
+  # --- Match into the user-supplied vector ---
+  matched_idx <- match(original_ids, names(.celltyping.map))
+  
+  # --- Validate: every landmark must have a label ---
+  if (anyNA(matched_idx)) {
+    missing <- lm_names[is.na(matched_idx)]
+    stop("Could not find labels for ", length(missing), " landmark(s).\n",
+         "First few: ", paste(head(missing, 5), collapse = ", "), "\n",
+         "Ensure names(.celltyping.map) contain the original cell IDs.")
+  }
+  
+  # --- Warn if all landmarks get the same label ---
+  if (length(unique(.celltyping.map[matched_idx])) == 1L) {
+    warning("All landmarks received the same cell-type label ('",
+            .celltyping.map[matched_idx][1],
+            "'). This is likely a user error.", call. = FALSE)
+  }
+  
+  # --- Assign ---
+  .tdr.obj@landmark.annot$celltyping <- list()
+  .tdr.obj@landmark.annot$celltyping$ids <-
+    factor(.celltyping.map[matched_idx])
+  names(.tdr.obj@landmark.annot$celltyping$ids) <- lm_names
+  
+  # Store provenance (no cluster map in Mode B)
+  .tdr.obj@landmark.annot$celltyping$map  <- NULL
+  .tdr.obj@landmark.annot$celltyping$mode <- "cell_labels"
+  
+  .tdr.obj
+}
 
 # ──────────────────────────────────────────────────────────────────────
 # Private helpers for celltyping refresh

@@ -1,3 +1,39 @@
+# tinydenseR 0.0.2.0002
+
+## `celltyping()` Mode B: per-cell labels (new feature)
+
+`celltyping()` now accepts **two mutually exclusive input modes**,
+dispatched automatically based on the type of `.celltyping.map`:
+
+| Mode | Input type | Semantics |
+|------|-----------|-----------|
+| **A** (existing) | Named `list` | Cluster-to-label mapping; all clusters must be covered |
+| **B** (new) | Named `character` vector | Per-cell labels for the full dataset; landmarks are matched automatically |
+
+### Mode B usage
+
+```r
+# cell_labels: named character vector, names = original cell IDs,
+# values = cell-type labels, covering ALL cells across all samples.
+obj <- celltyping(obj, cell_labels)
+```
+
+### Provenance
+
+A new `$landmark.annot$celltyping$mode` slot records `"cluster_map"` (A)
+or `"cell_labels"` (B).  In Mode B, `$celltyping$map` is `NULL`.
+
+## Unified cyto landmark naming
+
+Cytometry landmark rownames now use the same `paste0(sample, "_", cell_id)`
+convention as RNA, preventing cross-sample name collisions and enabling
+Mode B cell matching.  This change affects:
+
+- `get.landmarks()` (Pass 1 and Pass 2 cyto paths)
+- `get.map()` cell name construction and clustering/celltyping name prefixing
+
+---
+
 # tinydenseR 0.0.2.0001
 
 ## On-disk caching for `get.map()` (new feature)

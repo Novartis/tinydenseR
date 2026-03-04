@@ -631,7 +631,13 @@ get.landmarks <-
               )()
             
           } else {
-            readRDS(file = .tdr.obj@cells[[.cells.idx]])[lm.sample,.tdr.obj@config$markers]
+            readRDS(file = .tdr.obj@cells[[.cells.idx]])[lm.sample,.tdr.obj@config$markers] |>
+              (\(x)
+               `rownames<-`(x = x,
+                            value = paste0(names(x = .tdr.obj@cells)[.cells.idx],
+                                           "_",
+                                           rownames(x = x)))
+              )()
           }
         
         if(isTRUE(x = .verbose)){
@@ -979,7 +985,13 @@ get.landmarks <-
               )()
             
           } else {
-            readRDS(file = .tdr.obj@cells[[.cells.idx]])[lm.sample,.tdr.obj@config$markers]
+            readRDS(file = .tdr.obj@cells[[.cells.idx]])[lm.sample,.tdr.obj@config$markers] |>
+              (\(x)
+               `rownames<-`(x = x,
+                            value = paste0(names(x = .tdr.obj@cells)[.cells.idx],
+                                           "_",
+                                           rownames(x = x)))
+              )()
           }
         
         if(isTRUE(x = .verbose)){

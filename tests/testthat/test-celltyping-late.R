@@ -298,13 +298,14 @@ test_that("N2: non-celltyping slots are unchanged after late celltyping", {
 # .celltyping.map is stored for provenance
 # ──────────────────────────────────────────────────────────────────────
 
-test_that("celltyping.map is stored for provenance", {
+test_that("celltyping.map and mode are stored for provenance", {
   obj <- .build_mapped_obj()
   ct_map <- .make_ct_map(obj)
   
   obj2 <- celltyping(obj, ct_map, .verbose = FALSE)
   
   expect_identical(obj2@landmark.annot$celltyping$map, ct_map)
+  expect_identical(obj2@landmark.annot$celltyping$mode, "cluster_map")
 })
 
 # ──────────────────────────────────────────────────────────────────────
