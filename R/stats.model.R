@@ -3124,15 +3124,17 @@ get.embedding <-
 
 # -----------------------------------------------------------------------------
 # .prepare.X
-# Filters, normalizes (size-factor + log2 for RNA), and centers the expression
-# matrix.  Returns a list with:
-#   $X  — pre-centering (sparse; useful for sparse-aware loadings and nmfDE mass)
-#   $Xc — column-centered (sparse; needed for M.local and DE-semantic loadings)
+# Filters, normalizes (size-factor + log2 for RNA), and optionally centers the
+# expression matrix.  Returns a list with:
+#   $X   — pre-centering (sparse; useful for sparse-aware loadings and nmfDE mass)
+#   $muX — column means of X (numeric; always returned for implicit-centering)
+#   $Xc  — column-centered (dense; only when .center = TRUE)
 # -----------------------------------------------------------------------------
 
 .prepare.X <-
   function(.tdr.obj,
            .min.prop = 0.005,
+           .center = TRUE,
            .verbose = TRUE) {
     
     if (.tdr.obj@config$assay.type == "RNA") {
@@ -3170,15 +3172,23 @@ get.embedding <-
       
     }
     
-    # Center expression (genes/markers)
-    Xc <-
-      X |>
-      (\(x)
-       Matrix::t(x = x) - Matrix::colMeans(x = x)
-      )() |>
-      Matrix::t()
+    # Column means (sparse-aware, O(nnz))
+    muX <-
+      Matrix::colMeans(x = X)
     
-    return(list(X = X, Xc = Xc))
+    # Center expression (genes/markers) — only when requested
+    if (isTRUE(x = .center)) {
+      Xc <-
+        X |>
+        (\(x)
+         Matrix::t(x = x) - muX
+        )() |>
+        Matrix::t()
+    } else {
+      Xc <- NULL
+    }
+    
+    return(list(X = X, muX = muX, Xc = Xc))
     
   }
 
@@ -4660,7 +4670,7 @@ get.plsDE <-
       )()
     
     # -------------------------------------------------------------------------
-    # Prepare expression matrix
+    # Prepare expression matrix (sparse only; no dense Xc allocated)
     # -------------------------------------------------------------------------
     
     if (isTRUE(x = .verbose)) {
@@ -4670,19 +4680,20 @@ get.plsDE <-
     prep <-
       .prepare.X(.tdr.obj = .tdr.obj,
                  .min.prop = .min.prop,
+                 .center = FALSE,
                  .verbose = .verbose)
     
-    X  <- prep$X
-    Xc <- prep$Xc
+    X   <- prep$X     # sparse  n x p
+    muX <- prep$muX   # numeric length p
     
     n.landmarks <-
-      nrow(x = Xc)
+      nrow(x = X)
     
     n.genes <-
-      ncol(x = Xc)
+      ncol(x = X)
     
     gene.names <-
-      colnames(x = Xc)
+      colnames(x = X)
     
     # -------------------------------------------------------------------------
     # Build random-walk normalized graph P
@@ -4695,7 +4706,7 @@ get.plsDE <-
     SNN <-
       .tdr.obj@graphs$snn
     
-    P <-
+    P.graph <-
       .build.P(SNN = SNN,
                .degree.reg = .degree.reg,
                .tau.mult = .tau.mult,
@@ -4703,58 +4714,117 @@ get.plsDE <-
                .verbose = .verbose)
     
     # -------------------------------------------------------------------------
-    # Construct M.local
-    # -------------------------------------------------------------------------
-    
-    if (isTRUE(x = .YX.interaction)) {
-      
-      # M.local = P %*% diag(Y) %*% Xc (density-weighted interaction)
-      if (isTRUE(x = .verbose)) {
-        message("Computing density-weighted expression (M.local = P diag(Y) Xc)...")
-      }
-      
-      YX.term <-
-        (Matrix::Diagonal(x = Y) %*% Xc) |>
-        (\(x)
-         `dimnames<-`(x = x,
-                      value = dimnames(x = Xc))
-        )()
-      
-    } else {
-      
-      # M.local = P %*% Xc (graph-smoothed expression, no Y-weighting)
-      if (isTRUE(x = .verbose)) {
-        message("Computing graph-smoothed expression (M.local = P Xc)...")
-      }
-      
-      YX.term <- Xc
-      
-    }
-    
-    # Graph-smooth and center
-    M.local <-
-      (P %*% YX.term) |>
-      (\(x)
-       Matrix::t(x = x) - Matrix::colMeans(x = x)
-      )() |>
-      Matrix::t()
-    
-    # -------------------------------------------------------------------------
-    # NIPALS PLS1: M.local vs Y
+    # Implicit M.local operators  (no dense n x p matrix ever formed)
+    #
+    # M_local = columnCenter( P.graph  diag(Y)  (X - 1 muX') )   (YX.interaction)
+    # M_local = columnCenter( P.graph  (X - 1 muX') )             (no interaction)
+    #
+    # We precompute muM (column means of M_local) from vectors alone,
+    # then define M_mv(w) = M_local %*% w   and
+    #             Mt_mv(v) = t(M_local) %*% v
+    # touching X and P.graph only through sparse-dense matvec products.
     # -------------------------------------------------------------------------
     
     if (isTRUE(x = .verbose)) {
-      message("Running NIPALS PLS1 (", .ncomp, " components)...")
+      if (isTRUE(x = .YX.interaction)) {
+        message("Setting up sparse-implicit M.local operators (P diag(Y) Xc)...")
+      } else {
+        message("Setting up sparse-implicit M.local operators (P Xc)...")
+      }
     }
     
-    # Dense copy for deflation (deflation breaks sparsity on first step)
-    Z.work <-
-      as.matrix(x = M.local)
+    # --- precompute column means of M.local (all O(nnz) or O(n)) ---
+    #
+    # muM_j = (1/n) * [P.graph' 1]' diag(Y?) (X - 1 muX')
+    #       = (1/n) * { (qw)' X - sum(qw) muX }
+    #
+    # where  q = P.graph' 1  (column sums of P.graph, length n)
+    #        qw = q * Y      (if YX.interaction)  or  q  (otherwise)
+    
+    q.col <-
+      as.numeric(
+        x = Matrix::crossprod(
+          x = P.graph,
+          y = rep(x = 1, times = n.landmarks)
+        )
+      )
+    
+    if (isTRUE(x = .YX.interaction)) {
+      qw <- q.col * Y
+    } else {
+      qw <- q.col
+    }
+    
+    muM <-
+      (1 / n.landmarks) *
+      (as.numeric(x = Matrix::crossprod(x = X, y = qw)) -
+         sum(qw) * muX)
+    
+    # --- M_mv(w): M_local %*% w  (returns dense length n) ---
+    #
+    # = P.graph  diag(Y?)  (X w - (muX'w) 1)  -  (muM'w) 1
+    #
+    # Cost: one sparse X %*% w  +  one sparse P.graph %*% vec  =  O(nnz(X) + nnz(P))
+    
+    M_mv <- function(w) {
+      w <- as.numeric(x = w)
+      # sparse X %*% dense w  ->  dense length n
+      xw <- as.numeric(x = X %*% w)
+      # implicit centering: Xc w = X w - (muX'w) 1
+      xcw <- xw - sum(muX * w)
+      # density weighting (element-wise, length n)
+      if (isTRUE(x = .YX.interaction)) xcw <- Y * xcw
+      # graph smoothing (sparse P.graph %*% dense vec)
+      pxcw <- as.numeric(x = P.graph %*% xcw)
+      # center M.local (subtract column-mean contribution)
+      pxcw - sum(muM * w)
+    }
+    
+    # --- Mt_mv(v): t(M_local) %*% v  (returns dense length p) ---
+    #
+    # = (X - 1 muX')' diag(Y?) P.graph' v  -  muM sum(v)
+    # = X' (Y? * P.graph' v) - muX sum(Y? * P.graph' v)  -  muM sum(v)
+    #
+    # Cost: one sparse crossprod(X, vec)  +  one sparse crossprod(P.graph, vec)
+    
+    Mt_mv <- function(v) {
+      v <- as.numeric(x = v)
+      # sparse P.graph^T %*% dense v  ->  dense length n
+      ptv <- as.numeric(
+        x = Matrix::crossprod(x = P.graph, y = v)
+      )
+      # density weighting
+      if (isTRUE(x = .YX.interaction)) ptv <- Y * ptv
+      # sparse X^T %*% result  ->  dense length p
+      xtv <- as.numeric(
+        x = Matrix::crossprod(x = X, y = ptv)
+      )
+      # implicit centering of X (transpose side)
+      xctv <- xtv - muX * sum(ptv)
+      # center M.local (transpose side)
+      xctv - muM * sum(v)
+    }
+    
+    # -------------------------------------------------------------------------
+    # NIPALS PLS1 with implicit deflation
+    #
+    # Instead of  Z <- Z - t p'  (which densifies on step 1), we accumulate
+    # T  (n x k)  and  Pload  (p x k)  and substitute:
+    #   M_k  w = M_0 w - T_{<k} (Pload_{<k}' w)
+    #   M_k' v = M_0'v - Pload_{<k} (T_{<k}' v)
+    # Only Y is deflated in-place (a length-n vector).
+    # -------------------------------------------------------------------------
+    
+    if (isTRUE(x = .verbose)) {
+      message("Running NIPALS PLS1 (", .ncomp, " components, sparse-implicit)...")
+    }
+    
+    eps <- .Machine$double.eps
     
     Y.work <-
       Y
     
-    # Pre-allocate storage
+    # Pre-allocate storage (small dense matrices)
     W.mat <-
       matrix(data = 0,
              nrow = n.genes,
@@ -4773,51 +4843,82 @@ get.plsDE <-
     Q.vec <-
       numeric(length = .ncomp)
     
+    nfit <- 0L
+    
     for (k in seq_len(length.out = .ncomp)) {
       
-      # Gene weight: w = Z'Y / ||Z'Y||
-      ZtY <-
-        crossprod(x = Z.work,
-                  y = Y.work) |>
-        as.numeric()
+      # Gene weight:  w proportional to M_k' Y.work
+      #   M_k' Y.work = M_0' Y.work - Pload_{<k} (T_{<k}' Y.work)
+      cvec <-
+        Mt_mv(v = Y.work)
+      
+      if (k > 1L) {
+        cvec <- cvec -
+          P.mat[, 1:(k - 1), drop = FALSE] %*%
+          crossprod(
+            x = T.mat[, 1:(k - 1), drop = FALSE],
+            y = Y.work
+          )
+        cvec <- as.numeric(x = cvec)
+      }
       
       w.norm <-
-        sqrt(x = sum(ZtY^2))
+        sqrt(x = sum(cvec^2))
       
-      if (w.norm < .Machine$double.eps) {
+      if (!is.finite(x = w.norm) || w.norm < eps) {
         if (isTRUE(x = .verbose)) {
-          message("  Component ", k, ": Z'Y norm ~ 0, stopping early.")
+          message("  Component ", k, ": ||M_k' Y|| ~ 0, stopping early.")
         }
-        .ncomp <- k - 1L
         break
       }
       
       w <-
-        ZtY / w.norm
+        cvec / w.norm
       
-      # Score: t = Z w
+      # Score:  t = M_k w = M_0 w - T_{<k} (Pload_{<k}' w)
       t.score <-
-        (Z.work %*% w) |>
-        as.numeric()
+        M_mv(w = w)
       
-      # Deflation loading: p = Z't / (t't)
+      if (k > 1L) {
+        t.score <- t.score -
+          T.mat[, 1:(k - 1), drop = FALSE] %*%
+          crossprod(
+            x = P.mat[, 1:(k - 1), drop = FALSE],
+            y = w
+          )
+        t.score <- as.numeric(x = t.score)
+      }
+      
       tt <-
         sum(t.score^2)
       
-      p.load <-
-        (crossprod(x = Z.work,
-                   y = t.score) |>
-           as.numeric()) / tt
+      if (!is.finite(x = tt) || tt < eps) {
+        if (isTRUE(x = .verbose)) {
+          message("  Component ", k, ": t't ~ 0, stopping early.")
+        }
+        break
+      }
       
-      # Y loading: q = Y't / (t't)
+      # X-loading:  p = M_k' t / (t't)
+      pvec <-
+        Mt_mv(v = t.score)
+      
+      if (k > 1L) {
+        pvec <- pvec -
+          P.mat[, 1:(k - 1), drop = FALSE] %*%
+          crossprod(
+            x = T.mat[, 1:(k - 1), drop = FALSE],
+            y = t.score
+          )
+        pvec <- as.numeric(x = pvec)
+      }
+      pvec <- pvec / tt
+      
+      # Y loading (scalar):  q = Y.work' t / (t't)
       q.load <-
         sum(Y.work * t.score) / tt
       
-      # Deflate Z and Y
-      Z.work <-
-        Z.work - tcrossprod(x = t.score,
-                            y = p.load)
-      
+      # Deflate Y only (length-n vector, negligible memory)
       Y.work <-
         Y.work - t.score * q.load
       
@@ -4829,10 +4930,12 @@ get.plsDE <-
         t.score
       
       P.mat[, k] <-
-        p.load
+        pvec
       
       Q.vec[k] <-
         q.load
+      
+      nfit <- k
       
       if (isTRUE(x = .verbose)) {
         Ak <-
@@ -4847,11 +4950,16 @@ get.plsDE <-
     }
     
     # Trim if stopped early
+    .ncomp <- nfit
     if (.ncomp < ncol(x = W.mat)) {
       W.mat <- W.mat[, seq_len(length.out = .ncomp), drop = FALSE]
       T.mat <- T.mat[, seq_len(length.out = .ncomp), drop = FALSE]
       P.mat <- P.mat[, seq_len(length.out = .ncomp), drop = FALSE]
       Q.vec <- Q.vec[seq_len(length.out = .ncomp)]
+    }
+    
+    if (.ncomp == 0L) {
+      stop("plsDE: no components could be extracted (M' Y ~ 0 on first step).")
     }
     
     # -------------------------------------------------------------------------
@@ -4904,7 +5012,7 @@ get.plsDE <-
       gene.names
     
     rownames(x = T.mat) <-
-      rownames(x = Xc)
+      rownames(x = X)
     
     if (isTRUE(x = .verbose)) {
       message("Y-alignment (top 5): ",
@@ -4974,8 +5082,31 @@ get.plsDE <-
       )
     
     if (isTRUE(x = .store.M)) {
+      # Materialise M.local on demand (not kept in memory during PLS)
+      if (isTRUE(x = .verbose)) {
+        message("Materialising M.local for storage (.store.M = TRUE)...")
+      }
+      Xc.tmp <-
+        X |>
+        (\(x)
+         Matrix::t(x = x) - muX
+        )() |>
+        Matrix::t()
+      if (isTRUE(x = .YX.interaction)) {
+        YX.term <-
+          Matrix::Diagonal(x = Y) %*% Xc.tmp
+      } else {
+        YX.term <- Xc.tmp
+      }
+      M.local <-
+        (P.graph %*% YX.term) |>
+        (\(x)
+         Matrix::t(x = x) - Matrix::colMeans(x = x)
+        )() |>
+        Matrix::t()
       .tdr.obj@results$pls[[.coef.col]]$M.local <-
         M.local
+      rm(Xc.tmp, YX.term, M.local)
     }
     
     if (isTRUE(x = .verbose)) {
