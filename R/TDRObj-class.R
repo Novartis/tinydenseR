@@ -42,10 +42,15 @@
 #' @slot results list. All statistical outputs: lm, pb, marker, spec, nmf, pls,
 #'   clustering, celltyping, features.
 #'
+#' @param x A TDRObj object.
+#' @param name A character string naming the slot to access.
+#' @param value The value to assign to the slot.
+#' @param object A TDRObj object (used in show method).
+#'
 #' @name TDRObj-class
 #' @rdname TDRObj-class
 #' @exportClass TDRObj
-#' @importFrom methods setClass setMethod setReplaceMethod setAs new slot slot<- slotNames show validObject is
+#' @importFrom methods as setClass setMethod setReplaceMethod setAs new slot slot<- slotNames show validObject is
 setClass(
   Class = "TDRObj",
   slots = c(

@@ -491,7 +491,7 @@ get.landmarks <-
                             "metadata","config","integration","pca","graph","map",
                             "specDE","pbDE","markerDE","interact.plot")
         if(identical(x = names(x = .tdr.obj), y = expected_names)){
-          .tdr.obj <- as(.tdr.obj, "TDRObj")
+          .tdr.obj <- methods::as(.tdr.obj, "TDRObj")
         } else {
           stop("Invalid .tdr.obj structure.\n",
                "Ensure it was created with setup.tdr.obj() and not manually modified.")

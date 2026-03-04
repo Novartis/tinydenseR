@@ -209,7 +209,7 @@ lm.cells.DA.0.5 <-
                        fixed = FALSE))
   )()
 
-# New API: get.lm() returns updated .tdr.obj with results in $map$lm[[.model.name]]
+# New API: get.lm() returns updated .tdr.obj with results in $results$lm[[.model.name]]
 lm.cells.DA.0.5 <-
   tinydenseR::get.lm(
     .tdr.obj = lm.cells.DA.0.5,
@@ -219,10 +219,10 @@ lapply(X = .cells.DA.0.5,
        FUN = readRDS) |>
   do.call(what = rbind) |>
   (\(x)
-   (((Matrix::t(x = x[,lm.cells.DA.0.5$pca$HVG]) - lm.cells.DA.0.5$pca$center) /
-       lm.cells.DA.0.5$pca$scale) |>
+   (((Matrix::t(x = x[,lm.cells.DA.0.5$landmark.embed$pca$HVG]) - lm.cells.DA.0.5$landmark.embed$pca$center) /
+       lm.cells.DA.0.5$landmark.embed$pca$scale) |>
        Matrix::t()) %*%
-     lm.cells.DA.0.5$pca$rotation
+     lm.cells.DA.0.5$landmark.embed$pca$rotation
   )() |>
   as.matrix() |>
   as.data.frame() |>
@@ -306,10 +306,10 @@ lapply(X = .cells.DA.0.5,
        FUN = readRDS) |>
   do.call(what = rbind) |>
   (\(x)
-   (((Matrix::t(x = x[,lm.cells.DA.0.5$pca$HVG]) - lm.cells.DA.0.5$pca$center) /
-       lm.cells.DA.0.5$pca$scale) |>
+   (((Matrix::t(x = x[,lm.cells.DA.0.5$landmark.embed$pca$HVG]) - lm.cells.DA.0.5$landmark.embed$pca$center) /
+       lm.cells.DA.0.5$landmark.embed$pca$scale) |>
        Matrix::t()) %*%
-     lm.cells.DA.0.5$pca$rotation
+     lm.cells.DA.0.5$landmark.embed$pca$rotation
   )() |>
   as.matrix() |>
   as.data.frame() |>
@@ -344,14 +344,14 @@ lapply(X = .cells.DA.0.5,
   )()
 
 tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.0.5,
-                    .feature = lm.cells.DA.0.5$metada$Treatment[lm.cells.DA.0.5$config$key],
+                    .feature = lm.cells.DA.0.5$metadata$Treatment[lm.cells.DA.0.5$config$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,
                     .color.label = "Treatment")
 
 (tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.0.5,
-                     .feature = lm.cells.DA.0.5$map$lm$default$fit$coefficients[,"Depletion"],
+                     .feature = lm.cells.DA.0.5$results$lm$default$fit$coefficients[,"Depletion"],
                      .plot.title = "Depletion vs Baseline",
                      .color.label = "density\nlog2(+0.5)FC",
                      .panel.size = 2,
@@ -363,11 +363,11 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.0.5,
   .tdr.obj = lm.cells.DA.0.5,
   .feature =
     ifelse(
-      test = lm.cells.DA.0.5$map$lm$default$fit$coefficients[,"Depletion"] < 0,
+      test = lm.cells.DA.0.5$results$lm$default$fit$coefficients[,"Depletion"] < 0,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = lm.cells.DA.0.5$map$lm$default$fit$pca.weighted.q[,"Depletion"] < 0.1,
+      test = lm.cells.DA.0.5$results$lm$default$fit$pca.weighted.q[,"Depletion"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
@@ -381,7 +381,7 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.0.5,
 
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells.DA.0.5,
-  .feature = lm.cells.DA.0.5$graph$clustering$ids,
+  .feature = lm.cells.DA.0.5$landmark.annot$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
   .panel.size = 2) |> 
@@ -403,14 +403,14 @@ tinydenseR::plotTradStats(
   .model.name = "default")
 
 stat.test.percentages.DA.0.5 <-
-  lm.cells.DA.0.5$map$clustering$cell.perc |>
+  lm.cells.DA.0.5$density$composition$clustering$cell.perc |>
   dplyr::as_tibble() |>
   dplyr::mutate(treatment = lm.cells.DA.0.5$metadata$Treatment) |>
   tidyr::pivot_longer(cols = dplyr::starts_with(match = "cluster.")) |>
   dplyr::group_by(name) |>
   rstatix::t_test(formula = value ~ treatment) |>
-  dplyr::mutate(p = lm.cells.DA.0.5$map$lm$default$trad$clustering$fit$adj.p[name,"Depletion"],
-                p.adj = lm.cells.DA.0.5$map$lm$default$trad$clustering$fit$adj.p[name,"Depletion"]) |>
+  dplyr::mutate(p = lm.cells.DA.0.5$results$lm$default$trad$clustering$fit$adj.p[name,"Depletion"],
+                p.adj = lm.cells.DA.0.5$results$lm$default$trad$clustering$fit$adj.p[name,"Depletion"]) |>
   rstatix::add_significance() |>
   dplyr::mutate(p.adj = ifelse(test = p.adj < 0.01,
                                yes = formatC(x = p.adj,
@@ -476,8 +476,8 @@ tinydenseR::plotMarkerDE(
   .comparison.name = "cluster4_vs_all",
   .coefs = ".id1")
 
-lm.cells.DA.0.5$markerDE$default$cluster4_vs_all$adj.p
-lm.cells.DA.0.5$markerDE$default$cluster4_vs_all$coefficients
+lm.cells.DA.0.5$results$marker$default$cluster4_vs_all$adj.p
+lm.cells.DA.0.5$results$marker$default$cluster4_vs_all$coefficients
 
 # 5%
 .cells.DA.5 <-
@@ -539,7 +539,7 @@ lm.cells.DA.5 <-
                        fixed = FALSE))
   )()
 
-# New API: get.lm() returns updated .tdr.obj with results in $map$lm[[.model.name]]
+# New API: get.lm() returns updated .tdr.obj with results in $results$lm[[.model.name]]
 lm.cells.DA.5 <-
   tinydenseR::get.lm(
     .tdr.obj = lm.cells.DA.5,
@@ -549,10 +549,10 @@ lapply(X = .cells.DA.5,
        FUN = readRDS) |>
   do.call(what = rbind) |>
   (\(x)
-   (((Matrix::t(x = x[,lm.cells.DA.5$pca$HVG]) - lm.cells.DA.5$pca$center) /
-       lm.cells.DA.5$pca$scale) |>
+   (((Matrix::t(x = x[,lm.cells.DA.5$landmark.embed$pca$HVG]) - lm.cells.DA.5$landmark.embed$pca$center) /
+       lm.cells.DA.5$landmark.embed$pca$scale) |>
        Matrix::t()) %*%
-     lm.cells.DA.5$pca$rotation
+     lm.cells.DA.5$landmark.embed$pca$rotation
   )() |>
   as.matrix() |>
   as.data.frame() |>
@@ -636,10 +636,10 @@ lapply(X = .cells.DA.5,
        FUN = readRDS) |>
   do.call(what = rbind) |>
   (\(x)
-   (((Matrix::t(x = x[,lm.cells.DA.5$pca$HVG]) - lm.cells.DA.5$pca$center) /
-       lm.cells.DA.5$pca$scale) |>
+   (((Matrix::t(x = x[,lm.cells.DA.5$landmark.embed$pca$HVG]) - lm.cells.DA.5$landmark.embed$pca$center) /
+       lm.cells.DA.5$landmark.embed$pca$scale) |>
        Matrix::t()) %*%
-     lm.cells.DA.5$pca$rotation
+     lm.cells.DA.5$landmark.embed$pca$rotation
   )() |>
   as.matrix() |>
   as.data.frame() |>
@@ -674,14 +674,14 @@ lapply(X = .cells.DA.5,
   )()
 
 tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.5,
-                    .feature = lm.cells.DA.5$metada$Treatment[lm.cells.DA.5$config$key],
+                    .feature = lm.cells.DA.5$metadata$Treatment[lm.cells.DA.5$config$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,
                     .color.label = "Treatment")
 
 (tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.5,
-                     .feature = lm.cells.DA.5$map$lm$default$fit$coefficients[,"Depletion"],
+                     .feature = lm.cells.DA.5$results$lm$default$fit$coefficients[,"Depletion"],
                      .plot.title = "Depletion vs Baseline",
                      .color.label = "density\nlog2(+0.5)FC",
                      .panel.size = 2,
@@ -693,11 +693,11 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.5,
   .tdr.obj = lm.cells.DA.5,
   .feature =
     ifelse(
-      test = lm.cells.DA.5$map$lm$default$fit$coefficients[,"Depletion"] < 0,
+      test = lm.cells.DA.5$results$lm$default$fit$coefficients[,"Depletion"] < 0,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = lm.cells.DA.5$map$lm$default$fit$pca.weighted.q[,"Depletion"] < 0.1,
+      test = lm.cells.DA.5$results$lm$default$fit$pca.weighted.q[,"Depletion"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
@@ -711,7 +711,7 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.5,
 
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells.DA.5,
-  .feature = lm.cells.DA.5$graph$clustering$ids,
+  .feature = lm.cells.DA.5$landmark.annot$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
   .panel.size = 2) |> 
@@ -733,14 +733,14 @@ tinydenseR::plotTradStats(
   .model.name = "default")
 
 stat.test.percentages.DA.5 <-
-  lm.cells.DA.5$map$clustering$cell.perc |>
+  lm.cells.DA.5$density$composition$clustering$cell.perc |>
   dplyr::as_tibble() |>
   dplyr::mutate(treatment = lm.cells.DA.5$metadata$Treatment) |>
   tidyr::pivot_longer(cols = dplyr::starts_with(match = "cluster.")) |>
   dplyr::group_by(name) |>
   rstatix::t_test(formula = value ~ treatment) |>
-  dplyr::mutate(p = lm.cells.DA.5$map$lm$default$trad$clustering$fit$adj.p[name,"Depletion"],
-                p.adj = lm.cells.DA.5$map$lm$default$trad$clustering$fit$adj.p[name,"Depletion"]) |>
+  dplyr::mutate(p = lm.cells.DA.5$results$lm$default$trad$clustering$fit$adj.p[name,"Depletion"],
+                p.adj = lm.cells.DA.5$results$lm$default$trad$clustering$fit$adj.p[name,"Depletion"]) |>
   rstatix::add_significance() |>
   dplyr::mutate(p.adj = ifelse(test = p.adj < 0.01,
                                yes = formatC(x = p.adj,
@@ -808,8 +808,8 @@ tinydenseR::plotMarkerDE(
   .comparison.name = "cluster3_vs_all",
   .coefs = ".id1")
 
-lm.cells.DA.5$markerDE$default$cluster3_vs_all$adj.p
-lm.cells.DA.5$markerDE$default$cluster3_vs_all$coefficients
+lm.cells.DA.5$results$marker$default$cluster3_vs_all$adj.p
+lm.cells.DA.5$results$marker$default$cluster3_vs_all$coefficients
 
 # 50%
 .cells.DA.50 <-
@@ -880,10 +880,10 @@ lapply(X = .cells.DA.50,
        FUN = readRDS) |>
   do.call(what = rbind) |>
   (\(x)
-   (((Matrix::t(x = x[,lm.cells.DA.50$pca$HVG]) - lm.cells.DA.50$pca$center) /
-       lm.cells.DA.50$pca$scale) |>
+   (((Matrix::t(x = x[,lm.cells.DA.50$landmark.embed$pca$HVG]) - lm.cells.DA.50$landmark.embed$pca$center) /
+       lm.cells.DA.50$landmark.embed$pca$scale) |>
        Matrix::t()) %*%
-     lm.cells.DA.50$pca$rotation
+     lm.cells.DA.50$landmark.embed$pca$rotation
   )() |>
   as.matrix() |>
   as.data.frame() |>
@@ -967,10 +967,10 @@ lapply(X = .cells.DA.50,
        FUN = readRDS) |>
   do.call(what = rbind) |>
   (\(x)
-   (((Matrix::t(x = x[,lm.cells.DA.50$pca$HVG]) - lm.cells.DA.50$pca$center) /
-       lm.cells.DA.50$pca$scale) |>
+   (((Matrix::t(x = x[,lm.cells.DA.50$landmark.embed$pca$HVG]) - lm.cells.DA.50$landmark.embed$pca$center) /
+       lm.cells.DA.50$landmark.embed$pca$scale) |>
        Matrix::t()) %*%
-     lm.cells.DA.50$pca$rotation
+     lm.cells.DA.50$landmark.embed$pca$rotation
   )() |>
   as.matrix() |>
   as.data.frame() |>
@@ -1005,14 +1005,14 @@ lapply(X = .cells.DA.50,
   )() 
 
 tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.50,
-                    .feature = lm.cells.DA.50$metada$Treatment[lm.cells.DA.50$config$key],
+                    .feature = lm.cells.DA.50$metadata$Treatment[lm.cells.DA.50$config$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.50,
                     .point.size = 1,
                     .color.label = "Treatment")
 
 (tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.50,
-                     .feature = lm.cells.DA.50$map$lm$default$fit$coefficients[,"Depletion"],
+                     .feature = lm.cells.DA.50$results$lm$default$fit$coefficients[,"Depletion"],
                      .plot.title = "Depletion vs Baseline",
                      .color.label = "density\nlog2(+0.5)FC",
                      .panel.size = 2,
@@ -1024,11 +1024,11 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.50,
   .tdr.obj = lm.cells.DA.50,
   .feature =
     ifelse(
-      test = lm.cells.DA.50$map$lm$default$fit$coefficients[,"Depletion"] < 0,
+      test = lm.cells.DA.50$results$lm$default$fit$coefficients[,"Depletion"] < 0,
       yes = "less abundant",
       no = "more abundant") |>
     ifelse(
-      test = lm.cells.DA.50$map$lm$default$fit$pca.weighted.q[,"Depletion"] < 0.1,
+      test = lm.cells.DA.50$results$lm$default$fit$pca.weighted.q[,"Depletion"] < 0.1,
       no = "not sig.")  |>
     factor(levels = c("less abundant",
                       "not sig.",
@@ -1042,7 +1042,7 @@ tinydenseR::plotPCA(.tdr.obj = lm.cells.DA.50,
 
 tinydenseR::plotPCA(
   .tdr.obj = lm.cells.DA.50,
-  .feature = lm.cells.DA.50$graph$clustering$ids,
+  .feature = lm.cells.DA.50$landmark.annot$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
   .panel.size = 2) |> 
@@ -1064,14 +1064,14 @@ tinydenseR::plotTradStats(
   .model.name = "default")
 
 stat.test.percentages.DA.50 <-
-  lm.cells.DA.50$map$clustering$cell.perc |>
+  lm.cells.DA.50$density$composition$clustering$cell.perc |>
   dplyr::as_tibble() |>
   dplyr::mutate(treatment = lm.cells.DA.50$metadata$Treatment) |>
   tidyr::pivot_longer(cols = dplyr::starts_with(match = "cluster.")) |>
   dplyr::group_by(name) |>
   rstatix::t_test(formula = value ~ treatment) |>
-  dplyr::mutate(p = lm.cells.DA.50$map$lm$default$trad$clustering$fit$adj.p[name,"Depletion"],
-                p.adj = lm.cells.DA.50$map$lm$default$trad$clustering$fit$adj.p[name,"Depletion"]) |>
+  dplyr::mutate(p = lm.cells.DA.50$results$lm$default$trad$clustering$fit$adj.p[name,"Depletion"],
+                p.adj = lm.cells.DA.50$results$lm$default$trad$clustering$fit$adj.p[name,"Depletion"]) |>
   rstatix::add_significance() |>
   dplyr::mutate(p.adj = ifelse(test = p.adj < 0.01,
                                yes = formatC(x = p.adj,
@@ -1138,8 +1138,8 @@ tinydenseR::plotMarkerDE(
   .comparison.name = "cluster2_vs_all",
   .coefs = ".id1")
 
-lm.cells.DA.50$markerDE$default$cluster2_vs_all$adj.p
-lm.cells.DA.50$markerDE$default$cluster2_vs_all$coefficients
+lm.cells.DA.50$results$marker$default$cluster2_vs_all$adj.p
+lm.cells.DA.50$results$marker$default$cluster2_vs_all$coefficients
 
 # permutation tests
 source(file = "https://raw.githubusercontent.com/Novartis/tinydenseR/refs/heads/main/inst/scripts/perm_utils.R")

@@ -17,6 +17,15 @@
 
 \S4method{show}{TDRObj}(object)
 }
+\arguments{
+\item{x}{A TDRObj object.}
+
+\item{name}{A character string naming the slot to access.}
+
+\item{value}{The value to assign to the slot.}
+
+\item{object}{A TDRObj object (used in show method).}
+}
 \description{
 The core data structure for tinydenseR landmark-based analysis. Contains
 expression data references, metadata, dimensionality reduction results,
