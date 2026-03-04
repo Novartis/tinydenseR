@@ -4,12 +4,12 @@
 \alias{celltyping}
 \title{Manually assign cell type labels to clusters}
 \usage{
-celltyping(.tdr.obj, .celltyping.map)
+celltyping(.tdr.obj, .celltyping.map, .verbose = TRUE)
 }
 \arguments{
 \item{.tdr.obj}{A list object initialized with \code{setup.tdr.obj} and processed
 with \code{get.landmarks} and \code{get.graph}. Must contain
-\code{.tdr.obj$graph$clustering$ids}.}
+\code{.tdr.obj$landmark.annot$clustering$ids}.}
 
 \item{.celltyping.map}{A named list mapping cell types to cluster IDs.
 List names are cell type labels (e.g., "CD4.T.cells"), and each element
@@ -18,22 +18,40 @@ that belong to that cell type. Requirements:
 \itemize{
 \item Each cell type name must be unique
 \item Each cluster can only map to one cell type
-\item All clusters in \code{.tdr.obj$graph$clustering$ids} must be mapped
+\item All clusters in \code{.tdr.obj$landmark.annot$clustering$ids} must be mapped
 }}
+
+\item{.verbose}{Logical; if \code{TRUE}, print progress messages when
+refreshing downstream slots (default \code{TRUE}).}
 }
 \value{
 The \code{.tdr.obj} with the following updated fields:
 \describe{
-\item{\code{$graph$celltyping$ids}}{Factor vector of cell type labels
+\item{\code{$landmark.annot$celltyping$ids}}{Factor vector of cell type labels
 for each landmark}
-\item{\code{$graph$celltyping$median.exprs}}{Matrix of mean expression
+\item{\code{$landmark.annot$celltyping$map}}{The \code{.celltyping.map}
+list used to create the labels (stored for provenance)}
+\item{\code{$results$celltyping$median.exprs}}{Matrix of mean expression
 values per cell type (rows) by features (columns). For RNA data,
 displays z-scored expression of top PC-loading genes. For cytometry
 data, shows z-scored marker intensities.}
-\item{\code{$graph$celltyping$pheatmap}}{Heatmap object (from
+\item{\code{$results$celltyping$pheatmap}}{Heatmap object (from
 \code{pheatmap} package) visualizing mean expression patterns across
 cell types}
 }
+If \code{get.map()} has already been run, the following slots are also
+refreshed (no re-mapping required):
+\describe{
+\item{\code{$cellmap$celltype.ids}}{Per-sample list of cell-level celltype
+assignments, re-derived from the existing fuzzy graph}
+\item{\code{$density$composition$celltyping$cell.count}}{Samples x cell
+types count matrix}
+\item{\code{$density$composition$celltyping$cell.perc}}{Samples x cell
+types percentage matrix}
+}
+If \code{get.lm()} has been run, any existing
+\code{$results$lm[[model]]$trad$celltyping} fits are invalidated (set to
+\code{NULL}) with a warning.
 }
 \description{
 This function allows manual annotation of clusters by mapping one or more
@@ -42,6 +60,15 @@ useful in cytometry experiments, where there typically is a larger number of
 cells and lineage marker-based hierarchical analysis is common.
 }
 \details{
+\code{celltyping()} can be called at any point in the pipeline — before or
+after \code{\link{get.map}}.
+When called \strong{after} \code{get.map()}, it automatically refreshes all
+celltyping-dependent downstream slots (cell-level IDs, composition matrices,
+and the summary heatmap) without re-reading expression data or re-running
+the UMAP transform.  Any existing \code{get.lm()} results that depend on
+celltyping are invalidated with a warning so the user can re-run
+\code{get.lm()}.
+
 Manual cell type annotation is useful when:
 \itemize{
 \item Domain expertise is needed for fine-grained annotations
@@ -63,7 +90,7 @@ lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |>
   get.graph()
 
-# Map clusters to cell types
+# Map clusters to cell types (before get.map — traditional order)
 celltype_map <- list(
   "CD4.T.cells" = c("cluster.01", "cluster.02"),
   "CD8.T.cells" = c("cluster.03"),
@@ -71,6 +98,13 @@ celltype_map <- list(
   "unknown" = c("cluster.06")
 )
 lm.cells <- celltyping(lm.cells, celltype_map)
+
+# Late celltyping — after get.map (new supported workflow)
+lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
+  get.landmarks() |>
+  get.graph() |>
+  get.map() |>
+  celltyping(celltype_map)
 }
 }
 \seealso{

@@ -21,6 +21,15 @@
 #' useful in cytometry experiments, where there typically is a larger number of
 #' cells and lineage marker-based hierarchical analysis is common.
 #'
+#' \code{celltyping()} can be called at any point in the pipeline — before or
+#' after \code{\link{get.map}}.
+#' When called \strong{after} \code{get.map()}, it automatically refreshes all
+#' celltyping-dependent downstream slots (cell-level IDs, composition matrices,
+#' and the summary heatmap) without re-reading expression data or re-running
+#' the UMAP transform.  Any existing \code{get.lm()} results that depend on
+#' celltyping are invalidated with a warning so the user can re-run
+#' \code{get.lm()}.
+#'
 #' @details
 #' Manual cell type annotation is useful when:
 #' \itemize{
@@ -38,7 +47,7 @@
 #'
 #' @param .tdr.obj A list object initialized with \code{setup.tdr.obj} and processed 
 #'   with \code{get.landmarks} and \code{get.graph}. Must contain 
-#'   \code{.tdr.obj$graph$clustering$ids}.
+#'   \code{.tdr.obj$landmark.annot$clustering$ids}.
 #' @param .celltyping.map A named list mapping cell types to cluster IDs. 
 #'   List names are cell type labels (e.g., "CD4.T.cells"), and each element 
 #'   is a character vector of cluster IDs (e.g., c("cluster.01", "cluster.02")) 
@@ -46,8 +55,10 @@
 #'   \itemize{
 #'     \item Each cell type name must be unique
 #'     \item Each cluster can only map to one cell type
-#'     \item All clusters in \code{.tdr.obj$graph$clustering$ids} must be mapped
+#'     \item All clusters in \code{.tdr.obj$landmark.annot$clustering$ids} must be mapped
 #'   }
+#' @param .verbose Logical; if \code{TRUE}, print progress messages when
+#'   refreshing downstream slots (default \code{TRUE}).
 #' @examples
 #' \dontrun{
 #' # After clustering with get.graph()
@@ -55,7 +66,7 @@
 #'   get.landmarks() |>
 #'   get.graph()
 #' 
-#' # Map clusters to cell types
+#' # Map clusters to cell types (before get.map — traditional order)
 #' celltype_map <- list(
 #'   "CD4.T.cells" = c("cluster.01", "cluster.02"),
 #'   "CD8.T.cells" = c("cluster.03"),
@@ -63,26 +74,49 @@
 #'   "unknown" = c("cluster.06")
 #' )
 #' lm.cells <- celltyping(lm.cells, celltype_map)
+#'
+#' # Late celltyping — after get.map (new supported workflow)
+#' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
+#'   get.landmarks() |>
+#'   get.graph() |>
+#'   get.map() |>
+#'   celltyping(celltype_map)
 #' }
 #' @return The \code{.tdr.obj} with the following updated fields:
 #'   \describe{
-#'     \item{\code{$graph$celltyping$ids}}{Factor vector of cell type labels 
+#'     \item{\code{$landmark.annot$celltyping$ids}}{Factor vector of cell type labels 
 #'       for each landmark}
-#'     \item{\code{$graph$celltyping$median.exprs}}{Matrix of mean expression 
+#'     \item{\code{$landmark.annot$celltyping$map}}{The \code{.celltyping.map}
+#'       list used to create the labels (stored for provenance)}
+#'     \item{\code{$results$celltyping$median.exprs}}{Matrix of median expression 
 #'       values per cell type (rows) by features (columns). For RNA data, 
 #'       displays z-scored expression of top PC-loading genes. For cytometry 
 #'       data, shows z-scored marker intensities.}
-#'     \item{\code{$graph$celltyping$pheatmap}}{Heatmap object (from 
-#'       \code{pheatmap} package) visualizing mean expression patterns across 
+#'     \item{\code{$results$celltyping$pheatmap}}{Heatmap object (from 
+#'       \code{pheatmap} package) visualizing median expression patterns across 
 #'       cell types}
 #'   }
+#'   If \code{get.map()} has already been run, the following slots are also
+#'   refreshed (no re-mapping required):
+#'   \describe{
+#'     \item{\code{$cellmap$celltype.ids}}{Per-sample list of cell-level celltype
+#'       assignments, re-derived from the existing fuzzy graph}
+#'     \item{\code{$density$composition$celltyping$cell.count}}{Samples x cell
+#'       types count matrix}
+#'     \item{\code{$density$composition$celltyping$cell.perc}}{Samples x cell
+#'       types percentage matrix}
+#'   }
+#'   If \code{get.lm()} has been run, any existing
+#'   \code{$results$lm[[model]]$trad$celltyping} fits are invalidated (set to
+#'   \code{NULL}) with a warning.
 #' @seealso 
 #'   \code{\link{get.map}} for automatic cell typing with symphony reference objects,
 #'   \code{\link{lm.cluster}} for the clustering that produces cluster IDs used here
 #' @export
 celltyping <-
   function(.tdr.obj,
-           .celltyping.map){
+           .celltyping.map,
+           .verbose = TRUE){
     
     cell.pop <- NULL
     
@@ -129,7 +163,7 @@ celltyping <-
                   paste(cls.in.map[!(cls.in.map %in%
                                        unique(x = .tdr.obj@landmark.annot$clustering$ids))],
                         collapse = ", "),
-                  "\nThese clusters do not exist in .tdr.obj$graph$clustering$ids.",
+                  "\nThese clusters do not exist in .tdr.obj$landmark.annot$clustering$ids.",
                   "\nRun lm.cluster() to see available cluster IDs."))
     }
     
@@ -154,65 +188,362 @@ celltyping <-
       )() |>
       as.factor()
     
-    # For RNA: select top PC-loading genes for heatmap visualization
-    # Takes top 3 positive and top 3 negative loadings per PC to capture
-    # genes that drive the major axes of variation
-    if(.tdr.obj@config$assay.type == "RNA") {
-      
-      top <-
-        apply(X = .tdr.obj@landmark.embed$pca$rotation,
-              MARGIN = 2,
-              FUN = function(PC.rot){
-                
-                order(PC.rot,
-                      decreasing = TRUE) |>
-                  (\(x)
-                   c(utils::head(x = x, 
-                                 n = 3),
-                     utils::tail(x = x,
-                                 n = 3))
-                  )()
-                
-              }) |>
-        as.vector() |> 
-        (\(x)
-         rownames(x = .tdr.obj@landmark.embed$pca$rotation)[x]
-        )() |>
-        unique()
-      
-    }
+    # Store the map for provenance / reproducibility
+    .tdr.obj@landmark.annot$celltyping$map <- .celltyping.map
     
-    .tdr.obj@results$celltyping$median.exprs <-
-      (if(.tdr.obj@config$assay.type == "RNA") .tdr.obj@assay$scaled[,top] else .tdr.obj@assay$expr) |>
-      dplyr::as_tibble() |>
-      cbind(cell.pop = as.character(x = .tdr.obj@landmark.annot$celltyping$ids)) |>
-      dplyr::group_by(cell.pop) |>
-      dplyr::summarize_all(.funs = mean) |>
-      as.data.frame() |>
-      (\(x)
-       `rownames<-`(x = x[,colnames(x = x) != "cell.pop"],
-                    value = x$cell.pop)
-      )() |>
-      as.matrix()
-    
-    .tdr.obj@results$celltyping$pheatmap <-
-      pheatmap::pheatmap(mat = .tdr.obj@results$celltyping$median.exprs,
-                         color = grDevices::colorRampPalette(
-                           unname(obj =
-                                    Color.Palette[1,c(1,6,2)]))(100),
-                         kmeans_k = NA,
-                         breaks = NA,
-                         border_color = NA,
-                         scale = "none",
-                         angle_col = 90,
-                         cluster_rows = TRUE,
-                         cluster_cols = TRUE,
-                         cellwidth = 20,
-                         cellheight = 20,
-                         treeheight_row = 20,
-                         treeheight_col = 20,
-                         silent = TRUE)
+    # Refresh all celltyping-dependent slots
+    .tdr.obj <- .refresh_celltyping(.tdr.obj, .verbose = .verbose)
     
     return(.tdr.obj)
     
   }
+
+# ──────────────────────────────────────────────────────────────────────
+# Private helpers for celltyping refresh
+# ──────────────────────────────────────────────────────────────────────
+
+#' Recompute landmark-level celltyping summaries (median.exprs + pheatmap)
+#'
+#' Derives the \code{@results$celltyping$median.exprs} matrix and
+#' \code{@results$celltyping$pheatmap} heatmap object from the current
+#' \code{@landmark.annot$celltyping$ids}.  This is a pure function of
+#' landmark expression data and celltype labels — no cell-level data is
+#' needed.
+#'
+#' @param .tdr.obj A TDRObj with \code{@landmark.annot$celltyping$ids}
+#'   already set.
+#' @return The modified \code{.tdr.obj}.
+#' @keywords internal
+.recompute_celltyping_summaries <- function(.tdr.obj) {
+  
+  cell.pop <- NULL
+  
+  # For RNA: select top PC-loading genes for heatmap visualization
+  # Takes top 3 positive and top 3 negative loadings per PC to capture
+  # genes that drive the major axes of variation
+  if(.tdr.obj@config$assay.type == "RNA") {
+    
+    top <-
+      apply(X = .tdr.obj@landmark.embed$pca$rotation,
+            MARGIN = 2,
+            FUN = function(PC.rot){
+              
+              order(PC.rot,
+                    decreasing = TRUE) |>
+                (\(x)
+                 c(utils::head(x = x, 
+                               n = 3),
+                   utils::tail(x = x,
+                               n = 3))
+                )()
+              
+            }) |>
+      as.vector() |> 
+      (\(x)
+       rownames(x = .tdr.obj@landmark.embed$pca$rotation)[x]
+      )() |>
+      unique()
+    
+  }
+  
+  .tdr.obj@results$celltyping$median.exprs <-
+    (if(.tdr.obj@config$assay.type == "RNA") .tdr.obj@assay$scaled[,top] else .tdr.obj@assay$expr) |>
+    dplyr::as_tibble() |>
+    cbind(cell.pop = as.character(x = .tdr.obj@landmark.annot$celltyping$ids)) |>
+    dplyr::group_by(cell.pop) |>
+    dplyr::summarize_all(.funs = median) |>
+    as.data.frame() |>
+    (\(x)
+     `rownames<-`(x = x[,colnames(x = x) != "cell.pop"],
+                  value = x$cell.pop)
+    )() |>
+    as.matrix()
+  
+  .tdr.obj@results$celltyping$pheatmap <-
+    pheatmap::pheatmap(mat = .tdr.obj@results$celltyping$median.exprs,
+                       color = grDevices::colorRampPalette(
+                         unname(obj =
+                                  Color.Palette[1,c(1,6,2)]))(100),
+                       kmeans_k = NA,
+                       breaks = NA,
+                       border_color = NA,
+                       scale = "none",
+                       angle_col = 90,
+                       cluster_rows = nrow(.tdr.obj@results$celltyping$median.exprs) > 1,
+                       cluster_cols = ncol(.tdr.obj@results$celltyping$median.exprs) > 1,
+                       cellwidth = 20,
+                       cellheight = 20,
+                       treeheight_row = 20,
+                       treeheight_col = 20,
+                       silent = TRUE)
+  
+  .tdr.obj
+}
+
+#' Re-derive cell-level celltype IDs from fuzzy graph + landmark labels
+#'
+#' Reads the cached (on-disk or in-memory) fuzzy graph for each sample and
+#' applies the current \code{@landmark.annot$celltyping$ids} via the same
+#' weighted-voting logic used in \code{get.map()}.  No expression data is
+#' re-read and no UMAP transform is repeated.
+#'
+#' @param .tdr.obj A TDRObj where \code{get.map()} has already been run.
+#' @param .verbose Logical; print progress messages.
+#' @return The modified \code{.tdr.obj} with updated
+#'   \code{@cellmap$celltype.ids} (in-memory) or
+#'   \code{@density$.cache$manifests$celltyping.ids} (on-disk).
+#' @keywords internal
+.relabel_cellmap <- function(.tdr.obj, .verbose = FALSE) {
+  
+  # R CMD check appeasement
+  cell <- landmark <- label <- x <- confidence <- NULL
+  
+  ct_ids <- .tdr.obj@landmark.annot$celltyping$ids
+  .label.confidence <- if (!is.null(.tdr.obj@config$label.confidence)) {
+    .tdr.obj@config$label.confidence
+  } else {
+    0.8
+  }
+  
+  cache <- .tdr.obj@density$.cache
+  is_cached <- !is.null(cache) && isTRUE(cache$on.disk)
+  
+  sample_names <- names(.tdr.obj@cells)
+  
+  new_celltype_ids <- stats::setNames(
+    vector("list", length(sample_names)),
+    sample_names
+  )
+  
+  for (sn in sample_names) {
+    
+    if (isTRUE(.verbose)) {
+      message("-> Relabeling celltypes for sample: ", sn)
+    }
+    
+    # Read fuzzy graph (from disk cache or in-memory)
+    fgraph <- .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", sn)
+    
+    n_cells <- nrow(fgraph)
+    
+    # Apply the same weighted-voting logic as get.map():
+    # 1. Expand sparse fgraph into (cell, landmark, weight) triplets
+    # 2. Map landmarks to celltype labels
+    # 3. Sum weights per (cell, label), compute confidence
+    # 4. Assign label if confidence >= threshold, else "..low.confidence.."
+    new_celltype_ids[[sn]] <-
+      Matrix::summary(object = fgraph) |>
+      dplyr::rename(cell = i,
+                    landmark = j) |>
+      dplyr::mutate(label = as.character(x = ct_ids[landmark])) |>
+      dplyr::select(-landmark) |>
+      collapse::fgroup_by(cell,
+                          label,
+                          sort = FALSE) |>
+      collapse::fsum() |>
+      collapse::fgroup_by(cell,
+                          sort = FALSE) |>
+      collapse::fmutate(confidence = x / collapse::fsum(x)) |>
+      collapse::fungroup() |>
+      collapse::fsubset(confidence >= .label.confidence) |>
+      (\(x)
+       {
+         lbl <-
+           rep(x = "..low.confidence..",
+               times = n_cells)
+         
+         lbl[x$cell] <-
+           x$label
+         
+         # Recover original cell names from clustering IDs (same ordering)
+         cell_names <- names(.tdr_get_map_slot(.tdr.obj, "clustering.ids", sn))
+         
+         stats::setNames(object = lbl,
+                         nm = cell_names)
+       }
+      )()
+    
+    # Write to on-disk cache if active
+    if (is_cached) {
+      cache_record <- .tdr_cache_write(
+        object = new_celltype_ids[[sn]],
+        cache_dir = cache$root,
+        slot_name = "celltyping.ids",
+        sample_name = sn
+      )
+      .tdr.obj@density$.cache$manifests$celltyping.ids[[sn]] <- cache_record
+    }
+  }
+  
+  # Store in-memory (NULL if on-disk caching, populated otherwise)
+  if (!is_cached) {
+    .tdr.obj@cellmap$celltype.ids <- new_celltype_ids
+  }
+  
+  .tdr.obj
+}
+
+#' Recompute celltyping composition matrices from cell-level IDs
+#'
+#' Aggregates cell-level celltype assignments into samples x celltypes
+#' count and percentage matrices, replacing
+#' \code{@density$composition$celltyping$cell.count} and
+#' \code{@density$composition$celltyping$cell.perc}.
+#'
+#' @param .tdr.obj A TDRObj with freshly relabeled celltype IDs.
+#' @return The modified \code{.tdr.obj}.
+#' @keywords internal
+.recompute_composition_celltyping <- function(.tdr.obj) {
+  
+  sample_names <- names(.tdr.obj@cells)
+  
+  ct_counts <- lapply(
+    X = stats::setNames(sample_names, sample_names),
+    FUN = function(sn) {
+      ids <- .tdr_get_map_slot(.tdr.obj, "celltyping.ids", sn)
+      tbl <- table(ids)
+      stats::setNames(as.vector(tbl), names(tbl))
+    }
+  )
+  
+  # Determine which celltypes to exclude (the previously ignored population)
+  .cl.ct.to.ign <- .tdr.obj@density$ignored
+  
+  .tdr.obj@density$composition$celltyping$cell.count <-
+    ct_counts |>
+    dplyr::bind_rows(.id = "sample") |>
+    as.data.frame() |>
+    (\(x)
+     `rownames<-`(x = as.matrix(x = x[, colnames(x = x) != "sample"]),
+                  value = x$sample)
+    )() |>
+    (\(x)
+     x[, colnames(x = x) |>
+         sort()]
+    )() |>
+    (\(x)
+     x[, !(colnames(x = x) %in% .cl.ct.to.ign)]
+    )()
+  
+  .tdr.obj@density$composition$celltyping$cell.count[
+    is.na(x = .tdr.obj@density$composition$celltyping$cell.count)
+  ] <- 0
+  
+  .tdr.obj@density$composition$celltyping$cell.perc <-
+    (.tdr.obj@density$composition$celltyping$cell.count * 100) /
+    Matrix::rowSums(x = .tdr.obj@density$composition$celltyping$cell.count)
+  
+  .tdr.obj
+}
+
+#' Invalidate stale trad celltyping fits in get.lm() results
+#'
+#' Sets \code{@results$lm[[model]]$trad$celltyping} to \code{NULL} for every
+#' stored model and emits a warning so the user knows to re-run
+#' \code{get.lm()}.
+#'
+#' @param .tdr.obj A TDRObj.
+#' @return The modified \code{.tdr.obj}.
+#' @keywords internal
+.invalidate_trad_celltyping <- function(.tdr.obj) {
+  
+  model_names <- names(.tdr.obj@results$lm)
+  
+  for (mn in model_names) {
+    if (!is.null(.tdr.obj@results$lm[[mn]]$trad$celltyping)) {
+      .tdr.obj@results$lm[[mn]]$trad$celltyping <- NULL
+      warning("Invalidated trad$celltyping fit for model '", mn,
+              "'. Re-run get.lm() to recompute with updated celltype labels.",
+              call. = FALSE)
+    }
+  }
+  
+  .tdr.obj
+}
+
+#' Warn about potentially stale pseudobulk / marker DE results
+#'
+#' Checks whether any \code{get.pbDE()} or \code{get.markerDE()} results
+#' were computed with \code{.id.from = "celltyping"} and emits a warning
+#' if so, since those results now reflect the old celltype labels.
+#'
+#' @param .tdr.obj A TDRObj.
+#' @return The (unmodified) \code{.tdr.obj}, invisibly.
+#' @keywords internal
+.warn_stale_de_results <- function(.tdr.obj) {
+  
+  # Check pseudobulk DE results
+  if (!is.null(.tdr.obj@results$pb)) {
+    for (mn in names(.tdr.obj@results$pb)) {
+      for (pn in names(.tdr.obj@results$pb[[mn]])) {
+        res <- .tdr.obj@results$pb[[mn]][[pn]]
+        if (!is.null(res$.id.from) && res$.id.from == "celltyping") {
+          warning("Pseudobulk DE results for model '", mn,
+                  "', population '", pn,
+                  "' were computed with old celltyping labels and may be stale.",
+                  call. = FALSE)
+        }
+      }
+    }
+  }
+  
+  # Check marker DE results
+  if (!is.null(.tdr.obj@results$marker)) {
+    for (mn in names(.tdr.obj@results$marker)) {
+      res <- .tdr.obj@results$marker[[mn]]
+      if (!is.null(res$.id.from) && res$.id.from == "celltyping") {
+        warning("Marker DE results for model '", mn,
+                "' were computed with old celltyping labels and may be stale.",
+                call. = FALSE)
+      }
+    }
+  }
+  
+  invisible(.tdr.obj)
+}
+
+#' Refresh all celltyping-dependent slots
+#'
+#' Inspects the TDRObj and updates every populated celltyping-dependent slot.
+#' This is called at the end of \code{celltyping()} so that late-bound
+#' celltyping (after \code{get.map()}) produces a fully consistent object.
+#'
+#' Slots that have not yet been computed (e.g. \code{get.map()} has not run)
+#' are simply skipped — the object remains valid at whatever pipeline stage
+#' it is in.
+#'
+#' @param .tdr.obj A TDRObj with \code{@landmark.annot$celltyping$ids}
+#'   already set to the new values.
+#' @param .verbose Logical; print progress messages.
+#' @return The modified \code{.tdr.obj}.
+#' @keywords internal
+.refresh_celltyping <- function(.tdr.obj, .verbose = FALSE) {
+  
+  # --- P2, P3: median expression & pheatmap (always recompute — cheap) ---
+  .tdr.obj <- .recompute_celltyping_summaries(.tdr.obj)
+  
+  # --- P4–P7: cell-level IDs & composition (only if get.map() has run) ---
+  if (!is.null(.tdr.obj@density$fdens)) {
+    
+    if (isTRUE(.verbose)) {
+      message("-> get.map() results detected; refreshing cell-level celltype IDs and composition...")
+    }
+    
+    .tdr.obj <- .relabel_cellmap(.tdr.obj, .verbose = .verbose)
+    .tdr.obj <- .recompute_composition_celltyping(.tdr.obj)
+    
+    if (isTRUE(.verbose)) {
+      message("-> Cell-level celltype IDs and composition matrices refreshed.")
+    }
+  }
+  
+  # --- P8: trad celltyping fit (only if get.lm() was run) ---
+  if (!is.null(.tdr.obj@results$lm)) {
+    .tdr.obj <- .invalidate_trad_celltyping(.tdr.obj)
+  }
+  
+  # --- Warn about potentially stale pbDE / markerDE results ---
+  .warn_stale_de_results(.tdr.obj)
+  
+  .tdr.obj
+}

@@ -738,6 +738,9 @@ get.map <-
       stop(".label.confidence must be between 0.5 and 1")
     }
     
+    # Persist label confidence for downstream refresh (e.g. late celltyping)
+    .tdr.obj@config$label.confidence <- .label.confidence
+    
     # Validate and setup Symphony reference if provided
     if(!is.null(x = .ref.obj)){
       
@@ -1259,57 +1262,7 @@ get.map <-
         ] |>
         as.factor()
       
-      top <-
-        apply(X = .tdr.obj@landmark.embed$pca$rotation,
-              MARGIN = 2,
-              FUN = function(PC.rot){
-                
-                order(PC.rot,
-                      decreasing = TRUE) |>
-                  (\(x)
-                   c(utils::head(x = x, 
-                                 n = 3),
-                     utils::tail(x = x,
-                                 n = 3))
-                  )()
-                
-              }) |>
-        as.vector() |> 
-        (\(x)
-         rownames(x = .tdr.obj@landmark.embed$pca$rotation)[x]
-        )() |>
-        unique()
-      
-      .tdr.obj@results$celltyping$median.exprs <-
-        (if(.tdr.obj@config$assay.type == "RNA") .tdr.obj@assay$scaled[,top] else .tdr.obj@assay$expr) |>
-        dplyr::as_tibble() |>
-        cbind(cell.pop = as.character(x = .tdr.obj@landmark.annot$celltyping$ids)) |>
-        dplyr::group_by(cell.pop) |>
-        dplyr::summarize_all(.funs = stats::median) |>
-        as.data.frame() |>
-        (\(x)
-         `rownames<-`(x = x[,colnames(x = x) != "cell.pop"],
-                      value = x$cell.pop)
-        )() |>
-        as.matrix()
-      
-      .tdr.obj@results$celltyping$pheatmap <-
-        pheatmap::pheatmap(mat = .tdr.obj@results$celltyping$median.exprs,
-                           color = grDevices::colorRampPalette(
-                             unname(obj =
-                                      Color.Palette[1,c(1,6,2)]))(100),
-                           kmeans_k = NA,
-                           breaks = NA,
-                           border_color = NA,
-                           scale = "none",
-                           angle_col = 90,
-                           cluster_rows = TRUE,
-                           cluster_cols = TRUE,
-                           cellwidth = 20,
-                           cellheight = 20,
-                           treeheight_row = 20,
-                           treeheight_col = 20,
-                           silent = TRUE)
+      .tdr.obj <- .recompute_celltyping_summaries(.tdr.obj)
       
     }
     
