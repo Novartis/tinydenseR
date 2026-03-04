@@ -161,7 +161,7 @@ get.lm <-
     # Check if slot already exists
     # -------------------------------------------------------------------------
     
-    if(!is.null(x = .tdr.obj@map$lm[[.model.name]]) && !isTRUE(x = .force.recalc)){
+    if(!is.null(x = .tdr.obj@results$lm[[.model.name]]) && !isTRUE(x = .force.recalc)){
       stop(paste0("Model '", .model.name, "' already exists in .tdr.obj$map$lm. ",
                   "Use a different .model.name or set .force.recalc = TRUE to overwrite."))
     }
@@ -195,7 +195,7 @@ get.lm <-
                        collapse = " ")))
     }
     
-    if(is.null(x = .tdr.obj@map) || length(.tdr.obj@map) == 0L){
+    if(is.null(x = .tdr.obj@density$fdens)){
       stop("First run get.map")
     }
     
@@ -206,13 +206,13 @@ get.lm <-
     
     # Use pre-computed Y from get.map
     Y <-
-      .tdr.obj@map$Y
+      .tdr.obj@density$Y
     
     #if(nrow(x = Y) !=
-    #   nrow(x = .tdr.obj@landmarks)){
+    #   nrow(x = .tdr.obj@assay$expr)){
     #  
     #  stats$y <-
-    #    stats$y[match(x = rownames(x = .tdr.obj@landmarks),
+    #    stats$y[match(x = rownames(x = .tdr.obj@assay$expr),
     #                  table = rownames(x = stats$y)),]
     #  
     #  stats$y[
@@ -221,7 +221,7 @@ get.lm <-
     #           na.rm = TRUE)
     #  
     #  rownames(x = stats$y) <-
-    #    rownames(x = .tdr.obj@landmarks)
+    #    rownames(x = .tdr.obj@assay$expr)
     #  
     #}
     
@@ -288,7 +288,7 @@ get.lm <-
               }
               
               # use 1/sum of probabilities as the weighting for the weighted BH adjustment from Cydar
-              w <- 1 / log10(x = Matrix::rowSums(x = .tdr.obj@map$fdens) + 1)
+              w <- 1 / log10(x = Matrix::rowSums(x = .tdr.obj@density$fdens) + 1)
               w[is.infinite(x = w)] <- 1
               
               # Computing a density-weighted q-value.
@@ -332,7 +332,7 @@ get.lm <-
       # and stabilizes the correlation estimates in dupCor and blocked LM
       # but keep only top k later to avoid overfitting pi0
       tX <-
-        Matrix::t(x = .tdr.obj@pca$embed)
+        Matrix::t(x = .tdr.obj@landmark.embed$pca$coord)
       
       if(!(is.null(x = .block))){
         
@@ -380,7 +380,7 @@ get.lm <-
         (\(x)
          # keep only top k PCs that capture most variation
          # to avoid overfitting pi0 later
-         x[,1:elbow.sec.deriv(x = .tdr.obj@pca$sdev^2,
+         x[,1:elbow.sec.deriv(x = .tdr.obj@landmark.embed$pca$sdev^2,
                               sort.order = "desc")$index,
            drop=FALSE]
         )()
@@ -534,7 +534,7 @@ get.lm <-
       }
       
       cl.dupcor <- 
-        log2(x = .tdr.obj@map$clustering$cell.perc + 0.5) |>
+        log2(x = .tdr.obj@density$composition$clustering$cell.perc + 0.5) |>
         Matrix::t() |>
         limma::duplicateCorrelation(design = .design,
                                     block = .tdr.obj@metadata[[.block]])
@@ -545,7 +545,7 @@ get.lm <-
     }
     
     stats$trad$clustering$fit <-
-      limma::lmFit(object = log2(x = .tdr.obj@map$clustering$cell.perc + 0.5) |>
+      limma::lmFit(object = log2(x = .tdr.obj@density$composition$clustering$cell.perc + 0.5) |>
                      Matrix::t(),
                    design = .design,
                    block = if(exists(x = "cl.dupcor")) .tdr.obj@metadata[[.block]] else NULL,
@@ -568,7 +568,7 @@ get.lm <-
             FUN = stats::p.adjust,
             method = "fdr")
     
-    if(!is.null(x = .tdr.obj@graph$celltyping)){
+    if(!is.null(x = .tdr.obj@landmark.annot$celltyping)){
       
       if(!(is.null(x = .block))){
         
@@ -585,7 +585,7 @@ get.lm <-
         }
         
         ct.dupcor <- 
-          log2(x = .tdr.obj@map$celltyping$cell.perc + 0.5) |>
+          log2(x = .tdr.obj@density$composition$celltyping$cell.perc + 0.5) |>
           Matrix::t() |>
           limma::duplicateCorrelation(design = .design,
                                       block = .tdr.obj@metadata[[.block]])
@@ -596,7 +596,7 @@ get.lm <-
       }
       
       stats$trad$celltyping$fit <-
-        limma::lmFit(object = log2(x = .tdr.obj@map$celltyping$cell.perc + 0.5) |>
+        limma::lmFit(object = log2(x = .tdr.obj@density$composition$celltyping$cell.perc + 0.5) |>
                        Matrix::t(),
                      design = .design,
                      block = if(exists(x = "ct.dupcor")) .tdr.obj@metadata[[.block]] else NULL,
@@ -626,12 +626,12 @@ get.lm <-
     # -------------------------------------------------------------------------
     
     # Initialize stats slot if needed
-    if(is.null(x = .tdr.obj@map$lm)){
-      .tdr.obj@map$lm <- list()
+    if(is.null(x = .tdr.obj@results$lm)){
+      .tdr.obj@results$lm <- list()
     }
     
     # Store results under the model name
-    .tdr.obj@map$lm[[.model.name]] <- stats
+    .tdr.obj@results$lm[[.model.name]] <- stats
     
     if(isTRUE(x = .verbose)){
       message("\nResults stored in: .tdr.obj$map$lm$", .model.name)
@@ -853,7 +853,7 @@ get.pbDE <-
     # Check if slot already exists
     # -------------------------------------------------------------------------
     
-    if(!is.null(x = .tdr.obj@pbDE[[.model.name]][[.population.name]]) && !isTRUE(x = .force.recalc)){
+    if(!is.null(x = .tdr.obj@results$pb[[.model.name]][[.population.name]]) && !isTRUE(x = .force.recalc)){
       stop(paste0("Results for model '", .model.name, "' and population '", .population.name, 
                   "' already exist in .tdr.obj$pbDE. ",
                   "Use different names or set .force.recalc = TRUE to overwrite."))
@@ -873,9 +873,9 @@ get.pbDE <-
                     choices = c("clustering",
                                 "celltyping"))
         
-        if(!all(.id %in% unique(x = .tdr.obj@graph[[.id.from]]$ids))){
+        if(!all(.id %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))){
           
-          stop(paste0(paste0(.id[!(.id %in% unique(x = .tdr.obj@graph[[.id.from]]$ids))],
+          stop(paste0(paste0(.id[!(.id %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))],
                              collapse = ", "),
                       " not found in ",
                       .id.from))
@@ -884,7 +884,7 @@ get.pbDE <-
         
         # Cell-centric: get per-sample cell indices matching the requested population
         .lm.idx <-
-          lapply(X = .tdr.obj@map[[.id.from]]$ids,
+          lapply(X = .tdr_get_map_slot_all(.tdr.obj, paste0(.id.from, ".ids")),
                  FUN = function(smpl){
                    which(x = smpl %in% .id)
                  })
@@ -900,16 +900,16 @@ get.pbDE <-
       }
     } else {
       
-      if(!all(.id.idx %in% (nrow(x = .tdr.obj@landmarks) |> seq_len()))) {
+      if(!all(.id.idx %in% (nrow(x = .tdr.obj@assay$expr) |> seq_len()))) {
         stop(paste0(".id.idx must be an integer vector between 1 and ",
-                    nrow(x = .tdr.obj@landmarks)))
+                    nrow(x = .tdr.obj@assay$expr)))
       }
       
       # Cell-centric: use .label.confidence to determine which cells
       # confidently belong to the specified landmark set
       tmp.lbl <-
         rep(x = "out",
-            times = nrow(x = .tdr.obj@landmarks))
+            times = nrow(x = .tdr.obj@assay$expr))
       
       tmp.lbl[.id.idx] <-
         "in"
@@ -1150,7 +1150,7 @@ get.pbDE <-
             readRDS(file = .tdr.obj@cells[[smpl]])
           
           exprs.mat <-
-            exprs.mat[.lm.idx[[smpl]],colnames(x = .tdr.obj@landmarks)]
+            exprs.mat[.lm.idx[[smpl]],colnames(x = .tdr.obj@assay$expr)]
           
           wcl <- 
             .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[.lm.idx[[smpl]],,drop=FALSE]
@@ -1244,18 +1244,18 @@ get.pbDE <-
       n.pseudo
     
     # -------------------------------------------------------------------------
-    # Store results in .tdr.obj@pbDE[[.model.name]][[.population.name]]
+    # Store results in .tdr.obj@results$pb[[.model.name]][[.population.name]]
     # -------------------------------------------------------------------------
     
-    if(is.null(x = .tdr.obj@pbDE)){
-      .tdr.obj@pbDE <- list()
+    if(is.null(x = .tdr.obj@results$pb)){
+      .tdr.obj@results$pb <- list()
     }
     
-    if(is.null(x = .tdr.obj@pbDE[[.model.name]])){
-      .tdr.obj@pbDE[[.model.name]] <- list()
+    if(is.null(x = .tdr.obj@results$pb[[.model.name]])){
+      .tdr.obj@results$pb[[.model.name]] <- list()
     }
     
-    .tdr.obj@pbDE[[.model.name]][[.population.name]] <- .de
+    .tdr.obj@results$pb[[.model.name]][[.population.name]] <- .de
     
     if(isTRUE(x = .verbose)){
       message(sprintf("\nResults stored in .tdr.obj$pbDE$%s$%s", .model.name, .population.name))
@@ -1496,9 +1496,9 @@ get.markerDE <-
     }
     
     if(is.null(x = .id1.idx)){
-      if(!all(.id1 %in% unique(x = .tdr.obj@graph[[.id.from]]$ids))){
+      if(!all(.id1 %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))){
         
-        stop(paste0(paste0(.id1[!(.id1 %in% unique(x = .tdr.obj@graph[[.id.from]]$ids))],
+        stop(paste0(paste0(.id1[!(.id1 %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))],
                            collapse = ", "),
                     " not found in ",
                     .id.from))
@@ -1508,11 +1508,11 @@ get.markerDE <-
     
     if(is.null(x = .id2.idx)){
       if(!all(.id2 %in% c("..all.other.landmarks..",
-                          unique(x = .tdr.obj@graph[[.id.from]]$ids) |>
+                          unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids) |>
                           as.character()))){
         
         stop(paste0(paste0(.id2[!(.id2 %in% c("..all.other.landmarks..",
-                                              unique(x = .tdr.obj@graph[[.id.from]]$ids) |>
+                                              unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids) |>
                                                 as.character()))],
                            collapse = ", "),
                     " not found in ",
@@ -1525,23 +1525,23 @@ get.markerDE <-
       
       # Cell-centric: get per-sample cell indices matching group 1
       .lm1.idx <-
-        lapply(X = .tdr.obj@map[[.id.from]]$ids,
-               FUN = function(smpl){
-                 which(x = smpl %in% .id1)
-               })
+          lapply(X = .tdr_get_map_slot_all(.tdr.obj, paste0(.id.from, ".ids")),
+                 FUN = function(smpl){
+                   which(x = smpl %in% .id1)
+                 })
       
     } else {
       
-      if(!all(.id1.idx %in% (nrow(x = .tdr.obj@landmarks) |> seq_len()))) {
+      if(!all(.id1.idx %in% (nrow(x = .tdr.obj@assay$expr) |> seq_len()))) {
         stop(paste0(".id1.idx must be an integer vector between 1 and ",
-                    nrow(x = .tdr.obj@landmarks)))
+                    nrow(x = .tdr.obj@assay$expr)))
       }
       
       # Cell-centric: use .label.confidence to determine which cells
       # confidently belong to the specified landmark set (group 1)
       tmp.lbl1 <-
         rep(x = "out",
-            times = nrow(x = .tdr.obj@landmarks))
+            times = nrow(x = .tdr.obj@assay$expr))
       
       tmp.lbl1[.id1.idx] <-
         "in"
@@ -1605,23 +1605,23 @@ get.markerDE <-
         
         # Cell-centric: get per-sample cell indices matching group 2
         .lm2.idx <-
-          lapply(X = .tdr.obj@map[[.id.from]]$ids,
+          lapply(X = .tdr_get_map_slot_all(.tdr.obj, paste0(.id.from, ".ids")),
                  FUN = function(smpl){
                    which(x = smpl %in% .id2)
                  })
         
       } else {
         
-        if(!all(.id2.idx %in% (nrow(x = .tdr.obj@landmarks) |> seq_len()))) {
+        if(!all(.id2.idx %in% (nrow(x = .tdr.obj@assay$expr) |> seq_len()))) {
           stop(paste0(".id2.idx must be an integer vector between 1 and ",
-                      nrow(x = .tdr.obj@landmarks)))
+                      nrow(x = .tdr.obj@assay$expr)))
         }
         
         # Cell-centric: use .label.confidence to determine which cells
         # confidently belong to the specified landmark set (group 2)
         tmp.lbl2 <-
           rep(x = "out",
-              times = nrow(x = .tdr.obj@landmarks))
+              times = nrow(x = .tdr.obj@assay$expr))
         
         tmp.lbl2[.id2.idx] <-
           "in"
@@ -1679,15 +1679,15 @@ get.markerDE <-
     }
     
     # Initialize storage if needed
-    if(is.null(x = .tdr.obj@markerDE)){
-      .tdr.obj@markerDE <- list()
+    if(is.null(x = .tdr.obj@results$marker)){
+      .tdr.obj@results$marker <- list()
     }
-    if(is.null(x = .tdr.obj@markerDE[[.model.name]])){
-      .tdr.obj@markerDE[[.model.name]] <- list()
+    if(is.null(x = .tdr.obj@results$marker[[.model.name]])){
+      .tdr.obj@results$marker[[.model.name]] <- list()
     }
     
     # Check for existing results
-    if(!.force.recalc && !is.null(x = .tdr.obj@markerDE[[.model.name]][[.comparison.name]])){
+    if(!.force.recalc && !is.null(x = .tdr.obj@results$marker[[.model.name]][[.comparison.name]])){
       message(sprintf("Results already exist at .tdr.obj$markerDE$%s$%s. Use .force.recalc = TRUE to recalculate.", 
                       .model.name, .comparison.name))
       return(.tdr.obj)
@@ -1929,7 +1929,7 @@ get.markerDE <-
             readRDS(file = .tdr.obj@cells[[smpl]])
           
           cols <-
-            colnames(x = .tdr.obj@landmarks)
+            colnames(x = .tdr.obj@assay$expr)
           
           res <-
             tryCatch(
@@ -1978,7 +1978,7 @@ get.markerDE <-
             readRDS(file = .tdr.obj@cells[[smpl]])
           
           cols <-
-            colnames(x = .tdr.obj@landmarks)
+            colnames(x = .tdr.obj@assay$expr)
           
           res <-
             tryCatch(
@@ -2091,7 +2091,7 @@ get.markerDE <-
       n.pseudo2
     
     # Store results in .tdr.obj
-    .tdr.obj@markerDE[[.model.name]][[.comparison.name]] <- .de
+    .tdr.obj@results$marker[[.model.name]][[.comparison.name]] <- .de
     
     message(sprintf("Marker DE results stored at .tdr.obj$markerDE$%s$%s", .model.name, .comparison.name))
     
@@ -2162,23 +2162,23 @@ get.marker <- function(
   ){
     
     # Initialize embedding slot if not present
-    if(is.null(x = .tdr.obj@map$embedding)){
-      .tdr.obj@map$embedding <- list()
+    if(is.null(x = .tdr.obj@sample.embed)){
+      .tdr.obj@sample.embed <- list()
     }
     
     # -------------------------------------------------------------------------
     # Compute PCA if not already present
     # -------------------------------------------------------------------------
     
-    if(is.null(x = .tdr.obj@map$embedding$pca)){
+    if(is.null(x = .tdr.obj@sample.embed$pca)){
       
       if(isTRUE(x = .verbose)){
         message("\nComputing sample-level PCA on landmark densities")
       }
       
-      # Compute PCA via irlba (samples as rows, using .tdr.obj@map$Y)
+      # Compute PCA via irlba (samples as rows, using .tdr.obj@density$Y)
       pca.res <-
-        Matrix::t(x = .tdr.obj@map$Y) |>
+        Matrix::t(x = .tdr.obj@density$Y) |>
         (\(x)
          irlba::prcomp_irlba(
            x = x,
@@ -2192,7 +2192,7 @@ get.marker <- function(
       # coord = embedding coordinates (samples x PCs), 
       # rotation = loadings (landmarks x PCs),
       # center, scale, sdev
-      .tdr.obj@map$embedding$pca <- list(
+      .tdr.obj@sample.embed$pca <- list(
         coord = pca.res$x,
         rotation = pca.res$rotation,
         center = pca.res$center,
@@ -2201,8 +2201,8 @@ get.marker <- function(
       )
       
       # Set column names for coord
-      colnames(x = .tdr.obj@map$embedding$pca$coord) <- 
-        paste0("PC", seq_len(length.out = ncol(x = .tdr.obj@map$embedding$pca$coord)))
+      colnames(x = .tdr.obj@sample.embed$pca$coord) <- 
+        paste0("PC", seq_len(length.out = ncol(x = .tdr.obj@sample.embed$pca$coord)))
       
       if(isTRUE(x = .verbose)){
         var.explained <- round(100 * pca.res$sdev^2 / sum(pca.res$sdev^2), 1)
@@ -2224,7 +2224,7 @@ get.marker <- function(
     
     if(isTRUE(x = .ret.trajectory)){
       
-      if(is.null(x = .tdr.obj@map$embedding$traj)){
+      if(is.null(x = .tdr.obj@sample.embed$traj)){
         
         if(isTRUE(x = .verbose)){
           message("\nComputing diffusion map trajectory embedding")
@@ -2247,7 +2247,7 @@ get.marker <- function(
         options(Matrix.warnDeprecatedCoerce = 0)
         
         traj.res <- 
-          Matrix::t(x = .tdr.obj@map$Y) |>
+          Matrix::t(x = .tdr.obj@density$Y) |>
           (\(x)
            destiny::DiffusionMap(
              data = x,
@@ -2279,7 +2279,7 @@ get.marker <- function(
           rownames(x = .tdr.obj@metadata)
         
         # Store in format similar to pca slot
-        .tdr.obj@map$embedding$traj <- list(
+        .tdr.obj@sample.embed$traj <- list(
           coord = traj.coord,
           eigenvalues = traj.res@eigenvalues,
           eigenvectors = traj.res@eigenvectors,
@@ -2512,7 +2512,7 @@ get.embedding <-
     # -------------------------------------------------------------------------
     
     # Check that .tdr.obj has map$Y
-    if(is.null(x = .tdr.obj@map$Y)){
+    if(is.null(x = .tdr.obj@density$Y)){
       stop("'.tdr.obj$map$Y' not found. Run get.map() first.")
     }
     
@@ -2523,7 +2523,7 @@ get.embedding <-
     # If supervised args provided, require the full model to exist
     if(!unsupervised.only){
       
-      if(is.null(x = .tdr.obj@map$lm[[.full.model]])){
+      if(is.null(x = .tdr.obj@results$lm[[.full.model]])){
         stop(paste0("Model '", .full.model, "' not found in .tdr.obj$map$lm. ",
                     "Run get.lm() first, or omit '.contrast.of.interest'/'.red.model' for unsupervised-only."))
       }
@@ -2539,10 +2539,10 @@ get.embedding <-
     }
     
     # Reference the stats object for convenience
-    .stats.obj <- .tdr.obj@map$lm[[.full.model]]
+    .stats.obj <- .tdr.obj@results$lm[[.full.model]]
     
     # -------------------------------------------------------------------------
-    # Compute unsupervised embeddings (pca, traj) - stored in .tdr.obj@map$embedding
+    # Compute unsupervised embeddings (pca, traj) - stored in .tdr.obj@sample.embed
     # -------------------------------------------------------------------------
     
     .tdr.obj <- 
@@ -2659,9 +2659,9 @@ get.embedding <-
         }
       }
       
-      # Get the expression matrix Y (landmarks x samples) from .tdr.obj@map$Y
+      # Get the expression matrix Y (landmarks x samples) from .tdr.obj@density$Y
       Y <- 
-        .tdr.obj@map$Y
+        .tdr.obj@density$Y
       
       G <- 
         nrow(x = Y)
@@ -2833,12 +2833,12 @@ get.embedding <-
       }
       
       # Validate reduced model exists
-      if(is.null(x = .tdr.obj@map$lm[[.red.model]])){
+      if(is.null(x = .tdr.obj@results$lm[[.red.model]])){
         stop(paste0("Reduced model '", .red.model, "' not found in .tdr.obj$map$lm. ",
                     "Run get.lm() with .model.name = '", .red.model, "' first."))
       }
       
-      .red.stats.obj <- .tdr.obj@map$lm[[.red.model]]
+      .red.stats.obj <- .tdr.obj@results$lm[[.red.model]]
       
       if(isTRUE(x = .verbose)){
         message("\nComputing embedding via nested model comparison")
@@ -2847,8 +2847,8 @@ get.embedding <-
         message("  Reduced model ('", .red.model, "') columns: ", paste(colnames(.red.stats.obj$fit$design), collapse = ", "))
       }
       
-      # Get Y from .tdr.obj@map$Y for dimension validation
-      Y <- .tdr.obj@map$Y
+      # Get Y from .tdr.obj@density$Y for dimension validation
+      Y <- .tdr.obj@density$Y
       
       # Validate dimensions against model fits
       if(nrow(x = .stats.obj$fit$coefficients) != nrow(x = Y)){
@@ -2943,7 +2943,7 @@ get.embedding <-
     
     # project E.red.t using delta.Yhat.t's V
     pca$coord <-
-      Matrix::t(x = (.tdr.obj@map$Y - Yhat.red) - pca$center) %*%
+      Matrix::t(x = (.tdr.obj@density$Y - Yhat.red) - pca$center) %*%
       pca$rotation
     
     colnames(x = pca$coord) <- 
@@ -2953,7 +2953,7 @@ get.embedding <-
     # partial-effect principal component variance as a fraction of TOTAL variance
     perc.tot.var.exp <-
       (100 * ((pca$sdev[1:ncol(x = pca$coord)])^2) /
-         (matrixStats::rowVars(x = .tdr.obj@map$Y) |>
+         (matrixStats::rowVars(x = .tdr.obj@density$Y) |>
             sum())) |>
       stats::setNames(nm = colnames(x = pca$coord))
     
@@ -2980,15 +2980,15 @@ get.embedding <-
     }
     
     # -------------------------------------------------------------------------
-    # Store results in .tdr.obj@map$embedding$pePC[[slot.name]]
+    # Store results in .tdr.obj@sample.embed$pepc[[slot.name]]
     # -------------------------------------------------------------------------
     
     # Initialize pePC list if needed
-    if(is.null(x = .tdr.obj@map$embedding$pePC)){
-      .tdr.obj@map$embedding$pePC <- list()
+    if(is.null(x = .tdr.obj@sample.embed$pepc)){
+      .tdr.obj@sample.embed$pepc <- list()
     }
     
-    .tdr.obj@map$embedding$pePC[[slot.name]] <- 
+    .tdr.obj@sample.embed$pepc[[slot.name]] <- 
       c(pca,
         list(perc.tot.var.exp = perc.tot.var.exp,
              effect.resid.cor = effect.resid.cor,
@@ -3026,31 +3026,31 @@ get.embedding <-
     # Validate on-disk cache (if active) before proceeding
     .tdr_cache_validate_quiet(.tdr.obj)
     
-    if (is.null(x = .tdr.obj@map$lm[[.model.name]])) {
+    if (is.null(x = .tdr.obj@results$lm[[.model.name]])) {
       stop("Model '", .model.name, "' not found. Run get.lm() first.")
     }
     
     coef.mat <-
-      .tdr.obj@map$lm[[.model.name]]$fit$coefficients
+      .tdr.obj@results$lm[[.model.name]]$fit$coefficients
     
     if (!(.coef.col %in% colnames(x = coef.mat))) {
       stop("Coefficient '", .coef.col, "' not found in model coefficients.\n",
            "Available: ", paste(colnames(x = coef.mat), collapse = ", "))
     }
     
-    if (is.null(x = .tdr.obj@graph$snn)) {
+    if (is.null(x = .tdr.obj@graphs$snn)) {
       stop("SNN graph not found. Run get.graph() first.")
     }
     
-    if (!Matrix::isSymmetric(object = .tdr.obj@graph$snn)) {
+    if (!Matrix::isSymmetric(object = .tdr.obj@graphs$snn)) {
       stop("SNN graph not symmetric.")
     }
     
-    if (is.null(x = .tdr.obj@raw.landmarks)) {
+    if (is.null(x = .tdr.obj@assay$raw)) {
       stop("Raw landmarks not found. Run get.landmarks() first.")
     }
     
-    if (is.null(x = .tdr.obj@pca$embed)) {
+    if (is.null(x = .tdr.obj@landmark.embed$pca$coord)) {
       stop("PCA embedding not found. Run get.landmarks() first.")
     }
     
@@ -3139,14 +3139,14 @@ get.embedding <-
       
       # Filter genes: detected in at least min.prop of landmarks
       X <-
-        .tdr.obj@raw.landmarks |>
+        .tdr.obj@assay$raw |>
         (\(x)
          x[, Matrix::colSums(x = x > 0) > (nrow(x = x) * .min.prop)]
         )()
       
       if (isTRUE(x = .verbose)) {
         message("  Genes after filtering (>", .min.prop * 100, "% detection): ",
-                ncol(x = X), " / ", ncol(x = .tdr.obj@raw.landmarks))
+                ncol(x = X), " / ", ncol(x = .tdr.obj@assay$raw))
       }
       
       # Size factor normalization
@@ -3166,7 +3166,7 @@ get.embedding <-
       
       # Cytometry: use raw landmarks directly
       X <-
-        .tdr.obj@raw.landmarks
+        .tdr.obj@assay$raw
       
     }
     
@@ -3497,7 +3497,7 @@ get.specDE <-
     # Default .nv to number of PCs from get.landmarks
     if (is.null(x = .nv)) {
       .nv <-
-        ncol(x = .tdr.obj@pca$embed)
+        ncol(x = .tdr.obj@landmark.embed$pca$coord)
     }
     
     if (!is.numeric(x = .nv) || length(x = .nv) != 1 || .nv < 1) {
@@ -3547,7 +3547,7 @@ get.specDE <-
     }
     
     SNN <-
-      .tdr.obj@graph$snn
+      .tdr.obj@graphs$snn
     
     P <-
       .build.P(SNN = SNN,
@@ -3736,14 +3736,14 @@ get.specDE <-
     # Store results
     # -------------------------------------------------------------------------
     
-    if (is.null(x = .tdr.obj@specDE)) {
-      .tdr.obj@specDE <-
+    if (is.null(x = .tdr.obj@results$spec)) {
+      .tdr.obj@results$spec <-
         list()
     }
     
-    .tdr.obj@specDE[[.coef.col]] <-
+    .tdr.obj@results$spec[[.coef.col]] <-
       list(
-        scores = scores,
+        coord = scores,
         loadings = loadings,
         sdev = sdev,
         var.explained = var.explained,
@@ -3763,7 +3763,7 @@ get.specDE <-
       )
     
     if (isTRUE(x = .store.M)) {
-      .tdr.obj@specDE[[.coef.col]]$M.local <-
+      .tdr.obj@results$spec[[.coef.col]]$M.local <-
         M.local
     }
     
@@ -3949,7 +3949,7 @@ get.nmfDE <-
     # Default .k to number of PCs from get.landmarks
     if (is.null(x = .k)) {
       .k <-
-        ncol(x = .tdr.obj@pca$embed)
+        ncol(x = .tdr.obj@landmark.embed$pca$coord)
     }
     
     if (!is.numeric(x = .k) || length(x = .k) != 1 || .k < 1) {
@@ -4011,7 +4011,7 @@ get.nmfDE <-
     }
     
     SNN <-
-      .tdr.obj@graph$snn
+      .tdr.obj@graphs$snn
     
     P <-
       .build.P(SNN = SNN,
@@ -4379,15 +4379,15 @@ get.nmfDE <-
     # Store results
     # -------------------------------------------------------------------------
     
-    if (is.null(x = .tdr.obj@nmfDE)) {
-      .tdr.obj@nmfDE <-
+    if (is.null(x = .tdr.obj@results$nmf)) {
+      .tdr.obj@results$nmf <-
         list()
     }
     
-    .tdr.obj@nmfDE[[.coef.col]] <-
+    .tdr.obj@results$nmf[[.coef.col]] <-
       list(
-        scores = W,
-        signed.scores = signed.scores,
+        coord = W,
+        signed.coord = signed.scores,
         d = nmf.d,
         h.pos = H.pos,
         h.neg = H.neg,
@@ -4418,9 +4418,9 @@ get.nmfDE <-
       )
     
     if (isTRUE(x = .store.M)) {
-      .tdr.obj@nmfDE[[.coef.col]]$M.pos <-
+      .tdr.obj@results$nmf[[.coef.col]]$M.pos <-
         M.pos
-      .tdr.obj@nmfDE[[.coef.col]]$M.neg <-
+      .tdr.obj@results$nmf[[.coef.col]]$M.neg <-
         M.neg
     }
     
@@ -4634,7 +4634,7 @@ get.plsDE <-
     # Default .ncomp to number of PCs from get.landmarks
     if (is.null(x = .ncomp)) {
       .ncomp <-
-        ncol(x = .tdr.obj@pca$embed)
+        ncol(x = .tdr.obj@landmark.embed$pca$coord)
     }
     
     if (!is.numeric(x = .ncomp) || length(x = .ncomp) != 1 || .ncomp < 1) {
@@ -4693,7 +4693,7 @@ get.plsDE <-
     }
     
     SNN <-
-      .tdr.obj@graph$snn
+      .tdr.obj@graphs$snn
     
     P <-
       .build.P(SNN = SNN,
@@ -4945,14 +4945,14 @@ get.plsDE <-
     # Store results
     # -------------------------------------------------------------------------
     
-    if (is.null(x = .tdr.obj@plsDE)) {
-      .tdr.obj@plsDE <-
+    if (is.null(x = .tdr.obj@results$pls)) {
+      .tdr.obj@results$pls <-
         list()
     }
     
-    .tdr.obj@plsDE[[.coef.col]] <-
+    .tdr.obj@results$pls[[.coef.col]] <-
       list(
-        scores = T.mat,
+        coord = T.mat,
         gene.weights = W.mat,
         x.loadings = P.mat,
         y.loadings = Q.vec,
@@ -4974,7 +4974,7 @@ get.plsDE <-
       )
     
     if (isTRUE(x = .store.M)) {
-      .tdr.obj@plsDE[[.coef.col]]$M.local <-
+      .tdr.obj@results$pls[[.coef.col]]$M.local <-
         M.local
     }
     
