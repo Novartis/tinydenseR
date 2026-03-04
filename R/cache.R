@@ -158,7 +158,7 @@
 #' @keywords internal
 .tdr_get_map_slot <- function(.tdr.obj, slot_name, sample_name) {
   
-  cache <- .tdr.obj@map$.cache
+  cache <- .tdr.obj@density$.cache
   
   if (!is.null(cache) && isTRUE(cache$on.disk)) {
     # Read from disk
@@ -172,10 +172,10 @@
   
   # In-memory fallback
   switch(slot_name,
-         "clustering.ids"    = .tdr.obj@map$clustering$ids[[sample_name]],
-         "celltyping.ids"    = .tdr.obj@map$celltyping$ids[[sample_name]],
-         "nearest.landmarks" = .tdr.obj@map$nearest.landmarks[[sample_name]],
-         "fuzzy.graph"       = .tdr.obj@map$fuzzy.graph[[sample_name]],
+         "clustering.ids"    = .tdr.obj@cellmap$cluster.ids[[sample_name]],
+         "celltyping.ids"    = .tdr.obj@cellmap$celltype.ids[[sample_name]],
+         "nearest.landmarks" = .tdr.obj@cellmap$nearest.lm[[sample_name]],
+         "fuzzy.graph"       = .tdr.obj@cellmap$fuzzy.graph[[sample_name]],
          stop("Unknown slot_name: ", slot_name))
 }
 
@@ -191,7 +191,7 @@
 #' @keywords internal
 .tdr_get_map_slot_all <- function(.tdr.obj, slot_name) {
   
-  cache <- .tdr.obj@map$.cache
+  cache <- .tdr.obj@density$.cache
   
   if (!is.null(cache) && isTRUE(cache$on.disk)) {
     manifests <- cache$manifests[[slot_name]]
@@ -199,10 +199,10 @@
     lapply(X = manifests, FUN = .tdr_cache_read)
   } else {
     switch(slot_name,
-           "clustering.ids"    = .tdr.obj@map$clustering$ids,
-           "celltyping.ids"    = .tdr.obj@map$celltyping$ids,
-           "nearest.landmarks" = .tdr.obj@map$nearest.landmarks,
-           "fuzzy.graph"       = .tdr.obj@map$fuzzy.graph,
+           "clustering.ids"    = .tdr.obj@cellmap$cluster.ids,
+           "celltyping.ids"    = .tdr.obj@cellmap$celltype.ids,
+           "nearest.landmarks" = .tdr.obj@cellmap$nearest.lm,
+           "fuzzy.graph"       = .tdr.obj@cellmap$fuzzy.graph,
            stop("Unknown slot_name: ", slot_name))
   }
 }
@@ -228,7 +228,7 @@ tdr_cache_validate <- function(.tdr.obj,
                                .verify.checksum = FALSE,
                                .verbose = TRUE) {
   
-  cache <- .tdr.obj@map$.cache
+  cache <- .tdr.obj@density$.cache
   
   if (is.null(cache) || !isTRUE(cache$on.disk)) {
     if (isTRUE(.verbose)) message("No on-disk cache active; nothing to validate.")
@@ -301,7 +301,7 @@ tdr_cache_validate <- function(.tdr.obj,
 #' @return \code{NULL} invisibly.
 #' @keywords internal
 .tdr_cache_validate_quiet <- function(.tdr.obj) {
-  cache <- .tdr.obj@map$.cache
+  cache <- .tdr.obj@density$.cache
   if (is.null(cache) || !isTRUE(cache$on.disk)) return(invisible(NULL))
   tdr_cache_validate(.tdr.obj, .verify.checksum = FALSE, .verbose = FALSE)
   invisible(NULL)
@@ -318,12 +318,12 @@ tdr_cache_validate <- function(.tdr.obj,
 #' @return Updated \code{.tdr.obj} with cache removed.
 #' @export
 tdr_cache_cleanup <- function(.tdr.obj) {
-  cache_root <- .tdr.obj@map$.cache$root
+  cache_root <- .tdr.obj@density$.cache$root
   if (!is.null(cache_root) && dir.exists(cache_root)) {
     unlink(cache_root, recursive = TRUE)
     message("Removed cache directory: ", cache_root)
   }
-  .tdr.obj@map$.cache <- NULL
+  .tdr.obj@density$.cache <- NULL
   .tdr.obj
 }
 
@@ -355,7 +355,7 @@ tdr_cache_cleanup <- function(.tdr.obj) {
 #' @export
 tdr_cache_info <- function(.tdr.obj) {
   
-  cache <- .tdr.obj@map$.cache
+  cache <- .tdr.obj@density$.cache
   
   if (is.null(cache) || !isTRUE(cache$on.disk)) {
     message("On-disk cache: INACTIVE")

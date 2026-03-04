@@ -94,9 +94,9 @@ goi.summary <-
     .verbose = TRUE
   ){
     
-    if(!all(.goi %in% colnames(x = .tdr.obj@raw.landmarks))){
+    if(!all(.goi %in% colnames(x = .tdr.obj@assay$raw))){
       stop("Gene(s) not found in data: ",
-           paste(.goi[!(.goi %in% colnames(x = .tdr.obj@raw.landmarks))],
+           paste(.goi[!(.goi %in% colnames(x = .tdr.obj@assay$raw))],
                  collapse = ", "),
            "\nCheck gene names (case-sensitive) or use colnames(.tdr.obj$raw.landmarks) to see available genes.")
     }
@@ -106,7 +106,7 @@ goi.summary <-
            "Current assay type: ", .tdr.obj@config$assay.type)
     }
     
-    if(is.null(x = .tdr.obj@map) || length(.tdr.obj@map) == 0L){
+    if(is.null(x = .tdr.obj@cellmap$nearest.lm) && is.null(x = .tdr.obj@density$fdens)){
       stop("Cell mapping not found. Run get.graph() and get.map() before calling goi.summary().")
     }
     
@@ -125,10 +125,10 @@ goi.summary <-
                     choices = c("clustering",
                                 "celltyping"))
         
-        if(!all(.id %in% unique(x = .tdr.obj@graph[[.id.from]]$ids))){
+        if(!all(.id %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))){
           
           stop("Invalid ", .id.from, " ID(s): ",
-               paste(.id[!(.id %in% unique(x = .tdr.obj@graph[[.id.from]]$ids))],
+               paste(.id[!(.id %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))],
                      collapse = ", "),
                "\nThese IDs were not found. Use unique(.tdr.obj$graph$", .id.from, "$ids) to see valid IDs.")
           
@@ -206,8 +206,8 @@ goi.summary <-
                  ids[!all.goi.detected])
         
         # Repeat same process for cell type labels (if available)
-        .has.celltyping <- !is.null(x = .tdr.obj@map$celltyping$cell.count) ||
-          (!is.null(.tdr.obj@map$.cache) && !is.null(.tdr.obj@map$.cache$manifests$celltyping.ids))
+        .has.celltyping <- !is.null(x = .tdr.obj@density$composition$celltyping$cell.count) ||
+          (!is.null(.tdr.obj@density$.cache) && !is.null(.tdr.obj@density$.cache$manifests$celltyping.ids))
         if(isTRUE(x = .has.celltyping)){
           
           .smpl.ct.ids <- .tdr_get_map_slot(.tdr.obj, "celltyping.ids", .smpl.name)
@@ -332,8 +332,8 @@ goi.summary <-
                  (goi.elem$clustering$cell.count * 100) /
                  Matrix::rowSums(x = goi.elem$clustering$cell.count)
                
-               .has.ct <- !is.null(x = .tdr.obj@map$celltyping$cell.count) ||
-                 (!is.null(.tdr.obj@map$.cache) && !is.null(.tdr.obj@map$.cache$manifests$celltyping.ids))
+               .has.ct <- !is.null(x = .tdr.obj@density$composition$celltyping$cell.count) ||
+                 (!is.null(.tdr.obj@density$.cache) && !is.null(.tdr.obj@density$.cache$manifests$celltyping.ids))
                if(isTRUE(x = .has.ct)){
                  
                  # Same process for cell type labels

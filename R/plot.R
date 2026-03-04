@@ -86,7 +86,7 @@ plotPCA <-
   function(.tdr.obj,
            .PC.x = 1,
            .PC.y = 2,
-           .feature = .tdr.obj@graph$clustering$ids,
+           .feature = .tdr.obj@landmark.annot$clustering$ids,
            .cat.feature.color = Color.Palette[1,1:5],
            .panel.size = if(is.numeric(x = .feature)) 2 else 3,
            .midpoint = NULL,
@@ -102,10 +102,10 @@ plotPCA <-
     
     # Validate PC selection
     if(any(!c(.PC.x, .PC.y) %in%
-           1:ncol(x = .tdr.obj@pca$embed))){
+           1:ncol(x = .tdr.obj@landmark.embed$pca$coord))){
       
       stop(".PC.x and .PC.y must be valid PC indices.\n",
-           "Available PCs: ", paste(x = 1:ncol(x = .tdr.obj@pca$embed), collapse = ", "),
+           "Available PCs: ", paste(x = 1:ncol(x = .tdr.obj@landmark.embed$pca$coord), collapse = ", "),
            "\nProvided: .PC.x = ", .PC.x, ", .PC.y = ", .PC.y)
     }
     
@@ -118,10 +118,10 @@ plotPCA <-
     
     # Convert PC indices to column names
     .PC.x <-
-      colnames(x = .tdr.obj@pca$embed)[.PC.x]
+      colnames(x = .tdr.obj@landmark.embed$pca$coord)[.PC.x]
     
     .PC.y <-
-      colnames(x = .tdr.obj@pca$embed)[.PC.y]
+      colnames(x = .tdr.obj@landmark.embed$pca$coord)[.PC.y]
     
     # Set midpoint to median for continuous features
     if(is.null(x = .midpoint) &
@@ -132,7 +132,7 @@ plotPCA <-
     # Build plotting data frame
     set.seed(seed = .seed)
     dat.df <-
-      as.data.frame(x = .tdr.obj@pca$embed[,c(.PC.x,.PC.y)]) |>
+      as.data.frame(x = .tdr.obj@landmark.embed$pca$coord[,c(.PC.x,.PC.y)]) |>
       cbind(feature = .feature,
             point.size = .point.size)
     
@@ -140,7 +140,7 @@ plotPCA <-
     if(.hover.stats == "marker"){
       
       dat.df$topFeatTab <-
-        .tdr.obj@interact.plot$lm.features$html
+        .tdr.obj@results$features$lm.features$html
       
     }
     
@@ -303,7 +303,7 @@ plotPCA <-
 #' @export
 plotUMAP <-
   function(.tdr.obj,
-           .feature = .tdr.obj@graph$clustering$ids,
+           .feature = .tdr.obj@landmark.annot$clustering$ids,
            .cat.feature.color = Color.Palette[1,1:5],
            .panel.size = 2,
            .midpoint = NULL,
@@ -317,7 +317,7 @@ plotUMAP <-
     # R CMD check appeasement
     umap.1 <- umap.2 <- topFeatTab <- feature <- NULL
     
-    if(is.null(x = .tdr.obj@graph)){
+    if(is.null(x = .tdr.obj@landmark.embed$umap$coord)){
       stop("Graph component missing. Run get.graph() before plotting UMAP.")
     }
     
@@ -337,7 +337,7 @@ plotUMAP <-
     # Build plotting data frame
     set.seed(seed = .seed)
     dat.df <-
-      as.data.frame(x = .tdr.obj@graph$uwot$embedding) |>
+      as.data.frame(x = .tdr.obj@landmark.embed$umap$coord) |>
       cbind(feature = .feature,
             point.size = .point.size)
     
@@ -345,7 +345,7 @@ plotUMAP <-
     if(.hover.stats == "marker"){
       
       dat.df$topFeatTab <-
-        .tdr.obj@interact.plot$lm.features$html
+        .tdr.obj@results$features$lm.features$html
       
     }
     
@@ -528,11 +528,11 @@ plotBeeswarm <-
     sig <- adj.p <- facets <- pos.t <- neg.t <- q.bars <- dat.df <- value <- split.by <- .coef <- cell.perc <- pop <- NULL
     
     # Validate model exists
-    if(is.null(x = .tdr.obj@map$lm[[.model.name]])){
+    if(is.null(x = .tdr.obj@results$lm[[.model.name]])){
       stop(paste0("Model '", .model.name, "' not found in .tdr.obj$map$lm. ",
-                  "Available models: ", paste(names(.tdr.obj@map$lm), collapse = ", ")))
+                  "Available models: ", paste(names(.tdr.obj@results$lm), collapse = ", ")))
     }
-    .stats.obj <- .tdr.obj@map$lm[[.model.name]]
+    .stats.obj <- .tdr.obj@results$lm[[.model.name]]
     
     .split.by <-
       match.arg(arg = .split.by,
@@ -557,13 +557,13 @@ plotBeeswarm <-
       
       perc.plot <-
         data.frame(x = as.factor(x = 1),
-                   pop = colnames(x = .tdr.obj@map[[.split.by]]$cell.perc),
-                   cell.perc = Matrix::colMeans(x = .tdr.obj@map[[.split.by]]$cell.perc)) |>
+                   pop = colnames(x = .tdr.obj@density$composition[[.split.by]]$cell.perc),
+                   cell.perc = Matrix::colMeans(x = .tdr.obj@density$composition[[.split.by]]$cell.perc)) |>
         dplyr::mutate(pop = factor(x = pop,
                                    levels = if(isTRUE(x = .order.ids)){
                                      
-                                     .tdr.obj@graph[[.split.by]]$pheatmap$tree_row$labels[
-                                       .tdr.obj@graph[[.split.by]]$pheatmap$tree_row$order
+                                     .tdr.obj@results[[.split.by]]$pheatmap$tree_row$labels[
+                                       .tdr.obj@results[[.split.by]]$pheatmap$tree_row$order
                                      ]
                                      
                                    } else {
@@ -613,14 +613,14 @@ plotBeeswarm <-
     if((length(x = .coefs) > 1)){
       
       dat.df <-
-        as.data.frame(x = .stats.obj$fit$coefficients[!(.tdr.obj@graph[[.split.by]]$ids %in% 
-                                                          .tdr.obj@map$cl.ct.to.ign),.coefs]) |>
+        as.data.frame(x = .stats.obj$fit$coefficients[!(.tdr.obj@landmark.annot[[.split.by]]$ids %in% 
+                                                          .tdr.obj@density$ignored),.coefs]) |>
         tidyr::pivot_longer(cols = tidyselect::everything(),
                             names_to = "split.by",
                             values_to = "value",
                             cols_vary = "slowest") |>
-        dplyr::bind_cols(sig = as.data.frame(x = (.stats.obj$fit[[.q.from]][!(.tdr.obj@graph[[.split.by]]$ids %in% 
-                                                                                .tdr.obj@map$cl.ct.to.ign),.coefs] < .q)) |>
+        dplyr::bind_cols(sig = as.data.frame(x = (.stats.obj$fit[[.q.from]][!(.tdr.obj@landmark.annot[[.split.by]]$ids %in% 
+                                                                                .tdr.obj@density$ignored),.coefs] < .q)) |>
                            tidyr::pivot_longer(cols = tidyselect::everything(),
                                                names_to = "split.by",
                                                values_to = "adj.p",
@@ -652,19 +652,19 @@ plotBeeswarm <-
         dat.df <-
           dplyr::mutate(.data = dat.df,
                         facets = split.by,
-                        split.by = rep(x = .tdr.obj@graph[[.split.by]]$ids[!(.tdr.obj@graph[[.split.by]]$ids %in% 
-                                                                               .tdr.obj@map$cl.ct.to.ign)] |>
+                        split.by = rep(x = .tdr.obj@landmark.annot[[.split.by]]$ids[!(.tdr.obj@landmark.annot[[.split.by]]$ids %in% 
+                                                                               .tdr.obj@density$ignored)] |>
                                          as.character(),
                                        times = length(x = .coefs))  |> 
                           factor(levels = if(isTRUE(x = .order.ids)){
                             
-                            .tdr.obj@graph[[.split.by]]$pheatmap$tree_row$labels[
-                              .tdr.obj@graph[[.split.by]]$pheatmap$tree_row$order
+                            .tdr.obj@results[[.split.by]]$pheatmap$tree_row$labels[
+                              .tdr.obj@results[[.split.by]]$pheatmap$tree_row$order
                             ]
                             
                           } else {
                             
-                            levels(x = .tdr.obj@graph[[.split.by]]$ids)
+                            levels(x = .tdr.obj@landmark.annot[[.split.by]]$ids)
                             
                           }) |>
                           droplevels())
@@ -675,7 +675,7 @@ plotBeeswarm <-
       
       if(.split.by == "celltyping"){
         
-        if(is.null(x = .tdr.obj@graph$celltyping$ids)){
+        if(is.null(x = .tdr.obj@landmark.annot$celltyping$ids)){
           
           stop(".tdr.obj$graph$celltyping$ids could not be found")
           
@@ -694,22 +694,22 @@ plotBeeswarm <-
                                 no = "less abundant"),
                    no = "not sig."),
           split.by =
-            as.character(x = .tdr.obj@graph[[.split.by]]$ids) |> 
+            as.character(x = .tdr.obj@landmark.annot[[.split.by]]$ids) |> 
             factor(levels = if(isTRUE(x = .order.ids)){
               
-              .tdr.obj@graph[[.split.by]]$pheatmap$tree_row$labels[
-                .tdr.obj@graph[[.split.by]]$pheatmap$tree_row$order
+              .tdr.obj@results[[.split.by]]$pheatmap$tree_row$labels[
+                .tdr.obj@results[[.split.by]]$pheatmap$tree_row$order
               ]
               
             } else {
               
-              levels(x = .tdr.obj@graph[[.split.by]]$ids)
+              levels(x = .tdr.obj@landmark.annot[[.split.by]]$ids)
               
             })
         ) |> 
         (\(x)
-         x[!(.tdr.obj@graph[[.split.by]]$ids %in% 
-               .tdr.obj@map$cl.ct.to.ign),]
+         x[!(.tdr.obj@landmark.annot[[.split.by]]$ids %in% 
+               .tdr.obj@density$ignored),]
         )() |>
         droplevels()
       
@@ -886,30 +886,30 @@ plot2Markers <-
       
       if(.id.from == "clustering"){
         
-        .id <- .tdr.obj@graph$clustering$ids == .id
+        .id <- .tdr.obj@landmark.annot$clustering$ids == .id
         
       } else if(.id.from == "celltyping"){
         
-        if(is.null(x = .tdr.obj@graph$celltyping$ids)){
+        if(is.null(x = .tdr.obj@landmark.annot$celltyping$ids)){
           stop(".tdr.obj$graph$celltyping$ids could not be found")
         }
-        .id <- .tdr.obj@graph$celltyping$ids == .id
+        .id <- .tdr.obj@landmark.annot$celltyping$ids == .id
       }
     }
     
     if(.tdr.obj@config$assay.type == "RNA"){
       
       dat.df <-
-        (.tdr.obj@landmarks[if(!is.null(x = .id)) .id else 1:nrow(x = .tdr.obj@landmarks),
-                            colnames(x = .tdr.obj@landmarks) %in% c(.x.feature,.y.feature)]) |>
+        (.tdr.obj@assay$expr[if(!is.null(x = .id)) .id else 1:nrow(x = .tdr.obj@assay$expr),
+                            colnames(x = .tdr.obj@assay$expr) %in% c(.x.feature,.y.feature)]) |>
         as.data.frame()
       
       
     } else {
       
       dat.df <-
-        (.tdr.obj@landmarks[if(!is.null(x = .id)) .id else 1:nrow(x = .tdr.obj@landmarks),
-                            colnames(x = .tdr.obj@landmarks) %in% c(.x.feature,.y.feature)]) |>
+        (.tdr.obj@assay$expr[if(!is.null(x = .id)) .id else 1:nrow(x = .tdr.obj@assay$expr),
+                            colnames(x = .tdr.obj@assay$expr) %in% c(.x.feature,.y.feature)]) |>
         as.data.frame()
       
     }
@@ -927,13 +927,13 @@ plot2Markers <-
       
       p <-
         p +
-        ggplot2::scale_x_continuous(limits = (.tdr.obj@landmarks[,colnames(x = .tdr.obj@landmarks) %in%
+        ggplot2::scale_x_continuous(limits = (.tdr.obj@assay$expr[,colnames(x = .tdr.obj@assay$expr) %in%
                                                                    .x.feature, drop = TRUE]) |>
                                       (\(x)
                                        range(x[!((x > (mean(x = x) + .sd.range[2]*stats::sd(x = x))) |
                                                    (x < (mean(x = x) + .sd.range[1]*stats::sd(x = x))))])
                                       )()) +
-        ggplot2::scale_y_continuous(limits = (.tdr.obj@landmarks[,colnames(x = .tdr.obj@landmarks) %in%
+        ggplot2::scale_y_continuous(limits = (.tdr.obj@assay$expr[,colnames(x = .tdr.obj@assay$expr) %in%
                                                                    .y.feature, drop = TRUE]) |>
                                       (\(x)
                                        range(x[!((x > (mean(x = x) + .sd.range[2]*stats::sd(x = x))) |
@@ -947,7 +947,7 @@ plot2Markers <-
       
       p <-
         p  +
-        ggplot2::stat_density_2d(data = as.data.frame(x = .tdr.obj@landmarks),
+        ggplot2::stat_density_2d(data = as.data.frame(x = .tdr.obj@assay$expr),
                                  mapping = ggplot2::aes(fill = ggplot2::after_stat(x = log2(x = level))),
                                  geom = "polygon",
                                  bins = .density.bins) +
@@ -1141,8 +1141,8 @@ plotSampleEmbedding <-
         stop("'.sup.embed.slot' must be a single character string when .embedding = 'pePC'")
       }
       
-      if(is.null(x = .tdr.obj@map$embedding$pePC[[.sup.embed.slot]])){
-        available <- if(!is.null(.tdr.obj@map$embedding$pePC)) names(.tdr.obj@map$embedding$pePC) else "none"
+      if(is.null(x = .tdr.obj@sample.embed$pepc[[.sup.embed.slot]])){
+        available <- if(!is.null(.tdr.obj@sample.embed$pepc)) names(.tdr.obj@sample.embed$pepc) else "none"
         stop(paste0("'", .sup.embed.slot, "' not found in .tdr.obj$map$embedding$pePC. ",
                     "Run get.embedding() with .contrast.of.interest or .red.model first. ",
                     "Available: ", paste(available, collapse = ", ")))
@@ -1158,7 +1158,7 @@ plotSampleEmbedding <-
       }
       
       # Validate the corresponding slot exists in .tdr.obj$map$embedding
-      if(is.null(x = .tdr.obj@map$embedding[[.embedding]])){
+      if(is.null(x = .tdr.obj@sample.embed[[.embedding]])){
         stop(paste0("'", .embedding, "' embedding not found in .tdr.obj$map$embedding. Run get.embedding() first."))
       }
       
@@ -1204,7 +1204,7 @@ plotSampleEmbedding <-
     
     if(.embedding == "pePC"){
       # Supervised embeddings are now in .tdr.obj$map$embedding$pePC[[.sup.embed.slot]]
-      embed <- .tdr.obj@map$embedding$pePC[[.sup.embed.slot]]
+      embed <- .tdr.obj@sample.embed$pepc[[.sup.embed.slot]]
       axis.prefix <- "pePC"
       # pePC stores perc.tot.var.exp directly
       if(!is.null(x = embed$perc.tot.var.exp)){
@@ -1212,17 +1212,17 @@ plotSampleEmbedding <-
       }
     } else if(.embedding == "pca"){
       # Unsupervised embeddings are in .tdr.obj$map$embedding
-      embed <- .tdr.obj@map$embedding$pca
+      embed <- .tdr.obj@sample.embed$pca
       axis.prefix <- "PC"
       # PCA stores sdev, compute variance explained as proportion of TOTAL variance
       # (not sum of truncated sdev^2, since we use truncated PCA)
       if(!is.null(x = embed$sdev)){
-        total.var <- matrixStats::rowVars(x = .tdr.obj@map$Y) |> sum()
+        total.var <- matrixStats::rowVars(x = .tdr.obj@density$Y) |> sum()
         var.explained <- 100 * embed$sdev^2 / total.var
         names(x = var.explained) <- paste0("PC", seq_along(along.with = var.explained))
       }
     } else { # traj
-      embed <- .tdr.obj@map$embedding$traj
+      embed <- .tdr.obj@sample.embed$traj
       axis.prefix <- "DC"
       # Diffusion map eigenvalues don't represent variance explained in same way
     }
@@ -1486,11 +1486,11 @@ plotTradStats <-
     sig.shape <- sig <- adj.p <- level <- pop <- term <- coef <- cell.perc <- NULL
     
     # Validate model exists
-    if(is.null(x = .tdr.obj@map$lm[[.model.name]])){
+    if(is.null(x = .tdr.obj@results$lm[[.model.name]])){
       stop(paste0("Model '", .model.name, "' not found in .tdr.obj$map$lm. ",
-                  "Available models: ", paste(names(.tdr.obj@map$lm), collapse = ", ")))
+                  "Available models: ", paste(names(.tdr.obj@results$lm), collapse = ", ")))
     }
-    .stats.obj <- .tdr.obj@map$lm[[.model.name]]
+    .stats.obj <- .tdr.obj@results$lm[[.model.name]]
     
     .split.by <-
       match.arg(arg = .split.by,
@@ -1504,13 +1504,13 @@ plotTradStats <-
     
     perc.plot <-
       data.frame(x = as.factor(x = 1),
-                 pop = colnames(x = .tdr.obj@map[[.split.by]]$cell.perc),
-                 cell.perc = Matrix::colMeans(x = .tdr.obj@map[[.split.by]]$cell.perc)) |>
+                 pop = colnames(x = .tdr.obj@density$composition[[.split.by]]$cell.perc),
+                 cell.perc = Matrix::colMeans(x = .tdr.obj@density$composition[[.split.by]]$cell.perc)) |>
       dplyr::mutate(pop = factor(x = pop,
                                  levels = if(isTRUE(x = .order.ids)){
                                    
-                                   .tdr.obj@graph[[.split.by]]$pheatmap$tree_row$labels[
-                                     .tdr.obj@graph[[.split.by]]$pheatmap$tree_row$order
+                                   .tdr.obj@results[[.split.by]]$pheatmap$tree_row$labels[
+                                     .tdr.obj@results[[.split.by]]$pheatmap$tree_row$order
                                    ]
                                    
                                  } else {
@@ -1593,13 +1593,13 @@ plotTradStats <-
       dplyr::mutate(pop = factor(x = pop,
                                  levels = if(isTRUE(x = .order.ids)){
                                    
-                                   .tdr.obj@graph[[.split.by]]$pheatmap$tree_row$labels[
-                                     .tdr.obj@graph[[.split.by]]$pheatmap$tree_row$order
+                                   .tdr.obj@results[[.split.by]]$pheatmap$tree_row$labels[
+                                     .tdr.obj@results[[.split.by]]$pheatmap$tree_row$order
                                    ]
                                    
                                  } else {
                                    
-                                   colnames(x = .tdr.obj@map[[.split.by]]$cell.perc)
+                                   colnames(x = .tdr.obj@density$composition[[.split.by]]$cell.perc)
                                    
                                  })) |>
       droplevels()
@@ -1832,9 +1832,9 @@ plotTradPerc <-
       
       dat.df <-
         cbind(dat.df,
-              .tdr.obj@map[[.pop.from]]$cell.perc) |>
+              .tdr.obj@density$composition[[.pop.from]]$cell.perc) |>
         tidyr::pivot_longer(
-          cols = colnames(x = .tdr.obj@map[[.pop.from]]$cell.perc),
+          cols = colnames(x = .tdr.obj@density$composition[[.pop.from]]$cell.perc),
           cols_vary = "slowest"
         ) |>
         as.data.frame()
@@ -1842,7 +1842,7 @@ plotTradPerc <-
     } else {
       
       dat.df$value <-
-        .tdr.obj@map[[.pop.from]]$cell.perc[,.pop]
+        .tdr.obj@density$composition[[.pop.from]]$cell.perc[,.pop]
       
     }
     
@@ -1857,8 +1857,8 @@ plotTradPerc <-
       
       dat.df$name <-
         as.character(x = dat.df$name) |>
-        factor(levels = .tdr.obj@graph[[.pop.from]]$pheatmap$tree_row$labels[
-          .tdr.obj@graph[[.pop.from]]$pheatmap$tree_row$order
+        factor(levels = .tdr.obj@results[[.pop.from]]$pheatmap$tree_row$labels[
+          .tdr.obj@results[[.pop.from]]$pheatmap$tree_row$order
         ])
       
     }
@@ -2046,13 +2046,13 @@ plotDensity <-
       
       dat.df <-
         cbind(dat.df,
-              Matrix::t(x = log2(x = .tdr.obj@map$fdens + 0.5))) |>
+              Matrix::t(x = log2(x = .tdr.obj@density$fdens + 0.5))) |>
         tidyr::pivot_longer(
-          cols = rownames(x = .tdr.obj@map$fdens),
+          cols = rownames(x = .tdr.obj@density$fdens),
           cols_vary = "slowest"
         ) |>
-        dplyr::mutate(name = as.character(x = .tdr.obj@graph[[.pop.from]]$ids) |>
-                        stats::setNames(nm = rownames(x = .tdr.obj@map$fdens)) |>
+        dplyr::mutate(name = as.character(x = .tdr.obj@landmark.annot[[.pop.from]]$ids) |>
+                        stats::setNames(nm = rownames(x = .tdr.obj@density$fdens)) |>
                         (\(x)
                          x[name]
                         )()) |>
@@ -2062,9 +2062,9 @@ plotDensity <-
       
       dat.df <-
         cbind(dat.df,
-              Matrix::t(x = log2(x = .tdr.obj@map$fdens[.tdr.obj@graph[[.pop.from]]$ids == .pop,] + 0.5))) |>
+              Matrix::t(x = log2(x = .tdr.obj@density$fdens[.tdr.obj@landmark.annot[[.pop.from]]$ids == .pop,] + 0.5))) |>
         tidyr::pivot_longer(
-          cols = rownames(.tdr.obj@map$fdens),
+          cols = rownames(.tdr.obj@density$fdens),
           cols_vary = "slowest"
         ) |>
         as.data.frame()
@@ -2230,11 +2230,11 @@ plotPbDE <-
     
     # Get DE results from .tdr.obj$pbDE or from provided .de.obj
     if(is.null(x = .de.obj)){
-      if(is.null(x = .tdr.obj@pbDE[[.model.name]][[.population.name]])){
+      if(is.null(x = .tdr.obj@results$pb[[.model.name]][[.population.name]])){
         stop(sprintf("No results found at .tdr.obj$pbDE$%s$%s. Run get.pbDE() first.", 
                      .model.name, .population.name))
       }
-      .de.obj <- .tdr.obj@pbDE[[.model.name]][[.population.name]]
+      .de.obj <- .tdr.obj@results$pb[[.model.name]][[.population.name]]
     }
     
     # Default coefficients
@@ -2275,8 +2275,8 @@ plotPbDE <-
                       factor(
                         x = marker,
                         levels = if(.order.by == "none") .tdr.obj@config$markers else {
-                          rev(x = .tdr.obj@graph[[.order.by]]$pheatmap$tree_col$labels[
-                          .tdr.obj@graph[[.order.by]]$pheatmap$tree_col$order]) |>
+                          rev(x = .tdr.obj@results[[.order.by]]$pheatmap$tree_col$labels[
+                          .tdr.obj@results[[.order.by]]$pheatmap$tree_col$order]) |>
                           (\(x)
                            x[x %in% marker]
                           )()
@@ -2418,7 +2418,7 @@ plotDEA <- function(
     .dea.obj,
     .coefs = colnames(x = .dea.obj$coefficients),
     .order.by = "clustering",
-    .markers = colnames(x = .tdr.obj@graph[[.order.by]]$median.exprs),
+    .markers = colnames(x = .tdr.obj@results[[.order.by]]$median.exprs),
     .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.065,
@@ -2506,11 +2506,11 @@ plotMarkerDE <- function(
     if(is.null(x = .comparison.name)){
       stop("Please provide .comparison.name to fetch results from .tdr.obj$markerDE")
     }
-    if(is.null(x = .tdr.obj@markerDE[[.model.name]][[.comparison.name]])){
+    if(is.null(x = .tdr.obj@results$marker[[.model.name]][[.comparison.name]])){
       stop(sprintf("No results found at .tdr.obj$markerDE$%s$%s. Run get.markerDE() first.", 
                    .model.name, .comparison.name))
     }
-    .de.obj <- .tdr.obj@markerDE[[.model.name]][[.comparison.name]]
+    .de.obj <- .tdr.obj@results$marker[[.model.name]][[.comparison.name]]
   }
   
   # Use plotPbDE with the extracted DE object
@@ -2754,7 +2754,7 @@ plotHeatmap <-
   ){
     
     # Verify graph component exists
-    if(is.null(x = .tdr.obj@graph[[.id.from]])){
+    if(is.null(x = .tdr.obj@results[[.id.from]])){
       stop(paste0("Please run get.graph first."))
     }
     
@@ -2767,7 +2767,7 @@ plotHeatmap <-
       )
     
     # Display cached pheatmap generated during get.graph()
-    return(gridExtra::grid.arrange(.tdr.obj@graph[[.id.from]]$pheatmap$gtable))
+    return(gridExtra::grid.arrange(.tdr.obj@results[[.id.from]]$pheatmap$gtable))
     
   }
 
@@ -2855,19 +2855,19 @@ plotSpecDE <-
                   "pca"
                 ))
     
-    if (is.null(x = .tdr.obj@specDE[[.coef.col]])) {
+    if (is.null(x = .tdr.obj@results$spec[[.coef.col]])) {
       avail <-
-        if (is.null(x = .tdr.obj@specDE)) {
+        if (is.null(x = .tdr.obj@results$spec)) {
           "none (run get.specDE() first)"
         } else {
-          paste(names(x = .tdr.obj@specDE), collapse = ", ")
+          paste(names(x = .tdr.obj@results$spec), collapse = ", ")
         }
       stop("specDE results for '", .coef.col, "' not found.\n",
            "Available: ", avail)
     }
     
     specDE.res <-
-      .tdr.obj@specDE[[.coef.col]]
+      .tdr.obj@results$spec[[.coef.col]]
     
     # -------------------------------------------------------------------------
     # Diagnostic view: Sk x Ak scatter
@@ -2923,21 +2923,21 @@ plotSpecDE <-
     if (!is.numeric(x = .specDE.dim) ||
         length(x = .specDE.dim) != 1 ||
         .specDE.dim < 1 ||
-        .specDE.dim > ncol(x = specDE.res$scores)) {
-      stop(".specDE.dim must be an integer between 1 and ", ncol(x = specDE.res$scores))
+        .specDE.dim > ncol(x = specDE.res$coord)) {
+      stop(".specDE.dim must be an integer between 1 and ", ncol(x = specDE.res$coord))
     }
     
     .specDE.dim <-
       as.integer(x = .specDE.dim)
     
     comp.name <-
-      colnames(x = specDE.res$scores)[.specDE.dim]
+      colnames(x = specDE.res$coord)[.specDE.dim]
     
     score.vec <-
-      specDE.res$scores[, .specDE.dim]
+      specDE.res$coord[, .specDE.dim]
     
     # Check UMAP exists
-    if (is.null(x = .tdr.obj@graph$uwot$embedding)) {
+    if (is.null(x = .tdr.obj@landmark.embed$umap$coord)) {
       stop("UMAP embedding not found. Run get.graph() first.")
     }
     
@@ -2951,9 +2951,9 @@ plotSpecDE <-
     
     embed.df <-
       (if(.embed == "umap"){
-        as.data.frame(x = .tdr.obj@graph$uwot$embedding)
+        as.data.frame(x = .tdr.obj@landmark.embed$umap$coord)
       } else {
-        as.data.frame(x = .tdr.obj@pca$embed)
+        as.data.frame(x = .tdr.obj@landmark.embed$pca$coord)
       }) |>
       cbind(score = score.vec) |>
       (\(x)
@@ -2967,7 +2967,7 @@ plotSpecDE <-
       data.frame(
         Y = Y.vec,
         score = score.vec,
-        col = .tdr.obj@map$lm[[specDE.res$params$model.name]]$fit$coefficients[, specDE.res$params$coef.col]
+        col = .tdr.obj@results$lm[[specDE.res$params$model.name]]$fit$coefficients[, specDE.res$params$coef.col]
       )
     
     # Panel 1: UMAP colored by scores
@@ -3110,7 +3110,7 @@ plotSpecDE <-
   # Validate raw landmarks
   # -----------------------------------------------------------------------
 
-  if (is.null(x = .tdr.obj@raw.landmarks)) {
+  if (is.null(x = .tdr.obj@assay$raw)) {
     stop("Raw landmarks not found. Run get.landmarks() first.")
   }
 
@@ -3156,10 +3156,10 @@ plotSpecDE <-
   if (.tdr.obj@config$assay.type == "RNA") {
 
     lm.libsize <-
-      Matrix::rowSums(x = .tdr.obj@raw.landmarks)
+      Matrix::rowSums(x = .tdr.obj@assay$raw)
 
     X.sub <-
-      .tdr.obj@raw.landmarks[, top.features, drop = FALSE]
+      .tdr.obj@assay$raw[, top.features, drop = FALSE]
 
     size.factors <-
       lm.libsize / mean(x = lm.libsize)
@@ -3176,7 +3176,7 @@ plotSpecDE <-
   } else {
 
     X.sub <-
-      .tdr.obj@raw.landmarks[, top.features, drop = FALSE]
+      .tdr.obj@assay$raw[, top.features, drop = FALSE]
 
     X.centered <-
       scale(x = as.matrix(x = X.sub), center = TRUE, scale = FALSE)
@@ -4021,26 +4021,26 @@ plotSpecDEHeatmap <-
   ) {
 
     # Validate specDE results
-    if (is.null(x = .tdr.obj@specDE[[.coef.col]])) {
+    if (is.null(x = .tdr.obj@results$spec[[.coef.col]])) {
       avail <-
-        if (is.null(x = .tdr.obj@specDE)) {
+        if (is.null(x = .tdr.obj@results$spec)) {
           "none (run get.specDE() first)"
         } else {
-          paste(names(x = .tdr.obj@specDE), collapse = ", ")
+          paste(names(x = .tdr.obj@results$spec), collapse = ", ")
         }
       stop("specDE results for '", .coef.col, "' not found.\n",
            "Available: ", avail)
     }
 
     specDE.res <-
-      .tdr.obj@specDE[[.coef.col]]
+      .tdr.obj@results$spec[[.coef.col]]
 
     # Validate .specDE.dim
     if (!is.numeric(x = .specDE.dim) ||
         any(.specDE.dim < 1) ||
-        any(.specDE.dim > ncol(x = specDE.res$scores))) {
+        any(.specDE.dim > ncol(x = specDE.res$coord))) {
       stop(".specDE.dim must be integer(s) between 1 and ",
-           ncol(x = specDE.res$scores))
+           ncol(x = specDE.res$coord))
     }
 
     .specDE.dim <-
@@ -4051,7 +4051,7 @@ plotSpecDEHeatmap <-
       .tdr.obj = .tdr.obj,
       .coef.col = .coef.col,
       .loadings = specDE.res$loadings[, .specDE.dim[1]],
-      .scores = specDE.res$scores[, .specDE.dim, drop = FALSE],
+      .scores = specDE.res$coord[, .specDE.dim, drop = FALSE],
       .Y = specDE.res$Y,
       .method.name = "specDE",
       .dim.string = "specDE.dim",
@@ -4159,19 +4159,19 @@ plotNmfDE <-
                   "pca"
                 ))
     
-    if (is.null(x = .tdr.obj@nmfDE[[.coef.col]])) {
+    if (is.null(x = .tdr.obj@results$nmf[[.coef.col]])) {
       avail <-
-        if (is.null(x = .tdr.obj@nmfDE)) {
+        if (is.null(x = .tdr.obj@results$nmf)) {
           "none (run get.nmfDE() first)"
         } else {
-          paste(names(x = .tdr.obj@nmfDE), collapse = ", ")
+          paste(names(x = .tdr.obj@results$nmf), collapse = ", ")
         }
       stop("nmfDE results for '", .coef.col, "' not found.\n",
            "Available: ", avail)
     }
     
     nmfDE.res <-
-      .tdr.obj@nmfDE[[.coef.col]]
+      .tdr.obj@results$nmf[[.coef.col]]
     
     # -------------------------------------------------------------------------
     # Diagnostic view: Sk x Ak scatter, colored by d_k
@@ -4229,21 +4229,21 @@ plotNmfDE <-
     if (!is.numeric(x = .nmfDE.dim) ||
         length(x = .nmfDE.dim) != 1 ||
         .nmfDE.dim < 1 ||
-        .nmfDE.dim > ncol(x = nmfDE.res$signed.scores)) {
-      stop(".nmfDE.dim must be an integer between 1 and ", ncol(x = nmfDE.res$signed.scores))
+        .nmfDE.dim > ncol(x = nmfDE.res$signed.coord)) {
+      stop(".nmfDE.dim must be an integer between 1 and ", ncol(x = nmfDE.res$signed.coord))
     }
     
     .nmfDE.dim <-
       as.integer(x = .nmfDE.dim)
     
     comp.name <-
-      colnames(x = nmfDE.res$signed.scores)[.nmfDE.dim]
+      colnames(x = nmfDE.res$signed.coord)[.nmfDE.dim]
     
     score.vec <-
-      nmfDE.res$signed.scores[, .nmfDE.dim]
+      nmfDE.res$signed.coord[, .nmfDE.dim]
     
     # Check UMAP exists
-    if (.embed == "umap" && is.null(x = .tdr.obj@graph$uwot$embedding)) {
+    if (.embed == "umap" && is.null(x = .tdr.obj@landmark.embed$umap$coord)) {
       stop("UMAP embedding not found. Run get.graph() first.")
     }
     
@@ -4257,9 +4257,9 @@ plotNmfDE <-
     
     embed.df <-
       (if(.embed == "umap"){
-        as.data.frame(x = .tdr.obj@graph$uwot$embedding)
+        as.data.frame(x = .tdr.obj@landmark.embed$umap$coord)
       } else {
-        as.data.frame(x = .tdr.obj@pca$embed)
+        as.data.frame(x = .tdr.obj@landmark.embed$pca$coord)
       }) |>
       cbind(score = score.vec) |>
       (\(x)
@@ -4273,7 +4273,7 @@ plotNmfDE <-
       data.frame(
         Y = Y.vec,
         score = score.vec,
-        col = .tdr.obj@map$lm[[nmfDE.res$params$model.name]]$fit$coefficients[, nmfDE.res$params$coef.col]
+        col = .tdr.obj@results$lm[[nmfDE.res$params$model.name]]$fit$coefficients[, nmfDE.res$params$coef.col]
       )
     
     # Panel 1: UMAP colored by signed scores (diverging scale, centered at 0)
@@ -4507,26 +4507,26 @@ plotNmfDEHeatmap <-
   ) {
 
     # Validate nmfDE results
-    if (is.null(x = .tdr.obj@nmfDE[[.coef.col]])) {
+    if (is.null(x = .tdr.obj@results$nmf[[.coef.col]])) {
       avail <-
-        if (is.null(x = .tdr.obj@nmfDE)) {
+        if (is.null(x = .tdr.obj@results$nmf)) {
           "none (run get.nmfDE() first)"
         } else {
-          paste(names(x = .tdr.obj@nmfDE), collapse = ", ")
+          paste(names(x = .tdr.obj@results$nmf), collapse = ", ")
         }
       stop("nmfDE results for '", .coef.col, "' not found.\n",
            "Available: ", avail)
     }
 
     nmfDE.res <-
-      .tdr.obj@nmfDE[[.coef.col]]
+      .tdr.obj@results$nmf[[.coef.col]]
 
     # Validate .nmfDE.dim
     if (!is.numeric(x = .nmfDE.dim) ||
         any(.nmfDE.dim < 1) ||
-        any(.nmfDE.dim > ncol(x = nmfDE.res$signed.scores))) {
+        any(.nmfDE.dim > ncol(x = nmfDE.res$signed.coord))) {
       stop(".nmfDE.dim must be integer(s) between 1 and ",
-           ncol(x = nmfDE.res$signed.scores))
+           ncol(x = nmfDE.res$signed.coord))
     }
 
     .nmfDE.dim <-
@@ -4569,7 +4569,7 @@ plotNmfDEHeatmap <-
       .tdr.obj = .tdr.obj,
       .coef.col = .coef.col,
       .loadings = loadings,
-      .scores = nmfDE.res$signed.scores[, .nmfDE.dim, drop = FALSE],
+      .scores = nmfDE.res$signed.coord[, .nmfDE.dim, drop = FALSE],
       .Y = nmfDE.res$Y,
       .method.name = "nmfDE",
       .dim.string = "nmfDE.dim",
@@ -4672,19 +4672,19 @@ plotPlsDE <-
                   "pca"
                 ))
 
-    if (is.null(x = .tdr.obj@plsDE[[.coef.col]])) {
+    if (is.null(x = .tdr.obj@results$pls[[.coef.col]])) {
       avail <-
-        if (is.null(x = .tdr.obj@plsDE)) {
+        if (is.null(x = .tdr.obj@results$pls)) {
           "none (run get.plsDE() first)"
         } else {
-          paste(names(x = .tdr.obj@plsDE), collapse = ", ")
+          paste(names(x = .tdr.obj@results$pls), collapse = ", ")
         }
       stop("plsDE results for '", .coef.col, "' not found.\n",
            "Available: ", avail)
     }
 
     plsDE.res <-
-      .tdr.obj@plsDE[[.coef.col]]
+      .tdr.obj@results$pls[[.coef.col]]
 
     # -------------------------------------------------------------------------
     # Diagnostic view: Sk x Ak scatter, colored by |q_k|
@@ -4741,21 +4741,21 @@ plotPlsDE <-
     if (!is.numeric(x = .plsDE.dim) ||
         length(x = .plsDE.dim) != 1 ||
         .plsDE.dim < 1 ||
-        .plsDE.dim > ncol(x = plsDE.res$scores)) {
-      stop(".plsDE.dim must be an integer between 1 and ", ncol(x = plsDE.res$scores))
+        .plsDE.dim > ncol(x = plsDE.res$coord)) {
+      stop(".plsDE.dim must be an integer between 1 and ", ncol(x = plsDE.res$coord))
     }
 
     .plsDE.dim <-
       as.integer(x = .plsDE.dim)
 
     comp.name <-
-      colnames(x = plsDE.res$scores)[.plsDE.dim]
+      colnames(x = plsDE.res$coord)[.plsDE.dim]
 
     score.vec <-
-      plsDE.res$scores[, .plsDE.dim]
+      plsDE.res$coord[, .plsDE.dim]
 
     # Check UMAP exists
-    if (.embed == "umap" && is.null(x = .tdr.obj@graph$uwot$embedding)) {
+    if (.embed == "umap" && is.null(x = .tdr.obj@landmark.embed$umap$coord)) {
       stop("UMAP embedding not found. Run get.graph() first.")
     }
 
@@ -4769,9 +4769,9 @@ plotPlsDE <-
 
     embed.df <-
       (if(.embed == "umap"){
-        as.data.frame(x = .tdr.obj@graph$uwot$embedding)
+        as.data.frame(x = .tdr.obj@landmark.embed$umap$coord)
       } else {
-        as.data.frame(x = .tdr.obj@pca$embed)
+        as.data.frame(x = .tdr.obj@landmark.embed$pca$coord)
       }) |>
       cbind(score = score.vec) |>
       (\(x)
@@ -4785,7 +4785,7 @@ plotPlsDE <-
       data.frame(
         Y = Y.vec,
         score = score.vec,
-        col = .tdr.obj@map$lm[[plsDE.res$params$model.name]]$fit$coefficients[, plsDE.res$params$coef.col]
+        col = .tdr.obj@results$lm[[plsDE.res$params$model.name]]$fit$coefficients[, plsDE.res$params$coef.col]
       )
 
     # Panel 1: Embedding colored by PLS scores (diverging scale, centered at 0)
@@ -4983,26 +4983,26 @@ plotPlsDEHeatmap <-
   ) {
 
     # Validate plsDE results
-    if (is.null(x = .tdr.obj@plsDE[[.coef.col]])) {
+    if (is.null(x = .tdr.obj@results$pls[[.coef.col]])) {
       avail <-
-        if (is.null(x = .tdr.obj@plsDE)) {
+        if (is.null(x = .tdr.obj@results$pls)) {
           "none (run get.plsDE() first)"
         } else {
-          paste(names(x = .tdr.obj@plsDE), collapse = ", ")
+          paste(names(x = .tdr.obj@results$pls), collapse = ", ")
         }
       stop("plsDE results for '", .coef.col, "' not found.\n",
            "Available: ", avail)
     }
 
     plsDE.res <-
-      .tdr.obj@plsDE[[.coef.col]]
+      .tdr.obj@results$pls[[.coef.col]]
 
     # Validate .plsDE.dim
     if (!is.numeric(x = .plsDE.dim) ||
         any(.plsDE.dim < 1) ||
-        any(.plsDE.dim > ncol(x = plsDE.res$scores))) {
+        any(.plsDE.dim > ncol(x = plsDE.res$coord))) {
       stop(".plsDE.dim must be integer(s) between 1 and ",
-           ncol(x = plsDE.res$scores))
+           ncol(x = plsDE.res$coord))
     }
 
     .plsDE.dim <-
@@ -5019,7 +5019,7 @@ plotPlsDEHeatmap <-
       .tdr.obj = .tdr.obj,
       .coef.col = .coef.col,
       .loadings = loadings,
-      .scores = plsDE.res$scores[, .plsDE.dim, drop = FALSE],
+      .scores = plsDE.res$coord[, .plsDE.dim, drop = FALSE],
       .Y = plsDE.res$Y,
       .method.name = "plsDE",
       .dim.string = "plsDE.dim",
