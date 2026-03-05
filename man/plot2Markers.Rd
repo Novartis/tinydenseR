@@ -4,22 +4,13 @@
 \alias{plot2Markers}
 \title{Bidimensional Hexbin Plot for Marker Expression}
 \usage{
-plot2Markers(
-  .tdr.obj,
-  .id = NULL,
-  .id.from = "clustering",
-  .x.feature = "CD3",
-  .y.feature = "CD20",
-  .bins = 128,
-  .legend.position = "right",
-  .plot.title = "",
-  .panel.size = 1.5,
-  .reference = TRUE,
-  .density.bins = 32,
-  .sd.range = c(-3, 6)
-)
+plot2Markers(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object processed through \code{get.landmarks()} and \code{get.graph()}.}
 
 \item{.id}{Optional character: cluster or celltype ID to highlight. If NULL (default), plots all landmarks.}

@@ -4,19 +4,13 @@
 \alias{plotDEA}
 \title{Plot Differential Expression Analysis Results (Deprecated)}
 \usage{
-plotDEA(
-  .tdr.obj,
-  .dea.obj,
-  .coefs = colnames(x = .dea.obj$coefficients),
-  .order.by = "clustering",
-  .markers = colnames(x = .tdr.obj@results[[.order.by]]$median.exprs),
-  .q = 0.1,
-  .row.space.scaler = 0.2,
-  .col.space.scaler = 0.065,
-  .label.substr.rm = ""
-)
+plotDEA(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object.}
 
 \item{.dea.obj}{Differential expression results from \code{get.dea()} or \code{get.pbDE()}.}

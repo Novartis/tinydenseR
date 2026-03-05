@@ -4,17 +4,13 @@
 \alias{plotSamplePCA}
 \title{Plot Sample PCA (Deprecated)}
 \usage{
-plotSamplePCA(
-  .tdr.obj,
-  .labels.from = colnames(x = .tdr.obj@metadata)[1],
-  .cat.feature.color = Color.Palette[1, 1:5],
-  .point.size = 1,
-  .panel.size = 2,
-  .midpoint = if (is.numeric(x = .tdr.obj@metadata[[.labels.from]])) stats::median(x =
-    .tdr.obj@metadata[[.labels.from]]) else NA
-)
+plotSamplePCA(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.embedding()}.}
 
 \item{.labels.from}{Character specifying metadata column for coloring points.}

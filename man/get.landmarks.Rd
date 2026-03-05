@@ -18,6 +18,10 @@ get.landmarks(
 \arguments{
 \item{.tdr.obj}{Object initialized with \code{setup.tdr.obj}.}
 
+\item{.source}{The raw data object for non-file backends. \code{NULL} (default) for
+the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.
+Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.}
+
 \item{.verbose}{Logical, print progress messages. Default TRUE.}
 
 \item{.seed}{Integer for reproducibility. Default 123.}

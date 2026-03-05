@@ -18,6 +18,10 @@ goi.summary(
 \item{.tdr.obj}{A list object initialized with \code{setup.tdr.obj} and processed
 with \code{get.graph} and \code{get.map}. Must contain RNA assay data.}
 
+\item{.source}{The raw data object for non-file backends. \code{NULL} (default) for
+the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.
+Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.}
+
 \item{.goi}{Character vector of gene names to summarize. All genes must exist
 in \code{.tdr.obj$raw.landmarks} column names.}
 

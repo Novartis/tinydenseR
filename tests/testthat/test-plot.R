@@ -21,12 +21,12 @@ library(tinydenseR)
 
 test_that("plotting functions validate input types", {
   # Test that plotting functions require proper input types
-  expect_error(plotUMAP(.tdr.obj = NULL))
-  expect_error(plotUMAP(.tdr.obj = "not_a_list"))
-  expect_error(plotUMAP(.tdr.obj = list()))
+  expect_error(plotUMAP(NULL))
+  expect_error(plotUMAP("not_a_list"))
+  expect_error(plotUMAP(list()))
   
-  expect_error(plotPCA(.tdr.obj = NULL))
-  expect_error(plotPCA(.tdr.obj = "not_a_list"))
+  expect_error(plotPCA(NULL))
+  expect_error(plotPCA("not_a_list"))
   
   expect_error(scatterPlot(.x.feature = NULL, .y.feature = NULL))
   # Test scatterPlot with mismatched vector lengths
@@ -42,7 +42,7 @@ test_that("plotUMAP works with minimal valid structure", {
     )
   )
   
-  result <- plotUMAP(.tdr.obj = .tdr.obj)
+  result <- plotUMAP(.tdr.obj)
   expect_true("ggplot" %in% class(result))
 })
 
@@ -66,27 +66,27 @@ test_that("plotting functions handle mismatched dimensions", {
 test_that("plotting functions validate required fields", {
   # Test plotUMAP missing required fields
   incomplete_obj1 <- TDRObj(graph = list())
-  expect_error(plotUMAP(.tdr.obj = incomplete_obj1))
+  expect_error(plotUMAP(incomplete_obj1))
   
   incomplete_obj2 <- TDRObj(graph = list(uwot = list()))
-  expect_error(plotUMAP(.tdr.obj = incomplete_obj2))
+  expect_error(plotUMAP(incomplete_obj2))
   
   incomplete_obj3 <- TDRObj(graph = list(uwot = list(embedding = matrix(c(1,2), ncol=2))))
-  expect_error(plotUMAP(.tdr.obj = incomplete_obj3))  # Missing clustering
+  expect_error(plotUMAP(incomplete_obj3))  # Missing clustering
 })
 
 test_that("input validation for other plotting functions", {
   # Test basic input validation for functions that require complex structures
   # Rather than mock the complex structures, just test they expect the right input types
   
-  expect_error(plotPCA(.tdr.obj = list()))
-  expect_error(plotBeeswarm(.tdr.obj = list()))
-  expect_error(plot2Markers(.tdr.obj = list()))
-  expect_error(plotSamplePCA(.tdr.obj = list()))
-  expect_error(plotTradStats(.tdr.obj = list(), .stats.obj = list()))
-  expect_error(plotTradPerc(.tdr.obj = list()))
-  expect_error(plotDensity(.tdr.obj = list()))
-  expect_error(plotPbDE(.tdr.obj = list(), .de.obj = list(), .coefs = "test"))
+  expect_error(plotPCA(list()))
+  expect_error(plotBeeswarm(list()))
+  expect_error(plot2Markers(list()))
+  expect_error(plotSamplePCA(list()))
+  expect_error(plotTradStats(list(), .stats.obj = list()))
+  expect_error(plotTradPerc(list()))
+  expect_error(plotDensity(list()))
+  expect_error(plotPbDE(list(), .de.obj = list(), .coefs = "test"))
 })
 
 

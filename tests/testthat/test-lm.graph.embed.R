@@ -85,9 +85,9 @@ test_that("get.graph adds graph to .tdr.obj", {
                          .markers = c("CD3", "CD4", "CD8"),
                          .assay.type = "cyto",
                          .verbose = FALSE)
-  result <- get.landmarks(.tdr.obj = result,
+  result <- get.landmarks(result,
                            .verbose = FALSE)
-  result <- get.graph(.tdr.obj = result,
+  result <- get.graph(result,
                         .k = 3,
                         .scale = FALSE,
                         .verbose = FALSE,
@@ -134,9 +134,9 @@ test_that("get.map adds mapping info to .tdr.obj", {
                          .markers = c("CD3", "CD4", "CD8"),
                          .assay.type = "cyto",
                          .verbose = FALSE)
-  result <- get.landmarks(.tdr.obj = result,
+  result <- get.landmarks(result,
                           .verbose = FALSE)
-  result <- get.graph(.tdr.obj = result,
+  result <- get.graph(result,
                          .k = 3,
                          .scale = FALSE,
                          .verbose = FALSE,
@@ -181,14 +181,14 @@ test_that("get.lm.features.stats returns a list of feature stats", {
                          .markers = c("CD3", "CD4", "CD8"),
                          .assay.type = "cyto",
                          .verbose = FALSE)
-  result <- get.landmarks(.tdr.obj = result,
+  result <- get.landmarks(result,
                           .verbose = FALSE)
-  result <- get.graph(.tdr.obj = result,
+  result <- get.graph(result,
                          .k = 3,
                          .scale = FALSE,
                          .verbose = FALSE,
                          .seed = 42)
   expect_true(is.TDRObj(result))
-  result <- get.lm.features.stats(.tdr.obj = result)
+  result <- get.lm.features.stats(result)
   expect_true(is.TDRObj(result))
 })

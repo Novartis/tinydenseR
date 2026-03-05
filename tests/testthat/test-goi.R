@@ -30,13 +30,13 @@ test_that("goi.summary validates gene names correctly", {
   
   # Gene not found should error with helpful message
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = "NonExistentGene"),
+    object = goi.summary(.tdr.obj, .goi = "NonExistentGene"),
     regexp = "Gene\\(s\\) not found in data.*NonExistentGene"
   )
   
   # Error should suggest checking available genes
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = "NonExistentGene"),
+    object = goi.summary(.tdr.obj, .goi = "NonExistentGene"),
     regexp = "colnames\\(\\.tdr\\.obj\\$raw\\.landmarks\\)"
   )
 })
@@ -50,7 +50,7 @@ test_that("goi.summary requires RNA assay type", {
   )
   
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = "Marker1"),
+    object = goi.summary(.tdr.obj, .goi = "Marker1"),
     regexp = "goi.summary\\(\\) only supports RNA assay data"
   )
 })
@@ -64,7 +64,7 @@ test_that("goi.summary requires cell mapping", {
   )
   
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = "Gene1"),
+    object = goi.summary(.tdr.obj, .goi = "Gene1"),
     regexp = "Cell mapping not found.*Run get.graph\\(\\) and get.map\\(\\)"
   )
 })
@@ -86,7 +86,7 @@ test_that("goi.summary validates .id parameter", {
   
   # Invalid cluster ID should error
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = "Gene1", .id = "99", .id.from = "clustering"),
+    object = goi.summary(.tdr.obj, .goi = "Gene1", .id = "99", .id.from = "clustering"),
     regexp = "Invalid clustering ID\\(s\\).*99.*not found"
   )
 })
@@ -108,7 +108,7 @@ test_that("goi.summary validates .id.from parameter", {
   
   # .id.from must be "clustering" or "celltyping"
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = "Gene1", .id = "1", .id.from = "invalid"),
+    object = goi.summary(.tdr.obj, .goi = "Gene1", .id = "1", .id.from = "invalid"),
     regexp = "'arg' should be one of"
   )
 })
@@ -123,7 +123,7 @@ test_that("goi.summary handles case-sensitive gene names", {
   
   # Wrong case should error
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = "gene1"),
+    object = goi.summary(.tdr.obj, .goi = "gene1"),
     regexp = "Gene\\(s\\) not found in data.*gene1"
   )
 })
@@ -138,7 +138,7 @@ test_that("goi.summary accepts multiple genes", {
   
   # Mix of valid and invalid genes should error
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = c("Gene1", "InvalidGene", "Gene2")),
+    object = goi.summary(.tdr.obj, .goi = c("Gene1", "InvalidGene", "Gene2")),
     regexp = "Gene\\(s\\) not found.*InvalidGene"
   )
 })
@@ -153,7 +153,7 @@ test_that("goi.summary error messages are informative", {
   
   # Gene not found error should suggest checking available genes
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = "MissingGene"),
+    object = goi.summary(.tdr.obj, .goi = "MissingGene"),
     regexp = "use colnames\\(\\.tdr\\.obj\\$raw\\.landmarks\\)"
   )
 })
@@ -167,7 +167,7 @@ test_that("goi.summary handles cytometry assay type correctly", {
   )
   
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = "CD4"),
+    object = goi.summary(.tdr.obj, .goi = "CD4"),
     regexp = "goi.summary\\(\\) only supports RNA assay data.*Current assay type: cyto"
   )
 })
@@ -264,7 +264,7 @@ test_that("goi.summary validates that genes exist in raw.landmarks colnames", {
   
   # Mixed valid/invalid should fail
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = c("ACTB", "NotAGene")),
+    object = goi.summary(.tdr.obj, .goi = c("ACTB", "NotAGene")),
     regexp = "Gene\\(s\\) not found.*NotAGene"
   )
 })
@@ -288,7 +288,7 @@ test_that("goi.summary ID validation works for celltyping", {
   
   # Invalid celltype ID should error
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = "Gene1", 
+    object = goi.summary(.tdr.obj, .goi = "Gene1", 
                                      .id = "InvalidCelltype", .id.from = "celltyping"),
     regexp = "Invalid celltyping ID\\(s\\).*InvalidCelltype.*not found"
   )
@@ -304,7 +304,7 @@ test_that("goi.summary suggestion message includes available genes", {
   
   # Error message should guide user to check available genes
   expect_error(
-    object = goi.summary(.tdr.obj = .tdr.obj, .goi = "WrongGene"),
+    object = goi.summary(.tdr.obj, .goi = "WrongGene"),
     regexp = "use colnames\\(\\.tdr\\.obj\\$raw\\.landmarks\\) to see available genes"
   )
 })

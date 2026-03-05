@@ -53,6 +53,6 @@ test_that("workflow functions validate inputs properly", {
   
   # Test get.landmarks validation with incomplete object
   .tdr.obj <- list(config = list(assay.type = "RNA"))
-  expect_error(get.landmarks(.tdr.obj = .tdr.obj),
-               "Invalid .tdr.obj")  # Should error due to missing required fields
+  expect_error(get.landmarks(.tdr.obj),
+               "no applicable method")  # S3 dispatch error for non-TDRObj
 })

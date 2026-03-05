@@ -4,18 +4,13 @@
 \alias{plotNmfDE}
 \title{Plot nmfDE Scores (Diagnostic and Component Views)}
 \usage{
-plotNmfDE(
-  .tdr.obj,
-  .coef.col,
-  .nmfDE.dim = NULL,
-  .embed = "umap",
-  .point.size = 1,
-  .label.size = 3,
-  .panel.size = 2,
-  .seed = 123
-)
+plotNmfDE(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object after \code{get.nmfDE()}.}
 
 \item{.coef.col}{Character: coefficient name matching a slot in \code{.tdr.obj$nmfDE}.}

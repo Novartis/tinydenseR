@@ -38,6 +38,10 @@ in \code{.tdr.obj$map$lm[[.model.name]]}. Use different names to store multiple 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 
 \item{.seed}{Integer: random seed for reproducibility in blocking correlation estimation. Default 123.}
+
+\item{.source}{The raw data object for non-file backends. \code{NULL} (default) for
+the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.
+Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.}
 }
 \value{
 The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$map$lm[[.model.name]]}:

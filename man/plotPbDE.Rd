@@ -4,21 +4,13 @@
 \alias{plotPbDE}
 \title{Plot Pseudobulk Differential Expression Results}
 \usage{
-plotPbDE(
-  .tdr.obj,
-  .de.obj = NULL,
-  .model.name = "default",
-  .population.name = "all",
-  .coefs = NULL,
-  .order.by = "none",
-  .markers = .tdr.obj@config$markers,
-  .q = 0.1,
-  .row.space.scaler = 0.2,
-  .col.space.scaler = 0.065,
-  .label.substr.rm = ""
-)
+plotPbDE(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object processed through \code{get.pbDE()}.}
 
 \item{.de.obj}{Optional: differential expression results object. If NULL (default), retrieves

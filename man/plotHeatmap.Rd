@@ -4,9 +4,13 @@
 \alias{plotHeatmap}
 \title{Plot Mean Expression Heatmap}
 \usage{
-plotHeatmap(.tdr.obj, .id.from = "clustering")
+plotHeatmap(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object processed through \code{get.graph()}.}
 
 \item{.id.from}{Character: "clustering" or "celltyping" (default "clustering"). Determines which

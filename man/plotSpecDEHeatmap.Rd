@@ -4,25 +4,13 @@
 \alias{plotSpecDEHeatmap}
 \title{Plot specDE Expression Heatmap}
 \usage{
-plotSpecDEHeatmap(
-  .tdr.obj,
-  .coef.col,
-  .specDE.dim = 1,
-  .model.name = "default",
-  .n.features = 50,
-  .order.by = "dens.contrast",
-  .add.annot = NULL,
-  .order.decreasing = FALSE,
-  .viridis.options.annot = c("cividis", "rocket", "inferno", "mako", "magma"),
-  .annot.panel.width = 4,
-  .annot.panel.height = 0.15,
-  .panel.width = 4,
-  .panel.height = 3,
-  .feature.font.size = 7,
-  .show.landmark.labels = FALSE
-)
+plotSpecDEHeatmap(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object after \code{get.specDE()}.}
 
 \item{.coef.col}{Character: coefficient name matching a slot in \code{.tdr.obj$specDE}.}

@@ -20,6 +20,10 @@ get.map(
 \arguments{
 \item{.tdr.obj}{A tinydenseR object with \code{$graph} component populated by \code{get.graph}.}
 
+\item{.source}{The raw data object for non-file backends. \code{NULL} (default) for
+the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.
+Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.}
+
 \item{.ref.obj}{Optional Symphony reference object for cell type annotation. Must have
 \code{Z_corr} field (harmony-corrected embeddings) and metadata with cell type labels.
 Only compatible with RNA assays. Replaces any existing \code{$graph$celltyping}.}

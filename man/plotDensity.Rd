@@ -4,21 +4,13 @@
 \alias{plotDensity}
 \title{Plot Density}
 \usage{
-plotDensity(
-  .tdr.obj,
-  .x.split = colnames(x = .tdr.obj@metadata)[1],
-  .pop = NULL,
-  .pop.from = "clustering",
-  .subject.id = NULL,
-  .color.by = NULL,
-  .x.space.scaler = 0.25,
-  .height = 1.5,
-  .cat.feature.color = Color.Palette[1, 1:5],
-  .seed = 123,
-  .orientation = "wide"
-)
+plotDensity(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
 
 \item{.x.split}{Character specifying metadata column for x-axis grouping (default first column).}

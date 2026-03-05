@@ -22,6 +22,10 @@ get.markerDE(
 \arguments{
 \item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
 
+\item{.source}{The raw data object for non-file backends. \code{NULL} (default) for
+the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.
+Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.}
+
 \item{.geneset.ls}{Optional named list of character vectors defining gene sets for GSVA enrichment.
 Only for RNA data.}
 

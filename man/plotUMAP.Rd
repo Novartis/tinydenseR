@@ -5,21 +5,13 @@
 \title{Plot UMAP
 Plot UMAP}
 \usage{
-plotUMAP(
-  .tdr.obj,
-  .feature = .tdr.obj@landmark.annot$clustering$ids,
-  .cat.feature.color = Color.Palette[1, 1:5],
-  .panel.size = 2,
-  .midpoint = NULL,
-  .plot.title = "",
-  .color.label = "",
-  .legend.position = "right",
-  .point.size = 0.1,
-  .seed = 123,
-  .hover.stats = "none"
-)
+plotUMAP(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object with UMAP computed via \code{get.graph()}.}
 
 \item{.feature}{Numeric vector or factor of length \code{nrow(.tdr.obj$landmarks)} to color points by.

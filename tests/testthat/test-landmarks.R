@@ -107,14 +107,14 @@ test_that("setup.tdr.obj throws error when .markers used with RNA", {
 
 test_that("get.landmarks validates input properly", {
   # Test that get.landmarks expects a proper .tdr.obj structure
-  expect_error(get.landmarks(.tdr.obj = list()),
-               "Invalid .tdr.obj: missing structure")  # Should error due to missing required fields
+  expect_error(get.landmarks(list()),
+               "no applicable method")  # S3 dispatch error for non-TDRObj
   
   # Test with incomplete object
   incomplete_obj <- list(
     config = list(assay.type = "RNA"),
     cells = list()
   )
-  expect_error(get.landmarks(.tdr.obj = incomplete_obj),
-               "Invalid .tdr.obj structure")  # Should error due to missing required fields
+  expect_error(get.landmarks(incomplete_obj),
+               "no applicable method")  # S3 dispatch error for non-TDRObj
 })

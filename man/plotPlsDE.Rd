@@ -4,18 +4,13 @@
 \alias{plotPlsDE}
 \title{Plot plsDE Scores (Diagnostic and Component Views)}
 \usage{
-plotPlsDE(
-  .tdr.obj,
-  .coef.col,
-  .plsDE.dim = NULL,
-  .embed = "umap",
-  .point.size = 1,
-  .label.size = 3,
-  .panel.size = 2,
-  .seed = 123
-)
+plotPlsDE(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object after \code{get.plsDE()}.}
 
 \item{.coef.col}{Character: coefficient name matching a slot in \code{.tdr.obj$plsDE}.}

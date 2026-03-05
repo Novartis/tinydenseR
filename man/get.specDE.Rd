@@ -6,7 +6,6 @@
 \usage{
 get.specDE(
   .tdr.obj,
-  .source = NULL,
   .coef.col,
   .model.name = "default",
   .nv = NULL,

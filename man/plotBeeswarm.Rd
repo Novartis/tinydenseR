@@ -4,26 +4,13 @@
 \alias{plotBeeswarm}
 \title{Bee Swarm Plot of Density Estimate Change}
 \usage{
-plotBeeswarm(
-  .tdr.obj,
-  .model.name = "default",
-  .coefs,
-  .q = 0.1,
-  .q.from = "pca.weighted.q",
-  .split.by = if (length(x = .coefs) > 1) "none" else "clustering",
-  .swarm.title = NULL,
-  .label.substr.rm = "",
-  .point.size = 0.1,
-  .facet.scales = "fixed",
-  .row.space.scaler = 0.2,
-  .col.space.scaler = 0.1,
-  .panel.width = 1.5,
-  .legend.position = "right",
-  .perc.plot = TRUE,
-  .order.ids = FALSE
-)
+plotBeeswarm(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
 Statistical results should be stored in \code{.tdr.obj$map$lm}.}
 

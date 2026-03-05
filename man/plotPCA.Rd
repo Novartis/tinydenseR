@@ -4,23 +4,13 @@
 \alias{plotPCA}
 \title{Plot PCA}
 \usage{
-plotPCA(
-  .tdr.obj,
-  .PC.x = 1,
-  .PC.y = 2,
-  .feature = .tdr.obj@landmark.annot$clustering$ids,
-  .cat.feature.color = Color.Palette[1, 1:5],
-  .panel.size = if (is.numeric(x = .feature)) 2 else 3,
-  .midpoint = NULL,
-  .plot.title = "",
-  .color.label = "",
-  .legend.position = "right",
-  .point.size = 0.1,
-  .seed = 123,
-  .hover.stats = "none"
-)
+plotPCA(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object with PCA computed via \code{get.landmarks()}.}
 
 \item{.PC.x}{Integer specifying x-axis principal component (default 1).}

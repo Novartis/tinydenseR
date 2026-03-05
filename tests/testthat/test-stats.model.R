@@ -28,7 +28,7 @@ test_that("get.lm validates input correctly", {
   )
   .design <- matrix(1, nrow = 3, ncol = 1)  # Wrong number of rows
   
-  expect_error(get.lm(.tdr.obj = .tdr.obj, .design = .design),
+  expect_error(get.lm(.tdr.obj, .design = .design),
                "Number of rows in design matrix must be equal to the number of samples")
 })
 
@@ -36,7 +36,7 @@ test_that("get.lm requires map", {
   .tdr.obj <- TDRObj(cells = list(sample1 = "path1"), config = list(assay.type = "cyto"))
   .design <- matrix(1, nrow = 1, ncol = 1)
   
-  expect_error(get.lm(.tdr.obj = .tdr.obj, .design = .design),
+  expect_error(get.lm(.tdr.obj, .design = .design),
                "First run get.map")
 })
 
@@ -50,7 +50,7 @@ test_that("get.pbDE validates input correctly", {
   )
   .design <- matrix(1, nrow = 3, ncol = 1)  # Wrong number of rows
   
-  expect_error(get.pbDE(.tdr.obj = .tdr.obj, .design = .design),
+  expect_error(get.pbDE(.tdr.obj, .design = .design),
                "Number of rows in design matrix must be equal to the number of samples")
 })
 
@@ -62,7 +62,7 @@ test_that("get.pbDE validates geneset.ls for RNA", {
   .design <- matrix(1, nrow = 1, ncol = 1)
   .geneset.ls <- list(gene1 = c("A", "B"))
   
-  expect_error(get.pbDE(.tdr.obj = .tdr.obj, .design = .design, .geneset.ls = .geneset.ls),
+  expect_error(get.pbDE(.tdr.obj, .design = .design, .geneset.ls = .geneset.ls),
                ".geneset.ls is only supported for RNA assay type")
 })
 
@@ -75,7 +75,7 @@ test_that("get.markerDE validates geneset.ls correctly", {
   )
   .geneset.ls <- list(gene1 = c("A", "B"))
   
-  expect_error(get.markerDE(.tdr.obj = .tdr.obj, .geneset.ls = .geneset.ls, .id1 = "A", .id2 = "B"),
+  expect_error(get.markerDE(.tdr.obj, .geneset.ls = .geneset.ls, .id1 = "A", .id2 = "B"),
                ".geneset.ls is only supported for RNA assay type")
 })
 
@@ -87,9 +87,9 @@ test_that("get.markerDE requires valid id parameters", {
   )
   .design <- matrix(1, nrow = 1, ncol = 1)
   
-  expect_error(get.markerDE(.tdr.obj = .tdr.obj),
+  expect_error(get.markerDE(.tdr.obj),
                "Please provide .id1 or .id1.idx")
-  expect_error(get.markerDE(.tdr.obj = .tdr.obj, .id1 = "C"),
+  expect_error(get.markerDE(.tdr.obj, .id1 = "C"),
                "not found in clustering")
 })
 
@@ -100,7 +100,7 @@ test_that("get.marker is deprecated", {
   )
   
   expect_warning(
-    try(get.marker(.tdr.obj = .tdr.obj, .id1 = "A"), silent = TRUE),
+    try(get.marker(.tdr.obj, .id1 = "A"), silent = TRUE),
     "deprecated"
   )
 })

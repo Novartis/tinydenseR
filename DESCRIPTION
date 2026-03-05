@@ -13,6 +13,7 @@ Collate:
     'TDRObj-class.R'
     'accessor.R'
     'RunTDR.R'
+    'dispatch.R'
     'Color.Palette.R'
     'cache.R'
     'celltype.R'
@@ -71,6 +72,7 @@ Imports:
     scales,
     scattermore,
     SeuratObject,
+    SingleCellExperiment,
     sparseMatrixStats,
     stats,
     SummarizedExperiment,

@@ -5,7 +5,7 @@
 \title{Run the tinydenseR pipeline on an h5ad file}
 \usage{
 \method{RunTDR}{h5ad}(
-  path,
+  x,
   .sample.var,
   .meta,
   .assay.type = "RNA",
@@ -29,7 +29,7 @@
 )
 }
 \arguments{
-\item{path}{Character(1). Path to the \code{.h5ad} file.}
+\item{x}{Character(1). Path to the \code{.h5ad} file.}
 
 \item{.sample.var}{Character(1). Column in \code{adata$obs} identifying
 sample membership.}

@@ -4,19 +4,13 @@
 \alias{plotTradStats}
 \title{Plot Traditional Statistics}
 \usage{
-plotTradStats(
-  .tdr.obj,
-  .model.name = "default",
-  .split.by = "clustering",
-  .coefs = NULL,
-  .q = 0.1,
-  .row.space.scaler = 0.2,
-  .col.space.scaler = 0.07,
-  .label.substr.rm = "",
-  .order.ids = FALSE
-)
+plotTradStats(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
 Statistical results should be stored in \code{.tdr.obj$map$lm}.}
 

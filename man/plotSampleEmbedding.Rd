@@ -4,21 +4,13 @@
 \alias{plotSampleEmbedding}
 \title{Plot Sample Embedding from get.embedding}
 \usage{
-plotSampleEmbedding(
-  .tdr.obj,
-  .embedding = "pePC",
-  .sup.embed.slot = NULL,
-  .color.by = NULL,
-  .x.by = NULL,
-  .pc.x = 1,
-  .pc.y = 2,
-  .cat.feature.color = Color.Palette[1, 1:5],
-  .point.size = 1,
-  .panel.size = 2,
-  .midpoint = NULL
-)
+plotSampleEmbedding(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object processed through \code{get.map()} and
 \code{get.embedding()}. All embeddings are stored in \code{.tdr.obj$map$embedding}:
 unsupervised (\code{pca}, \code{traj}) and supervised (\code{pePC$<name>}).}

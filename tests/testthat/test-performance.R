@@ -28,7 +28,7 @@ test_that("functions handle empty inputs gracefully", {
                "Sample names mismatch between .cells and .meta")
   
   # Test get.lm with invalid inputs
-  expect_error(get.lm(.tdr.obj = list()))
+  expect_error(get.lm(list()))
 })
 
 test_that("functions handle large datasets", {
@@ -77,7 +77,7 @@ test_that("plotting functions handle different data sizes", {
     )
   )
   
-  result_small <- plotUMAP(.tdr.obj = .tdr.obj_small)
+  result_small <- plotUMAP(.tdr.obj_small)
   expect_true("ggplot" %in% class(result_small))
   
   # Test with larger data
@@ -88,14 +88,14 @@ test_that("plotting functions handle different data sizes", {
     )
   )
   
-  result_large <- plotUMAP(.tdr.obj = .tdr.obj_large)
+  result_large <- plotUMAP(.tdr.obj_large)
   expect_true("ggplot" %in% class(result_large))
 })
 
 test_that("functions handle edge cases", {
   # Test with invalid data types
-  expect_error(get.lm(.tdr.obj = "not_a_list"))
-  expect_error(get.pbDE(.tdr.obj = NULL))
+  expect_error(get.lm("not_a_list"))
+  expect_error(get.pbDE(NULL))
   
   # Test plotting functions with minimal valid data
   minimal_obj <- TDRObj(
@@ -105,7 +105,7 @@ test_that("functions handle edge cases", {
     )
   )
   
-  result <- plotUMAP(.tdr.obj = minimal_obj)
+  result <- plotUMAP(minimal_obj)
   expect_true("ggplot" %in% class(result))
 })
 

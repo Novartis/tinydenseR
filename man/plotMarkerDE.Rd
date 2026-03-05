@@ -4,21 +4,13 @@
 \alias{plotMarkerDE}
 \title{Plot Marker DE Results}
 \usage{
-plotMarkerDE(
-  .tdr.obj,
-  .de.obj = NULL,
-  .model.name = "default",
-  .comparison.name = NULL,
-  .coefs = NULL,
-  .order.by = "none",
-  .markers = .tdr.obj@config$markers,
-  .q = 0.1,
-  .row.space.scaler = 0.2,
-  .col.space.scaler = 0.065,
-  .label.substr.rm = ""
-)
+plotMarkerDE(x, ...)
 }
 \arguments{
+\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+
+\item{...}{Additional arguments passed to the TDRObj method.}
+
 \item{.tdr.obj}{A tinydenseR object with marker results from \code{get.markerDE}.}
 
 \item{.de.obj}{Optional: Direct DE results object for backward compatibility. If NULL, fetches
