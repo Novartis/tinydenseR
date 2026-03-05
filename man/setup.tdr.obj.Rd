@@ -45,6 +45,8 @@ Harmony batch correction. If NULL, no batch correction is performed.}
 \item{.assay.type}{Character string: "cyto" for cytometry (default) or "RNA" for
 scRNA-seq. Determines normalization strategy and feature selection approach.}
 
+\item{.celltype.vec}{Optional named character vector mapping cell IDs to cell type labels.}
+
 \item{.verbose}{Logical, whether to print progress messages. Default TRUE.}
 
 \item{.seed}{Integer for random seed to ensure reproducibility. Default 123.}

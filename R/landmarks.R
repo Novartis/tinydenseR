@@ -90,6 +90,7 @@
 #'   Harmony batch correction. If NULL, no batch correction is performed.
 #' @param .assay.type Character string: "cyto" for cytometry (default) or "RNA" for
 #'   scRNA-seq. Determines normalization strategy and feature selection approach.
+#' @param .celltype.vec Optional named character vector mapping cell IDs to cell type labels.
 #' @param .verbose Logical, whether to print progress messages. Default TRUE.
 #' @param .seed Integer for random seed to ensure reproducibility. Default 123.
 #' @param .prop.landmarks Numeric between 0 and 1 specifying proportion of cells to

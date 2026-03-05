@@ -23,9 +23,6 @@
 #' leverage the correlation structure among landmarks to improve statistical power.
 #'
 #' @param x A tinydenseR object processed through \code{get.map()}.
-#' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
-#'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
-#'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
 #' @param .design Design matrix specifying the experimental design. Rows correspond to samples 
 #'   (matching \code{.tdr.obj$cells}), columns to coefficients. Create with \code{model.matrix()}.
 #' @param .contrasts Optional contrast matrix for specific comparisons. Each column defines one 
