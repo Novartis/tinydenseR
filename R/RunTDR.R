@@ -1015,3 +1015,49 @@ RunTDR.h5ad <- function(path,
 
   return(.tdr.obj)
 }
+
+
+# ======================================================================
+# GetTDR – extractor generic + methods
+# ======================================================================
+
+#' Extract a TDRObj from a container object
+#'
+#' S3 generic that retrieves a \code{\linkS4class{TDRObj}} from the
+#' object in which \code{\link{RunTDR}} stored it.
+#'
+#' @param x An object that may contain a TDRObj.
+#' @param ... Additional arguments (currently unused).
+#'
+#' @return A \code{\linkS4class{TDRObj}}.
+#'
+#' @export
+GetTDR <- function(x, ...) UseMethod("GetTDR")
+
+#' @describeIn GetTDR Default method – returns a TDRObj as-is, errors otherwise
+#' @export
+GetTDR.default <- function(x, ...) {
+  if (is.TDRObj(x)) return(x)
+  stop("Cannot extract TDRObj from object of class '",
+       paste(class(x), collapse = "/"), "'.")
+}
+
+#' @describeIn GetTDR Extract TDRObj from a Seurat object's Misc slot
+#' @export
+GetTDR.Seurat <- function(x, ...) {
+  tdr <- SeuratObject::Misc(x, slot = "tdr.obj")
+  if (is.null(tdr))
+    stop("No TDRObj found in Seurat Misc slot 'tdr.obj'. ",
+         "Run RunTDR() first.")
+  tdr
+}
+
+#' @describeIn GetTDR Extract TDRObj from a SingleCellExperiment's metadata
+#' @export
+GetTDR.SingleCellExperiment <- function(x, ...) {
+  tdr <- S4Vectors::metadata(x)$tdr.obj
+  if (is.null(tdr))
+    stop("No TDRObj found in SCE metadata slot 'tdr.obj'. ",
+         "Run RunTDR() first.")
+  tdr
+}
