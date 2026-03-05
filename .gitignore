@@ -65,3 +65,6 @@ tinydenseR.Rproj
 /doc/
 /Meta/
 Rplots.pdf
+
+/.quarto/
+**/*.quarto_ipynb
