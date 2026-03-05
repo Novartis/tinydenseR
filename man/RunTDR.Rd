@@ -4,6 +4,7 @@
 \alias{RunTDR}
 \alias{RunTDR.default}
 \alias{RunTDR.Seurat}
+\alias{RunTDR.SingleCellExperiment}
 \title{Run the full tinydenseR pipeline}
 \usage{
 RunTDR(x, ...)
@@ -39,13 +40,36 @@ RunTDR(x, ...)
  },
   ...
 )
+
+\method{RunTDR}{SingleCellExperiment}(
+  x,
+  .sample.var,
+  .assay = "counts",
+  .assay.type = "RNA",
+  .harmony.var = NULL,
+  .markers = NULL,
+  .celltype.vec = NULL,
+  .min.cells.per.sample = 10,
+  .optimize.hdf5 = FALSE,
+  .verbose = TRUE,
+  .seed = 123,
+  .prop.landmarks = 0.1,
+  .n.threads = if (is.hpc()) {
+     max(RhpcBLASctl::blas_get_num_procs(),
+    RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
+
+    } else {
+     parallel::detectCores(logical = TRUE)
+ },
+  ...
+)
 }
 \arguments{
-\item{x}{A Seurat object.}
+\item{x}{A \code{SingleCellExperiment} object.}
 
 \item{...}{Additional arguments passed to pipeline functions.}
 
-\item{.celltype.vec}{Character(1). Column name in \code{x@meta.data}
+\item{.celltype.vec}{Character(1). Column name in \code{colData(x)}
 containing per-cell type labels, or \code{NULL}.}
 
 \item{.celltype.vec.overwrite}{Logical. If \code{TRUE}, replace an
@@ -55,10 +79,10 @@ existing \code{.celltype.vec} stored in the TDRObj config.}
 
 \item{.seed}{Integer. Random seed.}
 
-\item{.sample.var}{Character(1). Column name in \code{x@meta.data}
-identifying sample membership.}
+\item{.sample.var}{Character(1). Column in \code{colData(x)} identifying
+sample membership.}
 
-\item{.assay}{Character(1). Name of the Seurat assay to use.}
+\item{.assay}{Character(1). Name of the assay in \code{assayNames(x)}.}
 
 \item{.layer}{Character(1). Layer within the assay (e.g. \code{"counts"}).}
 
@@ -75,6 +99,10 @@ included.}
 \item{.prop.landmarks}{Numeric in (0, 1]. Proportion of cells as landmarks.}
 
 \item{.n.threads}{Integer. Number of threads.}
+
+\item{.optimize.hdf5}{Logical. If \code{TRUE} and the assay is
+HDF5-backed with poor contiguity, reorder the SCE columns by sample
+for faster I/O.}
 }
 \value{
 Depends on the method; see individual method documentation.
@@ -83,6 +111,9 @@ The updated \code{\linkS4class{TDRObj}}.
 
 The Seurat object \code{x} with the TDRObj stored in
 \code{Misc(x, slot = "tdr.obj")}.
+
+The \code{SingleCellExperiment} \code{x} with the TDRObj stored
+in \code{S4Vectors::metadata(x)$tdr.obj}.
 }
 \description{
 S3 generic that executes the complete tinydenseR analysis pipeline:
@@ -100,5 +131,11 @@ on a pre-built \code{\linkS4class{TDRObj}}.
 Builds a \code{\linkS4class{TDRObj}} from a Seurat object and executes
 the full pipeline. The finished TDRObj is stored in
 \code{SeuratObject::Misc(x, slot = "tdr.obj")}.
+
+\item \code{RunTDR(SingleCellExperiment)}: Run the pipeline directly on a SingleCellExperiment
+
+Builds a \code{\linkS4class{TDRObj}} from a \code{SingleCellExperiment}
+and executes the full pipeline. The finished TDRObj is stored in
+\code{S4Vectors::metadata(x)$tdr.obj}.
 
 }}
