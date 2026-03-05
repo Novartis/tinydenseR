@@ -847,6 +847,14 @@ get.map <-
     set.seed(seed = .seed)
     
     # ── Set up on-disk cache directory ──
+    # Auto-disable disk cache for non-files backends (cells are indices,
+    # not file paths, so dirname() would fail).
+    backend <- .tdr.obj@config$backend
+    if (is.null(backend)) backend <- "files"
+    if (backend != "files" && isTRUE(.cache.on.disk) && is.null(.cache.dir)) {
+      .cache.on.disk <- FALSE
+    }
+
     .cache.meta <- NULL
     if (isTRUE(x = .cache.on.disk)) {
       if (is.null(x = .cache.dir)) {
