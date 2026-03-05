@@ -130,11 +130,18 @@
 #' @seealso 
 #'   \code{\link{get.map}} for automatic cell typing with symphony reference objects,
 #'   \code{\link{lm.cluster}} for the clustering that produces cluster IDs used here
+#' @param x Object to operate on (TDRObj, Seurat, or SingleCellExperiment).
+#' @param ... Additional arguments passed to methods.
 #' @export
-celltyping <-
-  function(.tdr.obj,
+celltyping <- function(x, ...) UseMethod("celltyping")
+
+#' @export
+celltyping.TDRObj <-
+  function(x,
            .celltyping.map,
-           .verbose = TRUE){
+           .verbose = TRUE,
+           ...){
+    .tdr.obj <- x
     
     cell.pop <- NULL
     
@@ -357,7 +364,7 @@ celltyping <-
     dplyr::as_tibble() |>
     cbind(cell.pop = as.character(x = .tdr.obj@landmark.annot$celltyping$ids)) |>
     dplyr::group_by(cell.pop) |>
-    dplyr::summarize_all(.funs = median) |>
+    dplyr::summarize_all(.funs = stats::median) |>
     as.data.frame() |>
     (\(x)
      `rownames<-`(x = x[,colnames(x = x) != "cell.pop"],
@@ -402,7 +409,7 @@ celltyping <-
 .relabel_cellmap <- function(.tdr.obj, .verbose = FALSE) {
   
   # R CMD check appeasement
-  cell <- landmark <- label <- x <- confidence <- NULL
+  cell <- landmark <- label <- x <- confidence <- i <- j <- NULL
   
   ct_ids <- .tdr.obj@landmark.annot$celltyping$ids
   .label.confidence <- if (!is.null(.tdr.obj@config$label.confidence)) {

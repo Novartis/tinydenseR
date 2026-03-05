@@ -423,16 +423,23 @@ fast.jaccard.r <-
 #' lm.cells <- get.graph(lm.cells, .cl.method = "fgraph")
 #' }
 #' 
+#' @param x Object to operate on (TDRObj, Seurat, or SingleCellExperiment).
+#' @param ... Additional arguments passed to methods.
 #' @export
-get.graph <-
-  function(.tdr.obj,
+get.graph <- function(x, ...) UseMethod("get.graph")
+
+#' @export
+get.graph.TDRObj <-
+  function(x,
            .k = 20,
-           .scale = if(.tdr.obj@config$assay.type == "RNA") FALSE else TRUE,
+           .scale = if(x@config$assay.type == "RNA") FALSE else TRUE,
            .verbose = TRUE,
            .seed = 123,
            .cl.method = "snn",
            .cl.resolution.parameter = 0.8,
-           .small.size = floor(x = nrow(x = .tdr.obj@assay$expr) / 200)){
+           .small.size = floor(x = nrow(x = x@assay$expr) / 200),
+           ...){
+    .tdr.obj <- x
     
     # Validate clustering method
     .cl.method <-
@@ -596,7 +603,7 @@ get.graph <-
     
     # Apply Leiden clustering with straggler absorption
     .tdr.obj <-
-      lm.cluster(.tdr.obj = .tdr.obj,
+      lm.cluster(.tdr.obj,
                  .cl.method = .cl.method,
                  .cl.resolution.parameter = .cl.resolution.parameter,
                  .seed = .seed,
@@ -614,6 +621,9 @@ get.graph <-
 #' 
 #'
 #' @param .tdr.obj A tinydenseR object with \code{$graph} component populated by \code{get.graph}.
+#' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
+#'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
+#'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
 #' @param .ref.obj Optional Symphony reference object for cell type annotation. Must have 
 #'   \code{Z_corr} field (harmony-corrected embeddings) and metadata with cell type labels. 
 #'   Only compatible with RNA assays. Replaces any existing \code{$graph$celltyping}.
@@ -719,8 +729,11 @@ get.graph <-
 #' }
 #' 
 #' @export
-get.map <-
-  function(.tdr.obj,
+get.map <- function(x, ...) UseMethod("get.map")
+
+#' @export
+get.map.TDRObj <-
+  function(x,
            .source = NULL,
            .ref.obj = NULL,
            .celltype.col.name = "cell_type",
@@ -729,7 +742,9 @@ get.map <-
            .seed = 123,
            .label.confidence = 0.8,
            .cache.on.disk = TRUE,
-           .cache.dir = NULL){
+           .cache.dir = NULL,
+           ...){
+    .tdr.obj <- x
     
     # R CMD check appeasement for non-standard evaluation in dplyr and collapse
     cell.pop <- id <- value <- ri <- i <- j <- landmark <- cell <- label <- x <- confidence <-
@@ -1462,14 +1477,21 @@ get.map <-
 #' lm.cells <- lm.cluster(lm.cells, .cl.method = "fgraph")
 #' }
 #' 
+#' @param x Object to operate on (TDRObj, Seurat, or SingleCellExperiment).
+#' @param ... Additional arguments passed to methods.
 #' @export
-lm.cluster <-
-  function(.tdr.obj,
+lm.cluster <- function(x, ...) UseMethod("lm.cluster")
+
+#' @export
+lm.cluster.TDRObj <-
+  function(x,
            .cl.method = "snn",
            .cl.resolution.parameter = 0.8,
            .seed = 123,
            .verbose = TRUE,
-           .small.size = 3){
+           .small.size = 3,
+           ...){
+    .tdr.obj <- x
     
     # R CMD check appeasement
     cell.pop <- NULL
@@ -1615,11 +1637,18 @@ lm.cluster <-
 #' plotPCA(lm.cells, .hover.stats = "marker")
 #' }
 #' 
+#' @param x Object to operate on (TDRObj, Seurat, or SingleCellExperiment).
+#' @param ... Additional arguments passed to methods.
 #' @export
-get.lm.features.stats <-
+get.lm.features.stats <- function(x, ...) UseMethod("get.lm.features.stats")
+
+#' @export
+get.lm.features.stats.TDRObj <-
   function(
-    .tdr.obj
+    x,
+    ...
   ){
+    .tdr.obj <- x
     
     # Identify the top (dominant) PC for each landmark
     top.comp <-
