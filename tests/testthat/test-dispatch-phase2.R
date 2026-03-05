@@ -89,24 +89,45 @@ test_that("get.landmarks.TDRObj returns TDRObj with landmarks", {
 test_that("get.lm dispatches on Seurat and returns Seurat with lm results", {
   skip_on_cran()
   skip_if_not_installed("SeuratObject")
-  test_data <- create_test_lm_obj(n_cells = 50, n_markers = 5, n_samples = 4)
-  on.exit(cleanup_test_files(test_data), add = TRUE)
+
+  # Use well-separated blobs so Leiden finds multiple clusters
+  set.seed(42)
+  n <- 200; m <- 5
+  blob1 <- matrix(rnorm(n * m, mean = 0, sd = 0.5), nrow = n, ncol = m)
+  blob2 <- matrix(rnorm(n * m, mean = 5, sd = 0.5), nrow = n, ncol = m)
+
+  n_samples <- 4L
+  .cells <- lapply(seq_len(n_samples), function(i) {
+    mat <- rbind(blob1 + rnorm(1, 0, 0.1), blob2 + rnorm(1, 0, 0.1))
+    dimnames(mat) <- list(
+      paste0("s", i, "_", seq_len(nrow(mat))),
+      paste0("marker_", seq_len(m))
+    )
+    uri <- tempfile(fileext = ".RDS")
+    saveRDS(object = mat, file = uri, compress = FALSE)
+    return(uri)
+  })
+  names(.cells) <- paste0("sample", seq_len(n_samples))
+  .meta <- data.frame(
+    row.names = names(.cells),
+    group = rep(c("A", "B"), length.out = n_samples)
+  )
+  on.exit(lapply(.cells, unlink), add = TRUE)
 
   tdr <- setup.tdr.obj(
-    .cells = test_data$cells,
-    .meta = test_data$meta,
-    .markers = paste0("marker_", 1:5),
+    .cells = .cells,
+    .meta = .meta,
+    .markers = paste0("marker_", 1:m),
     .assay.type = "cyto",
     .verbose = FALSE
   )
   tdr <- get.landmarks(tdr, .verbose = FALSE, .seed = 42)
-  tdr <- get.graph(tdr, .verbose = FALSE, .seed = 42)
+  tdr <- get.graph(tdr, .k = 5, .scale = FALSE, .verbose = FALSE, .seed = 42)
   tdr <- get.map(tdr, .verbose = FALSE, .seed = 42)
 
   # Create design matrix: need as many rows as samples
-  n_samples <- length(tdr@cells)
   design <- cbind(intercept = 1,
-                  group = as.numeric(tdr@metadata$group == tdr@metadata$group[1]))
+                  group = as.numeric(tdr@metadata$group == "A"))
 
   # Store TDR in a Seurat
 
