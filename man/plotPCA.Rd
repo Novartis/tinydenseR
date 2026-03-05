@@ -60,7 +60,7 @@ Defaults to median of \code{.feature}.}
 \item{.seed}{Integer random seed for plot point ordering (default 123).}
 
 \item{.hover.stats}{Character specifying hover information: "none" (default) or "marker" (shows
-landmark feature signatures from \code{get.lm.features.stats()}). Requires \pkg{ggiraph}.}
+landmark feature signatures from \code{get.features()}). Requires \pkg{ggiraph}.}
 }
 \value{
 Plot object (class depends on interactivity):
@@ -95,12 +95,12 @@ plotPCA(lm.cells,
         .midpoint = 0)
 
 # Interactive with feature hover
-lm.cells <- get.lm.features.stats(lm.cells)
+lm.cells <- get.features(lm.cells)
 plotPCA(lm.cells, .hover.stats = "marker")
 }
 
 }
 \seealso{
-\code{\link{plotUMAP}} for UMAP visualization, \code{\link{get.lm.features.stats}}
+\code{\link{plotUMAP}} for UMAP visualization, \code{\link{get.features}}
 for hover feature computation
 }

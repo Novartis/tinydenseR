@@ -144,9 +144,9 @@ test_that("get.map adds mapping info to .tdr.obj", {
   expect_true(is.TDRObj(result))
 })
 
-# Test for get.lm.features.stats
+# Test for get.features
 
-test_that("get.lm.features.stats returns a list of feature stats", {
+test_that("get.featuresreturns a list of feature stats", {
   .cells <- list(sample1 = matrix(data = runif(n = 270), 
                                   nrow = 90, 
                                   ncol = 3, 
@@ -189,6 +189,6 @@ test_that("get.lm.features.stats returns a list of feature stats", {
                          .verbose = FALSE,
                          .seed = 42)
   expect_true(is.TDRObj(result))
-  result <- get.lm.features.stats(result)
+  result <- get.features(result)
   expect_true(is.TDRObj(result))
 })

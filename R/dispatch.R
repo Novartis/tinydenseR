@@ -104,22 +104,22 @@ lm.cluster.SingleCellExperiment <- function(x, ...) {
 }
 
 # ======================================================================
-# get.lm.features.stats Seurat / SCE wrappers
+# get.features Seurat / SCE wrappers
 # ======================================================================
 
-#' @method get.lm.features.stats Seurat
+#' @method get.features Seurat
 #' @export
-get.lm.features.stats.Seurat <- function(x, ...) {
+get.features.Seurat <- function(x, ...) {
   tdr <- GetTDR(x)
-  tdr <- get.lm.features.stats.TDRObj(tdr, ...)
+  tdr <- get.features.TDRObj(tdr, ...)
   SetTDR(x, tdr)
 }
 
-#' @method get.lm.features.stats SingleCellExperiment
+#' @method get.features SingleCellExperiment
 #' @export
-get.lm.features.stats.SingleCellExperiment <- function(x, ...) {
+get.features.SingleCellExperiment <- function(x, ...) {
   tdr <- GetTDR(x)
-  tdr <- get.lm.features.stats.TDRObj(tdr, ...)
+  tdr <- get.features.TDRObj(tdr, ...)
   SetTDR(x, tdr)
 }
 

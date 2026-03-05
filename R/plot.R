@@ -46,7 +46,7 @@
 #' @param .point.size Numeric point size (default 0.1).
 #' @param .seed Integer random seed for plot point ordering (default 123).
 #' @param .hover.stats Character specifying hover information: "none" (default) or "marker" (shows 
-#'   landmark feature signatures from \code{get.lm.features.stats()}). Requires \pkg{ggiraph}.
+#'   landmark feature signatures from \code{get.features()}). Requires \pkg{ggiraph}.
 #'   
 #' @return Plot object (class depends on interactivity):
 #'   \describe{
@@ -57,7 +57,7 @@
 #' @note Interactive hover features require the \pkg{ggiraph} package. Install with 
 #'   \code{install.packages("ggiraph")}.
 #'   
-#' @seealso \code{\link{plotUMAP}} for UMAP visualization, \code{\link{get.lm.features.stats}} 
+#' @seealso \code{\link{plotUMAP}} for UMAP visualization, \code{\link{get.features}} 
 #'   for hover feature computation
 #' 
 #' @examples
@@ -77,7 +77,7 @@
 #'         .midpoint = 0)
 #' 
 #' # Interactive with feature hover
-#' lm.cells <- get.lm.features.stats(lm.cells)
+#' lm.cells <- get.features(lm.cells)
 #' plotPCA(lm.cells, .hover.stats = "marker")
 #' }
 #' 
@@ -268,7 +268,7 @@ plotPCA.TDRObj <-
 #' @param .point.size Numeric point size (default 0.1).
 #' @param .seed Integer random seed for plot point ordering (default 123).
 #' @param .hover.stats Character specifying hover information: "none" (default) or "marker" (shows 
-#'   landmark feature signatures from \code{get.lm.features.stats()}). Requires \pkg{ggiraph}.
+#'   landmark feature signatures from \code{get.features()}). Requires \pkg{ggiraph}.
 #'   
 #' @return Plot object (class depends on interactivity):
 #'   \describe{
@@ -280,7 +280,7 @@ plotPCA.TDRObj <-
 #'   \pkg{ggiraph} package. Install with \code{install.packages("ggiraph")}.
 #'   
 #' @seealso \code{\link{plotPCA}} for PCA visualization, \code{\link{get.graph}}, 
-#'   \code{\link{get.lm.features.stats}} for hover feature computation
+#'   \code{\link{get.features}} for hover feature computation
 #' 
 #' @examples
 #' \dontrun{
@@ -303,7 +303,7 @@ plotPCA.TDRObj <-
 #'          .midpoint = 0)
 #' 
 #' # Interactive with feature hover
-#' lm.cells <- get.lm.features.stats(lm.cells)
+#' lm.cells <- get.features(lm.cells)
 #' plotUMAP(lm.cells, .hover.stats = "marker")
 #' }
 #' 

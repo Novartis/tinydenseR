@@ -1627,7 +1627,7 @@ lm.cluster.TDRObj <-
 #' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks() |>
 #'   get.graph() |>
-#'   get.lm.features.stats()
+#'   get.features()
 #' 
 #' # View feature signature for first landmark
 #' head(lm.cells$interact.plot$lm.features$res[[1]])
@@ -1639,12 +1639,12 @@ lm.cluster.TDRObj <-
 #' @param x Object to operate on (TDRObj, Seurat, or SingleCellExperiment).
 #' @param ... Additional arguments passed to methods.
 #' @export
-get.lm.features.stats <- function(x, ...) UseMethod("get.lm.features.stats")
+get.features<- function(x, ...) UseMethod("get.features")
 
-#' @rdname get.lm.features.stats
-#' @method get.lm.features.stats TDRObj
+#' @rdname get.features
+#' @method get.features TDRObj
 #' @export
-get.lm.features.stats.TDRObj <-
+get.features.TDRObj <-
   function(
     x,
     ...
