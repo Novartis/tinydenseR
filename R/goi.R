@@ -39,6 +39,9 @@
 #' 
 #' @param .tdr.obj A list object initialized with \code{setup.tdr.obj} and processed 
 #'   with \code{get.graph} and \code{get.map}. Must contain RNA assay data.
+#' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
+#'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
+#'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
 #' @param .goi Character vector of gene names to summarize. All genes must exist 
 #'   in \code{.tdr.obj$raw.landmarks} column names.
 #' @param .id.idx Integer index of a specific landmark to analyze. If NULL (default), 
@@ -84,16 +87,21 @@
 #'                            .id = c("cluster.01", "cluster.02"))
 #' }
 #' @export
-goi.summary <-
+goi.summary <- function(x, ...) UseMethod("goi.summary")
+
+#' @export
+goi.summary.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .source = NULL,
     .goi,
     .id.idx = NULL,
     .id = NULL,
     .id.from = "clustering",
-    .verbose = TRUE
+    .verbose = TRUE,
+    ...
   ){
+    .tdr.obj <- x
     
     if(!all(.goi %in% colnames(x = .tdr.obj@assay$raw))){
       stop("Gene(s) not found in data: ",

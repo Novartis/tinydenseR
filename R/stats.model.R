@@ -23,6 +23,9 @@
 #' leverage the correlation structure among landmarks to improve statistical power.
 #'
 #' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
+#' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
+#'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
+#'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
 #' @param .design Design matrix specifying the experimental design. Rows correspond to samples 
 #'   (matching \code{.tdr.obj$cells}), columns to coefficients. Create with \code{model.matrix()}.
 #' @param .contrasts Optional contrast matrix for specific comparisons. Each column defines one 
@@ -140,16 +143,21 @@
 #' 
 #' @export
 #'
-get.lm <-
+get.lm <- function(x, ...) UseMethod("get.lm")
+
+#' @export
+get.lm.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .design,
     .contrasts = NULL,
     .block = NULL,
     .model.name = "default",
     .force.recalc = FALSE,
     .verbose = TRUE,
-    .seed = 123){
+    .seed = 123,
+    ...){
+    .tdr.obj <- x
     
     # -------------------------------------------------------------------------
     # Validate on-disk cache (if active) before proceeding
@@ -763,9 +771,12 @@ get.lm <-
 #' 
 #' @export
 #'
-get.pbDE <-
+get.pbDE <- function(x, ...) UseMethod("get.pbDE")
+
+#' @export
+get.pbDE.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .source = NULL,
     .design,
     .contrasts = NULL,
@@ -778,8 +789,10 @@ get.pbDE <-
     .population.name = "all",
     .force.recalc = FALSE,
     .verbose = TRUE,
-    .label.confidence = 0.8
+    .label.confidence = 0.8,
+    ...
   ) {
+    .tdr.obj <- x
     
     i <- j <- landmark <- cell <- label <- x <- confidence <-
       NULL
@@ -1326,6 +1339,9 @@ get.dea <- function(
 #' characterizing clusters and validating cell type annotations.
 #'
 #' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
+#' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
+#'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
+#'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
 #' @param .geneset.ls Optional named list of character vectors defining gene sets for GSVA enrichment. 
 #'   Only for RNA data.
 #' @param .id1.idx Optional integer vector specifying landmark indices for group 1. When provided,
@@ -1451,9 +1467,12 @@ get.dea <- function(
 #' 
 #' @export
 #'
-get.markerDE <-
+get.markerDE <- function(x, ...) UseMethod("get.markerDE")
+
+#' @export
+get.markerDE.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .source = NULL,
     .geneset.ls = NULL,
     .id1.idx = NULL,
@@ -1464,8 +1483,10 @@ get.markerDE <-
     .model.name = "default",
     .comparison.name = NULL,
     .force.recalc = FALSE,
-    .label.confidence = 0.8
+    .label.confidence = 0.8,
+    ...
   ) {
+    .tdr.obj <- x
     
     i <- j <- landmark <- cell <- label <- x <- confidence <-
       NULL
@@ -2495,9 +2516,12 @@ get.marker <- function(
 #'
 #' @export
 #'
-get.embedding <-
+get.embedding <- function(x, ...) UseMethod("get.embedding")
+
+#' @export
+get.embedding.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .full.model = "default",
     .term.of.interest = NULL,
     .red.model = NULL,
@@ -2506,8 +2530,10 @@ get.embedding <-
     .n.pcs = 20,
     .ret.trajectory = FALSE,
     .traj.dist.metric = "cosine",
-    .verbose = TRUE
+    .verbose = TRUE,
+    ...
   ){
+    .tdr.obj <- x
     
     # -------------------------------------------------------------------------
     # Input validation
@@ -3478,9 +3504,11 @@ get.embedding <-
 #' }
 #'
 #' @export
-get.specDE <-
-  function(.tdr.obj,
-           .source = NULL,
+get.specDE <- function(x, ...) UseMethod("get.specDE")
+
+#' @export
+get.specDE.TDRObj <-
+  function(x,
            .coef.col,
            .model.name = "default",
            .nv = NULL,
@@ -3490,7 +3518,9 @@ get.specDE <-
            .tau.mult = 1,
            .lazy.alpha = 1,
            .loading.method = c("pearson", "ols", "spearman"),
-           .verbose = TRUE) {
+           .verbose = TRUE,
+           ...) {
+    .tdr.obj <- x
     
     # -------------------------------------------------------------------------
     # Input validation
@@ -3918,9 +3948,11 @@ get.specDE <-
 #'
 #' @export
 #'
-get.nmfDE <-
-  function(.tdr.obj,
-           .source = NULL,
+get.nmfDE <- function(x, ...) UseMethod("get.nmfDE")
+
+#' @export
+get.nmfDE.TDRObj <-
+  function(x,
            .coef.col,
            .model.name = "default",
            .k = NULL,
@@ -3934,7 +3966,9 @@ get.nmfDE <-
            .tol = 1e-4,
            .maxit = 100L,
            .seed = 42L,
-           .verbose = TRUE) {
+           .verbose = TRUE,
+           ...) {
+    .tdr.obj <- x
     
     # -------------------------------------------------------------------------
     # Dependency check
@@ -4612,9 +4646,11 @@ get.nmfDE <-
 #'
 #' @export
 #'
-get.plsDE <-
-  function(.tdr.obj,
-           .source = NULL,
+get.plsDE <- function(x, ...) UseMethod("get.plsDE")
+
+#' @export
+get.plsDE.TDRObj <-
+  function(x,
            .coef.col,
            .model.name = "default",
            .ncomp = NULL,
@@ -4625,7 +4661,9 @@ get.plsDE <-
            .lazy.alpha = 1,
            .YX.interaction = TRUE,
            .loading.method = c("pearson", "ols", "spearman"),
-           .verbose = TRUE) {
+           .verbose = TRUE,
+           ...) {
+    .tdr.obj <- x
     
     # -------------------------------------------------------------------------
     # Input validation

@@ -75,17 +75,33 @@ RunTDR.default <- function(x,
 
   eff_ct <- x@config$celltype.vec
 
+  # --- Argument routing ---
+  dots <- list(...)
+
+  .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
+  .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
+  .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+
+  lm_args  <- dots[names(dots) %in% .lm.formals]
+  gr_args  <- dots[names(dots) %in% .gr.formals]
+  map_args <- dots[names(dots) %in% .map.formals]
+
+  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+  orphans <- setdiff(names(dots), all_known)
+  if (length(orphans) > 0) {
+    warning("Unknown arguments will be ignored: ",
+            paste(orphans, collapse = ", "))
+  }
+
   # --- Pipeline ---
-  x <- get.landmarks(x, .source = NULL, .seed = .seed,
-                     .verbose = .verbose, ...)
-  x <- get.graph(x, .seed = .seed, .verbose = .verbose, ...)
+  x <- do.call(get.landmarks, c(list(x, .source = NULL, .seed = .seed, .verbose = .verbose), lm_args))
+  x <- do.call(get.graph, c(list(x, .seed = .seed, .verbose = .verbose), gr_args))
 
   if (!is.null(eff_ct)) {
     x <- celltyping(x, .celltyping.map = eff_ct, .verbose = .verbose)
   }
 
-  x <- get.map(x, .source = NULL, .seed = .seed,
-               .verbose = .verbose, ...)
+  x <- do.call(get.map, c(list(x, .source = NULL, .seed = .seed, .verbose = .verbose), map_args))
 
   return(x)
 }
@@ -209,11 +225,27 @@ RunTDR.Seurat <- function(x,
     .verbose = .verbose
   )
 
+  # --- Argument routing ---
+  dots <- list(...)
+
+  .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
+  .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
+  .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+
+  lm_args  <- dots[names(dots) %in% .lm.formals]
+  gr_args  <- dots[names(dots) %in% .gr.formals]
+  map_args <- dots[names(dots) %in% .map.formals]
+
+  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+  orphans <- setdiff(names(dots), all_known)
+  if (length(orphans) > 0) {
+    warning("Unknown arguments will be ignored: ",
+            paste(orphans, collapse = ", "))
+  }
+
   # --- Pipeline ---
-  tdr.obj <- get.landmarks(tdr.obj, .source = x, .seed = .seed,
-                           .verbose = .verbose, ...)
-  tdr.obj <- get.graph(tdr.obj, .seed = .seed,
-                       .verbose = .verbose, ...)
+  tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), lm_args))
+  tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
 
   if (!is.null(tdr.obj@config$celltype.vec)) {
     tdr.obj <- celltyping(tdr.obj,
@@ -221,8 +253,7 @@ RunTDR.Seurat <- function(x,
                           .verbose = .verbose)
   }
 
-  tdr.obj <- get.map(tdr.obj, .source = x, .seed = .seed,
-                     .verbose = .verbose, ...)
+  tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
 
   # --- Store TDRObj in Seurat Misc slot ---
   SeuratObject::Misc(x, slot = "tdr.obj") <- tdr.obj
@@ -541,11 +572,27 @@ RunTDR.SingleCellExperiment <- function(x,
     .verbose = .verbose
   )
 
+  # --- Argument routing ---
+  dots <- list(...)
+
+  .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
+  .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
+  .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+
+  lm_args  <- dots[names(dots) %in% .lm.formals]
+  gr_args  <- dots[names(dots) %in% .gr.formals]
+  map_args <- dots[names(dots) %in% .map.formals]
+
+  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+  orphans <- setdiff(names(dots), all_known)
+  if (length(orphans) > 0) {
+    warning("Unknown arguments will be ignored: ",
+            paste(orphans, collapse = ", "))
+  }
+
   # --- Pipeline ---
-  tdr.obj <- get.landmarks(tdr.obj, .source = x, .seed = .seed,
-                           .verbose = .verbose, ...)
-  tdr.obj <- get.graph(tdr.obj, .seed = .seed,
-                       .verbose = .verbose, ...)
+  tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), lm_args))
+  tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
 
   if (!is.null(tdr.obj@config$celltype.vec)) {
     tdr.obj <- celltyping(tdr.obj,
@@ -553,8 +600,7 @@ RunTDR.SingleCellExperiment <- function(x,
                           .verbose = .verbose)
   }
 
-  tdr.obj <- get.map(tdr.obj, .source = x, .seed = .seed,
-                     .verbose = .verbose, ...)
+  tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
 
   # --- Store TDRObj in SCE metadata ---
   S4Vectors::metadata(x)$tdr.obj <- tdr.obj
@@ -718,7 +764,7 @@ RunTDR.SingleCellExperiment <- function(x,
 #' This is a standalone exported function, not an S3 method (the
 #' \code{"character"} class is too generic for dispatch).
 #'
-#' @param path Character(1). Path to the \code{.h5ad} file.
+#' @param x Character(1). Path to the \code{.h5ad} file.
 #' @param .sample.var Character(1). Column in \code{adata$obs} identifying
 #'   sample membership.
 #' @param .meta A data.frame of sample-level metadata. Row names must
@@ -745,7 +791,7 @@ RunTDR.SingleCellExperiment <- function(x,
 #'   store it in).
 #'
 #' @export
-RunTDR.h5ad <- function(path,
+RunTDR.h5ad <- function(x,
                         .sample.var,
                         .meta,
                         .assay.type = "RNA",
@@ -775,7 +821,7 @@ RunTDR.h5ad <- function(path,
   }
 
   # --- Read h5ad ---
-  adata <- anndataR::read_h5ad(path, backend = "HDF5AnnData")
+  adata <- anndataR::read_h5ad(x, backend = "HDF5AnnData")
 
   # --- Input validation ---
   if (!is.character(.sample.var) || length(.sample.var) != 1) {
@@ -851,11 +897,27 @@ RunTDR.h5ad <- function(path,
     .verbose = .verbose
   )
 
+  # --- Argument routing ---
+  dots <- list(...)
+
+  .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
+  .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
+  .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+
+  lm_args  <- dots[names(dots) %in% .lm.formals]
+  gr_args  <- dots[names(dots) %in% .gr.formals]
+  map_args <- dots[names(dots) %in% .map.formals]
+
+  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+  orphans <- setdiff(names(dots), all_known)
+  if (length(orphans) > 0) {
+    warning("Unknown arguments will be ignored: ",
+            paste(orphans, collapse = ", "))
+  }
+
   # --- Pipeline ---
-  tdr.obj <- get.landmarks(tdr.obj, .source = adata, .seed = .seed,
-                           .verbose = .verbose, ...)
-  tdr.obj <- get.graph(tdr.obj, .seed = .seed,
-                       .verbose = .verbose, ...)
+  tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = adata, .seed = .seed, .verbose = .verbose), lm_args))
+  tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
 
   if (!is.null(tdr.obj@config$celltype.vec)) {
     tdr.obj <- celltyping(tdr.obj,
@@ -863,8 +925,7 @@ RunTDR.h5ad <- function(path,
                           .verbose = .verbose)
   }
 
-  tdr.obj <- get.map(tdr.obj, .source = adata, .seed = .seed,
-                     .verbose = .verbose, ...)
+  tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = adata, .seed = .seed, .verbose = .verbose), map_args))
 
   return(tdr.obj)
 }

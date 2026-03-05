@@ -437,6 +437,9 @@ setup.lm.obj <- function(...) {
 #' object for mapping query cells in a batch-corrected space.
 #' 
 #' @param .tdr.obj Object initialized with \code{setup.tdr.obj}.
+#' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
+#'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
+#'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
 #' @param .verbose Logical, print progress messages. Default TRUE.
 #' @param .seed Integer for reproducibility. Default 123.
 #' @param .nHVG Integer, number of highly variable genes to select for RNA data.
@@ -491,15 +494,20 @@ setup.lm.obj <- function(...) {
 #' }
 #' @export
 #'
-get.landmarks <-
-  function(.tdr.obj,
+get.landmarks <- function(x, ...) UseMethod("get.landmarks")
+
+#' @export
+get.landmarks.TDRObj <-
+  function(x,
            .source = NULL,
            .verbose = TRUE,
            .seed = 123,
            .nHVG = 5000,
            .nPC = 30,
            .exc.vdj.mito.ribo.genes.from.hvg = TRUE,
-           .force.in = NULL){
+           .force.in = NULL,
+           ...){
+    .tdr.obj <- x
     
     set.seed(seed = .seed)
     
