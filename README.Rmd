@@ -193,7 +193,7 @@ lm.cells <-
     tinydenseR::get.map()
 
 # Visualize results
-tinydenseR::plotPCA(.tdr.obj = lm.cells,
+tinydenseR::plotPCA(x = lm.cells,
                     .point.size = 1,
                     .panel.size = 1.5)
 ```
@@ -364,7 +364,7 @@ lm.cells <- tinydenseR::setup.tdr.obj(
     )
 
 # Map all cells to landmarks
-lm.cells <- tinydenseR::get.map(.tdr.obj = lm.cells,
+lm.cells <- tinydenseR::get.map(x = lm.cells,
                                .verbose = FALSE)
 ```
 
@@ -391,14 +391,14 @@ lm.cells$map$fdens |>
 # Test for differential density between conditions
 # Results stored in lm.cells$map$lm[["default"]]
 lm.cells <- tinydenseR::get.lm(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .design = .design,
-    .verbose = FALSE 
+    .verbose = FALSE
 )
 
 # Perform differential expression analysis
 lm.cells <- tinydenseR::get.pbDE(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .design = .design, 
     .verbose = FALSE
 )
@@ -411,8 +411,8 @@ Landmarks with differential density:
 ```{r include=TRUE, echo=TRUE, eval=FALSE, dpi=300}
 # Show density fold changes between conditions
 tinydenseR::plotPCA(
-    .tdr.obj = lm.cells,
-    .feature = lm.cells$map$lm[["default"]]$fit$coefficients[,"ConditionB"],
+    x = lm.cells,
+    .feature = lm.cells$results$lm[["default"]]$fit$coefficients[,"ConditionB"],
     .panel.size = 1.5,
     .point.size = 1,
     .color.label = "estimated density\nlog2 fold change",
@@ -421,13 +421,13 @@ tinydenseR::plotPCA(
 
 # Highlight significantly different regions
 tinydenseR::plotPCA(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .feature = ifelse(
-        test = lm.cells$map$lm[["default"]]$fit$coefficients[,"ConditionB"] < 0,
+        test = lm.cells$results$lm[["default"]]$fit$coefficients[,"ConditionB"] < 0,
         yes = "less abundant",
         no = "more abundant") |>
         ifelse(
-            test = lm.cells$map$lm[["default"]]$fit$pca.weighted.q[,"ConditionB"] < 0.1,
+            test = lm.cells$results$lm[["default"]]$fit$pca.weighted.q[,"ConditionB"] < 0.1,
             no = "not sig.") |>
         factor(levels = c("less abundant", "not sig.", "more abundant")),
     .cat.feature.color = Color.Palette[1,c(1,6,2)],
@@ -450,7 +450,7 @@ red.design <- model.matrix(object = ~ Replicate,
 
 # Fit reduced model (stored in lm.cells$map$lm[["reduced"]])
 lm.cells <- tinydenseR::get.lm(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .design = red.design,
     .model.name = "reduced",
     .verbose = FALSE 
@@ -460,7 +460,7 @@ lm.cells <- tinydenseR::get.lm(
 # Embedding stored in lm.cells$map$embedding$pePC[["Condition"]]
 lm.cells <-
   tinydenseR::get.embedding(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .full.model = "default",
     .term.of.interest = "Condition",
     .red.model = "reduced",
@@ -471,7 +471,7 @@ lm.cells <-
 ```{r include=TRUE, echo=TRUE, eval=FALSE, dpi=300}
 # Embed samples based on differences along Condition
 tinydenseR::plotSampleEmbedding(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .embedding = "pePC",
     .sup.embed.slot = "Condition",
     .color.by = "Condition",
@@ -492,22 +492,22 @@ tinydenseR::plotSampleEmbedding(
 
 ```{r include=TRUE, echo=TRUE, eval=FALSE, dpi=300}
 # Find most downregulated gene in condition B
-most_down_gene <- sort(.dea$coefficients[,"ConditionB"])[1] |> names()
+most_down_gene <- sort(lm.cells$results$pb$default$all$coefficients[,"ConditionB"])[1] |> names()
 
 tinydenseR::plotPCA(
-    .tdr.obj = lm.cells,
-    .feature = lm.cells$landmarks[,most_down_gene],
+    x = lm.cells,
+    .feature = lm.cells$assay$expr[,most_down_gene],
     .panel.size = 1.5,
     .point.size = 1,
     .color.label = most_down_gene
 )
 
 # Find most upregulated gene in condition B  
-most_up_gene <- sort(.dea$coefficients[,"ConditionB"], decreasing = TRUE)[1] |> names()
+most_up_gene <- sort(lm.cells$results$pb$default$all$coefficients[,"ConditionB"], decreasing = TRUE)[1] |> names()
 
 tinydenseR::plotPCA(
-    .tdr.obj = lm.cells,
-    .feature = lm.cells$landmarks[,most_up_gene],
+    x = lm.cells,
+    .feature = lm.cells$assay$expr[,most_up_gene],
     .panel.size = 1.5,
     .point.size = 1,
     .color.label = most_up_gene
@@ -524,11 +524,11 @@ tinydenseR::plotPCA(
 ```{r include=TRUE, echo=TRUE, eval=FALSE, dpi=300}
 # Add feature statistics for interactive exploration
 lm.cells <- 
-  tinydenseR::get.lm.features.stats(.tdr.obj = lm.cells)
+  tinydenseR::get.features(x = lm.cells)
 
 # Create interactive plot with hover information
 tinydenseR::plotPCA(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .hover.stats = "marker",
     .panel.size = 1.5,
     .point.size = 1

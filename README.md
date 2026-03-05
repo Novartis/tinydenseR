@@ -728,7 +728,7 @@ tinydenseR::plotPCA(
 ``` r
 # Add feature statistics for interactive exploration
 lm.cells <- 
-  tinydenseR::get.lm.features.stats(.tdr.obj = lm.cells)
+  tinydenseR::get.features(.tdr.obj = lm.cells)
 
 # Create interactive plot with hover information
 tinydenseR::plotPCA(
