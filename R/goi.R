@@ -87,6 +87,7 @@
 goi.summary <-
   function(
     .tdr.obj,
+    .source = NULL,
     .goi,
     .id.idx = NULL,
     .id = NULL,
@@ -174,7 +175,7 @@ goi.summary <-
         
         # Load expression data for selected cells and genes
         goi.exprs.mat <-
-          readRDS(file = .tdr.obj@cells[[cells.elem]]) |> 
+          .get_sample_matrix(.source, .tdr.obj, cells.elem) |> 
           (\(x)
            x[.goi,.id.idx[[cells.elem]],drop = FALSE]
           )() |>

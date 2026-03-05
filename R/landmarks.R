@@ -475,6 +475,7 @@ setup.lm.obj <- function(...) {
 #'
 get.landmarks <-
   function(.tdr.obj,
+           .source = NULL,
            .verbose = TRUE,
            .seed = 123,
            .nHVG = 5000,
@@ -521,7 +522,7 @@ get.landmarks <-
       lapply(FUN = function(.cells.idx){
         
         mat <-
-          readRDS(file = .tdr.obj@cells[[.cells.idx]])
+          .get_sample_matrix(.source, .tdr.obj, .cells.idx)
         
         if(.tdr.obj@config$assay.type == "RNA"){
           
@@ -621,7 +622,7 @@ get.landmarks <-
         landmarks <-
           if(.tdr.obj@config$assay.type == "RNA"){
             
-            readRDS(file = .tdr.obj@cells[[.cells.idx]])[,lm.sample] |>
+            .get_sample_matrix(.source, .tdr.obj, .cells.idx)[,lm.sample] |>
               Matrix::t() |>
               (\(x)
                `rownames<-`(x = x,
@@ -631,7 +632,7 @@ get.landmarks <-
               )()
             
           } else {
-            readRDS(file = .tdr.obj@cells[[.cells.idx]])[lm.sample,.tdr.obj@config$markers] |>
+            .get_sample_matrix(.source, .tdr.obj, .cells.idx)[lm.sample,.tdr.obj@config$markers] |>
               (\(x)
                `rownames<-`(x = x,
                             value = paste0(names(x = .tdr.obj@cells)[.cells.idx],
@@ -876,7 +877,7 @@ get.landmarks <-
         set.seed(seed = .seed)
         
         mat <-
-          readRDS(file = .tdr.obj@cells[[.cells.idx]])
+          .get_sample_matrix(.source, .tdr.obj, .cells.idx)
         
         if(.tdr.obj@config$assay.type == "RNA"){
           
@@ -975,7 +976,7 @@ get.landmarks <-
           if(.tdr.obj@config$assay.type == "RNA"){
             
             # For RNA: reload to get raw counts, add sample prefix to cell IDs
-            readRDS(file = .tdr.obj@cells[[.cells.idx]])[,lm.sample] |>
+            .get_sample_matrix(.source, .tdr.obj, .cells.idx)[,lm.sample] |>
               Matrix::t() |>
               (\(x)
                `rownames<-`(x = x,
@@ -985,7 +986,7 @@ get.landmarks <-
               )()
             
           } else {
-            readRDS(file = .tdr.obj@cells[[.cells.idx]])[lm.sample,.tdr.obj@config$markers] |>
+            .get_sample_matrix(.source, .tdr.obj, .cells.idx)[lm.sample,.tdr.obj@config$markers] |>
               (\(x)
                `rownames<-`(x = x,
                             value = paste0(names(x = .tdr.obj@cells)[.cells.idx],

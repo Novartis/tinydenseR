@@ -766,6 +766,7 @@ get.lm <-
 get.pbDE <-
   function(
     .tdr.obj,
+    .source = NULL,
     .design,
     .contrasts = NULL,
     .block = NULL,
@@ -981,7 +982,7 @@ get.pbDE <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .tdr.obj@cells[[smpl]])[,.lm.idx[[smpl]]]
+            .get_sample_matrix(.source, .tdr.obj, smpl)[,.lm.idx[[smpl]]]
           
           wcl <- 
             .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[.lm.idx[[smpl]],,drop = FALSE]
@@ -1147,7 +1148,7 @@ get.pbDE <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .tdr.obj@cells[[smpl]])
+            .get_sample_matrix(.source, .tdr.obj, smpl)
           
           exprs.mat <-
             exprs.mat[.lm.idx[[smpl]],colnames(x = .tdr.obj@assay$expr)]
@@ -1453,6 +1454,7 @@ get.dea <- function(
 get.markerDE <-
   function(
     .tdr.obj,
+    .source = NULL,
     .geneset.ls = NULL,
     .id1.idx = NULL,
     .id2.idx = NULL,
@@ -1732,7 +1734,7 @@ get.markerDE <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .tdr.obj@cells[[smpl]])
+            .get_sample_matrix(.source, .tdr.obj, smpl)
           
           res <-
             tryCatch(
@@ -1778,7 +1780,7 @@ get.markerDE <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .tdr.obj@cells[[smpl]])
+            .get_sample_matrix(.source, .tdr.obj, smpl)
           
           res <-
             tryCatch(
@@ -1926,7 +1928,7 @@ get.markerDE <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .tdr.obj@cells[[smpl]])
+            .get_sample_matrix(.source, .tdr.obj, smpl)
           
           cols <-
             colnames(x = .tdr.obj@assay$expr)
@@ -1975,7 +1977,7 @@ get.markerDE <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            readRDS(file = .tdr.obj@cells[[smpl]])
+            .get_sample_matrix(.source, .tdr.obj, smpl)
           
           cols <-
             colnames(x = .tdr.obj@assay$expr)
@@ -3478,6 +3480,7 @@ get.embedding <-
 #' @export
 get.specDE <-
   function(.tdr.obj,
+           .source = NULL,
            .coef.col,
            .model.name = "default",
            .nv = NULL,
@@ -3917,6 +3920,7 @@ get.specDE <-
 #'
 get.nmfDE <-
   function(.tdr.obj,
+           .source = NULL,
            .coef.col,
            .model.name = "default",
            .k = NULL,
@@ -4610,6 +4614,7 @@ get.nmfDE <-
 #'
 get.plsDE <-
   function(.tdr.obj,
+           .source = NULL,
            .coef.col,
            .model.name = "default",
            .ncomp = NULL,

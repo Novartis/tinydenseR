@@ -721,6 +721,7 @@ get.graph <-
 #' @export
 get.map <-
   function(.tdr.obj,
+           .source = NULL,
            .ref.obj = NULL,
            .celltype.col.name = "cell_type",
            .cl.ct.to.ign = NULL,
@@ -890,7 +891,7 @@ get.map <-
         set.seed(seed = .seed)
         
         mat.exprs <-
-          readRDS(file = .tdr.obj@cells[[cells.idx]])
+          .get_sample_matrix(.source, .tdr.obj, cells.idx)
         
         if(.tdr.obj@config$assay.type == "RNA"){
           
@@ -1068,7 +1069,7 @@ get.map <-
           }
           
           raw.exprs <-
-            readRDS(file = .tdr.obj@cells[[cells.idx]])
+            .get_sample_matrix(.source, .tdr.obj, cells.idx)
           
           # Map query
           query <-
