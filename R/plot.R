@@ -82,8 +82,11 @@
 #' }
 #' 
 #' @export
-plotPCA <-
-  function(.tdr.obj,
+plotPCA <- function(x, ...) UseMethod("plotPCA")
+
+#' @export
+plotPCA.TDRObj <-
+  function(x,
            .PC.x = 1,
            .PC.y = 2,
            .feature = .tdr.obj@landmark.annot$clustering$ids,
@@ -95,7 +98,9 @@ plotPCA <-
            .legend.position = "right",
            .point.size = 0.1,
            .seed = 123,
-           .hover.stats = "none"){
+           .hover.stats = "none", ...){
+    
+    .tdr.obj <- x
     
     # R CMD check appeasement
     topFeatTab <- feature <- NULL
@@ -301,8 +306,11 @@ plotPCA <-
 #' }
 #' 
 #' @export
-plotUMAP <-
-  function(.tdr.obj,
+plotUMAP <- function(x, ...) UseMethod("plotUMAP")
+
+#' @export
+plotUMAP.TDRObj <-
+  function(x,
            .feature = .tdr.obj@landmark.annot$clustering$ids,
            .cat.feature.color = Color.Palette[1,1:5],
            .panel.size = 2,
@@ -312,7 +320,9 @@ plotUMAP <-
            .legend.position = "right",
            .point.size = 0.1,
            .seed = 123,
-           .hover.stats = "none"){
+           .hover.stats = "none", ...){
+    
+    .tdr.obj <- x
     
     # R CMD check appeasement
     umap.1 <- umap.2 <- topFeatTab <- feature <- NULL
@@ -506,9 +516,12 @@ plotUMAP <-
 #' }
 #' 
 #' @export
-plotBeeswarm <-
+plotBeeswarm <- function(x, ...) UseMethod("plotBeeswarm")
+
+#' @export
+plotBeeswarm.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .model.name = "default",
     .coefs,
     .q = 0.1,
@@ -523,7 +536,9 @@ plotBeeswarm <-
     .panel.width = 1.5,
     .legend.position = "right",
     .perc.plot = TRUE,
-    .order.ids = FALSE) {
+    .order.ids = FALSE, ...) {
+    
+    .tdr.obj <- x
     
     sig <- adj.p <- facets <- pos.t <- neg.t <- q.bars <- dat.df <- value <- split.by <- .coef <- cell.perc <- pop <- NULL
     
@@ -860,8 +875,11 @@ plotBeeswarm <-
 #' }
 #' 
 #' @export
-plot2Markers <-
-  function(.tdr.obj,
+plot2Markers <- function(x, ...) UseMethod("plot2Markers")
+
+#' @export
+plot2Markers.TDRObj <-
+  function(x,
            #           .color.from = NULL,
            .id = NULL,
            .id.from = "clustering",
@@ -873,7 +891,9 @@ plot2Markers <-
            .panel.size = 1.5,
            .reference = TRUE,
            .density.bins = 32,
-           .sd.range = c(-3, 6)){
+           .sd.range = c(-3, 6), ...){
+    
+    .tdr.obj <- x
     
     level <- NULL
     
@@ -994,22 +1014,27 @@ plot2Markers <-
 #' @seealso \code{\link{plotSampleEmbedding}} for the recommended replacement
 #' 
 #' @export
-#'
-plotSamplePCA <-
+plotSamplePCA <- function(x, ...) UseMethod("plotSamplePCA")
+
+#' @export
+plotSamplePCA.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .labels.from = colnames(x = .tdr.obj@metadata)[1],
     .cat.feature.color = Color.Palette[1,1:5],
     .point.size = 1,
     .panel.size = 2,
-    .midpoint = if(is.numeric(x = .tdr.obj@metadata[[.labels.from]])) stats::median(x = .tdr.obj@metadata[[.labels.from]]) else NA
+    .midpoint = if(is.numeric(x = .tdr.obj@metadata[[.labels.from]])) stats::median(x = .tdr.obj@metadata[[.labels.from]]) else NA,
+    ...
   ){
+    
+    .tdr.obj <- x
     
     .Deprecated(new = "plotSampleEmbedding", 
                 msg = "plotSamplePCA is deprecated. Use plotSampleEmbedding(.embedding = 'pca') instead.")
     
-    plotSampleEmbedding(
-      .tdr.obj = .tdr.obj,
+    plotSampleEmbedding.TDRObj(
+      .tdr.obj,
       .embedding = "pca",
       .color.by = .labels.from,
       .cat.feature.color = .cat.feature.color,
@@ -1106,10 +1131,12 @@ plotSamplePCA <-
 #' }
 #'
 #' @export
-#'
-plotSampleEmbedding <-
+plotSampleEmbedding <- function(x, ...) UseMethod("plotSampleEmbedding")
+
+#' @export
+plotSampleEmbedding.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .embedding = "pePC",
     .sup.embed.slot = NULL,
     .color.by = NULL,
@@ -1119,8 +1146,11 @@ plotSampleEmbedding <-
     .cat.feature.color = Color.Palette[1,1:5],
     .point.size = 1,
     .panel.size = 2,
-    .midpoint = NULL
+    .midpoint = NULL,
+    ...
   ){
+    
+    .tdr.obj <- x
     
     PC_x <- PC_y <- PC1 <- x.var <- color.var <- labels.from <- NULL
     
@@ -1469,10 +1499,12 @@ plotSampleEmbedding <-
 #' }
 #' 
 #' @export
-#'
-plotTradStats <-
+plotTradStats <- function(x, ...) UseMethod("plotTradStats")
+
+#' @export
+plotTradStats.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .model.name = "default",
     .split.by = "clustering",
     .coefs = NULL,
@@ -1480,8 +1512,11 @@ plotTradStats <-
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.07,
     .label.substr.rm = "",
-    .order.ids = FALSE
+    .order.ids = FALSE,
+    ...
   ){
+    
+    .tdr.obj <- x
     
     sig.shape <- sig <- adj.p <- level <- pop <- term <- coef <- cell.perc <- NULL
     
@@ -1737,10 +1772,12 @@ plotTradStats <-
 #' }
 #' 
 #' @export
-#'
-plotTradPerc <-
+plotTradPerc <- function(x, ...) UseMethod("plotTradPerc")
+
+#' @export
+plotTradPerc.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .x.split = colnames(x = .tdr.obj@metadata)[1],
     .x.split.subset = NULL,
     .pop = NULL,
@@ -1753,8 +1790,11 @@ plotTradPerc <-
     .cat.feature.color = Color.Palette[1,1:5],
     .seed = 123,
     .orientation = "wide",
-    .log2.y = FALSE
+    .log2.y = FALSE,
+    ...
   ){
+    
+    .tdr.obj <- x
     
     dodge <- value <- name <- color <- group <- x <- y <- NULL
     
@@ -1985,10 +2025,12 @@ plotTradPerc <-
 #' }
 #' 
 #' @export
-#'
-plotDensity <-
+plotDensity <- function(x, ...) UseMethod("plotDensity")
+
+#' @export
+plotDensity.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .x.split = colnames(x = .tdr.obj@metadata)[1],
     .pop = NULL,
     .pop.from = "clustering",
@@ -1998,8 +2040,11 @@ plotDensity <-
     .height = 1.5,
     .cat.feature.color = Color.Palette[1,1:5],
     .seed = 123,
-    .orientation = "wide"
+    .orientation = "wide",
+    ...
   ){
+    
+    .tdr.obj <- x
     
     value <- name <- color <- group <- x <- y <- NULL
     
@@ -2209,10 +2254,12 @@ plotDensity <-
 #' }
 #' 
 #' @export
-#'
-plotPbDE <-
+plotPbDE <- function(x, ...) UseMethod("plotPbDE")
+
+#' @export
+plotPbDE.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .de.obj = NULL,
     .model.name = "default",
     .population.name = "all",
@@ -2222,8 +2269,11 @@ plotPbDE <-
     .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.065,
-    .label.substr.rm = ""
+    .label.substr.rm = "",
+    ...
   ){
+    
+    .tdr.obj <- x
     
     # R CMD check appeasement
     sig.shape <- sig <- adj.p <- level <- marker <- term <- coef <- cell.perc <- NULL
@@ -2413,8 +2463,11 @@ plotPbDE <-
 #' @seealso \code{\link{plotPbDE}}
 #' @keywords internal
 #' @export
-plotDEA <- function(
-    .tdr.obj,
+plotDEA <- function(x, ...) UseMethod("plotDEA")
+
+#' @export
+plotDEA.TDRObj <- function(
+    x,
     .dea.obj,
     .coefs = colnames(x = .dea.obj$coefficients),
     .order.by = "clustering",
@@ -2422,13 +2475,16 @@ plotDEA <- function(
     .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.065,
-    .label.substr.rm = ""
+    .label.substr.rm = "",
+    ...
 ) {
+  .tdr.obj <- x
+  
   .Deprecated("plotPbDE",
               msg = "plotDEA() is deprecated. Use plotPbDE() instead.")
   
-  plotPbDE(
-    .tdr.obj = .tdr.obj,
+  plotPbDE.TDRObj(
+    .tdr.obj,
     .de.obj = .dea.obj,
     .coefs = .coefs,
     .order.by = .order.by,
@@ -2487,8 +2543,11 @@ plotDEA <- function(
 #' }
 #'
 #' @export
-plotMarkerDE <- function(
-    .tdr.obj,
+plotMarkerDE <- function(x, ...) UseMethod("plotMarkerDE")
+
+#' @export
+plotMarkerDE.TDRObj <- function(
+    x,
     .de.obj = NULL,
     .model.name = "default",
     .comparison.name = NULL,
@@ -2498,8 +2557,11 @@ plotMarkerDE <- function(
     .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.065,
-    .label.substr.rm = ""
+    .label.substr.rm = "",
+    ...
 ) {
+  
+  .tdr.obj <- x
   
   # Get DE results from .tdr.obj$markerDE or from provided .de.obj
   if(is.null(x = .de.obj)){
@@ -2514,8 +2576,8 @@ plotMarkerDE <- function(
   }
   
   # Use plotPbDE with the extracted DE object
-  plotPbDE(
-    .tdr.obj = .tdr.obj,
+  plotPbDE.TDRObj(
+    .tdr.obj,
     .de.obj = .de.obj,
     .coefs = .coefs,
     .order.by = .order.by,
@@ -2746,12 +2808,17 @@ scatterPlot <-
 #' }
 #' 
 #' @export
-#'
-plotHeatmap <-
+plotHeatmap <- function(x, ...) UseMethod("plotHeatmap")
+
+#' @export
+plotHeatmap.TDRObj <-
   function(
-    .tdr.obj,
-    .id.from = "clustering"
+    x,
+    .id.from = "clustering",
+    ...
   ){
+    
+    .tdr.obj <- x
     
     # Verify graph component exists
     if(is.null(x = .tdr.obj@results[[.id.from]])){
@@ -2828,18 +2895,23 @@ plotHeatmap <-
 #' }
 #'
 #' @export
-#'
-plotSpecDE <-
+plotSpecDE <- function(x, ...) UseMethod("plotSpecDE")
+
+#' @export
+plotSpecDE.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .coef.col,
     .specDE.dim = NULL,
     .embed = "umap",
     .point.size = 1,
     .label.size = 3,
     .panel.size = 2,
-    .seed = 123
+    .seed = 123,
+    ...
   ) {
+    
+    .tdr.obj <- x
     
     # R CMD check appeasement
     Sk <- Ak <- Vk <- component <- PC1 <- PC2 <- umap.1 <- umap.2 <- Y <- score <- NULL
@@ -4000,10 +4072,12 @@ plotSpecDE <-
 #' }
 #'
 #' @export
-#'
-plotSpecDEHeatmap <-
+plotSpecDEHeatmap <- function(x, ...) UseMethod("plotSpecDEHeatmap")
+
+#' @export
+plotSpecDEHeatmap.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .coef.col,
     .specDE.dim = 1,
     .model.name = "default",
@@ -4017,8 +4091,11 @@ plotSpecDEHeatmap <-
     .panel.width = 4,
     .panel.height = 3,
     .feature.font.size = 7,
-    .show.landmark.labels = FALSE
+    .show.landmark.labels = FALSE,
+    ...
   ) {
+
+    .tdr.obj <- x
 
     # Validate specDE results
     if (is.null(x = .tdr.obj@results$spec[[.coef.col]])) {
@@ -4132,18 +4209,23 @@ plotSpecDEHeatmap <-
 #' }
 #'
 #' @export
-#'
-plotNmfDE <-
+plotNmfDE <- function(x, ...) UseMethod("plotNmfDE")
+
+#' @export
+plotNmfDE.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .coef.col,
     .nmfDE.dim = NULL,
     .embed = "umap",
     .point.size = 1,
     .label.size = 3,
     .panel.size = 2,
-    .seed = 123
+    .seed = 123,
+    ...
   ) {
+    
+    .tdr.obj <- x
     
     # R CMD check appeasement
     Sk <- Ak <- dk <- component <- PC1 <- PC2 <- umap.1 <- umap.2 <- Y <- score <- NULL
@@ -4485,10 +4567,12 @@ plotNmfDE <-
 #' }
 #'
 #' @export
-#'
-plotNmfDEHeatmap <-
+plotNmfDEHeatmap <- function(x, ...) UseMethod("plotNmfDEHeatmap")
+
+#' @export
+plotNmfDEHeatmap.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .coef.col,
     .nmfDE.dim = 1,
     .model.name = "default",
@@ -4503,8 +4587,11 @@ plotNmfDEHeatmap <-
     .panel.width = 4,
     .panel.height = 3,
     .feature.font.size = 7,
-    .show.landmark.labels = FALSE
+    .show.landmark.labels = FALSE,
+    ...
   ) {
+
+    .tdr.obj <- x
 
     # Validate nmfDE results
     if (is.null(x = .tdr.obj@results$nmf[[.coef.col]])) {
@@ -4645,18 +4732,23 @@ plotNmfDEHeatmap <-
 #' }
 #'
 #' @export
-#'
-plotPlsDE <-
+plotPlsDE <- function(x, ...) UseMethod("plotPlsDE")
+
+#' @export
+plotPlsDE.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .coef.col,
     .plsDE.dim = NULL,
     .embed = "umap",
     .point.size = 1,
     .label.size = 3,
     .panel.size = 2,
-    .seed = 123
+    .seed = 123,
+    ...
   ) {
+
+    .tdr.obj <- x
 
     # R CMD check appeasement
     Sk <- Ak <- qk <- component <- PC1 <- PC2 <- umap.1 <- umap.2 <- Y <- score <- NULL
@@ -4962,10 +5054,12 @@ plotPlsDE <-
 #' }
 #'
 #' @export
-#'
-plotPlsDEHeatmap <-
+plotPlsDEHeatmap <- function(x, ...) UseMethod("plotPlsDEHeatmap")
+
+#' @export
+plotPlsDEHeatmap.TDRObj <-
   function(
-    .tdr.obj,
+    x,
     .coef.col,
     .plsDE.dim = 1,
     .model.name = "default",
@@ -4979,8 +5073,11 @@ plotPlsDEHeatmap <-
     .panel.width = 4,
     .panel.height = 3,
     .feature.font.size = 7,
-    .show.landmark.labels = FALSE
+    .show.landmark.labels = FALSE,
+    ...
   ) {
+
+    .tdr.obj <- x
 
     # Validate plsDE results
     if (is.null(x = .tdr.obj@results$pls[[.coef.col]])) {

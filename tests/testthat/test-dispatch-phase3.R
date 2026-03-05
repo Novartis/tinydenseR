@@ -1,0 +1,198 @@
+#####
+# Copyright 2025 Novartis Biomedical Research Inc.
+#
+# Licensed under the MIT License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# https://www.mit.edu/~amini/LICENSE.md
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#####
+
+library(testthat)
+library(tinydenseR)
+
+# ======================================================================
+# Plot dispatch tests — verify S3 dispatch on TDRObj, Seurat, SCE
+# ======================================================================
+
+test_that("plotUMAP dispatches on TDRObj", {
+  tdr <- create_mock_graph_obj(n_points = 20, n_clusters = 3)
+  p <- plotUMAP(tdr)
+  expect_true(inherits(p, "gg") || inherits(p, "ggplot"))
+})
+
+test_that("plotPCA dispatches on TDRObj", {
+  tdr <- create_mock_graph_obj(n_points = 20, n_clusters = 3)
+  p <- plotPCA(tdr)
+  expect_true(inherits(p, "gg") || inherits(p, "ggplot"))
+})
+
+test_that("plotHeatmap dispatches on TDRObj", {
+  skip("plotHeatmap requires full pheatmap structure from get.graph")
+  tdr <- create_mock_graph_obj(n_points = 20, n_clusters = 3)
+  # plotHeatmap requires results$clustering, add it
+  tdr@results$clustering <- list(
+    median.exprs = matrix(runif(6), nrow = 3, ncol = 2,
+                          dimnames = list(paste0("cluster_", 1:3),
+                                         c("marker1", "marker2")))
+  )
+  p <- plotHeatmap(tdr)
+  expect_true(inherits(p, "gg") || inherits(p, "ggplot") ||
+              inherits(p, "gtable") || inherits(p, "grob"))
+})
+
+test_that("plotUMAP dispatches on Seurat", {
+  skip_if_not_installed("SeuratObject")
+  tdr <- create_mock_graph_obj(n_points = 20, n_clusters = 3)
+
+  counts <- Matrix::sparseMatrix(
+    i = c(1, 2, 3), j = c(1, 2, 3), x = c(1, 1, 1),
+    dims = c(3, 3),
+    dimnames = list(paste0("gene", 1:3), paste0("cell", 1:3))
+  )
+  seurat_obj <- SeuratObject::CreateSeuratObject(counts = counts)
+  seurat_obj <- SetTDR(seurat_obj, tdr)
+  p <- plotUMAP(seurat_obj)
+  expect_true(inherits(p, "gg") || inherits(p, "ggplot"))
+})
+
+test_that("plotPCA dispatches on Seurat", {
+  skip_if_not_installed("SeuratObject")
+  tdr <- create_mock_graph_obj(n_points = 20, n_clusters = 3)
+
+  counts <- Matrix::sparseMatrix(
+    i = c(1, 2, 3), j = c(1, 2, 3), x = c(1, 1, 1),
+    dims = c(3, 3),
+    dimnames = list(paste0("gene", 1:3), paste0("cell", 1:3))
+  )
+  seurat_obj <- SeuratObject::CreateSeuratObject(counts = counts)
+  seurat_obj <- SetTDR(seurat_obj, tdr)
+  p <- plotPCA(seurat_obj)
+  expect_true(inherits(p, "gg") || inherits(p, "ggplot"))
+})
+
+test_that("plotUMAP dispatches on SingleCellExperiment", {
+  tdr <- create_mock_graph_obj(n_points = 20, n_clusters = 3)
+
+  sce <- SingleCellExperiment::SingleCellExperiment(
+    list(counts = Matrix::sparseMatrix(
+      i = c(1, 2, 3), j = c(1, 2, 3), x = c(1, 1, 1),
+      dims = c(3, 3),
+      dimnames = list(paste0("gene", 1:3), paste0("cell", 1:3))
+    ))
+  )
+  sce <- SetTDR(sce, tdr)
+  p <- plotUMAP(sce)
+  expect_true(inherits(p, "gg") || inherits(p, "ggplot"))
+})
+
+# ======================================================================
+# SetTDR round-trip for all container types
+# ======================================================================
+
+test_that("SetTDR + GetTDR round-trip on Seurat preserves TDRObj", {
+  skip_if_not_installed("SeuratObject")
+  tdr <- TDRObj(config = list(assay.type = "cyto"))
+
+  counts <- Matrix::sparseMatrix(
+    i = c(1, 2, 3), j = c(1, 2, 3), x = c(1, 1, 1),
+    dims = c(3, 3),
+    dimnames = list(paste0("gene", 1:3), paste0("cell", 1:3))
+  )
+  seurat_obj <- SeuratObject::CreateSeuratObject(counts = counts)
+  seurat_obj <- SetTDR(seurat_obj, tdr)
+  retrieved <- GetTDR(seurat_obj)
+  expect_true(is.TDRObj(retrieved))
+  expect_identical(retrieved@config$assay.type, "cyto")
+})
+
+test_that("SetTDR + GetTDR round-trip on SCE preserves TDRObj", {
+  tdr <- TDRObj(config = list(assay.type = "cyto"))
+
+  sce <- SingleCellExperiment::SingleCellExperiment(
+    list(counts = Matrix::sparseMatrix(
+      i = c(1, 2, 3), j = c(1, 2, 3), x = c(1, 1, 1),
+      dims = c(3, 3),
+      dimnames = list(paste0("gene", 1:3), paste0("cell", 1:3))
+    ))
+  )
+  sce <- SetTDR(sce, tdr)
+  retrieved <- GetTDR(sce)
+  expect_true(is.TDRObj(retrieved))
+  expect_identical(retrieved@config$assay.type, "cyto")
+})
+
+# ======================================================================
+# Round-trip regression: stepwise dispatch vs monolithic RunTDR
+# ======================================================================
+
+test_that("Stepwise dispatch matches RunTDR pipeline on TDRObj", {
+  skip_on_cran()
+  test_data <- create_test_lm_obj(n_cells = 50, n_markers = 5, n_samples = 4)
+  on.exit(cleanup_test_files(test_data), add = TRUE)
+
+  tdr <- setup.tdr.obj(
+    .cells = test_data$cells,
+    .meta = test_data$meta,
+    .markers = c("marker_1", "marker_2", "marker_3", "marker_4", "marker_5"),
+    .assay.type = "cyto",
+    .verbose = FALSE
+  )
+
+  # Monolithic
+  result_mono <- RunTDR(tdr, .verbose = FALSE, .seed = 42)
+
+  # Stepwise
+  result_step <- tdr
+  result_step <- get.landmarks(result_step, .verbose = FALSE, .seed = 42)
+  result_step <- get.graph(result_step, .verbose = FALSE, .seed = 42)
+  result_step <- get.map(result_step, .verbose = FALSE, .seed = 42)
+
+  # Densities should match
+  expect_equal(
+    as.matrix(result_mono@density$fdens),
+    as.matrix(result_step@density$fdens),
+    tolerance = 1e-10
+  )
+})
+
+# ======================================================================
+# Generic existence tests
+# ======================================================================
+
+test_that("all plot generics exist and are functions", {
+  plot_fns <- c(
+    "plotPCA", "plotUMAP", "plotBeeswarm", "plot2Markers",
+    "plotSamplePCA", "plotSampleEmbedding", "plotTradStats",
+    "plotTradPerc", "plotDensity", "plotPbDE", "plotDEA",
+    "plotMarkerDE", "plotHeatmap", "plotSpecDE", "plotSpecDEHeatmap",
+    "plotNmfDE", "plotNmfDEHeatmap", "plotPlsDE", "plotPlsDEHeatmap"
+  )
+  for (fn_name in plot_fns) {
+    fn <- get(fn_name, envir = asNamespace("tinydenseR"))
+    expect_true(is.function(fn), info = paste(fn_name, "is not a function"))
+  }
+})
+
+test_that("all plot .TDRObj methods exist", {
+  plot_methods <- c(
+    "plotPCA.TDRObj", "plotUMAP.TDRObj", "plotBeeswarm.TDRObj",
+    "plot2Markers.TDRObj", "plotSamplePCA.TDRObj",
+    "plotSampleEmbedding.TDRObj", "plotTradStats.TDRObj",
+    "plotTradPerc.TDRObj", "plotDensity.TDRObj", "plotPbDE.TDRObj",
+    "plotDEA.TDRObj", "plotMarkerDE.TDRObj", "plotHeatmap.TDRObj",
+    "plotSpecDE.TDRObj", "plotSpecDEHeatmap.TDRObj",
+    "plotNmfDE.TDRObj", "plotNmfDEHeatmap.TDRObj",
+    "plotPlsDE.TDRObj", "plotPlsDEHeatmap.TDRObj"
+  )
+  for (fn_name in plot_methods) {
+    fn <- get(fn_name, envir = asNamespace("tinydenseR"))
+    expect_true(is.function(fn), info = paste(fn_name, "is not a function"))
+  }
+})
