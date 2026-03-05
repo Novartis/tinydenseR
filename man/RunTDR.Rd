@@ -3,6 +3,7 @@
 \name{RunTDR}
 \alias{RunTDR}
 \alias{RunTDR.default}
+\alias{RunTDR.Seurat}
 \title{Run the full tinydenseR pipeline}
 \usage{
 RunTDR(x, ...)
@@ -15,28 +16,73 @@ RunTDR(x, ...)
   .seed = 123,
   ...
 )
+
+\method{RunTDR}{Seurat}(
+  x,
+  .sample.var,
+  .assay = "RNA",
+  .layer = "counts",
+  .assay.type = "RNA",
+  .harmony.var = NULL,
+  .markers = NULL,
+  .celltype.vec = NULL,
+  .min.cells.per.sample = 10,
+  .verbose = TRUE,
+  .seed = 123,
+  .prop.landmarks = 0.1,
+  .n.threads = if (is.hpc()) {
+     max(RhpcBLASctl::blas_get_num_procs(),
+    RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
+
+    } else {
+     parallel::detectCores(logical = TRUE)
+ },
+  ...
+)
 }
 \arguments{
-\item{x}{A \code{\linkS4class{TDRObj}} (created by \code{\link{setup.tdr.obj}}).}
+\item{x}{A Seurat object.}
 
 \item{...}{Additional arguments passed to pipeline functions.}
 
-\item{.celltype.vec}{Named character vector of per-cell labels
-(names = cell IDs, values = cell type labels). Length must equal
-\code{sum(x@config$sampling$n.cells)}. If \code{NULL}, no cell
-typing is performed (unless one is already stored in the object).}
+\item{.celltype.vec}{Character(1). Column name in \code{x@meta.data}
+containing per-cell type labels, or \code{NULL}.}
 
 \item{.celltype.vec.overwrite}{Logical. If \code{TRUE}, replace an
 existing \code{.celltype.vec} stored in the TDRObj config.}
 
 \item{.verbose}{Logical. Print progress messages.}
 
-\item{.seed}{Integer. Random seed for reproducibility.}
+\item{.seed}{Integer. Random seed.}
+
+\item{.sample.var}{Character(1). Column name in \code{x@meta.data}
+identifying sample membership.}
+
+\item{.assay}{Character(1). Name of the Seurat assay to use.}
+
+\item{.layer}{Character(1). Layer within the assay (e.g. \code{"counts"}).}
+
+\item{.assay.type}{Character. \code{"RNA"} or \code{"cyto"}.}
+
+\item{.harmony.var}{Character vector of batch variable column names
+in sample-level metadata, or \code{NULL}.}
+
+\item{.markers}{Character vector of marker names (required for cyto).}
+
+\item{.min.cells.per.sample}{Integer. Minimum cells for a sample to be
+included.}
+
+\item{.prop.landmarks}{Numeric in (0, 1]. Proportion of cells as landmarks.}
+
+\item{.n.threads}{Integer. Number of threads.}
 }
 \value{
 Depends on the method; see individual method documentation.
 
 The updated \code{\linkS4class{TDRObj}}.
+
+The Seurat object \code{x} with the TDRObj stored in
+\code{Misc(x, slot = "tdr.obj")}.
 }
 \description{
 S3 generic that executes the complete tinydenseR analysis pipeline:
@@ -48,5 +94,11 @@ landmark selection, graph construction, optional cell typing, and mapping.
 
 Executes \code{get.landmarks → get.graph → celltyping → get.map}
 on a pre-built \code{\linkS4class{TDRObj}}.
+
+\item \code{RunTDR(Seurat)}: Run the pipeline directly on a Seurat object
+
+Builds a \code{\linkS4class{TDRObj}} from a Seurat object and executes
+the full pipeline. The finished TDRObj is stored in
+\code{SeuratObject::Misc(x, slot = "tdr.obj")}.
 
 }}
