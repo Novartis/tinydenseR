@@ -32,6 +32,7 @@ Depends:
 LazyData: true
 Suggests: 
     testthat (>= 3.0.0),
+    anndataR,
     filelock,
     ggiraph,
     rmarkdown,
