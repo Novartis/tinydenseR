@@ -2,19 +2,25 @@
 % Please edit documentation in R/lm.graph.embed.R
 \name{lm.cluster}
 \alias{lm.cluster}
+\alias{lm.cluster.TDRObj}
 \title{Leiden clustering of landmarks}
 \usage{
-lm.cluster(
-  .tdr.obj,
+lm.cluster(x, ...)
+
+\method{lm.cluster}{TDRObj}(
+  x,
   .cl.method = "snn",
   .cl.resolution.parameter = 0.8,
   .seed = 123,
   .verbose = TRUE,
-  .small.size = 3
+  .small.size = 3,
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object with \code{$graph} component from \code{get.graph}.}
+\item{x}{Object to operate on (TDRObj, Seurat, or SingleCellExperiment).}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.cl.method}{Character specifying clustering method: "snn" (shared nearest neighbors)
 or "fgraph" (fuzzy graph from UMAP). Default "snn".}

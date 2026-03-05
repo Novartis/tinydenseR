@@ -336,8 +336,6 @@ fast.jaccard.r <-
 #' Clustering is performed as a secondary step for visualization and interpretation, but is not 
 #' the primary objective.
 #'
-#' @param .tdr.obj A tinydenseR object initialized with \code{setup.tdr.obj} and processed with 
-#'   \code{get.landmarks}.
 #' @param .k Integer number of nearest neighbors for graph construction (default 20). Higher values 
 #'   create more connected graphs and smoother UMAP embeddings. Used for k-NN graph construction 
 #'   and passed to \code{uwot::umap} as \code{n_neighbors}.
@@ -428,6 +426,7 @@ fast.jaccard.r <-
 #' @export
 get.graph <- function(x, ...) UseMethod("get.graph")
 
+#' @rdname get.graph
 #' @export
 get.graph.TDRObj <-
   function(x,
@@ -620,7 +619,7 @@ get.graph.TDRObj <-
 #' In addition, transfers cluster/cell type labels from landmarks to all cells.
 #' 
 #'
-#' @param .tdr.obj A tinydenseR object with \code{$graph} component populated by \code{get.graph}.
+#' @param x A tinydenseR object with \code{$graph} component populated by \code{get.graph}.
 #' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
 #'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
 #'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
@@ -728,9 +727,11 @@ get.graph.TDRObj <-
 #'                     .celltype.col.name = "cell_type")
 #' }
 #' 
+#' @param ... Additional arguments passed to methods.
 #' @export
 get.map <- function(x, ...) UseMethod("get.map")
 
+#' @rdname get.map
 #' @export
 get.map.TDRObj <-
   function(x,
@@ -1430,7 +1431,6 @@ get.map.TDRObj <-
 #' the SNN graph or UMAP fuzzy graph. Clusters are used for visualization and as a coarser 
 #' grouping for statistical testing. This is a wrapper around \code{leiden.cluster}.
 #'
-#' @param .tdr.obj A tinydenseR object with \code{$graph} component from \code{get.graph}.
 #' @param .cl.method Character specifying clustering method: "snn" (shared nearest neighbors) 
 #'   or "fgraph" (fuzzy graph from UMAP). Default "snn".
 #' @param .cl.resolution.parameter Numeric resolution for Leiden clustering (default 0.8). 
@@ -1482,6 +1482,7 @@ get.map.TDRObj <-
 #' @export
 lm.cluster <- function(x, ...) UseMethod("lm.cluster")
 
+#' @rdname lm.cluster
 #' @export
 lm.cluster.TDRObj <-
   function(x,
@@ -1596,8 +1597,6 @@ lm.cluster.TDRObj <-
 #' determining which features contribute most strongly to the landmark's defining principal 
 #' component. This creates landmark-specific feature signatures useful for interpretation.
 #'
-#' @param .tdr.obj A tinydenseR object processed through \code{get.landmarks} (PCA required).
-#'   
 #' @return Updated \code{.tdr.obj} with \code{$interact.plot$lm.features} containing:
 #'   \itemize{
 #'     \item \code{res}: List of data frames (one per landmark) with top 10 feature importances
@@ -1642,6 +1641,8 @@ lm.cluster.TDRObj <-
 #' @export
 get.lm.features.stats <- function(x, ...) UseMethod("get.lm.features.stats")
 
+#' @rdname get.lm.features.stats
+#' @method get.lm.features.stats TDRObj
 #' @export
 get.lm.features.stats.TDRObj <-
   function(

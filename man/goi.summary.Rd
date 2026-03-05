@@ -2,21 +2,27 @@
 % Please edit documentation in R/goi.R
 \name{goi.summary}
 \alias{goi.summary}
+\alias{goi.summary.TDRObj}
 \title{Summarize gene expression patterns for genes of interest}
 \usage{
-goi.summary(
-  .tdr.obj,
+goi.summary(x, ...)
+
+\method{goi.summary}{TDRObj}(
+  x,
   .source = NULL,
   .goi,
   .id.idx = NULL,
   .id = NULL,
   .id.from = "clustering",
-  .verbose = TRUE
+  .verbose = TRUE,
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{A list object initialized with \code{setup.tdr.obj} and processed
+\item{x}{A list object initialized with \code{setup.tdr.obj} and processed
 with \code{get.graph} and \code{get.map}. Must contain RNA assay data.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.source}{The raw data object for non-file backends. \code{NULL} (default) for
 the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.

@@ -2,21 +2,27 @@
 % Please edit documentation in R/stats.model.R
 \name{get.lm}
 \alias{get.lm}
+\alias{get.lm.TDRObj}
 \title{Differential Density Testing}
 \usage{
-get.lm(
-  .tdr.obj,
+get.lm(x, ...)
+
+\method{get.lm}{TDRObj}(
+  x,
   .design,
   .contrasts = NULL,
   .block = NULL,
   .model.name = "default",
   .force.recalc = FALSE,
   .verbose = TRUE,
-  .seed = 123
+  .seed = 123,
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{x}{A tinydenseR object processed through \code{get.map()}.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.design}{Design matrix specifying the experimental design. Rows correspond to samples
 (matching \code{.tdr.obj$cells}), columns to coefficients. Create with \code{model.matrix()}.}

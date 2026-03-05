@@ -2,10 +2,13 @@
 % Please edit documentation in R/stats.model.R
 \name{get.markerDE}
 \alias{get.markerDE}
+\alias{get.markerDE.TDRObj}
 \title{Marker Gene/Protein Identification via Pairwise Comparison}
 \usage{
-get.markerDE(
-  .tdr.obj,
+get.markerDE(x, ...)
+
+\method{get.markerDE}{TDRObj}(
+  x,
   .source = NULL,
   .geneset.ls = NULL,
   .id1.idx = NULL,
@@ -16,11 +19,14 @@ get.markerDE(
   .model.name = "default",
   .comparison.name = NULL,
   .force.recalc = FALSE,
-  .label.confidence = 0.8
+  .label.confidence = 0.8,
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{x}{A tinydenseR object processed through \code{get.map()}.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.source}{The raw data object for non-file backends. \code{NULL} (default) for
 the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.

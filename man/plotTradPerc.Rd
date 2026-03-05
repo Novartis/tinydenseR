@@ -2,16 +2,33 @@
 % Please edit documentation in R/plot.R
 \name{plotTradPerc}
 \alias{plotTradPerc}
+\alias{plotTradPerc.TDRObj}
 \title{Plot Traditional Percentages}
 \usage{
 plotTradPerc(x, ...)
+
+\method{plotTradPerc}{TDRObj}(
+  x,
+  .x.split = colnames(x = .tdr.obj@metadata)[1],
+  .x.split.subset = NULL,
+  .pop = NULL,
+  .pop.from = "clustering",
+  .order.pop = FALSE,
+  .line.by = NULL,
+  .dodge.by = NULL,
+  .x.space.scaler = 0.25,
+  .height = 1.5,
+  .cat.feature.color = Color.Palette[1, 1:5],
+  .seed = 123,
+  .orientation = "wide",
+  .log2.y = FALSE,
+  ...
+)
 }
 \arguments{
-\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+\item{x}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{...}{Additional arguments passed to the TDRObj method.}
-
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{...}{Additional arguments passed to methods.}
 
 \item{.x.split}{Character specifying metadata column for x-axis grouping. Defaults to first
 column.}

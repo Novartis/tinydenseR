@@ -2,10 +2,13 @@
 % Please edit documentation in R/lm.graph.embed.R
 \name{get.map}
 \alias{get.map}
+\alias{get.map.TDRObj}
 \title{Mapping cells to landmarks}
 \usage{
-get.map(
-  .tdr.obj,
+get.map(x, ...)
+
+\method{get.map}{TDRObj}(
+  x,
   .source = NULL,
   .ref.obj = NULL,
   .celltype.col.name = "cell_type",
@@ -14,11 +17,14 @@ get.map(
   .seed = 123,
   .label.confidence = 0.8,
   .cache.on.disk = TRUE,
-  .cache.dir = NULL
+  .cache.dir = NULL,
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object with \code{$graph} component populated by \code{get.graph}.}
+\item{x}{A tinydenseR object with \code{$graph} component populated by \code{get.graph}.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.source}{The raw data object for non-file backends. \code{NULL} (default) for
 the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.

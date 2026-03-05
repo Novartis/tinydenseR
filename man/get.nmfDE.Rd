@@ -2,10 +2,13 @@
 % Please edit documentation in R/stats.model.R
 \name{get.nmfDE}
 \alias{get.nmfDE}
+\alias{get.nmfDE.TDRObj}
 \title{Mass-Diffusion NMF for Density-Contrast Differential Expression}
 \usage{
-get.nmfDE(
-  .tdr.obj,
+get.nmfDE(x, ...)
+
+\method{get.nmfDE}{TDRObj}(
+  x,
   .coef.col,
   .model.name = "default",
   .k = NULL,
@@ -19,11 +22,14 @@ get.nmfDE(
   .tol = 1e-04,
   .maxit = 100L,
   .seed = 42L,
-  .verbose = TRUE
+  .verbose = TRUE,
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object after \code{get.lm()}.}
+\item{x}{A tinydenseR object after \code{get.lm()}.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.coef.col}{Character: column name in model coefficients to use as density contrast Y.
 Must be a valid column in \code{.tdr.obj$map$lm[[.model.name]]$fit$coefficients}.}

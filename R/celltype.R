@@ -45,9 +45,6 @@
 #'   \item \code{\link{get.pbDE}} enables cell-type-specific pseudobulk differential expression analysis
 #' }
 #'
-#' @param .tdr.obj A list object initialized with \code{setup.tdr.obj} and processed 
-#'   with \code{get.landmarks} and \code{get.graph}. Must contain 
-#'   \code{.tdr.obj$landmark.annot$clustering$ids}.
 #' @param .celltyping.map Cell type assignments, supplied in one of two
 #'   mutually exclusive formats:
 #'   \describe{
@@ -135,6 +132,7 @@
 #' @export
 celltyping <- function(x, ...) UseMethod("celltyping")
 
+#' @rdname celltyping
 #' @export
 celltyping.TDRObj <-
   function(x,

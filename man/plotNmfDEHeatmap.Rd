@@ -2,16 +2,35 @@
 % Please edit documentation in R/plot.R
 \name{plotNmfDEHeatmap}
 \alias{plotNmfDEHeatmap}
+\alias{plotNmfDEHeatmap.TDRObj}
 \title{Plot nmfDE Expression Heatmap}
 \usage{
 plotNmfDEHeatmap(x, ...)
+
+\method{plotNmfDEHeatmap}{TDRObj}(
+  x,
+  .coef.col,
+  .nmfDE.dim = 1,
+  .model.name = "default",
+  .loadings.type = c("de", "signed", "mass"),
+  .n.features = 50,
+  .order.by = "dens.contrast",
+  .add.annot = NULL,
+  .order.decreasing = FALSE,
+  .viridis.options.annot = c("cividis", "rocket", "inferno", "mako", "magma"),
+  .annot.panel.width = 4,
+  .annot.panel.height = 0.15,
+  .panel.width = 4,
+  .panel.height = 3,
+  .feature.font.size = 7,
+  .show.landmark.labels = FALSE,
+  ...
+)
 }
 \arguments{
-\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+\item{x}{A tinydenseR object after \code{get.nmfDE()}.}
 
-\item{...}{Additional arguments passed to the TDRObj method.}
-
-\item{.tdr.obj}{A tinydenseR object after \code{get.nmfDE()}.}
+\item{...}{Additional arguments passed to methods.}
 
 \item{.coef.col}{Character: coefficient name matching a slot in \code{.tdr.obj$nmfDE}.}
 

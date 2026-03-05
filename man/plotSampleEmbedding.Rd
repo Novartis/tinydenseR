@@ -2,18 +2,32 @@
 % Please edit documentation in R/plot.R
 \name{plotSampleEmbedding}
 \alias{plotSampleEmbedding}
+\alias{plotSampleEmbedding.TDRObj}
 \title{Plot Sample Embedding from get.embedding}
 \usage{
 plotSampleEmbedding(x, ...)
+
+\method{plotSampleEmbedding}{TDRObj}(
+  x,
+  .embedding = "pePC",
+  .sup.embed.slot = NULL,
+  .color.by = NULL,
+  .x.by = NULL,
+  .pc.x = 1,
+  .pc.y = 2,
+  .cat.feature.color = Color.Palette[1, 1:5],
+  .point.size = 1,
+  .panel.size = 2,
+  .midpoint = NULL,
+  ...
+)
 }
 \arguments{
-\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
-
-\item{...}{Additional arguments passed to the TDRObj method.}
-
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()} and
+\item{x}{A tinydenseR object processed through \code{get.map()} and
 \code{get.embedding()}. All embeddings are stored in \code{.tdr.obj$map$embedding}:
 unsupervised (\code{pca}, \code{traj}) and supervised (\code{pePC$<name>}).}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.embedding}{Character string specifying which embedding type to plot. One of:
 \describe{

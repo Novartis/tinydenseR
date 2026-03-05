@@ -2,22 +2,27 @@
 % Please edit documentation in R/lm.graph.embed.R
 \name{get.graph}
 \alias{get.graph}
+\alias{get.graph.TDRObj}
 \title{Graph embedding of landmarks}
 \usage{
-get.graph(
-  .tdr.obj,
+get.graph(x, ...)
+
+\method{get.graph}{TDRObj}(
+  x,
   .k = 20,
-  .scale = if (.tdr.obj@config$assay.type == "RNA") FALSE else TRUE,
+  .scale = if (x@config$assay.type == "RNA") FALSE else TRUE,
   .verbose = TRUE,
   .seed = 123,
   .cl.method = "snn",
   .cl.resolution.parameter = 0.8,
-  .small.size = floor(x = nrow(x = .tdr.obj@assay$expr)/200)
+  .small.size = floor(x = nrow(x = x@assay$expr)/200),
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object initialized with \code{setup.tdr.obj} and processed with
-\code{get.landmarks}.}
+\item{x}{Object to operate on (TDRObj, Seurat, or SingleCellExperiment).}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.k}{Integer number of nearest neighbors for graph construction (default 20). Higher values
 create more connected graphs and smoother UMAP embeddings. Used for k-NN graph construction

@@ -2,16 +2,26 @@
 % Please edit documentation in R/plot.R
 \name{plotSamplePCA}
 \alias{plotSamplePCA}
+\alias{plotSamplePCA.TDRObj}
 \title{Plot Sample PCA (Deprecated)}
 \usage{
 plotSamplePCA(x, ...)
+
+\method{plotSamplePCA}{TDRObj}(
+  x,
+  .labels.from = colnames(x = .tdr.obj@metadata)[1],
+  .cat.feature.color = Color.Palette[1, 1:5],
+  .point.size = 1,
+  .panel.size = 2,
+  .midpoint = if (is.numeric(x = .tdr.obj@metadata[[.labels.from]])) stats::median(x =
+    .tdr.obj@metadata[[.labels.from]]) else NA,
+  ...
+)
 }
 \arguments{
-\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+\item{x}{A tinydenseR object processed through \code{get.map()} and \code{get.embedding()}.}
 
-\item{...}{Additional arguments passed to the TDRObj method.}
-
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.embedding()}.}
+\item{...}{Additional arguments passed to methods.}
 
 \item{.labels.from}{Character specifying metadata column for coloring points.}
 

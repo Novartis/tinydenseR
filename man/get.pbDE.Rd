@@ -2,10 +2,13 @@
 % Please edit documentation in R/stats.model.R
 \name{get.pbDE}
 \alias{get.pbDE}
+\alias{get.pbDE.TDRObj}
 \title{Pseudobulk Differential Expression Analysis}
 \usage{
-get.pbDE(
-  .tdr.obj,
+get.pbDE(x, ...)
+
+\method{get.pbDE}{TDRObj}(
+  x,
   .source = NULL,
   .design,
   .contrasts = NULL,
@@ -18,11 +21,18 @@ get.pbDE(
   .population.name = "all",
   .force.recalc = FALSE,
   .verbose = TRUE,
-  .label.confidence = 0.8
+  .label.confidence = 0.8,
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{x}{A tinydenseR object processed through \code{get.map()}.}
+
+\item{...}{Additional arguments passed to methods.}
+
+\item{.source}{The raw data object for non-file backends. \code{NULL} (default) for
+the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.
+Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.}
 
 \item{.design}{Design matrix specifying experimental design. Rows = samples, columns = coefficients.}
 

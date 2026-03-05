@@ -2,17 +2,36 @@
 % Please edit documentation in R/plot.R
 \name{plotBeeswarm}
 \alias{plotBeeswarm}
+\alias{plotBeeswarm.TDRObj}
 \title{Bee Swarm Plot of Density Estimate Change}
 \usage{
 plotBeeswarm(x, ...)
+
+\method{plotBeeswarm}{TDRObj}(
+  x,
+  .model.name = "default",
+  .coefs,
+  .q = 0.1,
+  .q.from = "pca.weighted.q",
+  .split.by = if (length(x = .coefs) > 1) "none" else "clustering",
+  .swarm.title = NULL,
+  .label.substr.rm = "",
+  .point.size = 0.1,
+  .facet.scales = "fixed",
+  .row.space.scaler = 0.2,
+  .col.space.scaler = 0.1,
+  .panel.width = 1.5,
+  .legend.position = "right",
+  .perc.plot = TRUE,
+  .order.ids = FALSE,
+  ...
+)
 }
 \arguments{
-\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
-
-\item{...}{Additional arguments passed to the TDRObj method.}
-
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
+\item{x}{A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
 Statistical results should be stored in \code{.tdr.obj$map$lm}.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.model.name}{Character string naming which model fit to use from \code{.tdr.obj$map$lm}
 (default "default"). Must match a name used in \code{get.lm(.model.name = ...)}.}

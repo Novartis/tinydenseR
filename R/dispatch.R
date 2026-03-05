@@ -107,6 +107,7 @@ lm.cluster.SingleCellExperiment <- function(x, ...) {
 # get.lm.features.stats Seurat / SCE wrappers
 # ======================================================================
 
+#' @method get.lm.features.stats Seurat
 #' @export
 get.lm.features.stats.Seurat <- function(x, ...) {
   tdr <- GetTDR(x)
@@ -114,6 +115,7 @@ get.lm.features.stats.Seurat <- function(x, ...) {
   SetTDR(x, tdr)
 }
 
+#' @method get.lm.features.stats SingleCellExperiment
 #' @export
 get.lm.features.stats.SingleCellExperiment <- function(x, ...) {
   tdr <- GetTDR(x)

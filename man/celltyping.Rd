@@ -2,14 +2,17 @@
 % Please edit documentation in R/celltype.R
 \name{celltyping}
 \alias{celltyping}
+\alias{celltyping.TDRObj}
 \title{Manually assign cell type labels to clusters}
 \usage{
-celltyping(.tdr.obj, .celltyping.map, .verbose = TRUE)
+celltyping(x, ...)
+
+\method{celltyping}{TDRObj}(x, .celltyping.map, .verbose = TRUE, ...)
 }
 \arguments{
-\item{.tdr.obj}{A list object initialized with \code{setup.tdr.obj} and processed
-with \code{get.landmarks} and \code{get.graph}. Must contain
-\code{.tdr.obj$landmark.annot$clustering$ids}.}
+\item{x}{Object to operate on (TDRObj, Seurat, or SingleCellExperiment).}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.celltyping.map}{Cell type assignments, supplied in one of two
 mutually exclusive formats:

@@ -2,16 +2,30 @@
 % Please edit documentation in R/plot.R
 \name{plotDensity}
 \alias{plotDensity}
+\alias{plotDensity.TDRObj}
 \title{Plot Density}
 \usage{
 plotDensity(x, ...)
+
+\method{plotDensity}{TDRObj}(
+  x,
+  .x.split = colnames(x = .tdr.obj@metadata)[1],
+  .pop = NULL,
+  .pop.from = "clustering",
+  .subject.id = NULL,
+  .color.by = NULL,
+  .x.space.scaler = 0.25,
+  .height = 1.5,
+  .cat.feature.color = Color.Palette[1, 1:5],
+  .seed = 123,
+  .orientation = "wide",
+  ...
+)
 }
 \arguments{
-\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+\item{x}{A tinydenseR object processed through \code{get.map()}.}
 
-\item{...}{Additional arguments passed to the TDRObj method.}
-
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
+\item{...}{Additional arguments passed to methods.}
 
 \item{.x.split}{Character specifying metadata column for x-axis grouping (default first column).}
 

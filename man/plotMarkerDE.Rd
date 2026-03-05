@@ -2,16 +2,30 @@
 % Please edit documentation in R/plot.R
 \name{plotMarkerDE}
 \alias{plotMarkerDE}
+\alias{plotMarkerDE.TDRObj}
 \title{Plot Marker DE Results}
 \usage{
 plotMarkerDE(x, ...)
+
+\method{plotMarkerDE}{TDRObj}(
+  x,
+  .de.obj = NULL,
+  .model.name = "default",
+  .comparison.name = NULL,
+  .coefs = NULL,
+  .order.by = "none",
+  .markers = .tdr.obj@config$markers,
+  .q = 0.1,
+  .row.space.scaler = 0.2,
+  .col.space.scaler = 0.065,
+  .label.substr.rm = "",
+  ...
+)
 }
 \arguments{
-\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+\item{x}{A tinydenseR object with marker results from \code{get.markerDE}.}
 
-\item{...}{Additional arguments passed to the TDRObj method.}
-
-\item{.tdr.obj}{A tinydenseR object with marker results from \code{get.markerDE}.}
+\item{...}{Additional arguments passed to methods.}
 
 \item{.de.obj}{Optional: Direct DE results object for backward compatibility. If NULL, fetches
 from \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]}.}

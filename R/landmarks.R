@@ -436,7 +436,7 @@ setup.lm.obj <- function(...) {
 #' batch correction on landmark PC embeddings. This creates a reference
 #' object for mapping query cells in a batch-corrected space.
 #' 
-#' @param .tdr.obj Object initialized with \code{setup.tdr.obj}.
+#' @param x Object initialized with \code{setup.tdr.obj}.
 #' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
 #'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
 #'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
@@ -492,10 +492,12 @@ setup.lm.obj <- function(...) {
 #' lm.cells <- get.landmarks(lm.cells, 
 #'                           .force.in = c("CD3D", "CD4", "CD8A"))
 #' }
+#' @param ... Additional arguments passed to methods.
 #' @export
 #'
 get.landmarks <- function(x, ...) UseMethod("get.landmarks")
 
+#' @rdname get.landmarks
 #' @export
 get.landmarks.TDRObj <-
   function(x,

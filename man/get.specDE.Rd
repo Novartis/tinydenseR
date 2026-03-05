@@ -2,10 +2,13 @@
 % Please edit documentation in R/stats.model.R
 \name{get.specDE}
 \alias{get.specDE}
+\alias{get.specDE.TDRObj}
 \title{Spectral Differential Expression (specDE)}
 \usage{
-get.specDE(
-  .tdr.obj,
+get.specDE(x, ...)
+
+\method{get.specDE}{TDRObj}(
+  x,
   .coef.col,
   .model.name = "default",
   .nv = NULL,
@@ -15,11 +18,14 @@ get.specDE(
   .tau.mult = 1,
   .lazy.alpha = 1,
   .loading.method = c("pearson", "ols", "spearman"),
-  .verbose = TRUE
+  .verbose = TRUE,
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object after \code{get.lm()}.}
+\item{x}{A tinydenseR object after \code{get.lm()}.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.coef.col}{Character: column name in model coefficients to use as density contrast Y.
 Must be a valid column in \code{.tdr.obj$map$lm[[.model.name]]$fit$coefficients}.}

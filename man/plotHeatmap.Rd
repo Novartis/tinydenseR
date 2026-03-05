@@ -2,16 +2,17 @@
 % Please edit documentation in R/plot.R
 \name{plotHeatmap}
 \alias{plotHeatmap}
+\alias{plotHeatmap.TDRObj}
 \title{Plot Mean Expression Heatmap}
 \usage{
 plotHeatmap(x, ...)
+
+\method{plotHeatmap}{TDRObj}(x, .id.from = "clustering", ...)
 }
 \arguments{
-\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+\item{x}{A tinydenseR object processed through \code{get.graph()}.}
 
-\item{...}{Additional arguments passed to the TDRObj method.}
-
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.graph()}.}
+\item{...}{Additional arguments passed to methods.}
 
 \item{.id.from}{Character: "clustering" or "celltyping" (default "clustering"). Determines which
 population definitions to show. Use "clustering" after \code{get.graph()}, or "celltyping" after

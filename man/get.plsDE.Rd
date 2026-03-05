@@ -2,10 +2,13 @@
 % Please edit documentation in R/stats.model.R
 \name{get.plsDE}
 \alias{get.plsDE}
+\alias{get.plsDE.TDRObj}
 \title{Graph-Diffused, Density Contrast-Aligned PLS for Differential Expression}
 \usage{
-get.plsDE(
-  .tdr.obj,
+get.plsDE(x, ...)
+
+\method{get.plsDE}{TDRObj}(
+  x,
   .coef.col,
   .model.name = "default",
   .ncomp = NULL,
@@ -16,11 +19,14 @@ get.plsDE(
   .lazy.alpha = 1,
   .YX.interaction = TRUE,
   .loading.method = c("pearson", "ols", "spearman"),
-  .verbose = TRUE
+  .verbose = TRUE,
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object after \code{get.lm()}.}
+\item{x}{A tinydenseR object after \code{get.lm()}.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.coef.col}{Character: column name in model coefficients to use as density contrast Y.
 Must be a valid column in \code{.tdr.obj$map$lm[[.model.name]]$fit$coefficients}.}

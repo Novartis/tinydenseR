@@ -2,16 +2,26 @@
 % Please edit documentation in R/plot.R
 \name{plotDEA}
 \alias{plotDEA}
+\alias{plotDEA.TDRObj}
 \title{Plot Differential Expression Analysis Results (Deprecated)}
 \usage{
 plotDEA(x, ...)
+
+\method{plotDEA}{TDRObj}(
+  x,
+  .dea.obj,
+  .coefs = colnames(x = .dea.obj$coefficients),
+  .order.by = "clustering",
+  .markers = colnames(x = .tdr.obj@results[[.order.by]]$median.exprs),
+  .q = 0.1,
+  .row.space.scaler = 0.2,
+  .col.space.scaler = 0.065,
+  .label.substr.rm = "",
+  ...
+)
 }
 \arguments{
-\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
-
-\item{...}{Additional arguments passed to the TDRObj method.}
-
-\item{.tdr.obj}{A tinydenseR object.}
+\item{x}{A tinydenseR object.}
 
 \item{.dea.obj}{Differential expression results from \code{get.dea()} or \code{get.pbDE()}.}
 

@@ -2,12 +2,17 @@
 % Please edit documentation in R/lm.graph.embed.R
 \name{get.lm.features.stats}
 \alias{get.lm.features.stats}
+\alias{get.lm.features.stats.TDRObj}
 \title{Graph-based feature discovery for landmarks}
 \usage{
-get.lm.features.stats(.tdr.obj)
+get.lm.features.stats(x, ...)
+
+\method{get.lm.features.stats}{TDRObj}(x, ...)
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.landmarks} (PCA required).}
+\item{x}{Object to operate on (TDRObj, Seurat, or SingleCellExperiment).}
+
+\item{...}{Additional arguments passed to methods.}
 }
 \value{
 Updated \code{.tdr.obj} with \code{$interact.plot$lm.features} containing:

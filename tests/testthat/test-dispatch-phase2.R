@@ -100,7 +100,7 @@ test_that("get.lm dispatches on Seurat and returns Seurat with lm results", {
     .verbose = FALSE
   )
   tdr <- get.landmarks(tdr, .verbose = FALSE, .seed = 42)
-  tdr <- get.graph(tdr, .k = 3, .verbose = FALSE, .seed = 42)
+  tdr <- get.graph(tdr, .verbose = FALSE, .seed = 42)
   tdr <- get.map(tdr, .verbose = FALSE, .seed = 42)
 
   # Create design matrix: need as many rows as samples

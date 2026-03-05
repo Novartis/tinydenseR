@@ -2,21 +2,27 @@
 % Please edit documentation in R/landmarks.R
 \name{get.landmarks}
 \alias{get.landmarks}
+\alias{get.landmarks.TDRObj}
 \title{Identify landmarks via leverage score sampling}
 \usage{
-get.landmarks(
-  .tdr.obj,
+get.landmarks(x, ...)
+
+\method{get.landmarks}{TDRObj}(
+  x,
   .source = NULL,
   .verbose = TRUE,
   .seed = 123,
   .nHVG = 5000,
   .nPC = 30,
   .exc.vdj.mito.ribo.genes.from.hvg = TRUE,
-  .force.in = NULL
+  .force.in = NULL,
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{Object initialized with \code{setup.tdr.obj}.}
+\item{x}{Object initialized with \code{setup.tdr.obj}.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.source}{The raw data object for non-file backends. \code{NULL} (default) for
 the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.

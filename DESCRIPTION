@@ -39,7 +39,8 @@ Suggests:
     rmarkdown,
     ggpubr,
     rstatix,
-    hexbin
+    hexbin,
+    SingleCellExperiment
 Config/testthat/edition: 3
 Imports: 
     collapse,
@@ -72,7 +73,6 @@ Imports:
     scales,
     scattermore,
     SeuratObject,
-    SingleCellExperiment,
     sparseMatrixStats,
     stats,
     SummarizedExperiment,

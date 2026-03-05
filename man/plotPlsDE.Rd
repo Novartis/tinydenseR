@@ -2,16 +2,27 @@
 % Please edit documentation in R/plot.R
 \name{plotPlsDE}
 \alias{plotPlsDE}
+\alias{plotPlsDE.TDRObj}
 \title{Plot plsDE Scores (Diagnostic and Component Views)}
 \usage{
 plotPlsDE(x, ...)
+
+\method{plotPlsDE}{TDRObj}(
+  x,
+  .coef.col,
+  .plsDE.dim = NULL,
+  .embed = "umap",
+  .point.size = 1,
+  .label.size = 3,
+  .panel.size = 2,
+  .seed = 123,
+  ...
+)
 }
 \arguments{
-\item{x}{A TDRObj, Seurat, or SingleCellExperiment object.}
+\item{x}{A tinydenseR object after \code{get.plsDE()}.}
 
-\item{...}{Additional arguments passed to the TDRObj method.}
-
-\item{.tdr.obj}{A tinydenseR object after \code{get.plsDE()}.}
+\item{...}{Additional arguments passed to methods.}
 
 \item{.coef.col}{Character: coefficient name matching a slot in \code{.tdr.obj$plsDE}.}
 

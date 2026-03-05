@@ -22,7 +22,7 @@
 #' landmarks can capture within-cluster heterogeneity. Uses PCA-weighted q-values that 
 #' leverage the correlation structure among landmarks to improve statistical power.
 #'
-#' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
+#' @param x A tinydenseR object processed through \code{get.map()}.
 #' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
 #'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
 #'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
@@ -141,10 +141,12 @@
 #' lm.obj$map$lm$reduced$fit$coefficients
 #' }
 #' 
+#' @param ... Additional arguments passed to methods.
 #' @export
 #'
 get.lm <- function(x, ...) UseMethod("get.lm")
 
+#' @rdname get.lm
 #' @export
 get.lm.TDRObj <-
   function(
@@ -656,7 +658,10 @@ get.lm.TDRObj <-
 #' (cytometry) to test for DE. Can restrict analysis to specific clusters/cell types, and optionally 
 #' perform gene set enrichment via GSVA.
 #'
-#' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
+#' @param x A tinydenseR object processed through \code{get.map()}.
+#' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
+#'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
+#'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
 #' @param .design Design matrix specifying experimental design. Rows = samples, columns = coefficients.
 #' @param .contrasts Optional contrast matrix for specific comparisons. Create with 
 #'   \code{limma::makeContrasts()}. If NULL, tests all \code{.design} coefficients.
@@ -769,10 +774,12 @@ get.lm.TDRObj <-
 #' lm.cells$pbDE$default$tcells$coefficients
 #' }
 #' 
+#' @param ... Additional arguments passed to methods.
 #' @export
 #'
 get.pbDE <- function(x, ...) UseMethod("get.pbDE")
 
+#' @rdname get.pbDE
 #' @export
 get.pbDE.TDRObj <-
   function(
@@ -1338,7 +1345,7 @@ get.dea <- function(
 #' experimental conditions, this compares cell populations to find defining features. Useful for 
 #' characterizing clusters and validating cell type annotations.
 #'
-#' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
+#' @param x A tinydenseR object processed through \code{get.map()}.
 #' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
 #'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
 #'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
@@ -1465,10 +1472,12 @@ get.dea <- function(
 #'                          .comparison.name = "cluster1_gsva")
 #' }
 #' 
+#' @param ... Additional arguments passed to methods.
 #' @export
 #'
 get.markerDE <- function(x, ...) UseMethod("get.markerDE")
 
+#' @rdname get.markerDE
 #' @export
 get.markerDE.TDRObj <-
   function(
@@ -2335,7 +2344,7 @@ get.marker <- function(
 #' partial-effect PCA (pePC) that isolates variation attributable to a specific effect. 
 #' Exact for OLS; if duplicateCorrelation/blocking is used, the decomposition is approximate.
 #'
-#' @param .tdr.obj The tinydenseR object processed through \code{get.map()}. Contains
+#' @param x The tinydenseR object processed through \code{get.map()}. Contains
 #'   \code{$map$Y} (log2-transformed densities) used for unsupervised embeddings. Statistical
 #'   model fits should be stored in \code{$map$lm} via \code{get.lm()}.
 #' @param .full.model Character string naming the full model in \code{.tdr.obj$map$lm}
@@ -2514,10 +2523,12 @@ get.marker <- function(
 #' names(lm.obj$map$embedding$pePC)  # c("TrtVsCtrl", "KO_TrtVsCtrl")
 #' }
 #'
+#' @param ... Additional arguments passed to methods.
 #' @export
 #'
 get.embedding <- function(x, ...) UseMethod("get.embedding")
 
+#' @rdname get.embedding
 #' @export
 get.embedding.TDRObj <-
   function(
@@ -3439,7 +3450,7 @@ get.embedding.TDRObj <-
 #' No single metric determines DA vs DE. Interpretation requires their joint pattern plus
 #' visualization (e.g., Y vs score scatter via \code{plotSpecDE}).
 #'
-#' @param .tdr.obj A tinydenseR object after \code{get.lm()}.
+#' @param x A tinydenseR object after \code{get.lm()}.
 #' @param .coef.col Character: column name in model coefficients to use as density contrast Y.
 #'   Must be a valid column in \code{.tdr.obj$map$lm[[.model.name]]$fit$coefficients}.
 #' @param .model.name Character: name of the fitted model to use (default "default").
@@ -3503,9 +3514,11 @@ get.embedding.TDRObj <-
 #' )
 #' }
 #'
+#' @param ... Additional arguments passed to methods.
 #' @export
 get.specDE <- function(x, ...) UseMethod("get.specDE")
 
+#' @rdname get.specDE
 #' @export
 get.specDE.TDRObj <-
   function(x,
@@ -3869,7 +3882,7 @@ get.specDE.TDRObj <-
 #' High Sk indicates large-scale, graph-smooth structure. Note: because NMF components are
 #' not orthogonal, Sk values across components are not independent.
 #'
-#' @param .tdr.obj A tinydenseR object after \code{get.lm()}.
+#' @param x A tinydenseR object after \code{get.lm()}.
 #' @param .coef.col Character: column name in model coefficients to use as density contrast Y.
 #'   Must be a valid column in \code{.tdr.obj$map$lm[[.model.name]]$fit$coefficients}.
 #' @param .model.name Character: name of the fitted model to use (default "default").
@@ -3946,10 +3959,12 @@ get.specDE.TDRObj <-
 #' )
 #' }
 #'
+#' @param ... Additional arguments passed to methods.
 #' @export
 #'
 get.nmfDE <- function(x, ...) UseMethod("get.nmfDE")
 
+#' @rdname get.nmfDE
 #' @export
 get.nmfDE.TDRObj <-
   function(x,
@@ -4569,7 +4584,7 @@ get.nmfDE.TDRObj <-
 #'   methods by providing a multivariate, graph-aware decomposition that
 #'   captures joint DA/DE patterns not visible in gene-by-gene tests.
 #'
-#' @param .tdr.obj A tinydenseR object after \code{get.lm()}.
+#' @param x A tinydenseR object after \code{get.lm()}.
 #' @param .coef.col Character: column name in model coefficients to use as density contrast Y.
 #'   Must be a valid column in \code{.tdr.obj$map$lm[[.model.name]]$fit$coefficients}.
 #' @param .model.name Character: name of the fitted model to use (default "default").
@@ -4644,10 +4659,12 @@ get.nmfDE.TDRObj <-
 #' )
 #' }
 #'
+#' @param ... Additional arguments passed to methods.
 #' @export
 #'
 get.plsDE <- function(x, ...) UseMethod("get.plsDE")
 
+#' @rdname get.plsDE
 #' @export
 get.plsDE.TDRObj <-
   function(x,

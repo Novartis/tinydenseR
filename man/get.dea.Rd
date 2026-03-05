@@ -18,8 +18,6 @@ get.dea(
 )
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object processed through \code{get.map()}.}
-
 \item{.design}{Design matrix specifying experimental design. Rows = samples, columns = coefficients.}
 
 \item{.contrasts}{Optional contrast matrix for specific comparisons. Create with

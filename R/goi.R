@@ -37,7 +37,7 @@
 #' The function operates on mapped cells (after \code{get.map}), allowing you to
 #' optionally filter to specific clusters or cell types using \code{.id} parameter.
 #' 
-#' @param .tdr.obj A list object initialized with \code{setup.tdr.obj} and processed 
+#' @param x A list object initialized with \code{setup.tdr.obj} and processed 
 #'   with \code{get.graph} and \code{get.map}. Must contain RNA assay data.
 #' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
 #'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
@@ -86,9 +86,11 @@
 #' goi_results <- goi.summary(lm.cells, markers, 
 #'                            .id = c("cluster.01", "cluster.02"))
 #' }
+#' @param ... Additional arguments passed to methods.
 #' @export
 goi.summary <- function(x, ...) UseMethod("goi.summary")
 
+#' @rdname goi.summary
 #' @export
 goi.summary.TDRObj <-
   function(

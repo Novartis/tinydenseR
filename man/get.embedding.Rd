@@ -2,10 +2,13 @@
 % Please edit documentation in R/stats.model.R
 \name{get.embedding}
 \alias{get.embedding}
+\alias{get.embedding.TDRObj}
 \title{Compute Sample Embedding from Partial Fitted Values}
 \usage{
-get.embedding(
-  .tdr.obj,
+get.embedding(x, ...)
+
+\method{get.embedding}{TDRObj}(
+  x,
   .full.model = "default",
   .term.of.interest = NULL,
   .red.model = NULL,
@@ -14,13 +17,16 @@ get.embedding(
   .n.pcs = 20,
   .ret.trajectory = FALSE,
   .traj.dist.metric = "cosine",
-  .verbose = TRUE
+  .verbose = TRUE,
+  ...
 )
 }
 \arguments{
-\item{.tdr.obj}{The tinydenseR object processed through \code{get.map()}. Contains
+\item{x}{The tinydenseR object processed through \code{get.map()}. Contains
 \code{$map$Y} (log2-transformed densities) used for unsupervised embeddings. Statistical
 model fits should be stored in \code{$map$lm} via \code{get.lm()}.}
+
+\item{...}{Additional arguments passed to methods.}
 
 \item{.full.model}{Character string naming the full model in \code{.tdr.obj$map$lm}
 (default "default"). Required only when computing supervised embeddings (pePC).}

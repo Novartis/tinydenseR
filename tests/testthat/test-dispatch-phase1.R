@@ -168,8 +168,8 @@ test_that("celltyping dispatches on Seurat and returns Seurat with celltyping po
   tdr <- get.landmarks(tdr, .verbose = FALSE, .seed = 42)
   tdr <- get.graph(tdr, .k = 3, .verbose = FALSE, .seed = 42)
 
-  # Build a per-cell label vector
-  all_cells <- rownames(tdr@assay$expr)
+  # Build a per-cell label vector matching ALL cells (not just landmarks)
+  all_cells <- unlist(lapply(tdr@cells, function(p) rownames(readRDS(p))))
   ct_vec <- stats::setNames(
     sample(c("TypeA", "TypeB"), length(all_cells), replace = TRUE),
     all_cells
