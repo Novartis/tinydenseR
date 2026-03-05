@@ -6,6 +6,7 @@
 \usage{
 get.pbDE(
   .tdr.obj,
+  .source = NULL,
   .design,
   .contrasts = NULL,
   .block = NULL,

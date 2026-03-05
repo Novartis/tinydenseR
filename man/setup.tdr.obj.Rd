@@ -11,6 +11,7 @@ setup.tdr.obj(
   .markers = NULL,
   .harmony.var = NULL,
   .assay.type = "cyto",
+  .celltype.vec = NULL,
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,

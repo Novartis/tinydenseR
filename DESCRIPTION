@@ -12,6 +12,7 @@ RoxygenNote: 7.3.3
 Collate: 
     'TDRObj-class.R'
     'accessor.R'
+    'RunTDR.R'
     'Color.Palette.R'
     'cache.R'
     'celltype.R'

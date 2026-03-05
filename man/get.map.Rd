@@ -6,6 +6,7 @@
 \usage{
 get.map(
   .tdr.obj,
+  .source = NULL,
   .ref.obj = NULL,
   .celltype.col.name = "cell_type",
   .cl.ct.to.ign = NULL,

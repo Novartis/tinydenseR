@@ -6,6 +6,7 @@
 \usage{
 get.nmfDE(
   .tdr.obj,
+  .source = NULL,
   .coef.col,
   .model.name = "default",
   .k = NULL,

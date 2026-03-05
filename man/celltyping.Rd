@@ -11,14 +11,24 @@ celltyping(.tdr.obj, .celltyping.map, .verbose = TRUE)
 with \code{get.landmarks} and \code{get.graph}. Must contain
 \code{.tdr.obj$landmark.annot$clustering$ids}.}
 
-\item{.celltyping.map}{A named list mapping cell types to cluster IDs.
-List names are cell type labels (e.g., "CD4.T.cells"), and each element
-is a character vector of cluster IDs (e.g., c("cluster.01", "cluster.02"))
-that belong to that cell type. Requirements:
-\itemize{
-\item Each cell type name must be unique
-\item Each cluster can only map to one cell type
-\item All clusters in \code{.tdr.obj$landmark.annot$clustering$ids} must be mapped
+\item{.celltyping.map}{Cell type assignments, supplied in one of two
+mutually exclusive formats:
+\describe{
+\item{Mode A — cluster map (named \code{list})}{
+List names are cell-type labels (e.g., \code{"CD4.T.cells"}), and
+each element is a character vector of cluster IDs
+(e.g., \code{c("cluster.01", "cluster.02")}) that belong to that
+cell type.  Every cluster in
+\code{.tdr.obj$landmark.annot$clustering$ids} must appear in exactly
+one element.
+}
+\item{Mode B — per-cell labels (named \code{character} vector)}{
+A named character vector where \code{names()} are the original cell
+IDs (before the \code{paste0(sample, "_", ...)} prefix added by
+tinydenseR) and values are cell-type labels.  The vector must cover
+\strong{all} cells across all samples; landmark-only labels are extracted
+automatically.  Duplicate names are not allowed.
+}
 }}
 
 \item{.verbose}{Logical; if \code{TRUE}, print progress messages when
@@ -29,14 +39,17 @@ The \code{.tdr.obj} with the following updated fields:
 \describe{
 \item{\code{$landmark.annot$celltyping$ids}}{Factor vector of cell type labels
 for each landmark}
-\item{\code{$landmark.annot$celltyping$map}}{The \code{.celltyping.map}
-list used to create the labels (stored for provenance)}
-\item{\code{$results$celltyping$median.exprs}}{Matrix of mean expression
+\item{\code{$landmark.annot$celltyping$map}}{Mode A only: the
+\code{.celltyping.map} list (stored for provenance).
+\code{NULL} in Mode B.}
+\item{\code{$landmark.annot$celltyping$mode}}{\code{"cluster_map"}
+(Mode A) or \code{"cell_labels"} (Mode B)}
+\item{\code{$results$celltyping$median.exprs}}{Matrix of median expression
 values per cell type (rows) by features (columns). For RNA data,
 displays z-scored expression of top PC-loading genes. For cytometry
 data, shows z-scored marker intensities.}
 \item{\code{$results$celltyping$pheatmap}}{Heatmap object (from
-\code{pheatmap} package) visualizing mean expression patterns across
+\code{pheatmap} package) visualizing median expression patterns across
 cell types}
 }
 If \code{get.map()} has already been run, the following slots are also
@@ -105,6 +118,11 @@ lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.graph() |>
   get.map() |>
   celltyping(celltype_map)
+
+# Mode B — per-cell labels (named character vector)
+# cell_labels is a named character vector: names = original cell IDs,
+# values = cell-type labels, covering ALL cells across all samples.
+lm.cells <- celltyping(lm.cells, cell_labels)
 }
 }
 \seealso{

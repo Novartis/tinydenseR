@@ -6,6 +6,7 @@
 \usage{
 goi.summary(
   .tdr.obj,
+  .source = NULL,
   .goi,
   .id.idx = NULL,
   .id = NULL,

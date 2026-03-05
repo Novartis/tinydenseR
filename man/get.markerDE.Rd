@@ -6,6 +6,7 @@
 \usage{
 get.markerDE(
   .tdr.obj,
+  .source = NULL,
   .geneset.ls = NULL,
   .id1.idx = NULL,
   .id2.idx = NULL,

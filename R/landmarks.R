@@ -162,6 +162,7 @@ setup.tdr.obj <-
     .markers = NULL,
     .harmony.var = NULL,
     .assay.type = "cyto",
+    .celltype.vec = NULL,
     .verbose = TRUE,
     .seed = 123,
     .prop.landmarks = 0.1,
@@ -313,6 +314,19 @@ setup.tdr.obj <-
     .tdr.obj@config$sampling$n.cells <-
       n.cells
     
+    # Validate .celltype.vec if provided
+    if (!is.null(.celltype.vec)) {
+      if (!is.character(.celltype.vec) || is.null(names(.celltype.vec))) {
+        stop(".celltype.vec must be a named character vector ",
+             "(names = cell IDs, values = cell type labels).")
+      }
+      expected_n <- sum(n.cells)
+      if (length(.celltype.vec) != expected_n) {
+        stop(".celltype.vec length (", length(.celltype.vec),
+             ") does not match total cell count (", expected_n, ").")
+      }
+    }
+    
     # Quality check: warn if sample sizes are highly imbalanced (>10-fold difference)
     if((max(.tdr.obj@config$sampling$n.cells) / min(.tdr.obj@config$sampling$n.cells)) > 10){
       
@@ -366,6 +380,10 @@ setup.tdr.obj <-
     if(!is.null(x = .harmony.var)){
       .tdr.obj@integration$harmony.var <- 
         .harmony.var  
+    }
+    
+    if (!is.null(.celltype.vec)) {
+      .tdr.obj@config$celltype.vec <- .celltype.vec
     }
     
     return(.tdr.obj)

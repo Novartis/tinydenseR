@@ -6,6 +6,7 @@
 \usage{
 get.plsDE(
   .tdr.obj,
+  .source = NULL,
   .coef.col,
   .model.name = "default",
   .ncomp = NULL,
