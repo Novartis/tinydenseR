@@ -262,12 +262,71 @@ test_that("GetTDR.SingleCellExperiment errors when no TDRObj stored", {
 })
 
 # ======================================================================
-# RunTDR.h5ad tests
+# RunTDR.HDF5AnnData tests
 # ======================================================================
 
-test_that("RunTDR.h5ad requires anndataR", {
+test_that("RunTDR dispatches to HDF5AnnData method", {
   skip_if_not_installed("anndataR")
-  # Basic smoke test: verify the function exists and is callable
+  # S3 dispatch reaches RunTDR.HDF5AnnData — verify it is registered
+  expect_true(is.function(getS3method("RunTDR", "HDF5AnnData")))
+})
 
-  expect_true(is.function(RunTDR.h5ad))
+test_that("RunTDR.HDF5AnnData runs full pipeline via S3 dispatch", {
+  skip_on_cran()
+  skip_if_not_installed("anndataR")
+  skip_if_not(curl::has_internet(), "No internet connection")
+
+  trajectory_data <- fetch_trajectory_data()
+  sce <- trajectory_data$SCE
+
+  # Write SCE to a temp h5ad, then read back as HDF5AnnData
+  h5ad_path <- tempfile(fileext = ".h5ad")
+  on.exit(unlink(h5ad_path), add = TRUE)
+
+  adata <- anndataR::from_SingleCellExperiment(sce, output_class = "HDF5AnnData",
+                                                file = h5ad_path)
+
+  sample_ids <- unique(as.character(
+    SummarizedExperiment::colData(sce)$Sample
+  ))
+  meta <- data.frame(row.names = sample_ids,
+                     group = rep("ctrl", length(sample_ids)))
+
+  # Call via generic — S3 dispatch should find RunTDR.HDF5AnnData
+  result <- RunTDR(x = adata,
+                   .sample.var = "Sample",
+                   .meta = meta,
+                   .assay.type = "RNA",
+                   .verbose = FALSE,
+                   .seed = 42)
+
+  expect_true(is.TDRObj(result))
+  expect_true(!is.null(result@density$fdens))
+  expect_equal(result@config$backend, "h5ad")
+})
+
+test_that("RunTDR.HDF5AnnData errors on invalid .sample.var", {
+  skip_on_cran()
+  skip_if_not_installed("anndataR")
+  skip_if_not(curl::has_internet(), "No internet connection")
+
+  trajectory_data <- fetch_trajectory_data()
+  sce <- trajectory_data$SCE
+
+  h5ad_path <- tempfile(fileext = ".h5ad")
+  on.exit(unlink(h5ad_path), add = TRUE)
+
+  adata <- anndataR::from_SingleCellExperiment(sce, output_class = "HDF5AnnData",
+                                                file = h5ad_path)
+
+  meta <- data.frame(row.names = "s1", group = "ctrl")
+
+  expect_error(
+    RunTDR(x = adata,
+           .sample.var = "NonExistentCol",
+           .meta = meta,
+           .assay.type = "RNA",
+           .verbose = FALSE),
+    "not found in x\\$obs"
+  )
 })

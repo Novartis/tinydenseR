@@ -756,42 +756,23 @@ RunTDR.SingleCellExperiment <- function(x,
 }
 
 
-#' Run the tinydenseR pipeline on an h5ad file
+#' @describeIn RunTDR Run the pipeline on an HDF5AnnData object
 #'
-#' Reads an \code{.h5ad} file via \pkg{anndataR}, builds a
-#' \code{\linkS4class{TDRObj}}, and executes the full pipeline.
+#' Builds a \code{\linkS4class{TDRObj}} from an HDF5-backed AnnData
+#' object and executes the full pipeline.
 #'
-#' This is a standalone exported function, not an S3 method (the
-#' \code{"character"} class is too generic for dispatch).
-#'
-#' @param x Character(1). Path to the \code{.h5ad} file.
-#' @param .sample.var Character(1). Column in \code{adata$obs} identifying
-#'   sample membership.
+#' @param x An \code{HDF5AnnData} object (created via
+#'   \code{anndataR::read_h5ad(..., backend = "HDF5AnnData")}).
 #' @param .meta A data.frame of sample-level metadata. Row names must
-#'   correspond to sample IDs in \code{adata$obs[[.sample.var]]}.
-#' @param .assay.type Character. \code{"RNA"} or \code{"cyto"}.
+#'   correspond to sample IDs in \code{x$obs[[.sample.var]]}.
 #' @param .assay.layer Character(1). Layer name in the AnnData object
 #'   (default \code{"X"}).
-#' @param .harmony.var Character vector of batch variable column names
-#'   in \code{.meta}, or \code{NULL}.
-#' @param .markers Character vector of marker names (required for cyto).
-#' @param .celltype.vec Character(1). Column name in \code{adata$obs}
-#'   containing per-cell type labels, or \code{NULL}.
-#' @param .min.cells.per.sample Integer. Minimum cells for a sample to be
-#'   included.
-#' @param .optimize.hdf5 Logical. If \code{TRUE}, warns that h5ad files
-#'   cannot be reordered in-place and suggests conversion to SCE.
-#' @param .verbose Logical. Print progress messages.
-#' @param .seed Integer. Random seed.
-#' @param .prop.landmarks Numeric in (0, 1]. Proportion of cells as landmarks.
-#' @param .n.threads Integer. Number of threads.
-#' @param ... Additional arguments passed to pipeline functions.
 #'
 #' @return A \code{\linkS4class{TDRObj}} (bare object — no container to
 #'   store it in).
 #'
 #' @export
-RunTDR.h5ad <- function(x,
+RunTDR.HDF5AnnData <- function(x,
                         .sample.var,
                         .meta,
                         .assay.type = "RNA",
@@ -814,26 +795,17 @@ RunTDR.h5ad <- function(x,
                         },
                         ...) {
 
-  # --- Dependency check ---
-  if (!requireNamespace("anndataR", quietly = TRUE)) {
-    stop("Package 'anndataR' is required for h5ad support. ",
-         "Install with: install.packages('anndataR')")
-  }
-
-  # --- Read h5ad ---
-  adata <- anndataR::read_h5ad(x, backend = "HDF5AnnData")
-
   # --- Input validation ---
   if (!is.character(.sample.var) || length(.sample.var) != 1) {
     stop(".sample.var must be a single character string.")
   }
 
-  if (!(.sample.var %in% colnames(adata$obs))) {
-    stop(".sample.var '", .sample.var, "' not found in adata$obs.")
+  if (!(.sample.var %in% colnames(x$obs))) {
+    stop(".sample.var '", .sample.var, "' not found in x$obs.")
   }
 
   # --- Build @cells as named list of sorted integer index vectors ---
-  sample_ids <- adata$obs[[.sample.var]]
+  sample_ids <- x$obs[[.sample.var]]
   counts_tbl <- table(sample_ids)
   valid <- names(counts_tbl)[
     counts_tbl >= .min.cells.per.sample &
@@ -850,16 +822,16 @@ RunTDR.h5ad <- function(x,
   if (!is.null(.celltype.vec)) {
     if (!is.character(.celltype.vec) || length(.celltype.vec) != 1) {
       stop(".celltype.vec must be a single character string ",
-           "(column name in adata$obs).")
+           "(column name in x$obs).")
     }
-    if (!(.celltype.vec %in% colnames(adata$obs))) {
+    if (!(.celltype.vec %in% colnames(x$obs))) {
       stop(".celltype.vec '", .celltype.vec,
-           "' not found in adata$obs.")
+           "' not found in x$obs.")
     }
     valid_cells <- unlist(.cells)
     ct_vec <- stats::setNames(
-      as.character(adata$obs[[.celltype.vec]][valid_cells]),
-      rownames(adata$obs)[valid_cells]
+      as.character(x$obs[[.celltype.vec]][valid_cells]),
+      rownames(x$obs)[valid_cells]
     )
   }
 
@@ -871,10 +843,25 @@ RunTDR.h5ad <- function(x,
 
   if (contiguity < 0.80) {
     if (isTRUE(.optimize.hdf5)) {
-      warning("h5ad files cannot be reordered in-place. Consider ",
-              "converting to SCE with ",
-              "anndataR::to_SingleCellExperiment() for optimal I/O.",
-              call. = FALSE)
+      # reorder metadata
+      metadata <- x$obs
+      metadata <- metadata[order(metadata[[.sample.var]]), ]
+
+      # reorder h5ad
+      x <- x[rownames(x = metadata), ]
+
+      # recompute after reordering
+      sample_ids <- x$obs[[.sample.var]]
+      counts_tbl <- table(sample_ids)
+      valid <- names(counts_tbl)[
+        counts_tbl >= .min.cells.per.sample &
+        names(counts_tbl) %in% rownames(.meta)
+      ]
+      .cells <- lapply(
+        stats::setNames(valid, valid),
+        function(s) sort(which(sample_ids == s))
+      )
+      .meta <- .meta[names(.cells), , drop = FALSE]
     } else {
       warning("Cells in HDF5-backed h5ad are not grouped by sample. ",
               "Consider .optimize.hdf5 = TRUE for ~10-50x faster I/O.",
@@ -916,7 +903,7 @@ RunTDR.h5ad <- function(x,
   }
 
   # --- Pipeline ---
-  tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = adata, .seed = .seed, .verbose = .verbose), lm_args))
+  tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), lm_args))
   tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
 
   if (!is.null(tdr.obj@config$celltype.vec)) {
@@ -925,7 +912,7 @@ RunTDR.h5ad <- function(x,
                           .verbose = .verbose)
   }
 
-  tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = adata, .seed = .seed, .verbose = .verbose), map_args))
+  tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
 
   return(tdr.obj)
 }

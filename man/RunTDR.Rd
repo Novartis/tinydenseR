@@ -5,6 +5,7 @@
 \alias{RunTDR.default}
 \alias{RunTDR.Seurat}
 \alias{RunTDR.SingleCellExperiment}
+\alias{RunTDR.HDF5AnnData}
 \title{Run the full tinydenseR pipeline}
 \usage{
 RunTDR(x, ...)
@@ -63,9 +64,33 @@ RunTDR(x, ...)
  },
   ...
 )
+
+\method{RunTDR}{HDF5AnnData}(
+  x,
+  .sample.var,
+  .meta,
+  .assay.type = "RNA",
+  .assay.layer = "X",
+  .harmony.var = NULL,
+  .markers = NULL,
+  .celltype.vec = NULL,
+  .min.cells.per.sample = 10,
+  .optimize.hdf5 = FALSE,
+  .verbose = TRUE,
+  .seed = 123,
+  .prop.landmarks = 0.1,
+  .n.threads = if (is.hpc()) {
+     max(RhpcBLASctl::blas_get_num_procs(),
+    RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
+
+    } else {
+     parallel::detectCores(logical = TRUE)
+ },
+  ...
+)
 }
 \arguments{
-\item{x}{A \code{SingleCellExperiment} object.}
+\item{x}{A \code{SingleCellExperiment} or \code{HDF5AnnData} object.}
 
 \item{...}{Additional arguments passed to pipeline functions.}
 
@@ -101,8 +126,15 @@ included.}
 \item{.n.threads}{Integer. Number of threads.}
 
 \item{.optimize.hdf5}{Logical. If \code{TRUE} and the assay is
-HDF5-backed with poor contiguity, reorder the SCE columns by sample
-for faster I/O.}
+HDF5-backed with poor contiguity, reorder the object's columns/rows
+by sample for faster I/O.}
+
+\item{.meta}{A data.frame of sample-level metadata. Row names must
+correspond to sample IDs in \code{x$obs[[.sample.var]]}.
+(HDF5AnnData method only.)}
+
+\item{.assay.layer}{Character(1). Layer name in the AnnData object
+(default \code{"X"}). (HDF5AnnData method only.)}
 }
 \value{
 Depends on the method; see individual method documentation.
@@ -114,6 +146,9 @@ The Seurat object \code{x} with the TDRObj stored in
 
 The \code{SingleCellExperiment} \code{x} with the TDRObj stored
 in \code{S4Vectors::metadata(x)$tdr.obj}.
+
+A \code{\linkS4class{TDRObj}} (bare object \emdash no container to
+store it in). (HDF5AnnData method.)
 }
 \description{
 S3 generic that executes the complete tinydenseR analysis pipeline:
@@ -137,5 +172,10 @@ the full pipeline. The finished TDRObj is stored in
 Builds a \code{\linkS4class{TDRObj}} from a \code{SingleCellExperiment}
 and executes the full pipeline. The finished TDRObj is stored in
 \code{S4Vectors::metadata(x)$tdr.obj}.
+
+\item \code{RunTDR(HDF5AnnData)}: Run the pipeline on an HDF5AnnData object
+
+Builds a \code{\linkS4class{TDRObj}} from an HDF5-backed AnnData
+object and executes the full pipeline.
 
 }}
