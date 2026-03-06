@@ -11,6 +11,7 @@ get.meta(.obj, .sample.var, .verbose = TRUE)
 \itemize{
 \item Seurat object (v4 or v5) - calls \code{get.meta.Seurat} or \code{get.meta.Seurat5}
 \item SingleCellExperiment object - calls \code{get.meta.SCE}
+\item HDF5AnnData object - calls \code{get.meta.HDF5AnnData}
 }}
 
 \item{.sample.var}{Character: column name in object metadata identifying samples.}
@@ -22,15 +23,17 @@ Data frame with one row per sample, containing only sample-level metadata column
 Rownames are sample IDs.
 }
 \description{
-Convenience wrapper that automatically detects input format (Seurat v4/v5 or SingleCellExperiment)
-and calls the appropriate metadata extraction function. Simplifies workflow by eliminating need
-to know object version.
+Convenience wrapper that automatically detects input format (Seurat v4/v5,
+SingleCellExperiment, or HDF5AnnData) and calls the appropriate metadata
+extraction function. Simplifies workflow by eliminating need to know object
+version.
 }
 \details{
 This function inspects the class of \code{.obj} to determine format:
 \itemize{
 \item \code{Seurat}: Checks first assay for Assay5 class to distinguish v4 from v5
 \item \code{SingleCellExperiment}: Uses standard \code{colData} accessor
+\item \code{HDF5AnnData}: Uses \code{obs} accessor
 }
 
 Automatically filters to sample-level metadata by testing which columns have consistent values
@@ -46,6 +49,10 @@ meta <- get.meta(.obj = seurat.obj,
 meta <- get.meta(.obj = sce.obj,
                  .sample.var = "Sample")
 
+# Example 3: HDF5AnnData object
+meta <- get.meta(.obj = adata,
+                 .sample.var = "sample_id")
+
 # Use with get.cells
 cells <- get.cells(.exprs = seurat.obj,
                    .meta = meta,
@@ -55,5 +62,6 @@ cells <- get.cells(.exprs = seurat.obj,
 }
 \seealso{
 \code{\link{get.meta.Seurat}}, \code{\link{get.meta.Seurat5}},
-\code{\link{get.meta.SCE}}, \code{\link{get.cells}} for extracting count data
+\code{\link{get.meta.SCE}}, \code{\link{get.meta.HDF5AnnData}},
+\code{\link{get.cells}} for extracting count data
 }

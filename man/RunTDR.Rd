@@ -68,9 +68,8 @@ RunTDR(x, ...)
 \method{RunTDR}{HDF5AnnData}(
   x,
   .sample.var,
-  .meta,
   .assay.type = "RNA",
-  .assay.layer = "X",
+  .assay.layer = "counts",
   .harmony.var = NULL,
   .markers = NULL,
   .celltype.vec = NULL,
@@ -90,7 +89,8 @@ RunTDR(x, ...)
 )
 }
 \arguments{
-\item{x}{A \code{SingleCellExperiment} or \code{HDF5AnnData} object.}
+\item{x}{An \code{HDF5AnnData} object (created via
+\code{anndataR::read_h5ad(..., backend = "HDF5AnnData")}).}
 
 \item{...}{Additional arguments passed to pipeline functions.}
 
@@ -126,15 +126,11 @@ included.}
 \item{.n.threads}{Integer. Number of threads.}
 
 \item{.optimize.hdf5}{Logical. If \code{TRUE} and the assay is
-HDF5-backed with poor contiguity, reorder the object's columns/rows
-by sample for faster I/O.}
-
-\item{.meta}{A data.frame of sample-level metadata. Row names must
-correspond to sample IDs in \code{x$obs[[.sample.var]]}.
-(HDF5AnnData method only.)}
+HDF5-backed with poor contiguity, reorder the SCE columns by sample
+for faster I/O.}
 
 \item{.assay.layer}{Character(1). Layer name in the AnnData object
-(default \code{"X"}). (HDF5AnnData method only.)}
+(default \code{"counts"}).}
 }
 \value{
 Depends on the method; see individual method documentation.
@@ -147,8 +143,8 @@ The Seurat object \code{x} with the TDRObj stored in
 The \code{SingleCellExperiment} \code{x} with the TDRObj stored
 in \code{S4Vectors::metadata(x)$tdr.obj}.
 
-A \code{\linkS4class{TDRObj}} (bare object \emdash no container to
-store it in). (HDF5AnnData method.)
+A \code{\linkS4class{TDRObj}} (bare object — no container to
+store it in).
 }
 \description{
 S3 generic that executes the complete tinydenseR analysis pipeline:

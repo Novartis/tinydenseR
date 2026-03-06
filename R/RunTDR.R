@@ -763,10 +763,8 @@ RunTDR.SingleCellExperiment <- function(x,
 #'
 #' @param x An \code{HDF5AnnData} object (created via
 #'   \code{anndataR::read_h5ad(..., backend = "HDF5AnnData")}).
-#' @param .meta A data.frame of sample-level metadata. Row names must
-#'   correspond to sample IDs in \code{x$obs[[.sample.var]]}.
 #' @param .assay.layer Character(1). Layer name in the AnnData object
-#'   (default \code{"X"}).
+#'   (default \code{"counts"}).
 #'
 #' @return A \code{\linkS4class{TDRObj}} (bare object — no container to
 #'   store it in).
@@ -774,9 +772,8 @@ RunTDR.SingleCellExperiment <- function(x,
 #' @export
 RunTDR.HDF5AnnData <- function(x,
                         .sample.var,
-                        .meta,
                         .assay.type = "RNA",
-                        .assay.layer = "X",
+                        .assay.layer = "counts",
                         .harmony.var = NULL,
                         .markers = NULL,
                         .celltype.vec = NULL,
@@ -803,6 +800,10 @@ RunTDR.HDF5AnnData <- function(x,
   if (!(.sample.var %in% colnames(x$obs))) {
     stop(".sample.var '", .sample.var, "' not found in x$obs.")
   }
+
+  # --- Extract sample-level metadata ---
+  .meta <- get.meta(.obj = x, .sample.var = .sample.var,
+                    .verbose = .verbose)
 
   # --- Build @cells as named list of sorted integer index vectors ---
   sample_ids <- x$obs[[.sample.var]]
@@ -1054,7 +1055,7 @@ RunTDR.HDF5AnnData <- function(x,
 
   # --- h5ad backend config ---
   .tdr.obj@config$backend <- "h5ad"
-  .tdr.obj@config$source.assay <- .assay.layer
+  .tdr.obj@config$source.layer <- .assay.layer
 
   # --- Cell type vector ---
   if (!is.null(.celltype.vec)) {

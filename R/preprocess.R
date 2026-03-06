@@ -1349,16 +1349,137 @@ get.meta.SCE <-
     
   }
 
+#' Extract Sample-Level Metadata from HDF5AnnData Object
+#'
+#' Extracts sample-wise metadata from an HDF5-backed AnnData object by
+#' identifying which \code{obs} columns have consistent values within each
+#' sample. Returns a data frame suitable for \code{setup.tdr.obj(.meta = ...)}.
+#'
+#' @param .h5ad.obj An HDF5AnnData object (created via
+#'   \code{anndataR::read_h5ad(..., backend = "HDF5AnnData")}).
+#' @param .sample.var Character: column name in \code{.h5ad.obj$obs}
+#'   identifying samples.
+#' @param .verbose Logical: print progress messages? Default TRUE.
+#'
+#' @return Data frame with one row per sample, containing only sample-level
+#'   metadata columns. Rownames are sample IDs from \code{.sample.var}.
+#'
+#' @details
+#' AnnData objects store cell-level annotations in \code{obs}. This function:
+#' \enumerate{
+#'   \item Reads \code{obs} as a data frame
+#'   \item Groups by \code{.sample.var}
+#'   \item Identifies columns with unique values within each sample (sample-level)
+#'   \item Excludes varying columns (cell-level) with warning
+#'   \item Returns one row per sample
+#' }
+#'
+#' @seealso \code{\link{get.meta}} for automatic format detection,
+#'   \code{\link{get.meta.Seurat}} for Seurat objects,
+#'   \code{\link{get.meta.SCE}} for SingleCellExperiment objects
+#'
+#' @examples
+#' \dontrun{
+#' adata <- anndataR::read_h5ad("data.h5ad", backend = "HDF5AnnData")
+#' meta <- get.meta.HDF5AnnData(.h5ad.obj = adata,
+#'                              .sample.var = "sample_id")
+#' }
+#'
+#' @export
+#'
+get.meta.HDF5AnnData <-
+  function(.h5ad.obj,
+           .sample.var,
+           .verbose = TRUE){
+    
+    if(!inherits(x = .h5ad.obj,
+                 what = "HDF5AnnData")){
+      stop(".h5ad.obj must be a HDF5AnnData object")
+    }
+    
+    if(!inherits(x = .sample.var,
+                 what = "character") ||
+       length(x = .sample.var) != 1){
+      stop(".sample.var must be a single character string")
+    }
+    
+    if(!(.sample.var %in% colnames(.h5ad.obj$obs))){
+      stop(paste0(".sample.var '", .sample.var, "' not found in HDF5AnnData obs"))
+    }
+    
+    if(!inherits(x = .verbose,
+                 what = "logical")){
+      stop(".verbose must be a logical")
+    }
+    
+    if(.verbose){
+      cat("Extracting metadata from HDF5AnnData object...\n")
+    }
+    
+    # Convert obs to data frame for analysis
+    .obs.df <-
+      as.data.frame(.h5ad.obj$obs)
+    
+    # Identify sample-level columns (where all values within each sample are identical)
+    .sample.level.cols <-
+      .obs.df |>
+      dplyr::group_by(!!rlang::sym(.sample.var)) |>
+      dplyr::summarize(dplyr::across(.cols = dplyr::everything(),
+                                     .fns = ~ length(x = unique(x = .x)) == 1),
+                       .groups = "drop") |> 
+      (\(x)
+       dplyr::select(.data = x[,!colnames(x = x) %in% .sample.var,
+                               drop = FALSE],
+                     dplyr::where(fn = all))
+      )() |>
+      colnames()
+    
+    # Always include the sample variable itself
+    .sample.level.cols <-
+      c(.sample.var, .sample.level.cols)
+    
+    # Identify excluded columns  
+    .all.cols <-
+      colnames(x = .obs.df)
+    
+    .excluded.cols <-
+      .all.cols[!.all.cols %in% .sample.level.cols]
+    
+    if(length(x = .excluded.cols) > 0 && .verbose){
+      warning(paste0("Excluded ", length(x = .excluded.cols), 
+                     " cell-level columns from .meta: ",
+                     paste0(.excluded.cols, collapse = ", ")))
+    }
+    
+    # Extract sample-wise metadata for sample-level columns only
+    .sample.meta <-
+      .obs.df[, .sample.level.cols, drop = FALSE] |>
+      dplyr::distinct() |>
+      as.data.frame() |>
+      (\(x)
+       `rownames<-`(x = x, value = x[[.sample.var]])
+      )()
+    
+    if(.verbose){
+      cat("Extracted metadata for", nrow(x = .sample.meta), "samples with", ncol(x = .sample.meta), "sample-level variables\n")
+    }
+    
+    return(.sample.meta)
+    
+  }
+
 #' Extract Sample-Level Metadata with Automatic Format Detection
 #'
-#' Convenience wrapper that automatically detects input format (Seurat v4/v5 or SingleCellExperiment) 
-#' and calls the appropriate metadata extraction function. Simplifies workflow by eliminating need 
-#' to know object version.
+#' Convenience wrapper that automatically detects input format (Seurat v4/v5,
+#' SingleCellExperiment, or HDF5AnnData) and calls the appropriate metadata
+#' extraction function. Simplifies workflow by eliminating need to know object
+#' version.
 #'
 #' @param .obj Object containing cell-level metadata. Can be:
 #'   \itemize{
 #'     \item Seurat object (v4 or v5) - calls \code{get.meta.Seurat} or \code{get.meta.Seurat5}
 #'     \item SingleCellExperiment object - calls \code{get.meta.SCE}
+#'     \item HDF5AnnData object - calls \code{get.meta.HDF5AnnData}
 #'   }
 #' @param .sample.var Character: column name in object metadata identifying samples.
 #' @param .verbose Logical: print progress messages? Default TRUE.
@@ -1371,13 +1492,15 @@ get.meta.SCE <-
 #' \itemize{
 #'   \item \code{Seurat}: Checks first assay for Assay5 class to distinguish v4 from v5
 #'   \item \code{SingleCellExperiment}: Uses standard \code{colData} accessor
+#'   \item \code{HDF5AnnData}: Uses \code{obs} accessor
 #' }
 #' 
 #' Automatically filters to sample-level metadata by testing which columns have consistent values 
 #' within each sample. Cell-level columns (varying within samples) are excluded with a warning.
 #' 
 #' @seealso \code{\link{get.meta.Seurat}}, \code{\link{get.meta.Seurat5}}, 
-#'   \code{\link{get.meta.SCE}}, \code{\link{get.cells}} for extracting count data
+#'   \code{\link{get.meta.SCE}}, \code{\link{get.meta.HDF5AnnData}},
+#'   \code{\link{get.cells}} for extracting count data
 #'   
 #' @examples
 #' \dontrun{
@@ -1388,6 +1511,10 @@ get.meta.SCE <-
 #' # Example 2: SingleCellExperiment object
 #' meta <- get.meta(.obj = sce.obj,
 #'                  .sample.var = "Sample")
+#' 
+#' # Example 3: HDF5AnnData object
+#' meta <- get.meta(.obj = adata,
+#'                  .sample.var = "sample_id")
 #' 
 #' # Use with get.cells
 #' cells <- get.cells(.exprs = seurat.obj,
@@ -1463,9 +1590,20 @@ get.meta <-
                           .sample.var = .sample.var,
                           .verbose = .verbose))
       
+    } else if(inherits(x = .obj,
+                       what = "HDF5AnnData")){
+      
+      if(.verbose){
+        cat("Detected HDF5AnnData object, using get.meta.HDF5AnnData...\n")
+      }
+      
+      return(get.meta.HDF5AnnData(.h5ad.obj = .obj,
+                                   .sample.var = .sample.var,
+                                   .verbose = .verbose))
+      
     } else {
       
-      stop("Input type not supported. .obj must be either a Seurat object or a SingleCellExperiment object")
+      stop("Input type not supported. .obj must be a Seurat, SingleCellExperiment, or HDF5AnnData object")
       
     }
     

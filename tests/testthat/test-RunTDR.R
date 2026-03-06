@@ -283,19 +283,12 @@ test_that("RunTDR.HDF5AnnData runs full pipeline via S3 dispatch", {
   h5ad_path <- tempfile(fileext = ".h5ad")
   on.exit(unlink(h5ad_path), add = TRUE)
 
-  adata <- anndataR::from_SingleCellExperiment(sce, output_class = "HDF5AnnData",
+  adata <- anndataR::as_AnnData(x = sce, output_class = "HDF5AnnData",
                                                 file = h5ad_path)
-
-  sample_ids <- unique(as.character(
-    SummarizedExperiment::colData(sce)$Sample
-  ))
-  meta <- data.frame(row.names = sample_ids,
-                     group = rep("ctrl", length(sample_ids)))
 
   # Call via generic — S3 dispatch should find RunTDR.HDF5AnnData
   result <- RunTDR(x = adata,
                    .sample.var = "Sample",
-                   .meta = meta,
                    .assay.type = "RNA",
                    .verbose = FALSE,
                    .seed = 42)
@@ -316,15 +309,12 @@ test_that("RunTDR.HDF5AnnData errors on invalid .sample.var", {
   h5ad_path <- tempfile(fileext = ".h5ad")
   on.exit(unlink(h5ad_path), add = TRUE)
 
-  adata <- anndataR::from_SingleCellExperiment(sce, output_class = "HDF5AnnData",
+  adata <- anndataR::as_AnnData(x = sce, output_class = "HDF5AnnData",
                                                 file = h5ad_path)
-
-  meta <- data.frame(row.names = "s1", group = "ctrl")
 
   expect_error(
     RunTDR(x = adata,
            .sample.var = "NonExistentCol",
-           .meta = meta,
            .assay.type = "RNA",
            .verbose = FALSE),
     "not found in x\\$obs"
