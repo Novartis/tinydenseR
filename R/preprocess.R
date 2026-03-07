@@ -1601,6 +1601,64 @@ get.meta <-
                                    .sample.var = .sample.var,
                                    .verbose = .verbose))
       
+    } else if(inherits(x = .obj, what = c("DataFrame","tibble","data.table","data.frame"))) {
+      
+      # this is probably cell-level metadata that needs to be filtered to sample-level
+      if(isTRUE(x = .verbose)){
+        cat("Input is a data frame, attempting to filter to sample-level metadata...\n")
+      }
+
+      # Check if .sample.var is a column in the data frame
+      if(!(.sample.var %in% colnames(x = .obj))){
+        stop(paste0(".sample.var '", .sample.var, "' not found in input data frame"))
+      }
+
+      # Identify sample-level columns (where all values within each sample are identical)
+      .sample.level.cols <-
+        .obj |>
+        dplyr::group_by(!!rlang::sym(.sample.var)) |>
+        dplyr::summarize(dplyr::across(.cols = dplyr::everything(),
+                                       .fns = ~ length(x = unique(x = .x)) == 1),
+                         .groups = "drop") |> 
+        (\(x)
+         dplyr::select(.data = x[,!colnames(x = x) %in% .sample.var,
+                                 drop = FALSE],
+                       dplyr::where(fn = all))
+        )() |>
+        colnames()
+
+      # Always include the sample variable itself
+    .sample.level.cols <-
+      c(.sample.var, .sample.level.cols)
+    
+    # Identify excluded columns  
+    .all.cols <-
+      colnames(x = .obj)
+    
+    .excluded.cols <-
+      .all.cols[!.all.cols %in% .sample.level.cols]
+    
+    if(length(x = .excluded.cols) > 0 && .verbose){
+      warning(paste0("Excluded ", length(x = .excluded.cols), 
+                     " cell-level columns from .meta: ",
+                     paste0(.excluded.cols, collapse = ", ")))
+    }
+    
+    # Extract sample-wise metadata for sample-level columns only
+    .sample.meta <-
+      .obj[, .sample.level.cols, drop = FALSE] |>
+      dplyr::distinct() |>
+      as.data.frame() |>
+      (\(x)
+       `rownames<-`(x = x, value = x[[.sample.var]])
+      )()
+    
+    if(.verbose){
+      cat("Extracted metadata for", nrow(x = .sample.meta), "samples with", ncol(x = .sample.meta), "sample-level variables\n")
+    }
+      
+    return(.sample.meta)
+
     } else {
       
       stop("Input type not supported. .obj must be a Seurat, SingleCellExperiment, or HDF5AnnData object")

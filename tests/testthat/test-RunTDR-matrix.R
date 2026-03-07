@@ -11,8 +11,8 @@ library(tinydenseR)
 # Helper: create a dgCMatrix + cell.meta for testing
 # ======================================================================
 
-.make_matrix_test_data <- function(n_cells = 50, n_markers = 5,
-                                   n_samples = 4, assay.type = "cyto") {
+.make_matrix_test_data <- function(n_cells = 100, n_markers = 50,
+                                   n_samples = 4, assay.type = "RNA") {
   sample_names <- paste0("sample", seq_len(n_samples))
   cells_per_sample <- rep(n_cells, n_samples)
   total_cells <- sum(cells_per_sample)
@@ -22,7 +22,7 @@ library(tinydenseR)
   cell_ids <- paste0(sample_ids, "_cell_", sequence(cells_per_sample))
 
   if (assay.type == "cyto") {
-    # cells x markers (dense, stored as dgCMatrix)
+    # cells x markers
     mat <- Matrix::Matrix(
       data = matrix(runif(total_cells * n_markers),
                     nrow = total_cells, ncol = n_markers,
@@ -69,26 +69,19 @@ test_that("RunTDR dispatches to IterableMatrix method", {
 # RunTDR.dgCMatrix tests
 # ======================================================================
 
-test_that("RunTDR.dgCMatrix runs full pipeline (cyto)", {
-  skip_on_cran()
+test_that("RunTDR.dgCMatrix rejects cyto assay type", {
   td <- .make_matrix_test_data(n_cells = 50, n_markers = 5,
-                               n_samples = 4, assay.type = "cyto")
-
-  result <- RunTDR(td$mat, .cell.meta = td$cell.meta,
-                   .sample.var = "Sample",
-                   .markers = paste0("marker_", 1:5),
-                   .assay.type = "cyto",
-                   .verbose = FALSE, .seed = 42)
-
-  expect_true(is.TDRObj(result))
-  expect_equal(result@config$backend, "matrix")
-  expect_true(!is.null(result@density$fdens))
-  expect_equal(nrow(result@metadata), 4L)
+                               n_samples = 2, assay.type = "cyto")
+  expect_error(RunTDR(td$mat, .cell.meta = td$cell.meta,
+                      .sample.var = "Sample",
+                      .markers = paste0("marker_", 1:5),
+                      .assay.type = "cyto"),
+               "only supported for .assay.type = 'RNA'")
 })
 
 test_that("RunTDR.dgCMatrix runs full pipeline (RNA)", {
   skip_on_cran()
-  td <- .make_matrix_test_data(n_cells = 50, n_markers = 10,
+  td <- .make_matrix_test_data(n_cells = 100, n_markers = 50,
                                n_samples = 4, assay.type = "RNA")
 
   result <- RunTDR(td$mat, .cell.meta = td$cell.meta,
@@ -99,17 +92,17 @@ test_that("RunTDR.dgCMatrix runs full pipeline (RNA)", {
   expect_true(is.TDRObj(result))
   expect_equal(result@config$backend, "matrix")
   expect_true(!is.null(result@density$fdens))
+  expect_equal(nrow(result@metadata), 4L)
 })
 
 test_that("RunTDR.dgCMatrix uses index-based .cells (not file paths)", {
   skip_on_cran()
-  td <- .make_matrix_test_data(n_cells = 50, n_markers = 5,
-                               n_samples = 4, assay.type = "cyto")
+  td <- .make_matrix_test_data(n_cells = 100, n_markers = 50,
+                               n_samples = 4, assay.type = "RNA")
 
   result <- RunTDR(td$mat, .cell.meta = td$cell.meta,
                    .sample.var = "Sample",
-                   .markers = paste0("marker_", 1:5),
-                   .assay.type = "cyto",
+                   .assay.type = "RNA",
                    .verbose = FALSE, .seed = 42)
 
   # .cells should be integer index vectors, not file paths
@@ -119,13 +112,12 @@ test_that("RunTDR.dgCMatrix uses index-based .cells (not file paths)", {
 
 test_that("RunTDR.dgCMatrix stores a locked source env", {
   skip_on_cran()
-  td <- .make_matrix_test_data(n_cells = 50, n_markers = 5,
-                               n_samples = 4, assay.type = "cyto")
+  td <- .make_matrix_test_data(n_cells = 100, n_markers = 50,
+                               n_samples = 4, assay.type = "RNA")
 
   result <- RunTDR(td$mat, .cell.meta = td$cell.meta,
                    .sample.var = "Sample",
-                   .markers = paste0("marker_", 1:5),
-                   .assay.type = "cyto",
+                   .assay.type = "RNA",
                    .verbose = FALSE, .seed = 42)
 
   env <- result@config$source.env
@@ -134,25 +126,9 @@ test_that("RunTDR.dgCMatrix stores a locked source env", {
   expect_error(env$mat <- "overwrite", "cannot change")
 })
 
-test_that(".get_sample_matrix works with matrix backend (cyto)", {
-  skip_on_cran()
-  td <- .make_matrix_test_data(n_cells = 30, n_markers = 5,
-                               n_samples = 3, assay.type = "cyto")
-
-  result <- RunTDR(td$mat, .cell.meta = td$cell.meta,
-                   .sample.var = "Sample",
-                   .markers = paste0("marker_", 1:5),
-                   .assay.type = "cyto",
-                   .verbose = FALSE, .seed = 42)
-
-  sample1_mat <- tinydenseR:::.get_sample_matrix(NULL, result, 1)
-  expect_equal(nrow(sample1_mat), lengths(result@cells)[[1]])
-  expect_equal(ncol(sample1_mat), 5L)
-})
-
 test_that(".get_sample_matrix works with matrix backend (RNA)", {
   skip_on_cran()
-  td <- .make_matrix_test_data(n_cells = 30, n_markers = 10,
+  td <- .make_matrix_test_data(n_cells = 350, n_markers = 50,
                                n_samples = 3, assay.type = "RNA")
 
   result <- RunTDR(td$mat, .cell.meta = td$cell.meta,
@@ -162,7 +138,7 @@ test_that(".get_sample_matrix works with matrix backend (RNA)", {
 
   sample1_mat <- tinydenseR:::.get_sample_matrix(NULL, result, 1)
   expect_equal(ncol(sample1_mat), lengths(result@cells)[[1]])
-  expect_equal(nrow(sample1_mat), 10L)
+  expect_equal(nrow(sample1_mat), 50L)
 })
 
 # ======================================================================
@@ -172,16 +148,16 @@ test_that(".get_sample_matrix works with matrix backend (RNA)", {
 test_that("RunTDR.DelayedMatrix runs full pipeline", {
   skip_on_cran()
   skip_if_not_installed("DelayedArray")
+  skip_if_not_installed("DelayedMatrixStats")
 
-  td <- .make_matrix_test_data(n_cells = 50, n_markers = 5,
-                               n_samples = 4, assay.type = "cyto")
+  td <- .make_matrix_test_data(n_cells = 100, n_markers = 50,
+                               n_samples = 4, assay.type = "RNA")
 
   delayed_mat <- DelayedArray::DelayedArray(as.matrix(td$mat))
 
   result <- RunTDR(delayed_mat, .cell.meta = td$cell.meta,
                    .sample.var = "Sample",
-                   .markers = paste0("marker_", 1:5),
-                   .assay.type = "cyto",
+                   .assay.type = "RNA",
                    .verbose = FALSE, .seed = 42)
 
   expect_true(is.TDRObj(result))
@@ -196,16 +172,16 @@ test_that("RunTDR.DelayedMatrix runs full pipeline", {
 test_that("RunTDR.IterableMatrix runs full pipeline", {
   skip_on_cran()
   skip_if_not_installed("BPCells")
+  skip_if_not_installed("DelayedMatrixStats")
 
-  td <- .make_matrix_test_data(n_cells = 50, n_markers = 5,
-                               n_samples = 4, assay.type = "cyto")
+  td <- .make_matrix_test_data(n_cells = 100, n_markers = 50,
+                               n_samples = 4, assay.type = "RNA")
 
-  bp_mat <- BPCells::as(td$mat, "IterableMatrix")
+  bp_mat <- methods::as(td$mat, "IterableMatrix")
 
   result <- RunTDR(bp_mat, .cell.meta = td$cell.meta,
                    .sample.var = "Sample",
-                   .markers = paste0("marker_", 1:5),
-                   .assay.type = "cyto",
+                   .assay.type = "RNA",
                    .verbose = FALSE, .seed = 42)
 
   expect_true(is.TDRObj(result))
@@ -222,17 +198,17 @@ test_that("RunTDR.dgCMatrix errors on non-data.frame .cell.meta", {
                               dimnames = list(paste0("g", 1:3),
                                               paste0("c", 1:3)))
   expect_error(RunTDR(mat, .cell.meta = "not_a_df",
-                      .sample.var = "x"),
+                      .sample.var = "x",
+                      .assay.type = "RNA"),
                "\\.cell\\.meta must be a data\\.frame")
 })
 
 test_that("RunTDR.dgCMatrix errors on missing .sample.var column", {
   td <- .make_matrix_test_data(n_cells = 10, n_markers = 3,
-                               n_samples = 2, assay.type = "cyto")
+                               n_samples = 2, assay.type = "RNA")
   expect_error(RunTDR(td$mat, .cell.meta = td$cell.meta,
                       .sample.var = "NonExistent",
-                      .markers = paste0("marker_", 1:3),
-                      .assay.type = "cyto"),
+                      .assay.type = "RNA"),
                "not found in \\.cell\\.meta")
 })
 
@@ -261,11 +237,10 @@ test_that("RunTDR.dgCMatrix errors when no cell overlap", {
 
 test_that("RunTDR.dgCMatrix errors when all samples below min cells", {
   td <- .make_matrix_test_data(n_cells = 5, n_markers = 3,
-                               n_samples = 2, assay.type = "cyto")
+                               n_samples = 2, assay.type = "RNA")
   expect_error(RunTDR(td$mat, .cell.meta = td$cell.meta,
                       .sample.var = "Sample",
-                      .markers = paste0("marker_", 1:3),
-                      .assay.type = "cyto",
+                      .assay.type = "RNA",
                       .min.cells.per.sample = 1000),
                "No samples have")
 })
@@ -276,20 +251,19 @@ test_that("RunTDR.dgCMatrix errors when all samples below min cells", {
 
 test_that("matrix backend produces same cell counts as files backend", {
   skip_on_cran()
-  td <- .make_matrix_test_data(n_cells = 50, n_markers = 5,
-                               n_samples = 4, assay.type = "cyto")
+  td <- .make_matrix_test_data(n_cells = 100, n_markers = 50,
+                               n_samples = 4, assay.type = "RNA")
 
   result_mat <- RunTDR(td$mat, .cell.meta = td$cell.meta,
                        .sample.var = "Sample",
-                       .markers = paste0("marker_", 1:5),
-                       .assay.type = "cyto",
+                       .assay.type = "RNA",
                        .verbose = FALSE, .seed = 42)
 
   # Files-based equivalent
   sample_names <- paste0("sample", 1:4)
   mat_list <- lapply(stats::setNames(sample_names, sample_names), function(s) {
     idx <- which(td$cell.meta$Sample == s)
-    td$mat[idx, , drop = FALSE]
+    td$mat[, idx, drop = FALSE]
   })
   files <- lapply(mat_list, function(m) {
     f <- tempfile(fileext = ".RDS")
@@ -305,8 +279,7 @@ test_that("matrix backend produces same cell counts as files backend", {
     stringsAsFactors = FALSE
   )
   tdr_files <- setup.tdr.obj(.cells = files, .meta = sample_meta,
-                             .markers = paste0("marker_", 1:5),
-                             .assay.type = "cyto", .verbose = FALSE)
+                             .assay.type = "RNA", .verbose = FALSE)
   tdr_files <- RunTDR(tdr_files, .verbose = FALSE, .seed = 42)
 
   expect_equal(result_mat@config$sampling$n.cells,

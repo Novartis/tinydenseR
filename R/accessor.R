@@ -57,7 +57,8 @@
         mat <- Matrix::t(mat)
       }
       if (!inherits(mat, "dgCMatrix") && methods::is(mat, "Matrix")) {
-        mat <- methods::as(mat, "CsparseMatrix")
+        mat <- methods::as(object = mat, Class = "CsparseMatrix") |>
+          methods::as(Class = "dgCMatrix")
       }
       mat
     },

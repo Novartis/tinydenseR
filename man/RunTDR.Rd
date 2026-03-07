@@ -6,6 +6,9 @@
 \alias{RunTDR.Seurat}
 \alias{RunTDR.SingleCellExperiment}
 \alias{RunTDR.HDF5AnnData}
+\alias{RunTDR.dgCMatrix}
+\alias{RunTDR.DelayedMatrix}
+\alias{RunTDR.IterableMatrix}
 \title{Run the full tinydenseR pipeline}
 \usage{
 RunTDR(x, ...)
@@ -87,14 +90,20 @@ RunTDR(x, ...)
  },
   ...
 )
+
+\method{RunTDR}{dgCMatrix}(x, .cell.meta, ...)
+
+\method{RunTDR}{DelayedMatrix}(x, .cell.meta, ...)
+
+\method{RunTDR}{IterableMatrix}(x, .cell.meta, ...)
 }
 \arguments{
-\item{x}{An \code{HDF5AnnData} object (created via
-\code{anndataR::read_h5ad(..., backend = "HDF5AnnData")}).}
+\item{x}{A \code{dgCMatrix} (features x cells for RNA,
+cells x features for cyto).}
 
 \item{...}{Additional arguments passed to pipeline functions.}
 
-\item{.celltype.vec}{Character(1). Column name in \code{colData(x)}
+\item{.celltype.vec}{Character(1). Column name in \code{.cell.meta}
 containing per-cell type labels, or \code{NULL}.}
 
 \item{.celltype.vec.overwrite}{Logical. If \code{TRUE}, replace an
@@ -104,8 +113,8 @@ existing \code{.celltype.vec} stored in the TDRObj config.}
 
 \item{.seed}{Integer. Random seed.}
 
-\item{.sample.var}{Character(1). Column in \code{colData(x)} identifying
-sample membership.}
+\item{.sample.var}{Character(1). Column name in \code{.cell.meta}
+identifying sample membership.}
 
 \item{.assay}{Character(1). Name of the assay in \code{assayNames(x)}.}
 
@@ -131,6 +140,10 @@ for faster I/O.}
 
 \item{.assay.layer}{Character(1). Layer name in the AnnData object
 (default \code{"counts"}).}
+
+\item{.cell.meta}{A \code{data.frame} of per-cell metadata.
+Must have one row per cell with rownames matching cell IDs
+in \code{x} (\code{colnames} for RNA, \code{rownames} for cyto).}
 }
 \value{
 Depends on the method; see individual method documentation.
@@ -145,6 +158,8 @@ in \code{S4Vectors::metadata(x)$tdr.obj}.
 
 A \code{\linkS4class{TDRObj}} (bare object — no container to
 store it in).
+
+A \code{\linkS4class{TDRObj}}.
 }
 \description{
 S3 generic that executes the complete tinydenseR analysis pipeline:
@@ -173,5 +188,14 @@ and executes the full pipeline. The finished TDRObj is stored in
 
 Builds a \code{\linkS4class{TDRObj}} from an HDF5-backed AnnData
 object and executes the full pipeline.
+
+\item \code{RunTDR(dgCMatrix)}: Run the pipeline on a sparse matrix (dgCMatrix)
+
+Builds a \code{\linkS4class{TDRObj}} from a \code{dgCMatrix} and
+per-cell metadata, then executes the full pipeline.
+
+\item \code{RunTDR(DelayedMatrix)}: Run the pipeline on a DelayedMatrix
+
+\item \code{RunTDR(IterableMatrix)}: Run the pipeline on a BPCells IterableMatrix
 
 }}

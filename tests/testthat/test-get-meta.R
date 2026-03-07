@@ -63,7 +63,16 @@ test_that("get.meta.HDF5AnnData errors on invalid inputs", {
                                      .sample.var = "x"),
                "must be.*HDF5AnnData")
 
-  expect_error(get.meta.HDF5AnnData(.h5ad.obj = data.frame(),
+  trajectory_data <- fetch_trajectory_data()
+  sce <- trajectory_data$SCE
+
+  h5ad_path <- tempfile(fileext = ".h5ad")
+  on.exit(unlink(h5ad_path), add = TRUE)
+
+  adata <- anndataR::as_AnnData(x = sce, output_class = "HDF5AnnData",
+                                file = h5ad_path)
+
+  expect_error(get.meta.HDF5AnnData(.h5ad.obj = adata,
                                      .sample.var = 123),
                "must be a single character string")
 })

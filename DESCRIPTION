@@ -19,6 +19,7 @@ Collate:
     'celltype.R'
     'elbow.finder.R'
     'goi.R'
+    'h5ad_utils.R'
     'landmarks.R'
     'lm.graph.embed.R'
     'plot.R'
@@ -33,19 +34,24 @@ Depends:
 LazyData: true
 Suggests: 
     testthat (>= 3.0.0),
+    DelayedMatrixStats,
     anndataR,
     filelock,
     ggiraph,
     rmarkdown,
     ggpubr,
+    rhdf5,
     rstatix,
     hexbin,
-    SingleCellExperiment
+    SingleCellExperiment,
+    DelayedArray,
+    destiny,
+    RcppML,
+    BPCells
 Config/testthat/edition: 3
 Imports: 
     collapse,
     curl,
-    destiny,
     dplyr,
     edgeR,
     ggh4x,
@@ -67,7 +73,6 @@ Imports:
     patchwork,
     pheatmap,
     qvalue,
-    RcppML,
     RhpcBLASctl,
     rlang,
     scales,

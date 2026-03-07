@@ -1100,6 +1100,11 @@ RunTDR.HDF5AnnData <- function(x,
 #'
 #' @export
 RunTDR.dgCMatrix <- function(x, .cell.meta, ...) {
+  dots <- list(...)
+  if (!is.null(dots$.assay.type) && dots$.assay.type != "RNA") {
+    stop("dgCMatrix input is only supported for .assay.type = 'RNA'.\n",
+         "For cytometry data, supply a dense matrix instead.")
+  }
   .run_tdr_matrix(x, .cell.meta, ...)
 }
 
@@ -1108,6 +1113,11 @@ RunTDR.dgCMatrix <- function(x, .cell.meta, ...) {
 #'
 #' @export
 RunTDR.DelayedMatrix <- function(x, .cell.meta, ...) {
+  dots <- list(...)
+  if (!is.null(dots$.assay.type) && dots$.assay.type != "RNA") {
+    stop("DelayedMatrix input is only supported for .assay.type = 'RNA'.\n",
+         "For cytometry data, supply a dense matrix instead.")
+  }
   .run_tdr_matrix(x, .cell.meta, ...)
 }
 
@@ -1116,6 +1126,11 @@ RunTDR.DelayedMatrix <- function(x, .cell.meta, ...) {
 #'
 #' @export
 RunTDR.IterableMatrix <- function(x, .cell.meta, ...) {
+  dots <- list(...)
+  if (!is.null(dots$.assay.type) && dots$.assay.type != "RNA") {
+    stop("IterableMatrix input is only supported for .assay.type = 'RNA'.\n",
+         "For cytometry data, supply a dense matrix instead.")
+  }
   .run_tdr_matrix(x, .cell.meta, ...)
 }
 

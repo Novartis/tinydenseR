@@ -999,7 +999,8 @@ get.pbDE.TDRObj <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            .get_sample_matrix(.source, .tdr.obj, smpl)[,.lm.idx[[smpl]]]
+            .get_sample_matrix(.source, .tdr.obj, smpl)[,.lm.idx[[smpl]]] |>
+            methods::as(Class = "dgCMatrix")
           
           wcl <- 
             .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[.lm.idx[[smpl]],,drop = FALSE]
@@ -1761,7 +1762,8 @@ get.markerDE.TDRObj <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            .get_sample_matrix(.source, .tdr.obj, smpl)
+            .get_sample_matrix(.source, .tdr.obj, smpl) |>
+            methods::as(Class = "dgCMatrix")
           
           res <-
             tryCatch(
@@ -1807,7 +1809,8 @@ get.markerDE.TDRObj <-
         lapply(FUN = function(smpl){
           
           exprs.mat <-
-            .get_sample_matrix(.source, .tdr.obj, smpl)
+            .get_sample_matrix(.source, .tdr.obj, smpl) |>
+            methods::as(Class = "dgCMatrix")
           
           res <-
             tryCatch(
@@ -4154,7 +4157,7 @@ get.nmfDE.TDRObj <-
     # Transpose so that landmarks are "samples" (columns) and genes are "features" (rows).
     A.t <-
       Matrix::t(x = A) |>
-      methods::as(Class = "CsparseMatrix")
+      methods::as(Class = "dgCMatrix")
     
     if (isTRUE(x = .verbose)) {
       message("Running NMF (k = ", .k, ", tol = ", .tol,

@@ -555,9 +555,14 @@ get.landmarks.TDRObj <-
         
         if(.tdr.obj@config$assay.type == "RNA"){
           
-          if(!inherits(x = mat,
+          if(inherits(x = mat,
+                       what = c("IterableMatrix", "DelayedMatrix"))){
+            mat <-
+              methods::as(object = mat,
+                         Class = "dgCMatrix")
+          } else if(!inherits(x = mat,
                        what = "dgCMatrix")){
-            stop("RNA expression matrices must be sparse (dgCMatrix class).\n")
+            stop("RNA expression matrices must be a dgCMatrix, IterableMatrix, or DelayedMatrix.\n")
           }
           
           # Identify genes to exclude from HVG selection (VDJ, mitochondrial, ribosomal)
@@ -652,6 +657,7 @@ get.landmarks.TDRObj <-
           if(.tdr.obj@config$assay.type == "RNA"){
             
             .get_sample_matrix(.source, .tdr.obj, .cells.idx)[,lm.sample] |>
+              methods::as(Class = "dgCMatrix") |>
               Matrix::t() |>
               (\(x)
                `rownames<-`(x = x,
@@ -686,7 +692,7 @@ get.landmarks.TDRObj <-
       
       .tdr.obj@assay$raw <-
         methods::as(object = .tdr.obj@assay$raw,
-                   Class = "CsparseMatrix")
+                   Class = "dgCMatrix")
       
     }
     
@@ -911,7 +917,9 @@ get.landmarks.TDRObj <-
         if(.tdr.obj@config$assay.type == "RNA"){
           
           mat <-
-            Matrix::t(x = mat) |>
+            methods::as(object = mat,
+                       Class = "dgCMatrix") |>
+            Matrix::t() |>
             (\(x)
              # size factor normalization, taking into consideration size factor of landmarks
              (x / (Matrix::rowSums(x = x) /
@@ -1006,6 +1014,7 @@ get.landmarks.TDRObj <-
             
             # For RNA: reload to get raw counts, add sample prefix to cell IDs
             .get_sample_matrix(.source, .tdr.obj, .cells.idx)[,lm.sample] |>
+              methods::as(Class = "dgCMatrix") |>
               Matrix::t() |>
               (\(x)
                `rownames<-`(x = x,

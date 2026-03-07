@@ -920,7 +920,9 @@ get.map.TDRObj <-
         if(.tdr.obj@config$assay.type == "RNA"){
           
           mat.exprs <-
-            Matrix::t(x = mat.exprs) |>
+            methods::as(object = mat.exprs, 
+              Class = "dgCMatrix") |>
+            Matrix::t() |>
             (\(x)
              # size factor normalization, taking into consideration size factor of landmarks
              (x / (Matrix::rowSums(x = x) /
@@ -1093,7 +1095,8 @@ get.map.TDRObj <-
           }
           
           raw.exprs <-
-            .get_sample_matrix(.source, .tdr.obj, cells.idx)
+            .get_sample_matrix(.source, .tdr.obj, cells.idx) |>
+            methods::as(object = "dgCMatrix")
           
           # Map query
           query <-
