@@ -1067,6 +1067,420 @@ RunTDR.HDF5AnnData <- function(x,
 
 
 # ======================================================================
+# RunTDR – matrix methods (dgCMatrix, DelayedMatrix, IterableMatrix)
+# ======================================================================
+
+#' @describeIn RunTDR Run the pipeline on a sparse matrix (dgCMatrix)
+#'
+#' Builds a \code{\linkS4class{TDRObj}} from a \code{dgCMatrix} and
+#' per-cell metadata, then executes the full pipeline.
+#'
+#' @param x A \code{dgCMatrix} (features x cells for RNA,
+#'   cells x features for cyto).
+#' @param .meta A \code{data.frame} of per-cell metadata.
+#'   Must have one row per cell with rownames matching cell IDs
+#'   in \code{x} (\code{colnames} for RNA, \code{rownames} for cyto).
+#' @param .sample.var Character(1). Column name in \code{.meta}
+#'   identifying sample membership.
+#' @param .assay.type Character. \code{"RNA"} or \code{"cyto"}.
+#' @param .harmony.var Character vector of batch variable column names
+#'   in sample-level metadata, or \code{NULL}.
+#' @param .markers Character vector of marker names (required for cyto).
+#' @param .celltype.vec Character(1). Column name in \code{.meta}
+#'   containing per-cell type labels, or \code{NULL}.
+#' @param .min.cells.per.sample Integer. Minimum cells for a sample to be
+#'   included.
+#' @param .verbose Logical. Print progress messages.
+#' @param .seed Integer. Random seed.
+#' @param .prop.landmarks Numeric in (0, 1]. Proportion of cells as landmarks.
+#' @param .n.threads Integer. Number of threads.
+#' @param ... Additional arguments passed to pipeline functions.
+#'
+#' @return A \code{\linkS4class{TDRObj}}.
+#'
+#' @export
+RunTDR.dgCMatrix <- function(x, .meta, ...) {
+  .run_tdr_matrix(x, .meta, ...)
+}
+
+
+#' @describeIn RunTDR Run the pipeline on a DelayedMatrix
+#'
+#' @export
+RunTDR.DelayedMatrix <- function(x, .meta, ...) {
+  .run_tdr_matrix(x, .meta, ...)
+}
+
+
+#' @describeIn RunTDR Run the pipeline on a BPCells IterableMatrix
+#'
+#' @export
+RunTDR.IterableMatrix <- function(x, .meta, ...) {
+  .run_tdr_matrix(x, .meta, ...)
+}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Internal: shared implementation for all matrix backends
+# ──────────────────────────────────────────────────────────────────────
+
+#' Run TDR pipeline on a bare matrix + cell metadata
+#'
+#' @keywords internal
+#' @noRd
+.run_tdr_matrix <- function(x,
+                            .meta,
+                            .sample.var,
+                            .assay.type = "RNA",
+                            .harmony.var = NULL,
+                            .markers = NULL,
+                            .celltype.vec = NULL,
+                            .min.cells.per.sample = 10,
+                            .verbose = TRUE,
+                            .seed = 123,
+                            .prop.landmarks = 0.1,
+                            .n.threads = if (is.hpc()) {
+                              max(RhpcBLASctl::blas_get_num_procs(),
+                                  RhpcBLASctl::omp_get_num_procs(),
+                                  RhpcBLASctl::omp_get_max_threads(),
+                                  na.rm = TRUE)
+                            } else {
+                              parallel::detectCores(logical = TRUE)
+                            },
+                            ...) {
+
+  # --- Input validation ---
+  .assay.type <- match.arg(arg = .assay.type,
+                           choices = c("cyto", "RNA"))
+
+  if (!inherits(.meta, "data.frame")) {
+    stop(".meta must be a data.frame.")
+  }
+
+  if (!is.character(.sample.var) || length(.sample.var) != 1) {
+    stop(".sample.var must be a single character string.")
+  }
+
+  if (!(.sample.var %in% colnames(.meta))) {
+    stop(".sample.var '", .sample.var, "' not found in .meta.")
+  }
+
+  # Determine cell IDs based on assay type orientation
+  if (.assay.type == "RNA") {
+    cell_ids <- colnames(x)
+    if (is.null(cell_ids)) {
+      stop("Matrix must have colnames (cell IDs) for RNA assay type.")
+    }
+  } else {
+    cell_ids <- rownames(x)
+    if (is.null(cell_ids)) {
+      stop("Matrix must have rownames (cell IDs) for cyto assay type.")
+    }
+  }
+
+  # Validate .meta rownames match matrix cell IDs
+  if (is.null(rownames(.meta))) {
+    stop(".meta must have rownames matching cell IDs in the matrix.")
+  }
+
+  shared <- intersect(rownames(.meta), cell_ids)
+  if (length(shared) == 0) {
+    stop("No overlap between rownames(.meta) and cell IDs in the matrix.")
+  }
+  if (length(shared) < length(cell_ids)) {
+    warning(length(cell_ids) - length(shared),
+            " cells in matrix not found in .meta; they will be dropped.")
+  }
+
+  # Subset to shared cells
+  if (.assay.type == "RNA") {
+    x <- x[, shared, drop = FALSE]
+  } else {
+    x <- x[shared, , drop = FALSE]
+  }
+  .meta <- .meta[shared, , drop = FALSE]
+
+  # --- Derive sample-level metadata ---
+  sample_ids <- .meta[[.sample.var]]
+  counts_tbl <- table(sample_ids)
+  valid <- names(counts_tbl)[counts_tbl >= .min.cells.per.sample]
+
+  if (length(valid) == 0) {
+    stop("No samples have >= ", .min.cells.per.sample,
+         " cells. Check .sample.var or lower .min.cells.per.sample.")
+  }
+
+  # Identify sample-level columns (constant within each sample)
+  sample_level_cols <- .meta |>
+    dplyr::group_by(!!rlang::sym(.sample.var)) |>
+    dplyr::summarize(
+      dplyr::across(
+        .cols = dplyr::everything(),
+        .fns = ~ length(unique(.x)) == 1
+      ),
+      .groups = "drop"
+    ) |>
+    (\(df) {
+      non_sv <- df[, !colnames(df) %in% .sample.var, drop = FALSE]
+      colnames(dplyr::select(non_sv, dplyr::where(all)))
+    })()
+
+  sample_level_cols <- c(.sample.var, sample_level_cols)
+
+  sample_meta <- .meta[, sample_level_cols, drop = FALSE] |>
+    dplyr::distinct() |>
+    as.data.frame()
+  rownames(sample_meta) <- sample_meta[[.sample.var]]
+  sample_meta <- sample_meta[intersect(valid, rownames(sample_meta)),
+                             , drop = FALSE]
+
+  # --- Split matrix by sample and save to temp RDS ---
+  cell_sample <- .meta[[.sample.var]]
+  valid_mask <- cell_sample %in% rownames(sample_meta)
+  cell_sample <- cell_sample[valid_mask]
+
+  if (.assay.type == "RNA") {
+    x <- x[, valid_mask, drop = FALSE]
+  } else {
+    x <- x[valid_mask, , drop = FALSE]
+  }
+
+  sample_names <- rownames(sample_meta)
+
+  .cells <- stats::setNames(
+    lapply(sample_names, function(s) {
+      idx <- which(cell_sample == s)
+      if (.assay.type == "RNA") {
+        mat <- x[, idx, drop = FALSE]
+      } else {
+        mat <- x[idx, , drop = FALSE]
+      }
+      uri <- tempfile(fileext = ".RDS")
+      saveRDS(object = mat, file = uri, compress = FALSE)
+      uri
+    }),
+    sample_names
+  )
+
+  # --- .celltype.vec handling ---
+  ct_vec <- NULL
+  if (!is.null(.celltype.vec)) {
+    if (!is.character(.celltype.vec) || length(.celltype.vec) != 1) {
+      stop(".celltype.vec must be a single character string ",
+           "(column name in .meta).")
+    }
+    if (!(.celltype.vec %in% colnames(.meta))) {
+      stop(".celltype.vec '", .celltype.vec,
+           "' not found in .meta.")
+    }
+    valid_cells <- if (.assay.type == "RNA") {
+      colnames(x)
+    } else {
+      rownames(x)
+    }
+    ct_vec <- stats::setNames(
+      as.character(.meta[valid_cells, .celltype.vec]),
+      valid_cells
+    )
+  }
+
+  # --- Build TDRObj ---
+  tdr.obj <- .setup_tdr_from_matrix(
+    .cells = .cells,
+    .meta = sample_meta,
+    .assay.type = .assay.type,
+    .markers = .markers,
+    .harmony.var = .harmony.var,
+    .celltype.vec = ct_vec,
+    .prop.landmarks = .prop.landmarks,
+    .seed = .seed,
+    .n.threads = .n.threads,
+    .verbose = .verbose
+  )
+
+  # --- Argument routing ---
+  dots <- list(...)
+
+  .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
+  .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
+  .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+
+  lm_args  <- dots[names(dots) %in% .lm.formals]
+  gr_args  <- dots[names(dots) %in% .gr.formals]
+  map_args <- dots[names(dots) %in% .map.formals]
+
+  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+  orphans <- setdiff(names(dots), all_known)
+  if (length(orphans) > 0) {
+    warning("Unknown arguments will be ignored: ",
+            paste(orphans, collapse = ", "))
+  }
+
+  # --- Pipeline ---
+  tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = NULL, .seed = .seed, .verbose = .verbose), lm_args))
+  tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
+
+  if (!is.null(tdr.obj@config$celltype.vec)) {
+    tdr.obj <- celltyping(tdr.obj,
+                          .celltyping.map = tdr.obj@config$celltype.vec,
+                          .verbose = .verbose)
+  }
+
+  tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = NULL, .seed = .seed, .verbose = .verbose), map_args))
+
+  return(tdr.obj)
+}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Internal helper: build TDRObj from matrix-derived inputs
+# ──────────────────────────────────────────────────────────────────────
+
+#' Build a TDRObj from matrix-derived cell lists and metadata
+#'
+#' @keywords internal
+#' @noRd
+.setup_tdr_from_matrix <- function(.cells,
+                                   .meta,
+                                   .assay.type,
+                                   .markers,
+                                   .harmony.var,
+                                   .celltype.vec,
+                                   .prop.landmarks,
+                                   .seed,
+                                   .n.threads,
+                                   .verbose) {
+
+  .assay.type <- match.arg(arg = .assay.type,
+                           choices = c("cyto", "RNA"))
+
+  # --- Harmony var validation ---
+  if (!is.null(.harmony.var)) {
+    if (!inherits(.harmony.var, "character")) {
+      stop(".harmony.var must be a character vector.")
+    }
+    if (!all(.harmony.var %in% colnames(.meta))) {
+      stop("Variables not found in metadata: ",
+           paste(.harmony.var[!(.harmony.var %in% colnames(.meta))],
+                 collapse = ", "),
+           "\nCheck column names in .meta with colnames(.meta).")
+    }
+  }
+
+  # --- Markers validation ---
+  if (!is.null(.markers)) {
+    if (.assay.type == "RNA") {
+      stop(".markers argument only applies to cytometry data.\n",
+           "For RNA data, feature selection uses highly variable genes (HVG) automatically.")
+    } else if (length(.markers) < 3) {
+      stop(".markers must contain at least 3 markers for meaningful dimensionality reduction.")
+    }
+  }
+
+  if (.assay.type == "cyto" && is.null(.markers)) {
+    stop("For cyto assay.type with matrix backend, .markers must be provided.")
+  }
+
+  # --- Prop landmarks validation ---
+  if ((.prop.landmarks < 0) | (.prop.landmarks > 1)) {
+    stop(".prop.landmarks must be between 0 and 1 (e.g., 0.1 for 10% of cells).\n",
+         "Current value: ", .prop.landmarks)
+  }
+
+  # --- Create TDRObj ---
+  .tdr.obj <- TDRObj(
+    config = list(
+      key = NULL,
+      sampling = NULL,
+      assay.type = .assay.type,
+      markers = NULL,
+      n.threads = .n.threads
+    ),
+    integration = list(
+      harmony.var = NULL,
+      harmony.obj = NULL
+    )
+  )
+
+  .tdr.obj@cells <- .cells
+
+  # --- n.cells: read cell counts from persisted RDS files ---
+  n.cells <- vapply(.cells, function(f) {
+    mat <- readRDS(f)
+    if (.assay.type == "RNA") ncol(mat) else nrow(mat)
+  }, integer(1))
+
+  .tdr.obj@config$sampling$n.cells <- n.cells
+
+  # Quality check: warn if sample sizes are highly imbalanced (>10-fold difference)
+  if ((max(.tdr.obj@config$sampling$n.cells) /
+       min(.tdr.obj@config$sampling$n.cells)) > 10) {
+
+    warning("Sample size imbalance detected: largest/smallest ratio > 10.\n",
+            "Smallest sample has ", min(.tdr.obj@config$sampling$n.cells),
+            " cells.\n",
+            "Consider removing low-quality samples.")
+
+    if (any(.tdr.obj@config$sampling$n.cells < 1000)) {
+      warning("Large variation in sample sizes detected. ",
+              "For cytometry, samples with <1000 cells may be unreliable.")
+    }
+  }
+
+  # Calculate target number of landmarks: prop of total cells, capped at 5000
+  .tdr.obj@config$sampling$target.lm.n <-
+    pmin(sum(.tdr.obj@config$sampling$n.cells) * .prop.landmarks,
+         5e3)
+
+  # Allocate landmarks per sample: proportional to sample size, but capped
+  .tdr.obj@config$sampling$n.perSample <-
+    pmin(ceiling(x = .tdr.obj@config$sampling$n.cells * .prop.landmarks),
+         ceiling(x = .tdr.obj@config$sampling$target.lm.n /
+                     length(x = .tdr.obj@cells)))
+
+  # Create key vector: maps each future landmark to its sample
+  .tdr.obj@config$key <-
+    seq_along(along.with = .tdr.obj@cells) |>
+    rep(times = .tdr.obj@config$sampling$n.perSample) |>
+    (\(x)
+     stats::setNames(object = x,
+                     nm = names(.tdr.obj@cells)[x])
+    )()
+
+  .tdr.obj@metadata <- .meta
+
+  .tdr.obj@metadata$n.perSample <-
+    .tdr.obj@config$sampling$n.perSample
+
+  .tdr.obj@metadata$n.cells <-
+    .tdr.obj@config$sampling$n.cells
+
+  .tdr.obj@metadata$log10.n.cells <-
+    log10(x = .tdr.obj@config$sampling$n.cells)
+
+  # --- Markers ---
+  if (.assay.type == "cyto") {
+    .tdr.obj@config$markers <- .markers
+  }
+
+  # --- Harmony ---
+  if (!is.null(.harmony.var)) {
+    .tdr.obj@integration$harmony.var <- .harmony.var
+  }
+
+  # --- Files backend (default) ---
+  .tdr.obj@config$backend <- "files"
+
+  # --- Cell type vector ---
+  if (!is.null(.celltype.vec)) {
+    .tdr.obj@config$celltype.vec <- .celltype.vec
+  }
+
+  return(.tdr.obj)
+}
+
+
+# ======================================================================
 # GetTDR – extractor generic + methods
 # ======================================================================
 
