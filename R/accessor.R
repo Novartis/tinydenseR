@@ -47,14 +47,28 @@
     },
     "h5ad" = {
       col_idx <- .tdr.obj@cells[[sample_idx]]
-      mat <- .source$X[col_idx, , drop = FALSE]
+      if(is.null(x = .source$layers[[.tdr.obj@config$source.layer]])){
+        warning("Layer '", .tdr.obj@config$source.layer, "' not found in AnnData object; using 'X' instead.")
+        mat <- .source$X[col_idx, , drop = FALSE]
+      } else {
+        mat <- .source$layers[[.tdr.obj@config$source.layer]][col_idx, , drop = FALSE]
+      }
       if (.tdr.obj@config$assay.type == "RNA") {
         mat <- Matrix::t(mat)
       }
       if (!inherits(mat, "dgCMatrix") && methods::is(mat, "Matrix")) {
-        mat <- methods::as(mat, "dgCMatrix")
+        mat <- methods::as(mat, "CsparseMatrix")
       }
       mat
+    },
+    "matrix" = {
+      col_idx <- .tdr.obj@cells[[sample_idx]]
+      src <- .tdr.obj@config$source.env$mat
+      if (.tdr.obj@config$assay.type == "RNA") {
+        src[, col_idx, drop = FALSE]
+      } else {
+        src[col_idx, , drop = FALSE]
+      }
     },
     stop("Unknown backend: ", backend)
   )

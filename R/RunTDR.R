@@ -1077,16 +1077,16 @@ RunTDR.HDF5AnnData <- function(x,
 #'
 #' @param x A \code{dgCMatrix} (features x cells for RNA,
 #'   cells x features for cyto).
-#' @param .meta A \code{data.frame} of per-cell metadata.
+#' @param .cell.meta A \code{data.frame} of per-cell metadata.
 #'   Must have one row per cell with rownames matching cell IDs
 #'   in \code{x} (\code{colnames} for RNA, \code{rownames} for cyto).
-#' @param .sample.var Character(1). Column name in \code{.meta}
+#' @param .sample.var Character(1). Column name in \code{.cell.meta}
 #'   identifying sample membership.
 #' @param .assay.type Character. \code{"RNA"} or \code{"cyto"}.
 #' @param .harmony.var Character vector of batch variable column names
 #'   in sample-level metadata, or \code{NULL}.
 #' @param .markers Character vector of marker names (required for cyto).
-#' @param .celltype.vec Character(1). Column name in \code{.meta}
+#' @param .celltype.vec Character(1). Column name in \code{.cell.meta}
 #'   containing per-cell type labels, or \code{NULL}.
 #' @param .min.cells.per.sample Integer. Minimum cells for a sample to be
 #'   included.
@@ -1099,24 +1099,24 @@ RunTDR.HDF5AnnData <- function(x,
 #' @return A \code{\linkS4class{TDRObj}}.
 #'
 #' @export
-RunTDR.dgCMatrix <- function(x, .meta, ...) {
-  .run_tdr_matrix(x, .meta, ...)
+RunTDR.dgCMatrix <- function(x, .cell.meta, ...) {
+  .run_tdr_matrix(x, .cell.meta, ...)
 }
 
 
 #' @describeIn RunTDR Run the pipeline on a DelayedMatrix
 #'
 #' @export
-RunTDR.DelayedMatrix <- function(x, .meta, ...) {
-  .run_tdr_matrix(x, .meta, ...)
+RunTDR.DelayedMatrix <- function(x, .cell.meta, ...) {
+  .run_tdr_matrix(x, .cell.meta, ...)
 }
 
 
 #' @describeIn RunTDR Run the pipeline on a BPCells IterableMatrix
 #'
 #' @export
-RunTDR.IterableMatrix <- function(x, .meta, ...) {
-  .run_tdr_matrix(x, .meta, ...)
+RunTDR.IterableMatrix <- function(x, .cell.meta, ...) {
+  .run_tdr_matrix(x, .cell.meta, ...)
 }
 
 
@@ -1129,7 +1129,7 @@ RunTDR.IterableMatrix <- function(x, .meta, ...) {
 #' @keywords internal
 #' @noRd
 .run_tdr_matrix <- function(x,
-                            .meta,
+                            .cell.meta,
                             .sample.var,
                             .assay.type = "RNA",
                             .harmony.var = NULL,
@@ -1153,16 +1153,16 @@ RunTDR.IterableMatrix <- function(x, .meta, ...) {
   .assay.type <- match.arg(arg = .assay.type,
                            choices = c("cyto", "RNA"))
 
-  if (!inherits(.meta, "data.frame")) {
-    stop(".meta must be a data.frame.")
+  if (!inherits(.cell.meta, "data.frame")) {
+    stop(".cell.meta must be a data.frame.")
   }
 
   if (!is.character(.sample.var) || length(.sample.var) != 1) {
     stop(".sample.var must be a single character string.")
   }
 
-  if (!(.sample.var %in% colnames(.meta))) {
-    stop(".sample.var '", .sample.var, "' not found in .meta.")
+  if (!(.sample.var %in% colnames(.cell.meta))) {
+    stop(".sample.var '", .sample.var, "' not found in .cell.meta.")
   }
 
   # Determine cell IDs based on assay type orientation
@@ -1178,18 +1178,18 @@ RunTDR.IterableMatrix <- function(x, .meta, ...) {
     }
   }
 
-  # Validate .meta rownames match matrix cell IDs
-  if (is.null(rownames(.meta))) {
-    stop(".meta must have rownames matching cell IDs in the matrix.")
+  # Validate .cell.meta rownames match matrix cell IDs
+  if (is.null(rownames(.cell.meta))) {
+    stop(".cell.meta must have rownames matching cell IDs in the matrix.")
   }
 
-  shared <- intersect(rownames(.meta), cell_ids)
+  shared <- intersect(rownames(.cell.meta), cell_ids)
   if (length(shared) == 0) {
-    stop("No overlap between rownames(.meta) and cell IDs in the matrix.")
+    stop("No overlap between rownames(.cell.meta) and cell IDs in the matrix.")
   }
   if (length(shared) < length(cell_ids)) {
     warning(length(cell_ids) - length(shared),
-            " cells in matrix not found in .meta; they will be dropped.")
+            " cells in matrix not found in .cell.meta; they will be dropped.")
   }
 
   # Subset to shared cells
@@ -1198,10 +1198,10 @@ RunTDR.IterableMatrix <- function(x, .meta, ...) {
   } else {
     x <- x[shared, , drop = FALSE]
   }
-  .meta <- .meta[shared, , drop = FALSE]
+  .cell.meta <- .cell.meta[shared, , drop = FALSE]
 
   # --- Derive sample-level metadata ---
-  sample_ids <- .meta[[.sample.var]]
+  sample_ids <- .cell.meta[[.sample.var]]
   counts_tbl <- table(sample_ids)
   valid <- names(counts_tbl)[counts_tbl >= .min.cells.per.sample]
 
@@ -1211,7 +1211,7 @@ RunTDR.IterableMatrix <- function(x, .meta, ...) {
   }
 
   # Identify sample-level columns (constant within each sample)
-  sample_level_cols <- .meta |>
+  sample_level_cols <- .cell.meta |>
     dplyr::group_by(!!rlang::sym(.sample.var)) |>
     dplyr::summarize(
       dplyr::across(
@@ -1227,51 +1227,54 @@ RunTDR.IterableMatrix <- function(x, .meta, ...) {
 
   sample_level_cols <- c(.sample.var, sample_level_cols)
 
-  sample_meta <- .meta[, sample_level_cols, drop = FALSE] |>
+  sample_meta <- .cell.meta[, sample_level_cols, drop = FALSE] |>
     dplyr::distinct() |>
     as.data.frame()
   rownames(sample_meta) <- sample_meta[[.sample.var]]
   sample_meta <- sample_meta[intersect(valid, rownames(sample_meta)),
                              , drop = FALSE]
 
-  # --- Split matrix by sample and save to temp RDS ---
-  cell_sample <- .meta[[.sample.var]]
+  # --- Build index-based .cells + locked source env ---
+  cell_sample <- .cell.meta[[.sample.var]]
   valid_mask <- cell_sample %in% rownames(sample_meta)
-  cell_sample <- cell_sample[valid_mask]
 
   if (.assay.type == "RNA") {
     x <- x[, valid_mask, drop = FALSE]
   } else {
     x <- x[valid_mask, , drop = FALSE]
   }
+  .cell.meta <- .cell.meta[valid_mask, , drop = FALSE]
+  cell_sample <- cell_sample[valid_mask]
 
+  # Store source matrix in a locked environment to prevent duplication
+  source_env <- new.env(parent = emptyenv())
+  source_env$mat <- x
+  lockBinding(sym = as.name("mat"), env = source_env)
+
+  # Build .cells as named list of integer index vectors (like Seurat/SCE)
   sample_names <- rownames(sample_meta)
-
-  .cells <- stats::setNames(
-    lapply(sample_names, function(s) {
-      idx <- which(cell_sample == s)
-      if (.assay.type == "RNA") {
-        mat <- x[, idx, drop = FALSE]
-      } else {
-        mat <- x[idx, , drop = FALSE]
-      }
-      uri <- tempfile(fileext = ".RDS")
-      saveRDS(object = mat, file = uri, compress = FALSE)
-      uri
-    }),
-    sample_names
-  )
+  if (.assay.type == "RNA") {
+    .cells <- lapply(
+      stats::setNames(sample_names, sample_names),
+      function(s) sort(which(cell_sample == s))
+    )
+  } else {
+    .cells <- lapply(
+      stats::setNames(sample_names, sample_names),
+      function(s) sort(which(cell_sample == s))
+    )
+  }
 
   # --- .celltype.vec handling ---
   ct_vec <- NULL
   if (!is.null(.celltype.vec)) {
     if (!is.character(.celltype.vec) || length(.celltype.vec) != 1) {
       stop(".celltype.vec must be a single character string ",
-           "(column name in .meta).")
+           "(column name in .cell.meta).")
     }
-    if (!(.celltype.vec %in% colnames(.meta))) {
+    if (!(.celltype.vec %in% colnames(.cell.meta))) {
       stop(".celltype.vec '", .celltype.vec,
-           "' not found in .meta.")
+           "' not found in .cell.meta.")
     }
     valid_cells <- if (.assay.type == "RNA") {
       colnames(x)
@@ -1279,7 +1282,7 @@ RunTDR.IterableMatrix <- function(x, .meta, ...) {
       rownames(x)
     }
     ct_vec <- stats::setNames(
-      as.character(.meta[valid_cells, .celltype.vec]),
+      as.character(.cell.meta[valid_cells, .celltype.vec]),
       valid_cells
     )
   }
@@ -1287,6 +1290,7 @@ RunTDR.IterableMatrix <- function(x, .meta, ...) {
   # --- Build TDRObj ---
   tdr.obj <- .setup_tdr_from_matrix(
     .cells = .cells,
+    .source.env = source_env,
     .meta = sample_meta,
     .assay.type = .assay.type,
     .markers = .markers,
@@ -1341,6 +1345,7 @@ RunTDR.IterableMatrix <- function(x, .meta, ...) {
 #' @keywords internal
 #' @noRd
 .setup_tdr_from_matrix <- function(.cells,
+                                   .source.env,
                                    .meta,
                                    .assay.type,
                                    .markers,
@@ -1404,11 +1409,8 @@ RunTDR.IterableMatrix <- function(x, .meta, ...) {
 
   .tdr.obj@cells <- .cells
 
-  # --- n.cells: read cell counts from persisted RDS files ---
-  n.cells <- vapply(.cells, function(f) {
-    mat <- readRDS(f)
-    if (.assay.type == "RNA") ncol(mat) else nrow(mat)
-  }, integer(1))
+  # --- n.cells from integer index vector lengths ---
+  n.cells <- lengths(.cells)
 
   .tdr.obj@config$sampling$n.cells <- n.cells
 
@@ -1468,8 +1470,9 @@ RunTDR.IterableMatrix <- function(x, .meta, ...) {
     .tdr.obj@integration$harmony.var <- .harmony.var
   }
 
-  # --- Files backend (default) ---
-  .tdr.obj@config$backend <- "files"
+  # --- Matrix backend: store locked env for .get_sample_matrix ---
+  .tdr.obj@config$backend <- "matrix"
+  .tdr.obj@config$source.env <- .source.env
 
   # --- Cell type vector ---
   if (!is.null(.celltype.vec)) {
