@@ -417,11 +417,23 @@ RunTDR.Seurat <- function(x,
 #' and executes the full pipeline. The finished TDRObj is stored in
 #' \code{S4Vectors::metadata(x)$tdr.obj}.
 #'
+#' If the assay is a \code{DelayedMatrix} (e.g., HDF5-backed), it is
+#' converted to a BPCells on-disk \code{IterableMatrix} and routed
+#' through \code{.run_tdr_matrix()} for efficient lazy access. If the
+#' assay is an in-memory matrix (e.g., \code{dgCMatrix}), the existing
+#' SCE backend path is used.
+#'
 #' @param x A \code{SingleCellExperiment} object.
 #' @param .sample.var Character(1). Column in \code{colData(x)} identifying
 #'   sample membership.
 #' @param .assay Character(1). Name of the assay in \code{assayNames(x)}.
 #' @param .assay.type Character. \code{"RNA"} or \code{"cyto"}.
+#' @param .bpcells.dir Character(1) or \code{NULL}. Directory path for
+#'   the BPCells on-disk matrix (used only when the assay is a
+#'   \code{DelayedMatrix}). If \code{NULL} (default), uses a temporary
+#'   directory (\code{tempdir()}) that is cleaned up on session end.
+#'   If a path is given and already contains a valid BPCells matrix,
+#'   the conversion step is skipped (cache hit).
 #' @param .harmony.var Character vector of batch variable column names
 #'   in sample-level metadata, or \code{NULL}.
 #' @param .markers Character vector of marker names (required for cyto).
@@ -429,9 +441,6 @@ RunTDR.Seurat <- function(x,
 #'   containing per-cell type labels, or \code{NULL}.
 #' @param .min.cells.per.sample Integer. Minimum cells for a sample to be
 #'   included.
-#' @param .optimize.hdf5 Logical. If \code{TRUE} and the assay is
-#'   HDF5-backed with poor contiguity, reorder the SCE columns by sample
-#'   for faster I/O.
 #' @param .verbose Logical. Print progress messages.
 #' @param .seed Integer. Random seed.
 #' @param .prop.landmarks Numeric in (0, 1]. Proportion of cells as landmarks.
@@ -446,11 +455,11 @@ RunTDR.SingleCellExperiment <- function(x,
                                         .sample.var,
                                         .assay = "counts",
                                         .assay.type = "RNA",
+                                        .bpcells.dir = NULL,
                                         .harmony.var = NULL,
                                         .markers = NULL,
                                         .celltype.vec = NULL,
                                         .min.cells.per.sample = 10,
-                                        .optimize.hdf5 = FALSE,
                                         .verbose = TRUE,
                                         .seed = 123,
                                         .prop.landmarks = 0.1,
@@ -483,129 +492,156 @@ RunTDR.SingleCellExperiment <- function(x,
     stop(".assay '", .assay, "' not found in assayNames(x).")
   }
 
-  # --- Extract sample-level metadata ---
-  .meta <- get.meta(.obj = x, .sample.var = .sample.var,
-                    .verbose = .verbose)
-
-  # --- Build @cells as named list of sorted integer index vectors ---
-  sample_ids <- SummarizedExperiment::colData(x)[[.sample.var]]
-  counts_tbl <- table(sample_ids)
-  valid <- names(counts_tbl)[
-    counts_tbl >= .min.cells.per.sample &
-    names(counts_tbl) %in% rownames(.meta)
-  ]
-  .cells <- lapply(
-    stats::setNames(valid, valid),
-    function(s) sort(which(sample_ids == s))
-  )
-  .meta <- .meta[names(.cells), , drop = FALSE]
-
-  # --- .celltype.vec handling ---
-  ct_vec <- NULL
-  if (!is.null(.celltype.vec)) {
-    if (!is.character(.celltype.vec) || length(.celltype.vec) != 1) {
-      stop(".celltype.vec must be a single character string ",
-           "(column name in colData(x)).")
-    }
-    if (!(.celltype.vec %in%
-          colnames(SummarizedExperiment::colData(x)))) {
-      stop(".celltype.vec '", .celltype.vec,
-           "' not found in colData(x).")
-    }
-    valid_cells <- unlist(.cells)
-    ct_vec <- stats::setNames(
-      as.character(
-        SummarizedExperiment::colData(x)[[.celltype.vec]][valid_cells]),
-      colnames(x)[valid_cells]
-    )
-  }
-
-  # --- HDF5 contiguity check ---
+  # --- Check if assay is a DelayedMatrix ---
   is_delayed <- methods::is(
     SummarizedExperiment::assay(x, .assay), "DelayedMatrix")
 
   if (is_delayed) {
-    contiguity <- mean(vapply(.cells, function(idx) {
-      if (length(idx) <= 1) return(1)
-      sum(diff(idx) == 1L) / (length(idx) - 1L)
-    }, numeric(1)))
 
-    if (contiguity < 0.80) {
-      if (isFALSE(.optimize.hdf5)) {
-        warning("Cells in HDF5-backed assay are not grouped by ",
-                "sample. Consider .optimize.hdf5 = TRUE for ",
-                "~10-50x faster I/O.", call. = FALSE)
-      } else {
-        # Reorder SCE by sample for contiguous access
-        new_order <- unlist(.cells, use.names = FALSE)
-        x <- x[, new_order]
-        # Rebuild .cells as contiguous ranges
-        sample_ids_new <- SummarizedExperiment::colData(x)[[.sample.var]]
-        .cells <- lapply(
-          stats::setNames(valid, valid),
-          function(s) sort(which(sample_ids_new == s))
-        )
-        if (!is.null(ct_vec)) {
-          # Rebuild ct_vec for reordered cells
-          ct_vec <- stats::setNames(
-            as.character(
-              SummarizedExperiment::colData(x)[[.celltype.vec]]),
-            colnames(x)
-          )[unlist(.cells, use.names = FALSE)]
-        }
-      }
+    # ══════════════════════════════════════════════════════════════════
+    # BPCells path for DelayedMatrix-backed SCE
+    # ══════════════════════════════════════════════════════════════════
+
+    if (!requireNamespace("BPCells", quietly = TRUE)) {
+      stop("Package 'BPCells' is required for DelayedMatrix SCE support. ",
+           "Install it with: BiocManager::install('BPCells')", call. = FALSE)
     }
+
+    if (isTRUE(.verbose)) {
+      cat("DelayedMatrix assay detected; converting to BPCells...\n")
+    }
+
+    # Extract the DelayedMatrix
+    mat <- SummarizedExperiment::assay(x, .assay)
+
+    # Convert to BPCells on-disk format
+    bp_mat <- .delayed_to_bpcells(mat, .bpcells.dir, .verbose)
+
+    # Preserve dimnames if lost during conversion
+    if (!is.null(rownames(mat)) && is.null(rownames(bp_mat))) {
+      rownames(bp_mat) <- rownames(mat)
+    }
+    if (!is.null(colnames(mat)) && is.null(colnames(bp_mat))) {
+      colnames(bp_mat) <- colnames(mat)
+    }
+
+    # Extract cell metadata: colData is a DataFrame, convert to data.frame
+    cell_meta <- as.data.frame(SummarizedExperiment::colData(x))
+
+    # Delegate to .run_tdr_matrix (the proven IterableMatrix path)
+    tdr.obj <- .run_tdr_matrix(
+      x               = bp_mat,
+      .cell.meta      = cell_meta,
+      .sample.var     = .sample.var,
+      .assay.type     = .assay.type,
+      .harmony.var    = .harmony.var,
+      .markers        = .markers,
+      .celltype.vec   = .celltype.vec,
+      .min.cells.per.sample = .min.cells.per.sample,
+      .verbose        = .verbose,
+      .seed           = .seed,
+      .prop.landmarks = .prop.landmarks,
+      .n.threads      = .n.threads,
+      ...
+    )
+
+    # Store TDRObj in SCE metadata
+    S4Vectors::metadata(x)$tdr.obj <- tdr.obj
+    return(x)
+
+  } else {
+
+    # ══════════════════════════════════════════════════════════════════
+    # Existing in-memory path for dgCMatrix / non-delayed assays
+    # ══════════════════════════════════════════════════════════════════
+
+    # --- Extract sample-level metadata ---
+    .meta <- get.meta(.obj = x, .sample.var = .sample.var,
+                      .verbose = .verbose)
+
+    # --- Build @cells as named list of sorted integer index vectors ---
+    sample_ids <- SummarizedExperiment::colData(x)[[.sample.var]]
+    counts_tbl <- table(sample_ids)
+    valid <- names(counts_tbl)[
+      counts_tbl >= .min.cells.per.sample &
+      names(counts_tbl) %in% rownames(.meta)
+    ]
+    .cells <- lapply(
+      stats::setNames(valid, valid),
+      function(s) sort(which(sample_ids == s))
+    )
+    .meta <- .meta[names(.cells), , drop = FALSE]
+
+    # --- .celltype.vec handling ---
+    ct_vec <- NULL
+    if (!is.null(.celltype.vec)) {
+      if (!is.character(.celltype.vec) || length(.celltype.vec) != 1) {
+        stop(".celltype.vec must be a single character string ",
+             "(column name in colData(x)).")
+      }
+      if (!(.celltype.vec %in%
+            colnames(SummarizedExperiment::colData(x)))) {
+        stop(".celltype.vec '", .celltype.vec,
+             "' not found in colData(x).")
+      }
+      valid_cells <- unlist(.cells)
+      ct_vec <- stats::setNames(
+        as.character(
+          SummarizedExperiment::colData(x)[[.celltype.vec]][valid_cells]),
+        colnames(x)[valid_cells]
+      )
+    }
+
+    # --- Build TDRObj ---
+    tdr.obj <- .setup_tdr_from_sce(
+      .cells = .cells,
+      .meta = .meta,
+      .assay = .assay,
+      .assay.type = .assay.type,
+      .markers = .markers,
+      .harmony.var = .harmony.var,
+      .celltype.vec = ct_vec,
+      .prop.landmarks = .prop.landmarks,
+      .seed = .seed,
+      .n.threads = .n.threads,
+      .verbose = .verbose
+    )
+
+    # --- Argument routing ---
+    dots <- list(...)
+
+    .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
+    .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
+    .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+
+    lm_args  <- dots[names(dots) %in% .lm.formals]
+    gr_args  <- dots[names(dots) %in% .gr.formals]
+    map_args <- dots[names(dots) %in% .map.formals]
+
+    all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+    orphans <- setdiff(names(dots), all_known)
+    if (length(orphans) > 0) {
+      warning("Unknown arguments will be ignored: ",
+              paste(orphans, collapse = ", "))
+    }
+
+    # --- Pipeline ---
+    tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), lm_args))
+    tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
+
+    if (!is.null(tdr.obj@config$celltype.vec)) {
+      tdr.obj <- celltyping(tdr.obj,
+                            .celltyping.map = tdr.obj@config$celltype.vec,
+                            .verbose = .verbose)
+    }
+
+    tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
+
+    # --- Store TDRObj in SCE metadata ---
+    S4Vectors::metadata(x)$tdr.obj <- tdr.obj
+
+    return(x)
   }
-
-  # --- Build TDRObj ---
-  tdr.obj <- .setup_tdr_from_sce(
-    .cells = .cells,
-    .meta = .meta,
-    .assay = .assay,
-    .assay.type = .assay.type,
-    .markers = .markers,
-    .harmony.var = .harmony.var,
-    .celltype.vec = ct_vec,
-    .prop.landmarks = .prop.landmarks,
-    .seed = .seed,
-    .n.threads = .n.threads,
-    .verbose = .verbose
-  )
-
-  # --- Argument routing ---
-  dots <- list(...)
-
-  .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
-  .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
-  .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
-
-  lm_args  <- dots[names(dots) %in% .lm.formals]
-  gr_args  <- dots[names(dots) %in% .gr.formals]
-  map_args <- dots[names(dots) %in% .map.formals]
-
-  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
-  orphans <- setdiff(names(dots), all_known)
-  if (length(orphans) > 0) {
-    warning("Unknown arguments will be ignored: ",
-            paste(orphans, collapse = ", "))
-  }
-
-  # --- Pipeline ---
-  tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), lm_args))
-  tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
-
-  if (!is.null(tdr.obj@config$celltype.vec)) {
-    tdr.obj <- celltyping(tdr.obj,
-                          .celltyping.map = tdr.obj@config$celltype.vec,
-                          .verbose = .verbose)
-  }
-
-  tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
-
-  # --- Store TDRObj in SCE metadata ---
-  S4Vectors::metadata(x)$tdr.obj <- tdr.obj
-
-  return(x)
 }
 
 
@@ -1033,16 +1069,155 @@ RunTDR.dgCMatrix <- function(x, .cell.meta, ...) {
 }
 
 
+# ──────────────────────────────────────────────────────────────────────
+# Internal: convert a DelayedMatrix to BPCells on-disk format
+# ──────────────────────────────────────────────────────────────────────
+
+#' Convert a DelayedMatrix to a BPCells on-disk IterableMatrix
+#'
+#' Converts a \code{DelayedMatrix} to a BPCells \code{IterableMatrix}
+#' without ever fully materializing the matrix in R memory.
+#' Three strategies are tried in order:
+#' (1) if the seed is already a BPCells \code{IterableMatrix}, return it
+#'     directly; (2) if the seed is an \code{HDF5ArraySeed}, open it via
+#'     \code{BPCells::open_matrix_hdf5()} for zero-copy streaming;
+#' (3) otherwise, iterate over column chunks of size \code{.chunk.size},
+#'     coercing each to \code{dgCMatrix} then \code{IterableMatrix},
+#'     lazy-\code{cbind}, and write to disk. Peak memory = one chunk.
+#' If \code{.bpcells.dir} already contains a valid BPCells matrix,
+#' the conversion is skipped (cache hit).
+#'
+#' @param mat A \code{DelayedMatrix}.
+#' @param .bpcells.dir Character(1) or \code{NULL}. Directory for the
+#'   BPCells on-disk matrix. If \code{NULL}, uses a temporary directory.
+#' @param .verbose Logical. Print progress messages.
+#' @param .chunk.size Integer. Number of columns per chunk for the
+#'   chunked fallback path. Default 5000.
+#' @return A BPCells \code{IterableMatrix} opened from the on-disk
+#'   directory, or the seed directly if already BPCells-backed.
+#' @keywords internal
+#' @noRd
+.delayed_to_bpcells <- function(mat, .bpcells.dir = NULL, .verbose = TRUE,
+                                .chunk.size = 5000L) {
+
+  if (!requireNamespace("BPCells", quietly = TRUE)) {
+    stop("Package 'BPCells' is required for DelayedMatrix \u2192 BPCells conversion. ",
+         "Install it with: BiocManager::install('BPCells')", call. = FALSE)
+  }
+
+  # --- Check if the DelayedMatrix is already BPCells-backed ---
+  seed <- DelayedArray::seed(mat)
+  if (methods::is(seed, "IterableMatrix")) {
+    if (isTRUE(.verbose)) {
+      cat("DelayedMatrix is already BPCells-backed; skipping conversion.\n")
+    }
+    return(seed)
+  }
+
+  # --- Default directory ---
+  if (is.null(.bpcells.dir)) {
+    .bpcells.dir <- file.path(tempdir(), paste0("bpcells_delayed_",
+                              nrow(mat), "x", ncol(mat)))
+  }
+
+  # --- Cache check ---
+  if (dir.exists(.bpcells.dir)) {
+    bp_mat <- tryCatch(
+      BPCells::open_matrix_dir(.bpcells.dir),
+      error = function(e) NULL
+    )
+    if (!is.null(bp_mat)) {
+      if (isTRUE(.verbose)) {
+        cat("BPCells cache hit: reusing ", .bpcells.dir, "\n")
+      }
+      return(bp_mat)
+    }
+  }
+
+  # --- HDF5-backed: zero-copy streaming via BPCells ---
+  if (requireNamespace("HDF5Array", quietly = TRUE) &&
+      methods::is(seed, "HDF5ArraySeed")) {
+    h5_path <- HDF5Array::path(seed)
+    h5_group <- seed@name
+    if (isTRUE(.verbose)) {
+      cat("HDF5-backed DelayedMatrix detected; streaming via BPCells...\n")
+    }
+    bp_mat <- BPCells::open_matrix_hdf5(path = h5_path, group = h5_group)
+    BPCells::write_matrix_dir(mat = bp_mat, dir = .bpcells.dir)
+    if (isTRUE(.verbose)) {
+      cat("BPCells matrix written to: ", .bpcells.dir, "\n")
+    }
+    return(BPCells::open_matrix_dir(.bpcells.dir))
+  }
+
+  # --- Chunked fallback for non-HDF5 backends ---
+  if (isTRUE(.verbose)) {
+    cat("Converting DelayedMatrix to BPCells on-disk format (chunked)...\n")
+  }
+  n <- ncol(mat)
+  chunks <- split(seq_len(n), ceiling(seq_len(n) / .chunk.size))
+  bp_parts <- lapply(chunks, function(idx) {
+    methods::as(methods::as(mat[, idx], "dgCMatrix"), "IterableMatrix")
+  })
+  bp_full <- do.call(cbind, bp_parts)
+  BPCells::write_matrix_dir(mat = bp_full, dir = .bpcells.dir)
+
+  if (isTRUE(.verbose)) {
+    cat("BPCells matrix written to: ", .bpcells.dir, "\n")
+  }
+
+  # Re-open from on-disk dir for consistent state
+  BPCells::open_matrix_dir(.bpcells.dir)
+}
+
+
 #' @describeIn RunTDR Run the pipeline on a DelayedMatrix
 #'
+#' Converts the \code{DelayedMatrix} to a BPCells on-disk
+#' \code{IterableMatrix} for efficient lazy access, then delegates
+#' to the proven \code{IterableMatrix} pipeline via
+#' \code{.run_tdr_matrix()}.
+#'
+#' @param x A \code{DelayedMatrix} (features \ifelse{html}{\out{&times;}}{\eqn{\times}} cells for RNA).
+#' @param .cell.meta A \code{data.frame} of per-cell metadata.
+#'   Must have one row per cell with rownames matching cell IDs
+#'   in \code{x} (\code{colnames} for RNA, \code{rownames} for cyto).
+#' @param .bpcells.dir Character(1) or \code{NULL}. Directory path for
+#'   the BPCells on-disk matrix. If \code{NULL} (default), uses a
+#'   temporary directory (\code{tempdir()}) that is cleaned up on session
+#'   end. If a path is given and already contains a valid BPCells
+#'   matrix, the conversion step is skipped (cache hit).
+#' @param ... Additional arguments passed to \code{.run_tdr_matrix}
+#'   (e.g. \code{.sample.var}, \code{.assay.type}, \code{.harmony.var},
+#'   \code{.markers}, \code{.celltype.vec}, \code{.min.cells.per.sample},
+#'   \code{.verbose}, \code{.seed}, \code{.prop.landmarks},
+#'   \code{.n.threads}).
+#'
+#' @return A \code{\linkS4class{TDRObj}}.
+#'
 #' @export
-RunTDR.DelayedMatrix <- function(x, .cell.meta, ...) {
+RunTDR.DelayedMatrix <- function(x, .cell.meta, .bpcells.dir = NULL, ...) {
   dots <- list(...)
   if (!is.null(dots$.assay.type) && dots$.assay.type != "RNA") {
     stop("DelayedMatrix input is only supported for .assay.type = 'RNA'.\n",
          "For cytometry data, supply a dense matrix instead.")
   }
-  .run_tdr_matrix(x, .cell.meta, ...)
+
+  .verbose <- if (!is.null(dots$.verbose)) dots$.verbose else TRUE
+
+  # --- Convert to BPCells on-disk format ---
+  bp_mat <- .delayed_to_bpcells(x, .bpcells.dir, .verbose)
+
+  # --- Preserve dimnames if lost during conversion ---
+  if (!is.null(rownames(x)) && is.null(rownames(bp_mat))) {
+    rownames(bp_mat) <- rownames(x)
+  }
+  if (!is.null(colnames(x)) && is.null(colnames(bp_mat))) {
+    colnames(bp_mat) <- colnames(x)
+  }
+
+  # --- Delegate to .run_tdr_matrix (the proven IterableMatrix path) ---
+  .run_tdr_matrix(bp_mat, .cell.meta, ...)
 }
 
 
