@@ -148,7 +148,7 @@ test_that(".get_sample_matrix works with matrix backend (RNA)", {
 test_that("RunTDR.DelayedMatrix runs full pipeline", {
   skip_on_cran()
   skip_if_not_installed("DelayedArray")
-  skip_if_not_installed("DelayedMatrixStats")
+  skip_if_not_installed("BPCells")
 
   td <- .make_matrix_test_data(n_cells = 100, n_markers = 50,
                                n_samples = 4, assay.type = "RNA")
@@ -172,7 +172,6 @@ test_that("RunTDR.DelayedMatrix runs full pipeline", {
 test_that("RunTDR.IterableMatrix runs full pipeline", {
   skip_on_cran()
   skip_if_not_installed("BPCells")
-  skip_if_not_installed("DelayedMatrixStats")
 
   td <- .make_matrix_test_data(n_cells = 100, n_markers = 50,
                                n_samples = 4, assay.type = "RNA")

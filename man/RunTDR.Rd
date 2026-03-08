@@ -50,11 +50,11 @@ RunTDR(x, ...)
   .sample.var,
   .assay = "counts",
   .assay.type = "RNA",
+  .bpcells.dir = NULL,
   .harmony.var = NULL,
   .markers = NULL,
   .celltype.vec = NULL,
   .min.cells.per.sample = 10,
-  .optimize.hdf5 = FALSE,
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
@@ -93,15 +93,18 @@ RunTDR(x, ...)
 
 \method{RunTDR}{dgCMatrix}(x, .cell.meta, ...)
 
-\method{RunTDR}{DelayedMatrix}(x, .cell.meta, ...)
+\method{RunTDR}{DelayedMatrix}(x, .cell.meta, .bpcells.dir = NULL, ...)
 
 \method{RunTDR}{IterableMatrix}(x, .cell.meta, ...)
 }
 \arguments{
-\item{x}{A \code{dgCMatrix} (features x cells for RNA,
-cells x features for cyto).}
+\item{x}{A \code{DelayedMatrix} (features \ifelse{html}{\out{&times;}}{\eqn{\times}} cells for RNA).}
 
-\item{...}{Additional arguments passed to pipeline functions.}
+\item{...}{Additional arguments passed to \code{.run_tdr_matrix}
+(e.g. \code{.sample.var}, \code{.assay.type}, \code{.harmony.var},
+\code{.markers}, \code{.celltype.vec}, \code{.min.cells.per.sample},
+\code{.verbose}, \code{.seed}, \code{.prop.landmarks},
+\code{.n.threads}).}
 
 \item{.celltype.vec}{Character(1). Column name in \code{.cell.meta}
 containing per-cell type labels, or \code{NULL}.}
@@ -134,20 +137,16 @@ included.}
 
 \item{.n.threads}{Integer. Number of threads.}
 
-\item{.optimize.hdf5}{Logical. If \code{TRUE} and the assay is
-HDF5-backed with poor contiguity, reorder the SCE columns by sample
-for faster I/O.}
-
-\item{.h5ad.group}{Character(1) or \code{NULL}. HDF5 group path
-containing the count matrix (e.g. \code{"/layers/counts"} or
-\code{"/X"}). If \code{NULL} (default), auto-detects by probing
-\code{/layers/counts} first, then falling back to \code{/X}.}
-
 \item{.bpcells.dir}{Character(1) or \code{NULL}. Directory path for
 the BPCells on-disk matrix. If \code{NULL} (default), uses a
 temporary directory (\code{tempdir()}) that is cleaned up on session
 end. If a path is given and already contains a valid BPCells
 matrix, the conversion step is skipped (cache hit).}
+
+\item{.h5ad.group}{Character(1) or \code{NULL}. HDF5 group path
+containing the count matrix (e.g. \code{"/layers/counts"} or
+\code{"/X"}). If \code{NULL} (default), auto-detects by probing
+\code{/layers/counts} first, then falling back to \code{/X}.}
 
 \item{.cell.meta}{A \code{data.frame} of per-cell metadata.
 Must have one row per cell with rownames matching cell IDs
@@ -163,6 +162,8 @@ The Seurat object \code{x} with the TDRObj stored in
 
 The \code{SingleCellExperiment} \code{x} with the TDRObj stored
 in \code{S4Vectors::metadata(x)$tdr.obj}.
+
+A \code{\linkS4class{TDRObj}}.
 
 A \code{\linkS4class{TDRObj}}.
 
@@ -191,6 +192,12 @@ Builds a \code{\linkS4class{TDRObj}} from a \code{SingleCellExperiment}
 and executes the full pipeline. The finished TDRObj is stored in
 \code{S4Vectors::metadata(x)$tdr.obj}.
 
+If the assay is a \code{DelayedMatrix} (e.g., HDF5-backed), it is
+converted to a BPCells on-disk \code{IterableMatrix} and routed
+through \code{.run_tdr_matrix()} for efficient lazy access. If the
+assay is an in-memory matrix (e.g., \code{dgCMatrix}), the existing
+SCE backend path is used.
+
 \item \code{RunTDR(HDF5AnnData)}: Run the pipeline on an HDF5AnnData object
 
 Builds a \code{\linkS4class{TDRObj}} from an HDF5-backed AnnData
@@ -207,6 +214,11 @@ Builds a \code{\linkS4class{TDRObj}} from a \code{dgCMatrix} and
 per-cell metadata, then executes the full pipeline.
 
 \item \code{RunTDR(DelayedMatrix)}: Run the pipeline on a DelayedMatrix
+
+Converts the \code{DelayedMatrix} to a BPCells on-disk
+\code{IterableMatrix} for efficient lazy access, then delegates
+to the proven \code{IterableMatrix} pipeline via
+\code{.run_tdr_matrix()}.
 
 \item \code{RunTDR(IterableMatrix)}: Run the pipeline on a BPCells IterableMatrix
 
