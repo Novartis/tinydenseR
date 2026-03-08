@@ -72,12 +72,12 @@ RunTDR(x, ...)
   x,
   .sample.var,
   .assay.type = "RNA",
-  .assay.layer = "counts",
+  .h5ad.group = NULL,
+  .bpcells.dir = NULL,
   .harmony.var = NULL,
   .markers = NULL,
   .celltype.vec = NULL,
   .min.cells.per.sample = 10,
-  .optimize.hdf5 = FALSE,
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
@@ -138,8 +138,16 @@ included.}
 HDF5-backed with poor contiguity, reorder the SCE columns by sample
 for faster I/O.}
 
-\item{.assay.layer}{Character(1). Layer name in the AnnData object
-(default \code{"counts"}).}
+\item{.h5ad.group}{Character(1) or \code{NULL}. HDF5 group path
+containing the count matrix (e.g. \code{"/layers/counts"} or
+\code{"/X"}). If \code{NULL} (default), auto-detects by probing
+\code{/layers/counts} first, then falling back to \code{/X}.}
+
+\item{.bpcells.dir}{Character(1) or \code{NULL}. Directory path for
+the BPCells on-disk matrix. If \code{NULL} (default), uses a
+temporary directory (\code{tempdir()}) that is cleaned up on session
+end. If a path is given and already contains a valid BPCells
+matrix, the conversion step is skipped (cache hit).}
 
 \item{.cell.meta}{A \code{data.frame} of per-cell metadata.
 Must have one row per cell with rownames matching cell IDs
@@ -156,8 +164,7 @@ The Seurat object \code{x} with the TDRObj stored in
 The \code{SingleCellExperiment} \code{x} with the TDRObj stored
 in \code{S4Vectors::metadata(x)$tdr.obj}.
 
-A \code{\linkS4class{TDRObj}} (bare object — no container to
-store it in).
+A \code{\linkS4class{TDRObj}}.
 
 A \code{\linkS4class{TDRObj}}.
 }
@@ -187,7 +194,12 @@ and executes the full pipeline. The finished TDRObj is stored in
 \item \code{RunTDR(HDF5AnnData)}: Run the pipeline on an HDF5AnnData object
 
 Builds a \code{\linkS4class{TDRObj}} from an HDF5-backed AnnData
-object and executes the full pipeline.
+object. The expression matrix is converted to a BPCells on-disk
+directory for efficient lazy access, then the proven
+\code{IterableMatrix} pipeline is used for all downstream steps.
+
+Metadata (obs) is read via \code{anndataR}; the expression matrix
+is read and converted via \code{BPCells}.
 
 \item \code{RunTDR(dgCMatrix)}: Run the pipeline on a sparse matrix (dgCMatrix)
 
