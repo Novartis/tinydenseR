@@ -756,29 +756,105 @@ RunTDR.SingleCellExperiment <- function(x,
 }
 
 
+# ──────────────────────────────────────────────────────────────────────
+# Internal: resolve which HDF5 group holds the count matrix in an h5ad
+# ──────────────────────────────────────────────────────────────────────
+
+#' Determine the HDF5 group containing counts in an h5ad file
+#'
+#' Probes first for \code{/layers/counts}, then falls back to \code{/X}.
+#' Uses \code{BPCells::open_matrix_anndata_hdf5} to test group validity
+#' (no data is read — BPCells only checks group structure).
+#'
+#' @param file_path Character(1). Path to the h5ad file.
+#' @param .h5ad.group Character(1) or \code{NULL}. If non-NULL, used
+#'   directly without auto-detection.
+#' @return Character(1) — the resolved HDF5 group path.
+#' @keywords internal
+#' @noRd
+.h5ad_resolve_counts_group <- function(file_path, .h5ad.group = NULL) {
+  if (!is.null(.h5ad.group)) {
+    # User override — validate it actually works
+    tryCatch(
+      {
+        BPCells::open_matrix_anndata_hdf5(file_path, group = .h5ad.group)
+        return(.h5ad.group)
+      },
+      error = function(e) {
+        stop("User-specified .h5ad.group '", .h5ad.group,
+             "' could not be opened by BPCells in '", file_path, "'.\n",
+             "Original error: ", conditionMessage(e), call. = FALSE)
+      }
+    )
+  }
+
+  # Auto-detect: try /layers/counts first, then /X
+  for (group in c("/layers/counts", "/X")) {
+    res <- tryCatch(
+      {
+        BPCells::open_matrix_anndata_hdf5(file_path, group = group)
+        group
+      },
+      error = function(e) NULL
+    )
+    if (!is.null(res)) return(res)
+  }
+
+  stop("Could not find a valid count matrix in '", file_path,
+       "'. Checked /layers/counts and /X. ",
+       "Specify the correct group with .h5ad.group.", call. = FALSE)
+}
+
+
 #' @describeIn RunTDR Run the pipeline on an HDF5AnnData object
 #'
 #' Builds a \code{\linkS4class{TDRObj}} from an HDF5-backed AnnData
-#' object and executes the full pipeline.
+#' object. The expression matrix is converted to a BPCells on-disk
+#' directory for efficient lazy access, then the proven
+#' \code{IterableMatrix} pipeline is used for all downstream steps.
+#'
+#' Metadata (obs) is read via \code{anndataR}; the expression matrix
+#' is read and converted via \code{BPCells}.
 #'
 #' @param x An \code{HDF5AnnData} object (created via
 #'   \code{anndataR::read_h5ad(..., backend = "HDF5AnnData")}).
-#' @param .assay.layer Character(1). Layer name in the AnnData object
-#'   (default \code{"counts"}).
+#' @param .sample.var Character(1). Column in \code{x$obs} identifying
+#'   sample membership.
+#' @param .assay.type Character. \code{"RNA"} or \code{"cyto"}.
+#' @param .h5ad.group Character(1) or \code{NULL}. HDF5 group path
+#'   containing the count matrix (e.g. \code{"/layers/counts"} or
+#'   \code{"/X"}). If \code{NULL} (default), auto-detects by probing
+#'   \code{/layers/counts} first, then falling back to \code{/X}.
+#' @param .bpcells.dir Character(1) or \code{NULL}. Directory path for
+#'   the BPCells on-disk matrix. If \code{NULL} (default), uses a
+#'   temporary directory (\code{tempdir()}) that is cleaned up on session
+#'   end. If a path is given and already contains a valid BPCells
+#'   matrix, the conversion step is skipped (cache hit).
+#' @param .harmony.var Character vector of batch variable column names
+#'   in sample-level metadata, or \code{NULL}.
+#' @param .markers Character vector of marker names (required for cyto).
+#' @param .celltype.vec Character(1). Column name in \code{x$obs}
+#'   containing per-cell type labels, or \code{NULL}.
+#' @param .min.cells.per.sample Integer. Minimum cells for a sample to be
+#'   included.
+#' @param .verbose Logical. Print progress messages.
+#' @param .seed Integer. Random seed.
+#' @param .prop.landmarks Numeric in (0, 1]. Proportion of cells as landmarks.
+#' @param .n.threads Integer. Number of threads.
+#' @param ... Additional arguments passed to pipeline functions.
 #'
-#' @return A \code{\linkS4class{TDRObj}} (bare object — no container to
-#'   store it in).
+#' @return A \code{\linkS4class{TDRObj}}.
 #'
 #' @export
 RunTDR.HDF5AnnData <- function(x,
                         .sample.var,
                         .assay.type = "RNA",
-                        .assay.layer = "counts",
+                        .h5ad.group = NULL,
+                        .bpcells.dir = NULL,
                         .harmony.var = NULL,
                         .markers = NULL,
                         .celltype.vec = NULL,
                         .min.cells.per.sample = 10,
-                        .optimize.hdf5 = FALSE,
                         .verbose = TRUE,
                         .seed = 123,
                         .prop.landmarks = 0.1,
@@ -801,268 +877,116 @@ RunTDR.HDF5AnnData <- function(x,
     stop(".sample.var '", .sample.var, "' not found in x$obs.")
   }
 
-  # --- Extract sample-level metadata ---
-  .meta <- get.meta(.obj = x, .sample.var = .sample.var,
-                    .verbose = .verbose)
+  if (!requireNamespace("BPCells", quietly = TRUE)) {
+    stop("Package 'BPCells' is required for HDF5AnnData support. ",
+         "Install it with: BiocManager::install('BPCells')", call. = FALSE)
+  }
 
-  # --- Build @cells as named list of sorted integer index vectors ---
-  sample_ids <- x$obs[[.sample.var]]
-  counts_tbl <- table(sample_ids)
-  valid <- names(counts_tbl)[
-    counts_tbl >= .min.cells.per.sample &
-    names(counts_tbl) %in% rownames(.meta)
-  ]
-  .cells <- lapply(
-    stats::setNames(valid, valid),
-    function(s) sort(which(sample_ids == s))
+  # --- Get backing file path ---
+  # HDF5AnnData stores the HDF5 handle in a private R6 field;
+  # extract the filename via rhdf5 (which anndataR already depends on)
+  h5ad_path <- tryCatch(
+    {
+      h5obj <- x$.__enclos_env__$private$.h5obj
+      rhdf5::H5Fget_name(h5obj)
+    },
+    error = function(e) NULL
   )
-  .meta <- .meta[names(.cells), , drop = FALSE]
+  if (is.null(h5ad_path) || !file.exists(h5ad_path)) {
+    stop("Could not determine h5ad file path from the HDF5AnnData object. ",
+         "Ensure x was created with anndataR::read_h5ad().", call. = FALSE)
+  }
 
-  # --- .celltype.vec handling ---
-  ct_vec <- NULL
-  if (!is.null(.celltype.vec)) {
-    if (!is.character(.celltype.vec) || length(.celltype.vec) != 1) {
-      stop(".celltype.vec must be a single character string ",
-           "(column name in x$obs).")
-    }
-    if (!(.celltype.vec %in% colnames(x$obs))) {
-      stop(".celltype.vec '", .celltype.vec,
-           "' not found in x$obs.")
-    }
-    valid_cells <- unlist(.cells)
-    ct_vec <- stats::setNames(
-      as.character(x$obs[[.celltype.vec]][valid_cells]),
-      rownames(x$obs)[valid_cells]
+  if (isTRUE(.verbose)) {
+    cat("h5ad file: ", h5ad_path, "\n")
+  }
+
+  # --- Resolve HDF5 group ---
+  group <- .h5ad_resolve_counts_group(h5ad_path, .h5ad.group)
+
+  if (isTRUE(.verbose)) {
+    cat("Using HDF5 group: ", group, "\n")
+  }
+
+  # --- Convert to BPCells on-disk format ---
+  if (is.null(.bpcells.dir)) {
+    .bpcells.dir <- file.path(tempdir(), paste0("bpcells_",
+                              tools::file_path_sans_ext(basename(h5ad_path))))
+  }
+
+  # Check for cache hit: if the dir exists and contains a valid BPCells matrix
+  cache_hit <- FALSE
+  if (dir.exists(.bpcells.dir)) {
+    bp_mat <- tryCatch(
+      {
+        BPCells::open_matrix_dir(.bpcells.dir)
+      },
+      error = function(e) NULL
     )
-  }
-
-  # --- HDF5 contiguity check ---
-  contiguity <- mean(vapply(.cells, function(idx) {
-    if (length(idx) <= 1) return(1)
-    sum(diff(idx) == 1L) / (length(idx) - 1L)
-  }, numeric(1)))
-
-  if (contiguity < 0.80) {
-    if (isTRUE(.optimize.hdf5)) {
-      # reorder metadata
-      metadata <- x$obs
-      metadata <- metadata[order(metadata[[.sample.var]]), ]
-
-      # reorder h5ad
-      x <- x[rownames(x = metadata), ]
-
-      # recompute after reordering
-      sample_ids <- x$obs[[.sample.var]]
-      counts_tbl <- table(sample_ids)
-      valid <- names(counts_tbl)[
-        counts_tbl >= .min.cells.per.sample &
-        names(counts_tbl) %in% rownames(.meta)
-      ]
-      .cells <- lapply(
-        stats::setNames(valid, valid),
-        function(s) sort(which(sample_ids == s))
-      )
-      .meta <- .meta[names(.cells), , drop = FALSE]
-    } else {
-      warning("Cells in HDF5-backed h5ad are not grouped by sample. ",
-              "Consider .optimize.hdf5 = TRUE for ~10-50x faster I/O.",
-              call. = FALSE)
+    if (!is.null(bp_mat)) {
+      cache_hit <- TRUE
+      if (isTRUE(.verbose)) {
+        cat("BPCells cache hit: reusing ", .bpcells.dir, "\n")
+      }
     }
   }
 
-  # --- Build TDRObj ---
-  tdr.obj <- .setup_tdr_from_h5ad(
-    .cells = .cells,
-    .meta = .meta,
-    .assay.layer = .assay.layer,
-    .assay.type = .assay.type,
-    .markers = .markers,
-    .harmony.var = .harmony.var,
-    .celltype.vec = ct_vec,
+  if (!cache_hit) {
+    if (isTRUE(.verbose)) {
+      cat("Converting h5ad matrix to BPCells on-disk format...\n")
+    }
+
+    # Open h5ad matrix lazily via BPCells (nearly instant, no data read)
+    h5_mat <- BPCells::open_matrix_anndata_hdf5(h5ad_path, group = group)
+
+    # Streaming write to BPCells on-disk directory
+    bp_mat <- BPCells::write_matrix_dir(mat = h5_mat, dir = .bpcells.dir)
+
+    if (isTRUE(.verbose)) {
+      cat("BPCells matrix written to: ", .bpcells.dir, "\n")
+    }
+
+    # Re-open from on-disk dir for consistent state
+    bp_mat <- BPCells::open_matrix_dir(.bpcells.dir)
+  }
+
+  # --- Apply gene names from anndataR var metadata ---
+  gene_names <- rownames(x$var)
+  if (is.null(gene_names)) {
+    gene_names <- x$var_names
+  }
+  if (!is.null(gene_names) && length(gene_names) == nrow(bp_mat)) {
+    rownames(bp_mat) <- gene_names
+  }
+
+  # --- Apply cell names (barcodes) ---
+  cell_names <- rownames(x$obs)
+  if (is.null(cell_names)) {
+    cell_names <- x$obs_names
+  }
+  if (!is.null(cell_names) && length(cell_names) == ncol(bp_mat)) {
+    colnames(bp_mat) <- cell_names
+  }
+
+  # --- Build cell metadata from obs ---
+  cell_meta <- as.data.frame(x$obs)
+
+  # --- Delegate to .run_tdr_matrix (the proven IterableMatrix path) ---
+  .run_tdr_matrix(
+    x               = bp_mat,
+    .cell.meta      = cell_meta,
+    .sample.var     = .sample.var,
+    .assay.type     = .assay.type,
+    .harmony.var    = .harmony.var,
+    .markers        = .markers,
+    .celltype.vec   = .celltype.vec,
+    .min.cells.per.sample = .min.cells.per.sample,
+    .verbose        = .verbose,
+    .seed           = .seed,
     .prop.landmarks = .prop.landmarks,
-    .seed = .seed,
-    .n.threads = .n.threads,
-    .verbose = .verbose
+    .n.threads      = .n.threads,
+    ...
   )
-
-  # --- Argument routing ---
-  dots <- list(...)
-
-  .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
-  .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
-  .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
-
-  lm_args  <- dots[names(dots) %in% .lm.formals]
-  gr_args  <- dots[names(dots) %in% .gr.formals]
-  map_args <- dots[names(dots) %in% .map.formals]
-
-  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
-  orphans <- setdiff(names(dots), all_known)
-  if (length(orphans) > 0) {
-    warning("Unknown arguments will be ignored: ",
-            paste(orphans, collapse = ", "))
-  }
-
-  # --- Pipeline ---
-  tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), lm_args))
-  tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
-
-  if (!is.null(tdr.obj@config$celltype.vec)) {
-    tdr.obj <- celltyping(tdr.obj,
-                          .celltyping.map = tdr.obj@config$celltype.vec,
-                          .verbose = .verbose)
-  }
-
-  tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
-
-  return(tdr.obj)
-}
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Internal helper: build TDRObj from h5ad-derived inputs
-# ──────────────────────────────────────────────────────────────────────
-
-#' Build a TDRObj from h5ad-derived cell lists and metadata
-#'
-#' @keywords internal
-#' @noRd
-.setup_tdr_from_h5ad <- function(.cells,
-                                 .meta,
-                                 .assay.layer,
-                                 .assay.type,
-                                 .markers,
-                                 .harmony.var,
-                                 .celltype.vec,
-                                 .prop.landmarks,
-                                 .seed,
-                                 .n.threads,
-                                 .verbose) {
-
-  .assay.type <- match.arg(arg = .assay.type,
-                           choices = c("cyto", "RNA"))
-
-  # --- Harmony var validation ---
-  if (!is.null(.harmony.var)) {
-    if (!inherits(.harmony.var, "character")) {
-      stop(".harmony.var must be a character vector.")
-    }
-    if (!all(.harmony.var %in% colnames(.meta))) {
-      stop("Variables not found in metadata: ",
-           paste(.harmony.var[!(.harmony.var %in% colnames(.meta))],
-                 collapse = ", "),
-           "\nCheck column names in .meta with colnames(.meta).")
-    }
-  }
-
-  # --- Markers validation ---
-  if (!is.null(.markers)) {
-    if (.assay.type == "RNA") {
-      stop(".markers argument only applies to cytometry data.\n",
-           "For RNA data, feature selection uses highly variable genes (HVG) automatically.")
-    } else if (length(.markers) < 3) {
-      stop(".markers must contain at least 3 markers for meaningful dimensionality reduction.")
-    }
-  }
-
-  if (.assay.type == "cyto" && is.null(.markers)) {
-    stop("For cyto assay.type with h5ad backend, .markers must be provided.")
-  }
-
-  # --- Prop landmarks validation ---
-  if ((.prop.landmarks < 0) | (.prop.landmarks > 1)) {
-    stop(".prop.landmarks must be between 0 and 1 (e.g., 0.1 for 10% of cells).\n",
-         "Current value: ", .prop.landmarks)
-  }
-
-  # --- Create TDRObj ---
-  .tdr.obj <- TDRObj(
-    config = list(
-      key = NULL,
-      sampling = NULL,
-      assay.type = .assay.type,
-      markers = NULL,
-      n.threads = .n.threads
-    ),
-    integration = list(
-      harmony.var = NULL,
-      harmony.obj = NULL
-    )
-  )
-
-  .tdr.obj@cells <- .cells
-
-  # --- n.cells from integer index vector lengths ---
-  n.cells <- lengths(.cells)
-
-  .tdr.obj@config$sampling$n.cells <- n.cells
-
-  # Quality check: warn if sample sizes are highly imbalanced (>10-fold difference)
-  if ((max(.tdr.obj@config$sampling$n.cells) /
-       min(.tdr.obj@config$sampling$n.cells)) > 10) {
-
-    warning("Sample size imbalance detected: largest/smallest ratio > 10.\n",
-            "Smallest sample has ", min(.tdr.obj@config$sampling$n.cells),
-            " cells.\n",
-            "Consider removing low-quality samples.")
-
-    if (any(.tdr.obj@config$sampling$n.cells < 1000)) {
-      warning("Large variation in sample sizes detected. ",
-              "For cytometry, samples with <1000 cells may be unreliable.")
-    }
-  }
-
-  # Calculate target number of landmarks: prop of total cells, capped at 5000
-  .tdr.obj@config$sampling$target.lm.n <-
-    pmin(sum(.tdr.obj@config$sampling$n.cells) * .prop.landmarks,
-         5e3)
-
-  # Allocate landmarks per sample: proportional to sample size, but capped
-  .tdr.obj@config$sampling$n.perSample <-
-    pmin(ceiling(x = .tdr.obj@config$sampling$n.cells * .prop.landmarks),
-         ceiling(x = .tdr.obj@config$sampling$target.lm.n /
-                     length(x = .tdr.obj@cells)))
-
-  # Create key vector: maps each future landmark to its sample
-  .tdr.obj@config$key <-
-    seq_along(along.with = .tdr.obj@cells) |>
-    rep(times = .tdr.obj@config$sampling$n.perSample) |>
-    (\(x)
-     stats::setNames(object = x,
-                     nm = names(.tdr.obj@cells)[x])
-    )()
-
-  .tdr.obj@metadata <- .meta
-
-  .tdr.obj@metadata$n.perSample <-
-    .tdr.obj@config$sampling$n.perSample
-
-  .tdr.obj@metadata$n.cells <-
-    .tdr.obj@config$sampling$n.cells
-
-  .tdr.obj@metadata$log10.n.cells <-
-    log10(x = .tdr.obj@config$sampling$n.cells)
-
-  # --- Markers ---
-  if (.assay.type == "cyto") {
-    .tdr.obj@config$markers <- .markers
-  }
-
-  # --- Harmony ---
-  if (!is.null(.harmony.var)) {
-    .tdr.obj@integration$harmony.var <- .harmony.var
-  }
-
-  # --- h5ad backend config ---
-  .tdr.obj@config$backend <- "h5ad"
-  .tdr.obj@config$source.layer <- .assay.layer
-
-  # --- Cell type vector ---
-  if (!is.null(.celltype.vec)) {
-    .tdr.obj@config$celltype.vec <- .celltype.vec
-  }
-
-  return(.tdr.obj)
 }
 
 

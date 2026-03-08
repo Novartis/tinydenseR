@@ -19,7 +19,6 @@ Collate:
     'celltype.R'
     'elbow.finder.R'
     'goi.R'
-    'h5ad_utils.R'
     'landmarks.R'
     'lm.graph.embed.R'
     'plot.R'
@@ -40,7 +39,6 @@ Suggests:
     ggiraph,
     rmarkdown,
     ggpubr,
-    rhdf5,
     rstatix,
     hexbin,
     SingleCellExperiment,
