@@ -1027,6 +1027,313 @@ RunTDR.HDF5AnnData <- function(x,
 
 
 # ======================================================================
+# RunTDR – cytoset method
+# ======================================================================
+
+#' @describeIn RunTDR Run the pipeline on a flowWorkspace cytoset
+#'
+#' Builds a \code{\linkS4class{TDRObj}} from a \code{cytoset} object
+#' (one FCS sample per \code{cytoframe}) and executes the full pipeline.
+#'
+#' @param x A \code{flowWorkspace::cytoset} object.
+#' @param .sample.var Character(1). Column name in \code{flowWorkspace::pData(x)}
+#'   identifying sample membership.
+#' @param .assay.type Character. Must be \code{"cyto"} (only valid type for
+#'   flow cytometry data).
+#' @param .harmony.var Character vector of batch variable column names
+#'   in pData, or \code{NULL}.
+#' @param .markers Character vector of marker/channel names. If \code{NULL},
+#'   defaults to all channels in the cytoset.
+#' @param .celltype.vec Named character vector of per-cell type labels
+#'   (names = cell IDs, values = labels), or \code{NULL}.
+#' @param .min.cells.per.sample Integer. Minimum cells for inclusion.
+#' @param .verbose Logical.
+#' @param .seed Integer.
+#' @param .prop.landmarks Numeric in (0, 1].
+#' @param .n.threads Integer.
+#' @param ... Additional arguments passed to pipeline functions.
+#'
+#' @return The updated \code{\linkS4class{TDRObj}}.
+#'
+#' @export
+RunTDR.cytoset <- function(x,
+                           .sample.var,
+                           .assay.type = "cyto",
+                           .harmony.var = NULL,
+                           .markers = NULL,
+                           .celltype.vec = NULL,
+                           .min.cells.per.sample = 10,
+                           .verbose = TRUE,
+                           .seed = 123,
+                           .prop.landmarks = 0.1,
+                           .n.threads = if (is.hpc()) {
+                             max(RhpcBLASctl::blas_get_num_procs(),
+                                 RhpcBLASctl::omp_get_num_procs(),
+                                 RhpcBLASctl::omp_get_max_threads(),
+                                 na.rm = TRUE)
+                           } else {
+                             parallel::detectCores(logical = TRUE)
+                           },
+                           ...) {
+
+  # --- Guard ---
+  if (!requireNamespace("flowWorkspace", quietly = TRUE)) {
+    stop("Package 'flowWorkspace' is required for RunTDR.cytoset(). ",
+         "Install it with: BiocManager::install('flowWorkspace')", call. = FALSE)
+  }
+
+  # --- Validate input ---
+  if (!inherits(x, "cytoset")) {
+    stop("x must be a flowWorkspace::cytoset object.")
+  }
+
+  if (!identical(.assay.type, "cyto")) {
+    stop(".assay.type must be 'cyto' for cytoset input. ",
+         "RNA data is not supported with cytoset.")
+  }
+
+  if (!is.character(.sample.var) || length(.sample.var) != 1) {
+    stop(".sample.var must be a single character string.")
+  }
+
+  if (!(.sample.var %in% colnames(flowWorkspace::pData(x)))) {
+    stop(".sample.var '", .sample.var,
+         "' not found in pData(x).")
+  }
+
+  # --- Extract sample metadata ---
+  sample_meta <- as.data.frame(flowWorkspace::pData(x))
+  rownames(sample_meta) <- sample_meta[[.sample.var]]
+  sample_meta <- sample_meta[, !colnames(sample_meta) %in% .sample.var,
+                             drop = FALSE]
+
+  # --- Build .cells ---
+  snames <- flowWorkspace::sampleNames(x)
+  .cells <- lapply(
+    stats::setNames(snames, snames),
+    function(s) seq_len(nrow(x[[s]]))
+  )
+
+  # --- Filter by .min.cells.per.sample ---
+  keep <- vapply(.cells, length, integer(1)) >= .min.cells.per.sample
+  .cells <- .cells[keep]
+  sample_meta <- sample_meta[names(.cells), , drop = FALSE]
+
+  if (length(.cells) == 0) {
+    stop("No samples have >= ", .min.cells.per.sample,
+         " cells. Check .min.cells.per.sample.")
+  }
+
+  # --- Resolve markers ---
+  all_channels <-
+    flowCore::parameters(object = x[[flowWorkspace::sampleNames(x)[1]]])$name |>
+    unname()
+  if (is.null(.markers)) {
+    .markers <- all_channels
+  } else {
+    bad <- setdiff(.markers, all_channels)
+    if (length(bad) > 0) {
+      stop("Markers not found in cytoset channels: ",
+           paste(bad, collapse = ", "))
+    }
+  }
+
+  # --- Build source_env ---
+  source_env <- new.env(parent = emptyenv())
+  source_env$cs <- x
+  lockBinding(sym = as.name("cs"), env = source_env)
+
+  # --- .celltype.vec handling ---
+  ct_vec <- NULL
+  if (!is.null(.celltype.vec)) {
+    if (!is.character(.celltype.vec) || is.null(names(.celltype.vec))) {
+      stop(".celltype.vec must be a named character vector ",
+           "(names = cell IDs, values = cell type labels).")
+    }
+    ct_vec <- .celltype.vec
+  }
+
+  # --- Build TDRObj ---
+  tdr.obj <- .setup_tdr_from_cytoset(
+    .cells = .cells,
+    .source.env = source_env,
+    .meta = sample_meta,
+    .markers = .markers,
+    .harmony.var = .harmony.var,
+    .celltype.vec = ct_vec,
+    .prop.landmarks = .prop.landmarks,
+    .seed = .seed,
+    .n.threads = .n.threads,
+    .verbose = .verbose
+  )
+
+  # --- Argument routing ---
+  dots <- list(...)
+
+  .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
+  .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
+  .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+
+  lm_args  <- dots[names(dots) %in% .lm.formals]
+  gr_args  <- dots[names(dots) %in% .gr.formals]
+  map_args <- dots[names(dots) %in% .map.formals]
+
+  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+  orphans <- setdiff(names(dots), all_known)
+  if (length(orphans) > 0) {
+    warning("Unknown arguments will be ignored: ",
+            paste(orphans, collapse = ", "))
+  }
+
+  # --- Pipeline ---
+  tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = NULL, .seed = .seed, .verbose = .verbose), lm_args))
+  tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
+
+  if (!is.null(tdr.obj@config$celltype.vec)) {
+    tdr.obj <- celltyping(tdr.obj,
+                          .celltyping.map = tdr.obj@config$celltype.vec,
+                          .verbose = .verbose)
+  }
+
+  tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = NULL, .seed = .seed, .verbose = .verbose), map_args))
+
+  return(tdr.obj)
+}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Internal helper: build TDRObj from cytoset-derived inputs
+# ──────────────────────────────────────────────────────────────────────
+
+#' Build a TDRObj from cytoset-derived cell lists and metadata
+#'
+#' @keywords internal
+#' @noRd
+.setup_tdr_from_cytoset <- function(.cells,
+                                    .source.env,
+                                    .meta,
+                                    .markers,
+                                    .harmony.var,
+                                    .celltype.vec,
+                                    .prop.landmarks,
+                                    .seed,
+                                    .n.threads,
+                                    .verbose) {
+
+  # --- Harmony var validation ---
+  if (!is.null(.harmony.var)) {
+    if (!inherits(.harmony.var, "character")) {
+      stop(".harmony.var must be a character vector.")
+    }
+    if (!all(.harmony.var %in% colnames(.meta))) {
+      stop("Variables not found in metadata: ",
+           paste(.harmony.var[!(.harmony.var %in% colnames(.meta))],
+                 collapse = ", "),
+           "\nCheck column names in .meta with colnames(.meta).")
+    }
+  }
+
+  # --- Markers validation ---
+  if (is.null(.markers) || length(.markers) < 3) {
+    stop(".markers must contain at least 3 markers for meaningful dimensionality reduction.")
+  }
+
+  # --- Prop landmarks validation ---
+  if ((.prop.landmarks < 0) | (.prop.landmarks > 1)) {
+    stop(".prop.landmarks must be between 0 and 1 (e.g., 0.1 for 10% of cells).\n",
+         "Current value: ", .prop.landmarks)
+  }
+
+  # --- Create TDRObj ---
+  .tdr.obj <- TDRObj(
+    config = list(
+      key = NULL,
+      sampling = NULL,
+      assay.type = "cyto",
+      markers = NULL,
+      n.threads = .n.threads
+    ),
+    integration = list(
+      harmony.var = NULL,
+      harmony.obj = NULL
+    )
+  )
+
+  .tdr.obj@cells <- .cells
+
+  # --- n.cells from integer index vector lengths ---
+  n.cells <- lengths(.cells)
+
+  .tdr.obj@config$sampling$n.cells <- n.cells
+
+  # Quality check: warn if sample sizes are highly imbalanced (>10-fold difference)
+  if ((max(.tdr.obj@config$sampling$n.cells) /
+       min(.tdr.obj@config$sampling$n.cells)) > 10) {
+
+    warning("Sample size imbalance detected: largest/smallest ratio > 10.\n",
+            "Smallest sample has ", min(.tdr.obj@config$sampling$n.cells),
+            " cells.\n",
+            "Consider removing low-quality samples.")
+
+    if (any(.tdr.obj@config$sampling$n.cells < 1000)) {
+      warning("Large variation in sample sizes detected. ",
+              "For cytometry, samples with <1000 cells may be unreliable.")
+    }
+  }
+
+  # Calculate target number of landmarks: prop of total cells, capped at 5000
+  .tdr.obj@config$sampling$target.lm.n <-
+    pmin(sum(.tdr.obj@config$sampling$n.cells) * .prop.landmarks,
+         5e3)
+
+  # Allocate landmarks per sample: proportional to sample size, but capped
+  .tdr.obj@config$sampling$n.perSample <-
+    pmin(ceiling(x = .tdr.obj@config$sampling$n.cells * .prop.landmarks),
+         ceiling(x = .tdr.obj@config$sampling$target.lm.n /
+                     length(x = .tdr.obj@cells)))
+
+  # Create key vector: maps each future landmark to its sample
+  .tdr.obj@config$key <-
+    seq_along(along.with = .tdr.obj@cells) |>
+    rep(times = .tdr.obj@config$sampling$n.perSample) |>
+    (\(x)
+     stats::setNames(object = x,
+                     nm = names(.tdr.obj@cells)[x])
+    )()
+
+  .tdr.obj@metadata <- .meta
+
+  .tdr.obj@metadata$n.perSample <-
+    .tdr.obj@config$sampling$n.perSample
+
+  .tdr.obj@metadata$n.cells <-
+    .tdr.obj@config$sampling$n.cells
+
+  .tdr.obj@metadata$log10.n.cells <-
+    log10(x = .tdr.obj@config$sampling$n.cells)
+
+  # --- Markers ---
+  .tdr.obj@config$markers <- .markers
+
+  # --- Harmony ---
+  if (!is.null(.harmony.var)) {
+    .tdr.obj@integration$harmony.var <- .harmony.var
+  }
+
+  # --- Cytoset backend: store locked env for .get_sample_matrix ---
+  .tdr.obj@config$backend <- "cytoset"
+  .tdr.obj@config$source.env <- .source.env
+
+  # --- Cell type vector ---
+  if (!is.null(.celltype.vec)) {
+    .tdr.obj@config$celltype.vec <- .celltype.vec
+  }
+
+  return(.tdr.obj)
+}
+
+
+# ======================================================================
 # RunTDR – matrix methods (dgCMatrix, DelayedMatrix, IterableMatrix)
 # ======================================================================
 

@@ -200,7 +200,7 @@ test_that("U6: Mode B errors on duplicate cell IDs", {
 
   expect_error(
     celltyping(fix$obj, dup_labels, .verbose = FALSE),
-    "Duplicate cell IDs"
+    "Duplicate cell IDs in sample"
   )
 })
 

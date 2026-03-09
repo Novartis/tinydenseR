@@ -265,6 +265,89 @@ test_that("GetTDR.SingleCellExperiment errors when no TDRObj stored", {
 # RunTDR.HDF5AnnData tests
 # ======================================================================
 
+# Helper: create h5ad via Python anndata (anndataR-written h5ad files
+# are not compatible with BPCells::open_matrix_anndata_hdf5).
+.make_test_h5ad_runtdr <- function(file_path,
+                                   n_cells = 200,
+                                   n_genes = 50,
+                                   n_samples = 4,
+                                   use_layers_counts = FALSE) {
+
+  python_script <- sprintf('
+import anndata
+import numpy as np
+import scipy.sparse as sp
+import pandas as pd
+
+np.random.seed(42)
+n_obs, n_var, n_samples = %d, %d, %d
+
+counts = sp.random(n_obs, n_var, density=0.3, format="csr", dtype=np.float32)
+counts.data = np.round(counts.data * 10).astype(np.float32)
+
+cells_per_sample = [n_obs // n_samples] * n_samples
+for i in range(n_obs %% n_samples):
+    cells_per_sample[i] += 1
+
+sample_ids = []
+for i, c in enumerate(cells_per_sample):
+    sample_ids.extend([f"sample{i+1}"] * c)
+
+cell_ids = []
+cell_counters = [0] * n_samples
+for sid in sample_ids:
+    idx = int(sid.replace("sample", "")) - 1
+    cell_counters[idx] += 1
+    cell_ids.append(f"{sid}_cell_{cell_counters[idx]}")
+
+gene_ids = [f"gene_{i+1}" for i in range(n_var)]
+
+obs = pd.DataFrame({
+    "sample_id": pd.Categorical(sample_ids),
+    "group": pd.Categorical(["A", "B"] * (n_obs // 2) + ["A"] * (n_obs %% 2))
+}, index=cell_ids)
+
+var = pd.DataFrame({
+    "gene_name": gene_ids
+}, index=gene_ids)
+
+use_layers = %s
+
+if use_layers:
+    adata = anndata.AnnData(obs=obs, var=var)
+    adata.layers["counts"] = counts.tocsc()
+else:
+    adata = anndata.AnnData(X=counts.tocsc(), obs=obs, var=var)
+
+adata.write_h5ad("%s")
+', n_cells, n_genes, n_samples,
+  ifelse(use_layers_counts, "True", "False"),
+  file_path)
+
+  py_file <- tempfile(fileext = ".py")
+  on.exit(unlink(py_file), add = TRUE)
+  writeLines(python_script, py_file)
+
+  result <- system2("python3", py_file, stdout = TRUE, stderr = TRUE)
+  status <- attr(result, "status")
+  if (!is.null(status) && status != 0) {
+    stop("Failed to create test h5ad fixture:\n",
+         paste(result, collapse = "\n"))
+  }
+
+  invisible(file_path)
+}
+
+.has_python_anndata_runtdr <- function() {
+  result <- tryCatch(
+    system2("python3", c("-c", shQuote("import anndata")),
+            stdout = TRUE, stderr = TRUE),
+    error = function(e) "ERROR"
+  )
+  status <- attr(result, "status")
+  is.null(status) || status == 0
+}
+
 test_that("RunTDR dispatches to HDF5AnnData method", {
   skip_if_not_installed("anndataR")
   # S3 dispatch reaches RunTDR.HDF5AnnData — verify it is registered
@@ -273,47 +356,46 @@ test_that("RunTDR dispatches to HDF5AnnData method", {
 
 test_that("RunTDR.HDF5AnnData runs full pipeline via S3 dispatch", {
   skip_on_cran()
+  skip_if_not_installed("BPCells")
   skip_if_not_installed("anndataR")
-  skip_if_not(curl::has_internet(), "No internet connection")
+  skip_if(!.has_python_anndata_runtdr(), "python3 with anndata not available")
 
-  trajectory_data <- fetch_trajectory_data()
-  sce <- trajectory_data$SCE
+  tmp_h5ad <- withr::local_tempfile(fileext = ".h5ad")
+  bp_dir <- withr::local_tempdir()
 
-  # Write SCE to a temp h5ad, then read back as HDF5AnnData
-  h5ad_path <- tempfile(fileext = ".h5ad")
-  on.exit(unlink(h5ad_path), add = TRUE)
+  .make_test_h5ad_runtdr(tmp_h5ad, n_cells = 200, n_genes = 50, n_samples = 4,
+                         use_layers_counts = FALSE)
 
-  adata <- anndataR::as_AnnData(x = sce, output_class = "HDF5AnnData",
-                                                file = h5ad_path)
+  x <- anndataR::read_h5ad(tmp_h5ad, as = "HDF5AnnData")
 
   # Call via generic — S3 dispatch should find RunTDR.HDF5AnnData
-  result <- RunTDR(x = adata,
-                   .sample.var = "Sample",
+  result <- RunTDR(x = x,
+                   .sample.var = "sample_id",
                    .assay.type = "RNA",
+                   .bpcells.dir = file.path(bp_dir, "bp"),
+                   .nPC = 3,
                    .verbose = FALSE,
                    .seed = 42)
 
   expect_true(is.TDRObj(result))
   expect_true(!is.null(result@density$fdens))
-  expect_equal(result@config$backend, "h5ad")
+  expect_equal(result@config$backend, "matrix")
 })
 
 test_that("RunTDR.HDF5AnnData errors on invalid .sample.var", {
   skip_on_cran()
+  skip_if_not_installed("BPCells")
   skip_if_not_installed("anndataR")
-  skip_if_not(curl::has_internet(), "No internet connection")
+  skip_if(!.has_python_anndata_runtdr(), "python3 with anndata not available")
 
-  trajectory_data <- fetch_trajectory_data()
-  sce <- trajectory_data$SCE
+  tmp_h5ad <- withr::local_tempfile(fileext = ".h5ad")
 
-  h5ad_path <- tempfile(fileext = ".h5ad")
-  on.exit(unlink(h5ad_path), add = TRUE)
+  .make_test_h5ad_runtdr(tmp_h5ad, n_cells = 40, n_genes = 10, n_samples = 2)
 
-  adata <- anndataR::as_AnnData(x = sce, output_class = "HDF5AnnData",
-                                                file = h5ad_path)
+  x <- anndataR::read_h5ad(tmp_h5ad, as = "HDF5AnnData")
 
   expect_error(
-    RunTDR(x = adata,
+    RunTDR(x = x,
            .sample.var = "NonExistentCol",
            .assay.type = "RNA",
            .verbose = FALSE),

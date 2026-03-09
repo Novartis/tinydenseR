@@ -247,65 +247,76 @@ celltyping.TDRObj <-
 # Mode B: per-cell labels (new)
 # ──────────────────────────────────────────────────────────────────────
 .celltyping_mode_b <- function(.tdr.obj, .celltyping.map) {
-  
-  # --- Validate: no duplicate cell names ---
-  if (anyDuplicated(names(.celltyping.map))) {
-    dupes <- unique(names(.celltyping.map)[duplicated(names(.celltyping.map))])
-    stop("Duplicate cell IDs in names(.celltyping.map): ",
-         paste(head(dupes, 5), collapse = ", "),
-         if (length(dupes) > 5) paste0(" ... (", length(dupes), " total)"),
-         "\nEach cell must appear exactly once.")
-  }
-  
+
   # --- Validate: length matches total cell count ---
   expected_n <- sum(.tdr.obj@config$sampling$n.cells)
   if (length(.celltyping.map) != expected_n) {
     stop("Length of .celltyping.map (", length(.celltyping.map),
          ") does not match total cell count (", expected_n, ").")
   }
-  
+
   # --- Get landmark row names from the assay matrix ---
   lm_names <- rownames(.tdr.obj@assay$expr)
-  
-  # --- Strip the sample prefix to recover original cell IDs ---
-  # All landmarks use: paste0(sample_name, "_", original_cell_id)
-  sample_prefixes <- paste0("^",
-                            unique(names(.tdr.obj@config$key)),
-                            "_")
-  original_ids <- sub(
-    pattern     = paste0(sample_prefixes, collapse = "|"),
-    replacement = "",
-    x           = lm_names
-  )
-  
-  # --- Match into the user-supplied vector ---
-  matched_idx <- match(original_ids, names(.celltyping.map))
-  
-  # --- Validate: every landmark must have a label ---
-  if (anyNA(matched_idx)) {
-    missing <- lm_names[is.na(matched_idx)]
-    stop("Could not find labels for ", length(missing), " landmark(s).\n",
-         "First few: ", paste(head(missing, 5), collapse = ", "), "\n",
-         "Ensure names(.celltyping.map) contain the original cell IDs.")
+
+  # --- Split .celltyping.map by sample using n.cells counts ---
+  sample_names <- names(.tdr.obj@cells)
+  n_cells      <- .tdr.obj@config$sampling$n.cells
+  ct_splits    <- split(
+    .celltyping.map,
+    rep(sample_names, times = n_cells)
+  )[sample_names]              # preserve sample order
+
+  # --- Validate: no duplicate cell IDs within any sample ---
+  for (sn in sample_names) {
+    chunk_names <- names(ct_splits[[sn]])
+    if (anyDuplicated(chunk_names)) {
+      dupes <- unique(chunk_names[duplicated(chunk_names)])
+      stop("Duplicate cell IDs in sample '", sn, "': ",
+           paste(head(dupes, 5), collapse = ", "),
+           if (length(dupes) > 5) paste0(" ... (", length(dupes), " total)"),
+           "\nEach cell must appear exactly once within a sample.")
+    }
   }
-  
+
+  # --- Match sample-by-sample (safe for non-unique cell IDs) ---
+  labels <- character(length(lm_names))
+
+  # config$key names tell us which sample each landmark belongs to
+  lm_sample <- names(.tdr.obj@config$key)
+
+  for (sn in sample_names) {
+    idx    <- which(lm_sample == sn)
+    if (length(idx) == 0L) next
+    prefix <- paste0("^", sn, "_")
+    stripped <- sub(prefix, "", lm_names[idx])
+    ct_sample <- ct_splits[[sn]]
+    m <- match(stripped, names(ct_sample))
+    if (anyNA(m)) {
+      missing <- lm_names[idx][is.na(m)]
+      stop("Could not find labels for ", length(missing),
+           " landmark(s) in sample '", sn, "'.\n",
+           "First few: ", paste(head(missing, 5), collapse = ", "), "\n",
+           "Ensure names(.celltyping.map) contain the original cell IDs.")
+    }
+    labels[idx] <- ct_sample[m]
+  }
+
   # --- Warn if all landmarks get the same label ---
-  if (length(unique(.celltyping.map[matched_idx])) == 1L) {
+  if (length(unique(labels)) == 1L) {
     warning("All landmarks received the same cell-type label ('",
-            .celltyping.map[matched_idx][1],
+            labels[1],
             "'). This is likely a user error.", call. = FALSE)
   }
-  
+
   # --- Assign ---
   .tdr.obj@landmark.annot$celltyping <- list()
-  .tdr.obj@landmark.annot$celltyping$ids <-
-    factor(.celltyping.map[matched_idx])
+  .tdr.obj@landmark.annot$celltyping$ids <- factor(labels)
   names(.tdr.obj@landmark.annot$celltyping$ids) <- lm_names
-  
+
   # Store provenance (no cluster map in Mode B)
   .tdr.obj@landmark.annot$celltyping$map  <- NULL
   .tdr.obj@landmark.annot$celltyping$mode <- "cell_labels"
-  
+
   .tdr.obj
 }
 

@@ -6,6 +6,7 @@
 \alias{RunTDR.Seurat}
 \alias{RunTDR.SingleCellExperiment}
 \alias{RunTDR.HDF5AnnData}
+\alias{RunTDR.cytoset}
 \alias{RunTDR.dgCMatrix}
 \alias{RunTDR.DelayedMatrix}
 \alias{RunTDR.IterableMatrix}
@@ -74,6 +75,27 @@ RunTDR(x, ...)
   .assay.type = "RNA",
   .h5ad.group = NULL,
   .bpcells.dir = NULL,
+  .harmony.var = NULL,
+  .markers = NULL,
+  .celltype.vec = NULL,
+  .min.cells.per.sample = 10,
+  .verbose = TRUE,
+  .seed = 123,
+  .prop.landmarks = 0.1,
+  .n.threads = if (is.hpc()) {
+     max(RhpcBLASctl::blas_get_num_procs(),
+    RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
+
+    } else {
+     parallel::detectCores(logical = TRUE)
+ },
+  ...
+)
+
+\method{RunTDR}{cytoset}(
+  x,
+  .sample.var,
+  .assay.type = "cyto",
   .harmony.var = NULL,
   .markers = NULL,
   .celltype.vec = NULL,
@@ -165,6 +187,8 @@ in \code{S4Vectors::metadata(x)$tdr.obj}.
 
 A \code{\linkS4class{TDRObj}}.
 
+The updated \code{\linkS4class{TDRObj}}.
+
 A \code{\linkS4class{TDRObj}}.
 
 A \code{\linkS4class{TDRObj}}.
@@ -207,6 +231,11 @@ directory for efficient lazy access, then the proven
 
 Metadata (obs) is read via \code{anndataR}; the expression matrix
 is read and converted via \code{BPCells}.
+
+\item \code{RunTDR(cytoset)}: Run the pipeline on a flowWorkspace cytoset
+
+Builds a \code{\linkS4class{TDRObj}} from a \code{cytoset} object
+(one FCS sample per \code{cytoframe}) and executes the full pipeline.
 
 \item \code{RunTDR(dgCMatrix)}: Run the pipeline on a sparse matrix (dgCMatrix)
 

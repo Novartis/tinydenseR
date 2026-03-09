@@ -13,6 +13,7 @@ Collate:
     'TDRObj-class.R'
     'accessor.R'
     'RunTDR.R'
+    'simulate.R'
     'dispatch.R'
     'Color.Palette.R'
     'cache.R'
@@ -35,6 +36,8 @@ Suggests:
     testthat (>= 3.0.0),
     anndataR,
     filelock,
+    flowCore,
+    flowWorkspace,
     ggiraph,
     rmarkdown,
     ggpubr,
@@ -45,7 +48,9 @@ Suggests:
     destiny,
     RcppML,
     BPCells,
-    HDF5Array
+    HDF5Array,
+    rhdf5,
+    withr
 Config/testthat/edition: 3
 Imports: 
     collapse,

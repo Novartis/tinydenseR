@@ -54,6 +54,17 @@
         src[col_idx, , drop = FALSE]
       }
     },
+    "cytoset" = {
+      cs <- .tdr.obj@config$source.env$cs
+      sample_name <- names(.tdr.obj@cells)[sample_idx]
+      mat <- flowCore::exprs(cs[[sample_name]])
+      # strip $PnN names attribute from colnames
+      colnames(mat) <- unname(colnames(mat))
+      if (is.null(rownames(mat))) {
+        rownames(mat) <- paste0("event_", seq_len(nrow(mat)))
+      }
+      mat
+    },
     stop("Unknown backend: ", backend)
   )
 

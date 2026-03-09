@@ -21,85 +21,12 @@ library(rstatix)
 library(patchwork)
 library(ggh4x)
 library(Matrix)
+library(flowCore)
+library(flowWorkspace)
 
-set.seed(42)
-
-# Parameters
-groups <- c("Baseline", "Depletion")
-batches <- c("Batch1", "Batch2")
-settings <- c(0.005, 0.05, 0.5)  # Proportions for Baseline
-samples_per_group <- 6
-mean_cells <- 50000
-sd_cells <- 500  # Noise in total cell count
-
-# Initialize storage
-data_list_DA <- list()
-
-# Simulate data
-for (setting in settings) {
-  for (group in groups) {
-    for (sample_id in 1:samples_per_group) {
-      batch <- 
-        if(sample_id %% 2 == 0) {
-          "Batch2"
-        } else {
-          "Batch1"
-        }
-      total_cells <- round(rnorm(1, mean = mean_cells, sd = sd_cells))
-      total_cells <- max(total_cells, 1000)  # Ensure a minimum number of cells
-      
-      # Two-fold difference in proportions
-      proportion <- if (group == "Baseline") setting else setting / 2
-      
-      num_interest <- round(total_cells * proportion)
-      num_other <- total_cells - num_interest
-      cell_types <- c(rep("target", num_interest), rep("other", num_other))
-      cell_types <- sample(cell_types)
-      
-      # Simulate expression data
-      marker1 <- numeric(total_cells)
-      marker2 <- rlnorm(total_cells, meanlog = 0, sdlog = 1.5)
-      marker3 <- rlnorm(total_cells, meanlog = 0, sdlog = 2.5)
-      marker4 <- numeric(total_cells)  
-      marker5 <- numeric(total_cells)  
-      
-      # Assign Marker1, Marker4 Marker5 based on cell type
-      marker1[cell_types == "other"] <- rlnorm(sum(cell_types == "other"), meanlog = 0, sdlog = 2)
-      marker1[cell_types == "target"] <- rlnorm(sum(cell_types == "target"), meanlog = 0 + 5, sdlog = 2)  # Shift by 5 SD
-      marker4[cell_types == "other"] <- rlnorm(sum(cell_types == "other"), meanlog = 0, sdlog = 1.2)
-      marker4[cell_types == "target"] <- rlnorm(sum(cell_types == "target"), meanlog = 0 + 3, sdlog = 1.2)  # Shift by 3 SD
-      marker5[cell_types == "other"] <- rlnorm(sum(cell_types == "other"), meanlog = 0, sdlog = 1.8)
-      marker5[cell_types == "target"] <- rlnorm(sum(cell_types == "target"), meanlog = 0 + 7, sdlog = 1.8)  # Shift by 7 SD
-      
-      # Add batch effect
-      if (batch == "Batch2") {
-        marker1 <- marker1 * rlnorm(total_cells, meanlog = 0.1, sdlog = 0.5)
-        marker2 <- marker2 * rlnorm(total_cells, meanlog = 0.2, sdlog = 0.3)
-        marker3 <- marker3 * rlnorm(total_cells, meanlog = 0.3, sdlog = 0.4)
-        marker4 <- marker4 * rlnorm(total_cells, meanlog = 0.4, sdlog = 0.3)
-        marker5 <- marker5 * rlnorm(total_cells, meanlog = 0.5, sdlog = 0.5)
-      }
-      
-      sample_name <- paste0(group, "_S", sample_id, "_Set", setting * 100)
-      df <- data.frame(
-        Sample = sample_name,
-        Treatment = group,
-        Batch = batch,
-        Setting = paste0(setting * 100, "%"),
-        CellType = cell_types,
-        Marker1 = marker1,
-        Marker2 = marker2,
-        Marker3 = marker3,
-        Marker4 = marker4,
-        Marker5 = marker5
-      )
-      data_list_DA[[length(data_list_DA) + 1]] <- df
-    }
-  }
-}
-
-# Combine
-final_data_DA <- do.call(rbind, data_list_DA)
+# Simulate DA data and write FCS files
+sim_data <- simulate_DA_data()
+final_data_DA <- sim_data$cell_meta
 
 DA_res_DA <-
   final_data_DA |>
@@ -150,53 +77,37 @@ DA_res_DA |>
   )()
 
 # 0.5%
-.cells.DA.0.5 <-
-  final_data_DA |>
-  dplyr::filter(Setting == "0.5%") |>
-  dplyr::pull(Sample) |>
-  unique() |> 
-  (\(x)
-   setNames(object = x,
-            nm = x)
-  )() |>
-  lapply(FUN = function(sample.id){
-    
-    uri <- tempfile(fileext = ".RDS")
-    
-    saveRDS(object = final_data_DA[final_data_DA$Sample == sample.id,
-                                   c("Marker1", "Marker2", "Marker3", "Marker4", "Marker5")] |>
-              as.matrix() |>
-              log(),
-            file = uri,
-            compress = FALSE)
-    
-    return(uri)
-    
-  })
+.setting.meta.0.5 <-
+  sim_data$sample_meta |>
+  dplyr::filter(Setting == "0.5%")
 
-.meta.DA.0.5 <-
-  final_data_DA |>
-  dplyr::filter(Sample %in% names(x = .cells.DA.0.5)) |>
-  dplyr::select(Sample, Treatment, Batch) |>
-  dplyr::distinct() |> 
-  (\(x)
-   `rownames<-`(x = x[match(x = names(x = .cells.DA.0.5),
-                            table = x$Sample),
-                      c("Treatment", "Batch")],
-                value = names(x = .cells.DA.0.5))
-  )()
+cs.DA.0.5 <-
+  flowWorkspace::load_cytoset_from_fcs(
+    files = stats::setNames(.setting.meta.0.5$fcs_path,
+                            .setting.meta.0.5$Sample))
+
+flowWorkspace::pData(cs.DA.0.5)$Sample <-
+  flowWorkspace::sampleNames(cs.DA.0.5)
+flowWorkspace::pData(cs.DA.0.5)$Treatment <-
+  .setting.meta.0.5$Treatment[match(flowWorkspace::sampleNames(cs.DA.0.5),
+                                    .setting.meta.0.5$Sample)]
+flowWorkspace::pData(cs.DA.0.5)$Batch <-
+  .setting.meta.0.5$Batch[match(flowWorkspace::sampleNames(cs.DA.0.5),
+                                .setting.meta.0.5$Sample)]
 
 set.seed(seed = 123)
 lm.cells.DA.0.5 <-
-  tinydenseR::setup.tdr.obj(
-    .cells = .cells.DA.0.5,
-    .meta = .meta.DA.0.5,
-    .assay.type = "cyto") |>
-  tinydenseR::get.landmarks() |>
-  tinydenseR::get.graph(.cl.resolution.parameter = 0.5)
+  tinydenseR::RunTDR(
+    cs.DA.0.5,
+    .sample.var = "Sample",
+    .assay.type = "cyto",
+    .markers = paste0("Marker", 1:5),
+    .seed = 123,
+    .verbose = TRUE,
+    .cl.resolution.parameter = 0.5)
 
-lm.cells.DA.0.5 <-
-  tinydenseR::get.map(.tdr.obj = lm.cells.DA.0.5)
+.meta.DA.0.5 <-
+  lm.cells.DA.0.5@metadata
 
 .design.0.5 <-
   model.matrix(object = ~ Treatment + Batch,
@@ -215,8 +126,8 @@ lm.cells.DA.0.5 <-
     .tdr.obj = lm.cells.DA.0.5,
     .design = .design.0.5)
 
-lapply(X = .cells.DA.0.5,
-       FUN = readRDS) |>
+lapply(X = names(lm.cells.DA.0.5@cells),
+       FUN = function(s) flowCore::exprs(cs.DA.0.5[[s]])) |>
   do.call(what = rbind) |>
   (\(x)
    (((Matrix::t(x = x[,lm.cells.DA.0.5$landmark.embed$pca$HVG]) - lm.cells.DA.0.5$landmark.embed$pca$center) /
@@ -230,7 +141,7 @@ lapply(X = .cells.DA.0.5,
    dplyr::mutate(
      .data = x,
      Treatment = final_data_DA |>
-       dplyr::filter(Sample %in% names(x = .cells.DA.0.5)) |>
+       dplyr::filter(Sample %in% names(x = lm.cells.DA.0.5@cells)) |>
        dplyr::pull(Treatment))
   )() |>
   (\(x)
@@ -251,7 +162,7 @@ lapply(X = .cells.DA.0.5,
   )()
 
 final_data_DA |>
-  dplyr::filter(Sample %in% names(x = .cells.DA.0.5)) |>
+  dplyr::filter(Sample %in% names(x = lm.cells.DA.0.5@cells)) |>
   dplyr::mutate(CellType = factor(x = CellType,
                                   levels = c("target",
                                              "other"))) |>
@@ -302,8 +213,8 @@ final_data_DA |>
                                                units = "in"))
   )()
 
-lapply(X = .cells.DA.0.5,
-       FUN = readRDS) |>
+lapply(X = names(lm.cells.DA.0.5@cells),
+       FUN = function(s) flowCore::exprs(cs.DA.0.5[[s]])) |>
   do.call(what = rbind) |>
   (\(x)
    (((Matrix::t(x = x[,lm.cells.DA.0.5$landmark.embed$pca$HVG]) - lm.cells.DA.0.5$landmark.embed$pca$center) /
@@ -317,10 +228,10 @@ lapply(X = .cells.DA.0.5,
    dplyr::mutate(
      .data = x,
      Treatment = final_data_DA |>
-       dplyr::filter(Sample %in% names(x = .cells.DA.0.5)) |>
+       dplyr::filter(Sample %in% names(x = lm.cells.DA.0.5@cells)) |>
        dplyr::pull(Treatment),
      Batch = final_data_DA |>
-       dplyr::filter(Sample %in% names(x = .cells.DA.0.5)) |>
+       dplyr::filter(Sample %in% names(x = lm.cells.DA.0.5@cells)) |>
        dplyr::pull(Batch))
   )() |>
   (\(x)
@@ -480,53 +391,37 @@ lm.cells.DA.0.5$results$marker$default$cluster4_vs_all$adj.p
 lm.cells.DA.0.5$results$marker$default$cluster4_vs_all$coefficients
 
 # 5%
-.cells.DA.5 <-
-  final_data_DA |>
-  dplyr::filter(Setting == "5%") |>
-  dplyr::pull(Sample) |>
-  unique() |> 
-  (\(x)
-   setNames(object = x,
-            nm = x)
-  )() |>
-  lapply(FUN = function(sample.id){
-    
-    uri <- tempfile(fileext = ".RDS")
-    
-    saveRDS(object = final_data_DA[final_data_DA$Sample == sample.id,
-                                   c("Marker1", "Marker2", "Marker3", "Marker4", "Marker5")] |>
-              as.matrix() |>
-              log(),
-            file = uri,
-            compress = FALSE)
-    
-    return(uri)
-    
-  })
+.setting.meta.5 <-
+  sim_data$sample_meta |>
+  dplyr::filter(Setting == "5%")
 
-.meta.DA.5 <-
-  final_data_DA |>
-  dplyr::filter(Sample %in% names(x = .cells.DA.5)) |>
-  dplyr::select(Sample, Treatment, Batch) |>
-  dplyr::distinct() |> 
-  (\(x)
-   `rownames<-`(x = x[match(x = names(x = .cells.DA.5),
-                            table = x$Sample),
-                      c("Treatment", "Batch")],
-                value = names(x = .cells.DA.5))
-  )()
+cs.DA.5 <-
+  flowWorkspace::load_cytoset_from_fcs(
+    files = stats::setNames(.setting.meta.5$fcs_path,
+                            .setting.meta.5$Sample))
+
+flowWorkspace::pData(cs.DA.5)$Sample <-
+  flowWorkspace::sampleNames(cs.DA.5)
+flowWorkspace::pData(cs.DA.5)$Treatment <-
+  .setting.meta.5$Treatment[match(flowWorkspace::sampleNames(cs.DA.5),
+                                  .setting.meta.5$Sample)]
+flowWorkspace::pData(cs.DA.5)$Batch <-
+  .setting.meta.5$Batch[match(flowWorkspace::sampleNames(cs.DA.5),
+                              .setting.meta.5$Sample)]
 
 set.seed(seed = 123)
 lm.cells.DA.5 <-
-  tinydenseR::setup.tdr.obj(
-    .cells = .cells.DA.5,
-    .meta = .meta.DA.5,
-    .assay.type = "cyto") |>
-  tinydenseR::get.landmarks() |>
-  tinydenseR::get.graph(.cl.resolution.parameter = 0.5)
+  tinydenseR::RunTDR(
+    cs.DA.5,
+    .sample.var = "Sample",
+    .assay.type = "cyto",
+    .markers = paste0("Marker", 1:5),
+    .seed = 123,
+    .verbose = TRUE,
+    .cl.resolution.parameter = 0.5)
 
-lm.cells.DA.5 <-
-  tinydenseR::get.map(.tdr.obj = lm.cells.DA.5)
+.meta.DA.5 <-
+  lm.cells.DA.5@metadata
 
 .design.5 <-
   model.matrix(object = ~ Treatment + Batch,
@@ -545,8 +440,8 @@ lm.cells.DA.5 <-
     .tdr.obj = lm.cells.DA.5,
     .design = .design.5)
 
-lapply(X = .cells.DA.5,
-       FUN = readRDS) |>
+lapply(X = names(lm.cells.DA.5@cells),
+       FUN = function(s) flowCore::exprs(cs.DA.5[[s]])) |>
   do.call(what = rbind) |>
   (\(x)
    (((Matrix::t(x = x[,lm.cells.DA.5$landmark.embed$pca$HVG]) - lm.cells.DA.5$landmark.embed$pca$center) /
@@ -560,7 +455,7 @@ lapply(X = .cells.DA.5,
    dplyr::mutate(
      .data = x,
      Treatment = final_data_DA |>
-       dplyr::filter(Sample %in% names(x = .cells.DA.5)) |>
+       dplyr::filter(Sample %in% names(x = lm.cells.DA.5@cells)) |>
        dplyr::pull(Treatment))
   )() |>
   (\(x)
@@ -581,7 +476,7 @@ lapply(X = .cells.DA.5,
   )()
 
 final_data_DA |>
-  dplyr::filter(Sample %in% names(x = .cells.DA.5)) |>
+  dplyr::filter(Sample %in% names(x = lm.cells.DA.5@cells)) |>
   dplyr::mutate(CellType = factor(x = CellType,
                                   levels = c("target",
                                              "other"))) |>
@@ -632,8 +527,8 @@ final_data_DA |>
                                                units = "in"))
   )()
 
-lapply(X = .cells.DA.5,
-       FUN = readRDS) |>
+lapply(X = names(lm.cells.DA.5@cells),
+       FUN = function(s) flowCore::exprs(cs.DA.5[[s]])) |>
   do.call(what = rbind) |>
   (\(x)
    (((Matrix::t(x = x[,lm.cells.DA.5$landmark.embed$pca$HVG]) - lm.cells.DA.5$landmark.embed$pca$center) /
@@ -647,10 +542,10 @@ lapply(X = .cells.DA.5,
    dplyr::mutate(
      .data = x,
      Treatment = final_data_DA |>
-       dplyr::filter(Sample %in% names(x = .cells.DA.5)) |>
+       dplyr::filter(Sample %in% names(x = lm.cells.DA.5@cells)) |>
        dplyr::pull(Treatment),
      Batch = final_data_DA |>
-       dplyr::filter(Sample %in% names(x = .cells.DA.5)) |>
+       dplyr::filter(Sample %in% names(x = lm.cells.DA.5@cells)) |>
        dplyr::pull(Batch))
   )() |>
   (\(x)
@@ -812,53 +707,37 @@ lm.cells.DA.5$results$marker$default$cluster3_vs_all$adj.p
 lm.cells.DA.5$results$marker$default$cluster3_vs_all$coefficients
 
 # 50%
-.cells.DA.50 <-
-  final_data_DA |>
-  dplyr::filter(Setting == "50%") |>
-  dplyr::pull(Sample) |>
-  unique() |> 
-  (\(x)
-   setNames(object = x,
-            nm = x)
-  )() |>
-  lapply(FUN = function(sample.id){
-    
-    uri <- tempfile(fileext = ".RDS")
-    
-    saveRDS(object = final_data_DA[final_data_DA$Sample == sample.id,
-                                   c("Marker1", "Marker2", "Marker3", "Marker4", "Marker5")] |>
-              as.matrix() |>
-              log(),
-            file = uri,
-            compress = FALSE)
-    
-    return(uri)
-    
-  })
+.setting.meta.50 <-
+  sim_data$sample_meta |>
+  dplyr::filter(Setting == "50%")
 
-.meta.DA.50 <-
-  final_data_DA |>
-  dplyr::filter(Sample %in% names(x = .cells.DA.50)) |>
-  dplyr::select(Sample, Treatment, Batch) |>
-  dplyr::distinct() |> 
-  (\(x)
-   `rownames<-`(x = x[match(x = names(x = .cells.DA.50),
-                            table = x$Sample),
-                      c("Treatment", "Batch")],
-                value = names(x = .cells.DA.50))
-  )()
+cs.DA.50 <-
+  flowWorkspace::load_cytoset_from_fcs(
+    files = stats::setNames(.setting.meta.50$fcs_path,
+                            .setting.meta.50$Sample))
+
+flowWorkspace::pData(cs.DA.50)$Sample <-
+  flowWorkspace::sampleNames(cs.DA.50)
+flowWorkspace::pData(cs.DA.50)$Treatment <-
+  .setting.meta.50$Treatment[match(flowWorkspace::sampleNames(cs.DA.50),
+                                   .setting.meta.50$Sample)]
+flowWorkspace::pData(cs.DA.50)$Batch <-
+  .setting.meta.50$Batch[match(flowWorkspace::sampleNames(cs.DA.50),
+                               .setting.meta.50$Sample)]
 
 set.seed(seed = 123)
 lm.cells.DA.50 <-
-  tinydenseR::setup.tdr.obj(
-    .cells = .cells.DA.50,
-    .meta = .meta.DA.50,
-    .assay.type = "cyto") |>
-  tinydenseR::get.landmarks() |>
-  tinydenseR::get.graph(.cl.resolution.parameter = 0.5)
+  tinydenseR::RunTDR(
+    cs.DA.50,
+    .sample.var = "Sample",
+    .assay.type = "cyto",
+    .markers = paste0("Marker", 1:5),
+    .seed = 123,
+    .verbose = TRUE,
+    .cl.resolution.parameter = 0.5)
 
-lm.cells.DA.50 <-
-  tinydenseR::get.map(.tdr.obj = lm.cells.DA.50)
+.meta.DA.50 <-
+  lm.cells.DA.50@metadata
 
 .design.50 <-
   model.matrix(object = ~ Treatment + Batch,
@@ -876,8 +755,8 @@ lm.cells.DA.50 <-
     .tdr.obj = lm.cells.DA.50,
     .design = .design.50)
 
-lapply(X = .cells.DA.50,
-       FUN = readRDS) |>
+lapply(X = names(lm.cells.DA.50@cells),
+       FUN = function(s) flowCore::exprs(cs.DA.50[[s]])) |>
   do.call(what = rbind) |>
   (\(x)
    (((Matrix::t(x = x[,lm.cells.DA.50$landmark.embed$pca$HVG]) - lm.cells.DA.50$landmark.embed$pca$center) /
@@ -891,7 +770,7 @@ lapply(X = .cells.DA.50,
    dplyr::mutate(
      .data = x,
      Treatment = final_data_DA |>
-       dplyr::filter(Sample %in% names(x = .cells.DA.50)) |>
+       dplyr::filter(Sample %in% names(x = lm.cells.DA.50@cells)) |>
        dplyr::pull(Treatment))
   )() |>
   (\(x)
@@ -912,7 +791,7 @@ lapply(X = .cells.DA.50,
   )() 
 
 final_data_DA |>
-  dplyr::filter(Sample %in% names(x = .cells.DA.50)) |>
+  dplyr::filter(Sample %in% names(x = lm.cells.DA.50@cells)) |>
   dplyr::mutate(CellType = factor(x = CellType,
                                   levels = c("target",
                                              "other"))) |>
@@ -963,8 +842,8 @@ final_data_DA |>
                                                units = "in"))
   )() 
 
-lapply(X = .cells.DA.50,
-       FUN = readRDS) |>
+lapply(X = names(lm.cells.DA.50@cells),
+       FUN = function(s) flowCore::exprs(cs.DA.50[[s]])) |>
   do.call(what = rbind) |>
   (\(x)
    (((Matrix::t(x = x[,lm.cells.DA.50$landmark.embed$pca$HVG]) - lm.cells.DA.50$landmark.embed$pca$center) /
@@ -978,10 +857,10 @@ lapply(X = .cells.DA.50,
    dplyr::mutate(
      .data = x,
      Treatment = final_data_DA |>
-       dplyr::filter(Sample %in% names(x = .cells.DA.50)) |>
+       dplyr::filter(Sample %in% names(x = lm.cells.DA.50@cells)) |>
        dplyr::pull(Treatment),
      Batch = final_data_DA |>
-       dplyr::filter(Sample %in% names(x = .cells.DA.50)) |>
+       dplyr::filter(Sample %in% names(x = lm.cells.DA.50@cells)) |>
        dplyr::pull(Batch))
   )() |>
   (\(x)
