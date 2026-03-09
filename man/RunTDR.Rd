@@ -201,7 +201,7 @@ landmark selection, graph construction, optional cell typing, and mapping.
 \itemize{
 \item \code{RunTDR(default)}: Run the pipeline on an existing TDRObj
 
-Executes \code{get.landmarks → get.graph → celltyping → get.map}
+Executes \code{get.landmarks → get.graph → celltyping → get.map → get.embedding}
 on a pre-built \code{\linkS4class{TDRObj}}.
 
 \item \code{RunTDR(Seurat)}: Run the pipeline directly on a Seurat object

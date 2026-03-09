@@ -88,13 +88,16 @@ cs.DA.0.5 <-
 
 flowWorkspace::pData(cs.DA.0.5)$Sample <-
   flowWorkspace::sampleNames(cs.DA.0.5)
+
 flowWorkspace::pData(cs.DA.0.5)$Treatment <-
   .setting.meta.0.5$Treatment[match(flowWorkspace::sampleNames(cs.DA.0.5),
-                                    .setting.meta.0.5$Sample)]
+                                    paste0(.setting.meta.0.5$Sample,
+                                           ".fcs"))]
+
 flowWorkspace::pData(cs.DA.0.5)$Batch <-
   .setting.meta.0.5$Batch[match(flowWorkspace::sampleNames(cs.DA.0.5),
-                                .setting.meta.0.5$Sample)]
-
+                                paste0(.setting.meta.0.5$Sample,
+                                       ".fcs"))]
 set.seed(seed = 123)
 lm.cells.DA.0.5 <-
   tinydenseR::RunTDR(
@@ -123,7 +126,7 @@ lm.cells.DA.0.5 <-
 # New API: get.lm() returns updated .tdr.obj with results in $results$lm[[.model.name]]
 lm.cells.DA.0.5 <-
   tinydenseR::get.lm(
-    .tdr.obj = lm.cells.DA.0.5,
+    x = lm.cells.DA.0.5,
     .design = .design.0.5)
 
 lapply(X = names(lm.cells.DA.0.5@cells),
@@ -141,7 +144,7 @@ lapply(X = names(lm.cells.DA.0.5@cells),
    dplyr::mutate(
      .data = x,
      Treatment = final_data_DA |>
-       dplyr::filter(Sample %in% names(x = lm.cells.DA.0.5@cells)) |>
+       dplyr::filter(Sample %in% gsub(pattern = "\\.fcs$", replacement = "", names(x = lm.cells.DA.0.5@cells))) |>
        dplyr::pull(Treatment))
   )() |>
   (\(x)
@@ -162,7 +165,7 @@ lapply(X = names(lm.cells.DA.0.5@cells),
   )()
 
 final_data_DA |>
-  dplyr::filter(Sample %in% names(x = lm.cells.DA.0.5@cells)) |>
+  dplyr::filter(Sample %in% gsub(pattern = "\\.fcs$", replacement = "", names(x = lm.cells.DA.0.5@cells))) |>
   dplyr::mutate(CellType = factor(x = CellType,
                                   levels = c("target",
                                              "other"))) |>

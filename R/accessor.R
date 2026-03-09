@@ -56,7 +56,12 @@
     },
     "cytoset" = {
       cs <- .tdr.obj@config$source.env$cs
-      sample_name <- names(.tdr.obj@cells)[sample_idx]
+      # Handle both integer index and character sample name
+      if (is.numeric(sample_idx)) {
+        sample_name <- names(.tdr.obj@cells)[sample_idx]
+      } else {
+        sample_name <- sample_idx
+      }
       mat <- flowCore::exprs(cs[[sample_name]])
       # strip $PnN names attribute from colnames
       colnames(mat) <- unname(colnames(mat))

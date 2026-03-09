@@ -19,7 +19,7 @@ RunTDR <- function(x, ...) UseMethod("RunTDR")
 
 #' @describeIn RunTDR Run the pipeline on an existing TDRObj
 #'
-#' Executes \code{get.landmarks → get.graph → celltyping → get.map}
+#' Executes \code{get.landmarks → get.graph → celltyping → get.map → get.embedding}
 #' on a pre-built \code{\linkS4class{TDRObj}}.
 #'
 #' @param x A \code{\linkS4class{TDRObj}} (created by \code{\link{setup.tdr.obj}}).
@@ -81,12 +81,14 @@ RunTDR.default <- function(x,
   .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
   .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
   .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+  .emb.formals <- setdiff(names(formals(get.embedding.TDRObj)), c("x", "..."))
 
   lm_args  <- dots[names(dots) %in% .lm.formals]
   gr_args  <- dots[names(dots) %in% .gr.formals]
   map_args <- dots[names(dots) %in% .map.formals]
+  emb_args <- dots[names(dots) %in% .emb.formals]
 
-  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+  all_known <- Reduce(union, list(.lm.formals, .gr.formals, .map.formals, .emb.formals))
   orphans <- setdiff(names(dots), all_known)
   if (length(orphans) > 0) {
     warning("Unknown arguments will be ignored: ",
@@ -102,6 +104,7 @@ RunTDR.default <- function(x,
   }
 
   x <- do.call(get.map, c(list(x, .source = NULL, .seed = .seed, .verbose = .verbose), map_args))
+  x <- do.call(get.embedding, c(list(x, .verbose = .verbose), emb_args))
 
   return(x)
 }
@@ -231,12 +234,14 @@ RunTDR.Seurat <- function(x,
   .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
   .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
   .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+  .emb.formals <- setdiff(names(formals(get.embedding.TDRObj)), c("x", "..."))
 
   lm_args  <- dots[names(dots) %in% .lm.formals]
   gr_args  <- dots[names(dots) %in% .gr.formals]
   map_args <- dots[names(dots) %in% .map.formals]
+  emb_args <- dots[names(dots) %in% .emb.formals]
 
-  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+  all_known <- Reduce(union, list(.lm.formals, .gr.formals, .map.formals, .emb.formals))
   orphans <- setdiff(names(dots), all_known)
   if (length(orphans) > 0) {
     warning("Unknown arguments will be ignored: ",
@@ -254,6 +259,7 @@ RunTDR.Seurat <- function(x,
   }
 
   tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
+  tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .verbose = .verbose), emb_args))
 
   # --- Store TDRObj in Seurat Misc slot ---
   SeuratObject::Misc(x, slot = "tdr.obj") <- tdr.obj
@@ -613,12 +619,14 @@ RunTDR.SingleCellExperiment <- function(x,
     .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
     .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
     .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+    .emb.formals <- setdiff(names(formals(get.embedding.TDRObj)), c("x", "..."))
 
     lm_args  <- dots[names(dots) %in% .lm.formals]
     gr_args  <- dots[names(dots) %in% .gr.formals]
     map_args <- dots[names(dots) %in% .map.formals]
+    emb_args <- dots[names(dots) %in% .emb.formals]
 
-    all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+    all_known <- Reduce(union, list(.lm.formals, .gr.formals, .map.formals, .emb.formals))
     orphans <- setdiff(names(dots), all_known)
     if (length(orphans) > 0) {
       warning("Unknown arguments will be ignored: ",
@@ -636,6 +644,7 @@ RunTDR.SingleCellExperiment <- function(x,
     }
 
     tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
+    tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .verbose = .verbose), emb_args))
 
     # --- Store TDRObj in SCE metadata ---
     S4Vectors::metadata(x)$tdr.obj <- tdr.obj
@@ -1173,12 +1182,14 @@ RunTDR.cytoset <- function(x,
   .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
   .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
   .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+  .emb.formals <- setdiff(names(formals(get.embedding.TDRObj)), c("x", "..."))
 
   lm_args  <- dots[names(dots) %in% .lm.formals]
   gr_args  <- dots[names(dots) %in% .gr.formals]
   map_args <- dots[names(dots) %in% .map.formals]
+  emb_args <- dots[names(dots) %in% .emb.formals]
 
-  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+  all_known <- Reduce(union, list(.lm.formals, .gr.formals, .map.formals, .emb.formals))
   orphans <- setdiff(names(dots), all_known)
   if (length(orphans) > 0) {
     warning("Unknown arguments will be ignored: ",
@@ -1196,6 +1207,7 @@ RunTDR.cytoset <- function(x,
   }
 
   tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = NULL, .seed = .seed, .verbose = .verbose), map_args))
+  tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .verbose = .verbose), emb_args))
 
   return(tdr.obj)
 }
@@ -1729,12 +1741,14 @@ RunTDR.IterableMatrix <- function(x, .cell.meta, ...) {
   .lm.formals  <- setdiff(names(formals(get.landmarks.TDRObj)), c("x", "..."))
   .gr.formals  <- setdiff(names(formals(get.graph.TDRObj)), c("x", "..."))
   .map.formals <- setdiff(names(formals(get.map.TDRObj)), c("x", "..."))
+  .emb.formals <- setdiff(names(formals(get.embedding.TDRObj)), c("x", "..."))
 
   lm_args  <- dots[names(dots) %in% .lm.formals]
   gr_args  <- dots[names(dots) %in% .gr.formals]
   map_args <- dots[names(dots) %in% .map.formals]
+  emb_args <- dots[names(dots) %in% .emb.formals]
 
-  all_known <- union(union(.lm.formals, .gr.formals), .map.formals)
+  all_known <- Reduce(union, list(.lm.formals, .gr.formals, .map.formals, .emb.formals))
   orphans <- setdiff(names(dots), all_known)
   if (length(orphans) > 0) {
     warning("Unknown arguments will be ignored: ",
@@ -1752,6 +1766,7 @@ RunTDR.IterableMatrix <- function(x, .cell.meta, ...) {
   }
 
   tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = NULL, .seed = .seed, .verbose = .verbose), map_args))
+  tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .verbose = .verbose), emb_args))
 
   return(tdr.obj)
 }
