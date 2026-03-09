@@ -258,47 +258,66 @@ celltyping.TDRObj <-
   # --- Get landmark row names from the assay matrix ---
   lm_names <- rownames(.tdr.obj@assay$expr)
 
-  # --- Split .celltyping.map by sample using n.cells counts ---
+  # config$key names tell us which sample each landmark belongs to
   sample_names <- names(.tdr.obj@cells)
   n_cells      <- .tdr.obj@config$sampling$n.cells
-  ct_splits    <- split(
-    .celltyping.map,
-    rep(sample_names, times = n_cells)
-  )[sample_names]              # preserve sample order
+  lm_sample    <- names(.tdr.obj@config$key)
 
-  # --- Validate: no duplicate cell IDs within any sample ---
-  for (sn in sample_names) {
-    chunk_names <- names(ct_splits[[sn]])
-    if (anyDuplicated(chunk_names)) {
-      dupes <- unique(chunk_names[duplicated(chunk_names)])
-      stop("Duplicate cell IDs in sample '", sn, "': ",
-           paste(head(dupes, 5), collapse = ", "),
-           if (length(dupes) > 5) paste0(" ... (", length(dupes), " total)"),
-           "\nEach cell must appear exactly once within a sample.")
-    }
-  }
-
-  # --- Match sample-by-sample (safe for non-unique cell IDs) ---
   labels <- character(length(lm_names))
 
-  # config$key names tell us which sample each landmark belongs to
-  lm_sample <- names(.tdr.obj@config$key)
+  if (anyDuplicated(names(.celltyping.map))) {
+    # ── Non-unique cell IDs (e.g. cytoset event_N) ──
+    # Positional split: the vec MUST be ordered by sample.
+    ct_splits <- split(
+      .celltyping.map,
+      rep(sample_names, times = n_cells)
+    )[sample_names]
 
-  for (sn in sample_names) {
-    idx    <- which(lm_sample == sn)
-    if (length(idx) == 0L) next
-    prefix <- paste0("^", sn, "_")
-    stripped <- sub(prefix, "", lm_names[idx])
-    ct_sample <- ct_splits[[sn]]
-    m <- match(stripped, names(ct_sample))
-    if (anyNA(m)) {
-      missing <- lm_names[idx][is.na(m)]
-      stop("Could not find labels for ", length(missing),
-           " landmark(s) in sample '", sn, "'.\n",
-           "First few: ", paste(head(missing, 5), collapse = ", "), "\n",
-           "Ensure names(.celltyping.map) contain the original cell IDs.")
+    # Validate: no duplicate cell IDs within any sample
+    for (sn in sample_names) {
+      chunk_names <- names(ct_splits[[sn]])
+      if (anyDuplicated(chunk_names)) {
+        dupes <- unique(chunk_names[duplicated(chunk_names)])
+        stop("Duplicate cell IDs in sample '", sn, "': ",
+             paste(head(dupes, 5), collapse = ", "),
+             if (length(dupes) > 5)
+               paste0(" ... (", length(dupes), " total)"),
+             "\nEach cell must appear exactly once within a sample.")
+      }
     }
-    labels[idx] <- ct_sample[m]
+
+    for (sn in sample_names) {
+      idx <- which(lm_sample == sn)
+      if (length(idx) == 0L) next
+      stripped <- substring(lm_names[idx], nchar(sn) + 2L)
+      m <- match(stripped, names(ct_splits[[sn]]))
+      if (anyNA(m)) {
+        missing <- lm_names[idx][is.na(m)]
+        stop("Could not find labels for ", length(missing),
+             " landmark(s) in sample '", sn, "'.\n",
+             "First few: ", paste(head(missing, 5), collapse = ", "), "\n",
+             "Ensure names(.celltyping.map) contain the original cell IDs.")
+      }
+      labels[idx] <- ct_splits[[sn]][m]
+    }
+
+  } else {
+    # ── Globally unique cell IDs (Seurat barcodes, matrix colnames, ──
+    # ── files-backend rownames): direct match against full map.     ──
+    for (sn in sample_names) {
+      idx <- which(lm_sample == sn)
+      if (length(idx) == 0L) next
+      stripped <- substring(lm_names[idx], nchar(sn) + 2L)
+      m <- match(stripped, names(.celltyping.map))
+      if (anyNA(m)) {
+        missing <- lm_names[idx][is.na(m)]
+        stop("Could not find labels for ", length(missing),
+             " landmark(s) in sample '", sn, "'.\n",
+             "First few: ", paste(head(missing, 5), collapse = ", "), "\n",
+             "Ensure names(.celltyping.map) contain the original cell IDs.")
+      }
+      labels[idx] <- .celltyping.map[m]
+    }
   }
 
   # --- Warn if all landmarks get the same label ---
