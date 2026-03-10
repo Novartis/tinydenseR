@@ -22,7 +22,8 @@ get.embedding(x, ...)
 )
 }
 \arguments{
-\item{x}{The tinydenseR object processed through \code{get.map()}. Contains
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object processed through \code{get.map()}. Contains
 \code{$map$Y} (log2-transformed densities) used for unsupervised embeddings. Statistical
 model fits should be stored in \code{$map$lm} via \code{get.lm()}.}
 
