@@ -1,0 +1,222 @@
+---
+title: "tinydenseR Package Architecture"
+author: "Pedro Milanez-Almeida"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+vignette: >
+  %\VignetteIndexEntry{tinydenseR Package Architecture}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE,
+  dpi = 300,
+  out.width = "100%",
+  eval = FALSE
+)
+```
+
+## Overview
+
+`tinydenseR` is a landmark-based framework for differential abundance and
+differential expression analysis of single-cell data. It is designed for
+scRNA-seq, flow, mass, and spectral cytometry data.
+
+The core idea is to select a representative set of **landmark cells**,
+build a graph over them, map all cells to their nearest landmarks, and
+then model per-landmark density or expression across **samples as
+biological replicates**. This preserves statistical rigor while
+maintaining the richness of single-cell resolution.
+
+## TDRObj: The Core Data Structure
+
+All analysis results are stored in a single S4 class, `TDRObj`. It contains
+12 slots that organize the data and results at each stage of the pipeline:
+
+| Slot | Contents |
+|:-----|:---------|
+| `cells` | Named list of per-sample cell indices (or file paths for the files backend) |
+| `metadata` | `data.frame` of sample-level metadata |
+| `config` | Run parameters: key, sampling, assay.type, markers, n.threads, backend |
+| `integration` | Trained projection models and batch variables (harmony.var, harmony.obj, symphony.obj, umap.model) |
+| `assay` | Landmark expression layers (L × features matrices): raw, expr, scaled |
+| `landmark.embed` | Landmark-space coordinate matrices (pca, le, umap), each with a `$coord` entry |
+| `landmark.annot` | Per-landmark categorical annotations: clustering and celltyping, each with an `$ids` factor |
+| `graphs` | Landmark-landmark connectivity: adj.matrix, snn, fgraph |
+| `density` | Sample-level analytics (L × N matrices): fdens, Y, composition |
+| `sample.embed` | Sample-level embeddings (N × k matrices): pca, traj, pepc |
+| `cellmap` | Per-cell, per-sample cached lists: cluster.ids, celltype.ids, nearest.lm, fuzzy.graph |
+| `results` | All statistical outputs: lm, pb, marker, spec, nmf, pls, clustering, celltyping, features |
+
+The `$` accessor is overloaded so you can use `tdr$results` instead of
+`tdr@results`:
+
+```{r accessor}
+tdr$metadata              # sample-level metadata
+tdr$landmark.embed$pca    # PCA coordinates of landmarks
+tdr$results$lm            # linear model results
+tdr$config$assay.type     # "RNA" or "cyto"
+```
+
+## Analysis Pipeline Stages
+
+The standard analysis pipeline proceeds through a series of stages, each
+populating specific slots in the `TDRObj`:
+
+```
+setup.tdr.obj() / RunTDR()
+    |
+    v
+get.landmarks()  --> landmark.embed (pca, le)
+    |                 assay (raw, expr, scaled)
+    v
+get.graph()      --> graphs (adj.matrix, snn)
+    |                 landmark.embed (umap)
+    |                 landmark.annot (clustering)
+    v
+get.map()        --> density (fdens, Y, composition)
+    |                 cellmap (nearest.lm, fuzzy.graph)
+    v
+get.lm()         --> results$lm (fit, trad)
+    |                 sample.embed (pca)
+    v
+get.pbDE()            --> results$pb
+get.markerDE()        --> results$marker
+get.specDE()          --> results$spec
+get.nmfDE()           --> results$nmf
+get.plsDE()           --> results$pls
+```
+
+A typical workflow looks like:
+
+```{r pipeline}
+library(tinydenseR)
+
+# Option 1: step-by-step
+tdr <- setup.tdr.obj(...)
+tdr <- get.landmarks(tdr)
+tdr <- get.graph(tdr)
+tdr <- get.map(tdr)
+tdr <- get.lm(tdr, .design = design)
+
+# Option 2: RunTDR() runs landmarks + graph + map + embedding in one call
+result <- RunTDR(seurat_obj, .sample.var = "sample_id", .assay.type = "RNA")
+result <- get.lm(result, .design = design)
+```
+
+## S3 Dispatch System
+
+`tinydenseR` uses S3 dispatch to support multiple container types
+(Seurat, SingleCellExperiment, HDF5AnnData) through a single API. The
+dispatch wrappers in `dispatch.R` follow one of three patterns:
+
+### Tier 1: Compute-Only
+
+Functions that only need the `TDRObj` for computation. The wrapper
+extracts the `TDRObj`, runs the `.TDRObj` method, and stores it back.
+
+```{r tier1}
+# Example: get.lm.Seurat
+get.lm.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- get.lm.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+```
+
+Functions in this tier: `get.graph()`, `get.lm()`, `get.embedding()`,
+`get.specDE()`, `get.nmfDE()`, `get.plsDE()`, `get.features()`,
+`lm.cluster()`, `celltyping()`.
+
+### Tier 2: Needs Source Data
+
+Functions that need access to the original data container (e.g., to
+read expression matrices via `.get_sample_matrix()`). The source object
+is passed via the `.source` argument.
+
+```{r tier2}
+# Example: get.landmarks.Seurat
+get.landmarks.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- get.landmarks.TDRObj(tdr, .source = x, ...)
+  SetTDR(x, tdr)
+}
+```
+
+Functions in this tier: `get.landmarks()`, `get.map()`, `get.pbDE()`,
+`get.markerDE()`.
+
+### Tier 3: Read-Only Plots
+
+Plot functions only need to read the `TDRObj`; they return a plot object
+rather than updating the container.
+
+```{r tier3}
+# Example: plotPCA.Seurat
+plotPCA.Seurat <- function(x, ...) plotPCA.TDRObj(GetTDR(x), ...)
+```
+
+All `plot*()` functions follow this pattern: `plotPCA()`, `plotUMAP()`,
+`plotBeeswarm()`, `plot2Markers()`, `plotSamplePCA()`,
+`plotSampleEmbedding()`, `plotTradStats()`, `plotTradPerc()`,
+`plotDensity()`, `plotPbDE()`, `plotDEA()`, `plotMarkerDE()`,
+`plotHeatmap()`, `plotSpecDE()`, `plotSpecDEHeatmap()`, `plotNmfDE()`,
+`plotNmfDEHeatmap()`, `plotPlsDE()`, `plotPlsDEHeatmap()`.
+
+## Backend Data Flow
+
+When `tinydenseR` needs to access per-sample expression matrices during
+the pipeline, it calls the internal function `.get_sample_matrix()`. This
+function dispatches on `config$backend` to retrieve data from the
+appropriate source:
+
+| Backend value | Source | How data is retrieved |
+|:--------------|:-------|:----------------------|
+| `"files"` | RDS files on disk | `readRDS(tdr@cells[[sample_idx]])` |
+| `"seurat"` | Live Seurat object | `SeuratObject::LayerData(.source, assay, layer)[, col_idx]` |
+| `"sce"` | Live SingleCellExperiment | `SummarizedExperiment::assay(.source, assay)[, col_idx]` |
+| `"matrix"` | In-memory or on-disk matrix | Direct column indexing on the stored matrix reference |
+| `"cytoset"` | flowWorkspace cytoset | `flowCore::exprs(cs[[sample_name]])` |
+
+The `"matrix"` backend is used by `dgCMatrix`, `DelayedMatrix`,
+`IterableMatrix`, and `HDF5AnnData` inputs. In these cases, a reference
+to the matrix is stored in a locked environment within `config$source.env`
+so that `.get_sample_matrix()` can slice into it without copying the
+entire matrix.
+
+For the `"seurat"` and `"sce"` backends, the live container object is
+passed as `.source` to Tier 2 functions, which then forward it to
+`.get_sample_matrix()`.
+
+## Caching System
+
+`tinydenseR` includes an on-disk caching system for per-cell mapping
+results (nearest landmark assignments, fuzzy graph memberships). This
+avoids recomputing expensive cell-to-landmark mappings when re-running
+downstream analyses.
+
+The cache is managed through three user-facing functions:
+
+```{r cache}
+# Show cache location and size
+tdr_cache_info(tdr)
+
+# Validate cache integrity
+tdr_cache_validate(tdr)
+
+# Remove orphaned cache files
+tdr_cache_cleanup(tdr)
+```
+
+Internal helpers (`.tdr_cache_read()`, `.tdr_cache_write()`,
+`.tdr_cache_sweep_orphans()`) handle the low-level read/write operations
+and are not intended to be called directly by users.
