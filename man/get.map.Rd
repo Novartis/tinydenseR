@@ -22,7 +22,8 @@ get.map(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object with \code{$graph} component populated by \code{get.graph}.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object with \code{$graph} component populated by \code{get.graph}.}
 
 \item{...}{Additional arguments passed to methods.}
 

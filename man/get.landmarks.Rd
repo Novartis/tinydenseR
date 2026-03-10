@@ -20,7 +20,8 @@ get.landmarks(x, ...)
 )
 }
 \arguments{
-\item{x}{Object initialized with \code{setup.tdr.obj}.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object initialized with \code{setup.tdr.obj}.}
 
 \item{...}{Additional arguments passed to methods.}
 

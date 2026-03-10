@@ -10,7 +10,8 @@ get.features(x, ...)
 \method{get.features}{TDRObj}(x, ...)
 }
 \arguments{
-\item{x}{Object to operate on (TDRObj, Seurat, or SingleCellExperiment).}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object.}
 
 \item{...}{Additional arguments passed to methods.}
 }

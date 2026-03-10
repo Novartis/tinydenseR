@@ -421,7 +421,8 @@ fast.jaccard.r <-
 #' lm.cells <- get.graph(lm.cells, .cl.method = "fgraph")
 #' }
 #' 
-#' @param x Object to operate on (TDRObj, Seurat, or SingleCellExperiment).
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object.
 #' @param ... Additional arguments passed to methods.
 #' @export
 get.graph <- function(x, ...) UseMethod("get.graph")
@@ -619,7 +620,8 @@ get.graph.TDRObj <-
 #' In addition, transfers cluster/cell type labels from landmarks to all cells.
 #' 
 #'
-#' @param x A tinydenseR object with \code{$graph} component populated by \code{get.graph}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object with \code{$graph} component populated by \code{get.graph}.
 #' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
 #'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
 #'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
@@ -1480,7 +1482,8 @@ get.map.TDRObj <-
 #' lm.cells <- lm.cluster(lm.cells, .cl.method = "fgraph")
 #' }
 #' 
-#' @param x Object to operate on (TDRObj, Seurat, or SingleCellExperiment).
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object.
 #' @param ... Additional arguments passed to methods.
 #' @export
 lm.cluster <- function(x, ...) UseMethod("lm.cluster")
@@ -1639,7 +1642,8 @@ lm.cluster.TDRObj <-
 #' plotPCA(lm.cells, .hover.stats = "marker")
 #' }
 #' 
-#' @param x Object to operate on (TDRObj, Seurat, or SingleCellExperiment).
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object.
 #' @param ... Additional arguments passed to methods.
 #' @export
 get.features<- function(x, ...) UseMethod("get.features")

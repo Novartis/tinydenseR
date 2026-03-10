@@ -19,7 +19,8 @@ goi.summary(x, ...)
 )
 }
 \arguments{
-\item{x}{A list object initialized with \code{setup.tdr.obj} and processed
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object initialized with \code{setup.tdr.obj} and processed
 with \code{get.graph} and \code{get.map}. Must contain RNA assay data.}
 
 \item{...}{Additional arguments passed to methods.}

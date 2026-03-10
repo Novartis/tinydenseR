@@ -127,7 +127,8 @@
 #' @seealso 
 #'   \code{\link{get.map}} for automatic cell typing with symphony reference objects,
 #'   \code{\link{lm.cluster}} for the clustering that produces cluster IDs used here
-#' @param x Object to operate on (TDRObj, Seurat, or SingleCellExperiment).
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object.
 #' @param ... Additional arguments passed to methods.
 #' @export
 celltyping <- function(x, ...) UseMethod("celltyping")
