@@ -1963,3 +1963,12 @@ GetTDR.SingleCellExperiment <- function(x, ...) {
          "Run RunTDR() first.")
   tdr
 }
+
+#' @describeIn GetTDR Extract TDRObj from AnnData uns
+#' @export
+GetTDR.HDF5AnnData <- function(x, ...) {
+  tdr <- x$uns[["tdr.obj"]]
+  if (is.null(tdr))
+    stop("No TDRObj found in AnnData uns slot 'tdr.obj'. Run RunTDR() first.")
+  tdr
+}
