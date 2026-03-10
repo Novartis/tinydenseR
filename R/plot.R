@@ -25,7 +25,8 @@
 #' results. Supports both continuous (e.g., gene expression, fold changes) and categorical 
 #' (e.g., clusters, cell types) overlays. Optional interactive hover shows landmark feature signatures.
 #'
-#' @param x A tinydenseR object with PCA computed via \code{get.landmarks()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object with PCA computed via \code{get.landmarks()}.
 #' @param .PC.x Integer specifying x-axis principal component (default 1).
 #' @param .PC.y Integer specifying y-axis principal component (default 2).
 #' @param .feature Numeric vector or factor of length \code{nrow(.tdr.obj$landmarks)} to color points by. 
@@ -250,7 +251,8 @@ plotPCA.TDRObj <-
 #' (e.g., clusters, cell types) overlays. Optional interactive hover shows landmark feature signatures.
 #' Identical interface to \code{plotPCA()} for easy comparison.
 #'
-#' @param x A tinydenseR object with UMAP computed via \code{get.graph()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object with UMAP computed via \code{get.graph()}.
 #' @param .feature Numeric vector or factor of length \code{nrow(.tdr.obj$landmarks)} to color points by. 
 #'   Defaults to cluster IDs from \code{$landmark.annot$clustering$ids}. Can be:
 #'   \itemize{
@@ -457,7 +459,8 @@ plotUMAP.TDRObj <-
 #' testing, with points colored by significance. Optionally splits results by cluster or cell type 
 #' and displays mean cell percentages alongside for biological context.
 #'
-#' @param x A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object processed through \code{get.map()} and \code{get.lm()}.
 #'   Statistical results should be stored in \code{.tdr.obj$map$lm}.
 #' @param .model.name Character string naming which model fit to use from \code{.tdr.obj$map$lm}
 #'   (default "default"). Must match a name used in \code{get.lm(.model.name = ...)}.
@@ -826,7 +829,8 @@ plotBeeswarm.TDRObj <-
 #' landmarks. Useful for exploring marker coexpression patterns and identifying cell populations. 
 #' Optionally overlays reference density from all landmarks when plotting a specific cluster/celltype.
 #'
-#' @param x A tinydenseR object processed through \code{get.landmarks()} and \code{get.graph()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object processed through \code{get.landmarks()} and \code{get.graph()}.
 #' @param .id Optional character: cluster or celltype ID to highlight. If NULL (default), plots all landmarks.
 #' @param .id.from Character: "clustering" (default) or "celltyping". Source of \code{.id}.
 #' @param .x.feature Character: column name from \code{.tdr.obj$landmarks} for x-axis (default "CD3").
@@ -1010,7 +1014,8 @@ plot2Markers.TDRObj <-
 #' This function is deprecated. Please use \code{\link{plotSampleEmbedding}} with 
 #' \code{.embedding = "pca"} instead.
 #'
-#' @param x A tinydenseR object processed through \code{get.map()} and \code{get.embedding()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object processed through \code{get.map()} and \code{get.embedding()}.
 #' @param .labels.from Character specifying metadata column for coloring points.
 #' @param .cat.feature.color Character vector of colors for categorical labels.
 #' @param .point.size Numeric point size (default 1).
@@ -1062,7 +1067,8 @@ plotSamplePCA.TDRObj <-
 #' three embedding types: supervised partial-effect PCA (pePC), unsupervised PCA on
 #' landmark densities (pca), and diffusion map trajectory (traj).
 #'
-#' @param x A tinydenseR object processed through \code{get.map()} and 
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object processed through \code{get.map()} and 
 #'   \code{get.embedding()}. All embeddings are stored in \code{.tdr.obj$map$embedding}:
 #'   unsupervised (\code{pca}, \code{traj}) and supervised (\code{pePC$<name>}).
 #' @param .embedding Character string specifying which embedding type to plot. One of:
@@ -1467,7 +1473,8 @@ plotSampleEmbedding.TDRObj <-
 #' Shows effect sizes as heatmap with significance markers, providing a complementary view to 
 #' landmark-based analysis for easier interpretation at the population level.
 #'
-#' @param x A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object processed through \code{get.map()} and \code{get.lm()}.
 #'   Statistical results should be stored in \code{.tdr.obj$map$lm}.
 #' @param .model.name Character string naming which model fit to use from \code{.tdr.obj$map$lm}
 #'   (default "default"). Must match a name used in \code{get.lm(.model.name = ...)}.
@@ -1733,7 +1740,8 @@ plotTradStats.TDRObj <-
 #' for visually inspecting distribution of cell abundances across conditions and identifying 
 #' paired/longitudinal patterns. Complements statistical test results from \code{plotTradStats()}.
 #'
-#' @param x A tinydenseR object processed through \code{get.map()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object processed through \code{get.map()}.
 #' @param .x.split Character specifying metadata column for x-axis grouping. Defaults to first 
 #'   column.
 #' @param .x.split.subset Optional character vector to subset \code{.x.split} categories. Default NULL.
@@ -2009,7 +2017,8 @@ plotTradPerc.TDRObj <-
 #' function plots landmark-level densities Useful for inspecting distributions and 
 #' paired/longitudinal patterns at the landmark resolution.
 #'
-#' @param x A tinydenseR object processed through \code{get.map()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object processed through \code{get.map()}.
 #' @param .x.split Character specifying metadata column for x-axis grouping (default first column).
 #' @param .pop Character vector of population names to plot. If NULL, plots all landmarks. If 
 #'   specified, plots only landmarks belonging to that population (from \code{.pop.from}).
@@ -2217,7 +2226,8 @@ plotDensity.TDRObj <-
 #' for genes/markers across coefficients. Rows ordered by cluster/celltype expression patterns, 
 #' with significance indicated by asterisks. Helps identify which features drive population-level changes.
 #'
-#' @param x A tinydenseR object processed through \code{get.pbDE()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object processed through \code{get.pbDE()}.
 #' @param .de.obj Optional: differential expression results object. If NULL (default), retrieves 
 #'   results from \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}.
 #' @param .model.name Character: model name to retrieve from \code{.tdr.obj$pbDE} (default "default").
@@ -2469,7 +2479,8 @@ plotPbDE.TDRObj <-
 #' \code{plotDEA()} has been renamed to \code{\link{plotPbDE}()} for clarity. This function
 #' is provided for backward compatibility and will be removed in a future version.
 #'
-#' @param x A tinydenseR object.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object.
 #' @param .dea.obj Differential expression results from \code{get.dea()} or \code{get.pbDE()}.
 #' @param .coefs Character vector of coefficient names to plot.
 #' @param .order.by Character: "clustering" or "celltyping".
@@ -2523,7 +2534,8 @@ plotDEA.TDRObj <- function(
 #' log fold changes with significance overlays. Uses the new storage pattern where results are 
 #' stored in \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]}.
 #'
-#' @param x A tinydenseR object with marker results from \code{get.markerDE}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object with marker results from \code{get.markerDE}.
 #' @param .de.obj Optional: Direct DE results object for backward compatibility. If NULL, fetches 
 #'   from \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]}.
 #' @param .model.name Character identifying the model (default "default").
@@ -2791,7 +2803,8 @@ scatterPlot <-
 #' patterns that define each population, helping to validate cluster annotations and identify marker genes. 
 #' The heatmap is automatically generated during \code{get.graph()} and stored for quick display.
 #' 
-#' @param x A tinydenseR object processed through \code{get.graph()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object processed through \code{get.graph()}.
 #' @param .id.from Character: "clustering" or "celltyping" (default "clustering"). Determines which 
 #'   population definitions to show. Use "clustering" after \code{get.graph()}, or "celltyping" after 
 #'   manual annotation with \code{celltyping()}.
@@ -2869,7 +2882,8 @@ plotHeatmap.TDRObj <-
 #' is specified, shows UMAP colored by scores alongside Y-vs-specDE scatter.
 #' When component is NULL, displays a diagnostic overview of all components.
 #'
-#' @param x A tinydenseR object after \code{get.specDE()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object after \code{get.specDE()}.
 #' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$specDE}.
 #' @param .specDE.dim Integer or NULL: component to visualize (1-indexed). If NULL,
 #'   plots Ak vs Sk diagnostic scatter for all components.
@@ -3999,7 +4013,8 @@ plotSpecDE.TDRObj <-
 #' and features are ranked by absolute loading. For RNA data, expression is properly
 #' normalized, log-transformed, and centered.
 #'
-#' @param x A tinydenseR object after \code{get.specDE()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object after \code{get.specDE()}.
 #' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$specDE}.
 #' @param .specDE.dim Integer or integer vector: specDE component(s) to use for:
 #'   (1) ranking features by absolute loading, and (2) ordering landmarks (if
@@ -4185,7 +4200,8 @@ plotSpecDEHeatmap.TDRObj <-
 #'
 #' When component is NULL, displays a diagnostic overview of all components.
 #'
-#' @param x A tinydenseR object after \code{get.nmfDE()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object after \code{get.nmfDE()}.
 #' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$nmfDE}.
 #' @param .nmfDE.dim Integer or NULL: component to visualize (1-indexed). If NULL,
 #'   plots Ak vs Sk diagnostic scatter for all components.
@@ -4484,7 +4500,8 @@ plotNmfDE.TDRObj <-
 #' and features are ranked by absolute loading. For RNA data, expression is properly
 #' normalized, log-transformed, and centered.
 #'
-#' @param x A tinydenseR object after \code{get.nmfDE()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object after \code{get.nmfDE()}.
 #' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$nmfDE}.
 #' @param .nmfDE.dim Integer or integer vector: nmfDE component(s) to use for:
 #'   (1) ranking features by absolute loading, and (2) ordering landmarks (if
@@ -4716,7 +4733,8 @@ plotNmfDEHeatmap.TDRObj <-
 #' Visualize plsDE results: either a diagnostic overview of all components
 #' or a detailed component-level view showing embedding and Y-vs-score scatter.
 #'
-#' @param x A tinydenseR object after \code{get.plsDE()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object after \code{get.plsDE()}.
 #' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$plsDE}.
 #' @param .plsDE.dim Integer or NULL: component to visualize (1-indexed). If NULL,
 #'   plots Ak vs Sk diagnostic scatter for all components.
@@ -5007,7 +5025,8 @@ plotPlsDE.TDRObj <-
 #' and features are ranked by absolute regression loading. For RNA data,
 #' expression is properly normalized, log-transformed, and centered.
 #'
-#' @param x A tinydenseR object after \code{get.plsDE()}.
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object after \code{get.plsDE()}.
 #' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$plsDE}.
 #' @param .plsDE.dim Integer or integer vector: plsDE component(s) to use for:
 #'   (1) ranking features by absolute loading, and (2) ordering landmarks (if

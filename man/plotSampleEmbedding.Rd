@@ -23,7 +23,8 @@ plotSampleEmbedding(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object processed through \code{get.map()} and
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object processed through \code{get.map()} and
 \code{get.embedding()}. All embeddings are stored in \code{.tdr.obj$map$embedding}:
 unsupervised (\code{pca}, \code{traj}) and supervised (\code{pePC$<name>}).}
 

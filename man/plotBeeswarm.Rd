@@ -28,7 +28,8 @@ plotBeeswarm(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object processed through \code{get.map()} and \code{get.lm()}.
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object processed through \code{get.map()} and \code{get.lm()}.
 Statistical results should be stored in \code{.tdr.obj$map$lm}.}
 
 \item{...}{Additional arguments passed to methods.}

@@ -24,7 +24,8 @@ plot2Markers(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object processed through \code{get.landmarks()} and \code{get.graph()}.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object processed through \code{get.landmarks()} and \code{get.graph()}.}
 
 \item{...}{Additional arguments passed to methods.}
 

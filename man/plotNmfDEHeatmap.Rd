@@ -28,7 +28,8 @@ plotNmfDEHeatmap(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object after \code{get.nmfDE()}.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object after \code{get.nmfDE()}.}
 
 \item{...}{Additional arguments passed to methods.}
 

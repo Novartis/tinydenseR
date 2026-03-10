@@ -25,7 +25,8 @@ plotPCA(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object with PCA computed via \code{get.landmarks()}.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object with PCA computed via \code{get.landmarks()}.}
 
 \item{...}{Additional arguments passed to methods.}
 

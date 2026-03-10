@@ -10,7 +10,8 @@ plotHeatmap(x, ...)
 \method{plotHeatmap}{TDRObj}(x, .id.from = "clustering", ...)
 }
 \arguments{
-\item{x}{A tinydenseR object processed through \code{get.graph()}.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object processed through \code{get.graph()}.}
 
 \item{...}{Additional arguments passed to methods.}
 

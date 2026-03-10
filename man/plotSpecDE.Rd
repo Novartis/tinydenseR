@@ -20,7 +20,8 @@ plotSpecDE(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object after \code{get.specDE()}.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object after \code{get.specDE()}.}
 
 \item{...}{Additional arguments passed to methods.}
 

@@ -23,7 +23,8 @@ plotPbDE(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object processed through \code{get.pbDE()}.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object processed through \code{get.pbDE()}.}
 
 \item{...}{Additional arguments passed to methods.}
 

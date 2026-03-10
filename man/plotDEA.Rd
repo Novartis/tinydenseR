@@ -21,7 +21,8 @@ plotDEA(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object.}
 
 \item{.dea.obj}{Differential expression results from \code{get.dea()} or \code{get.pbDE()}.}
 

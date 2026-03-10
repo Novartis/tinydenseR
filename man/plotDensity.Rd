@@ -23,7 +23,8 @@ plotDensity(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object processed through \code{get.map()}.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object processed through \code{get.map()}.}
 
 \item{...}{Additional arguments passed to methods.}
 

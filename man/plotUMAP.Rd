@@ -24,7 +24,8 @@ plotUMAP(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object with UMAP computed via \code{get.graph()}.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object with UMAP computed via \code{get.graph()}.}
 
 \item{...}{Additional arguments passed to methods.}
 

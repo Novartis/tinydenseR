@@ -23,7 +23,8 @@ plotMarkerDE(x, ...)
 )
 }
 \arguments{
-\item{x}{A tinydenseR object with marker results from \code{get.markerDE}.}
+\item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+(anndataR) object with marker results from \code{get.markerDE}.}
 
 \item{...}{Additional arguments passed to methods.}
 
