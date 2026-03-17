@@ -3192,6 +3192,7 @@ plotSpecDE.TDRObj <-
 # @param .loading.label Character: legend title for the row annotation bar
 # @param .row.annot.title Character or NULL: title above the row annot bar
 # @param .subtitle.extra Character: appended to subtitle line
+# @param .label.substr.rm Character substring to remove from density contrast label (default "").
 # @param ... shared layout / display parameters from public wrappers
 .plotDEHeatmap <- function(
   .tdr.obj,
@@ -3213,7 +3214,8 @@ plotSpecDE.TDRObj <-
   .panel.width = 4,
   .panel.height = 3,
   .feature.font.size = 7,
-  .show.landmark.labels = FALSE
+  .show.landmark.labels = FALSE,
+  .label.substr.rm = ""
 ) {
 
   # R CMD check appeasement
@@ -3439,14 +3441,22 @@ plotSpecDE.TDRObj <-
     if (.order.is.method.dim) {
       annot.names <- c(
         colnames(x = .order.by),
-        .coef.col,
+        gsub(
+          pattern = .label.substr.rm,
+          replacement = "",
+          x = .coef.col,
+          fixed = FALSE),
         colnames(x = .add.annot)
       )
       annot.mat <- cbind(.order.by, Y.ordered, .add.annot)
     } else {
       annot.names <- c(
         colnames(x = .order.by),
-        .coef.col,
+        gsub(
+          pattern = .label.substr.rm,
+          replacement = "",
+          x = .coef.col,
+          fixed = FALSE),
         colnames(x = .add.annot),
         colnames(x = scores.ordered)
       )
@@ -3457,7 +3467,11 @@ plotSpecDE.TDRObj <-
              !isTRUE(x = .user.order.by)) {
 
     annot.names <- c(
-      .coef.col,
+        gsub(
+          pattern = .label.substr.rm,
+          replacement = "",
+          x = .coef.col,
+          fixed = FALSE),
       colnames(x = .add.annot),
       colnames(x = scores.ordered)
     )
@@ -3469,13 +3483,21 @@ plotSpecDE.TDRObj <-
     if (.order.is.method.dim) {
       annot.names <- c(
         colnames(x = .order.by),
-        .coef.col
+        gsub(
+          pattern = .label.substr.rm,
+          replacement = "",
+          x = .coef.col,
+          fixed = FALSE)
       )
       annot.mat <- cbind(.order.by, Y.ordered)
     } else {
       annot.names <- c(
         colnames(x = .order.by),
-        .coef.col,
+        gsub(
+          pattern = .label.substr.rm,
+          replacement = "",
+          x = .coef.col,
+          fixed = FALSE),
         colnames(x = scores.ordered)
       )
       annot.mat <- cbind(.order.by, Y.ordered, scores.ordered)
@@ -3483,7 +3505,13 @@ plotSpecDE.TDRObj <-
 
   } else {
 
-    annot.names <- c(.coef.col,
+    annot.names <- c(
+      gsub(
+          pattern = .label.substr.rm,
+          replacement = "",
+          x = .coef.col,
+          fixed = FALSE)
+,
                      colnames(x = scores.ordered))
     annot.mat <- cbind(Y.ordered, scores.ordered)
 
@@ -3642,8 +3670,13 @@ plotSpecDE.TDRObj <-
 
       # Legend title: show "(centered)" for density contrast
       legend.title <-
-        if (identical(x = dim.name, y = .coef.col)) {
-          paste0(.coef.col, "\n(centered)")
+        if (identical(x = dim.name, y = gsub(pattern = .label.substr.rm,
+                                            replacement = "",
+                                            x = .coef.col,
+                                            fixed = FALSE))) {
+          paste0(
+            dim.name,
+            "\n(centered)")
         } else {
           dim.name
         }
@@ -3655,7 +3688,10 @@ plotSpecDE.TDRObj <-
         ggplot2::geom_raster() +
         {
           if(identical(x = dim.name,
-                       y = .coef.col)) {
+                       y = gsub(pattern = .label.substr.rm,
+                                replacement = "",
+                                x = .coef.col,
+                                fixed = FALSE))) {
             ggplot2::scale_fill_gradient2(
               low = unname(obj = Color.Palette[1, 1]),
               mid = unname(obj = Color.Palette[1, 6]),
@@ -3959,7 +3995,14 @@ plotSpecDE.TDRObj <-
   title.text <-
     paste0(.method.name, " Heatmap")
   subtitle.text <-
-    paste0("Density Contrast: ", .coef.col, .subtitle.extra)
+    paste0(
+      "Density Contrast: ",
+      gsub(
+        pattern = .label.substr.rm,
+        replacement = "",
+        x = .coef.col,
+        fixed = FALSE),
+      .subtitle.extra)
 
   title.grob <-
     grid::textGrob(label = title.text,
@@ -4136,6 +4179,7 @@ plotSpecDEHeatmap.TDRObj <-
     .panel.height = 3,
     .feature.font.size = 7,
     .show.landmark.labels = FALSE,
+    .label.substr.rm = "",
     ...
   ) {
 
@@ -4185,7 +4229,8 @@ plotSpecDEHeatmap.TDRObj <-
       .panel.width = .panel.width,
       .panel.height = .panel.height,
       .feature.font.size = .feature.font.size,
-      .show.landmark.labels = .show.landmark.labels
+      .show.landmark.labels = .show.landmark.labels,
+      .label.substr.rm = .label.substr.rm
     )
 
   }
@@ -4235,8 +4280,9 @@ plotSpecDEHeatmap.TDRObj <-
 #'   \item DE-dominated (functional): lower region, moderate/low Ak
 #'   \item Strong components: bright color (large d_k), regardless of Ak/Sk
 #' }
-#' Unlike specDE, variance cannot be cleanly partitioned: d_k indicates overall
-#' component strength but not independent variance explained.
+#' NMF components are not orthogonal, so variance cannot be cleanly partitioned
+#' per component. The NMF scaling diagonal d_k indicates overall component
+#' strength rather than independent variance explained.
 #'
 #' @seealso \code{\link{get.nmfDE}} for computing nmfDE, \code{\link{plotNmfDEHeatmap}}
 #'   for expression heatmaps
@@ -4511,8 +4557,8 @@ plotNmfDE.TDRObj <-
 #' @param .model.name Character: name of the fitted model (default "default").
 #' @param .loadings.type Character: which loadings to use for feature selection.
 #'   One of \code{"signed"} (default; d*h+ - d*h- from the NMF factorization),
-#'   \code{"de"} (regression of centered X on signed scores, parallel to specDE),
-#'   or \code{"mass"} (regression of nonneg X0 on W).
+#'   \code{"de"} (regression of centered X on signed scores; standard DE
+#'   interpretation), or \code{"mass"} (regression of nonneg X0 on W).
 #' @param .n.features Integer: maximum number of features to display. For RNA, features
 #'   are ranked by absolute loading and top \code{.n.features} are shown. For cytometry,
 #'   all markers are shown and this parameter is ignored. Default 50.
@@ -4555,8 +4601,8 @@ plotNmfDE.TDRObj <-
 #'     d_k * h+_k - d_k * h-_k. The most natural choice for nmfDE: positive means
 #'     gene carries more mass through the positive-contrast block than the negative.
 #'     No regression step required.}
-#'   \item{\code{"de"}}{Regression of centered X on signed scores. Parallel to
-#'     specDE loadings and standard DE interpretation (positive = upregulated with Y).}
+#'   \item{\code{"de"}}{Regression of centered X on signed scores. Standard DE
+#'     interpretation: positive = upregulated with Y, negative = downregulated.}
 #'   \item{\code{"mass"}}{Regression of nonneg X0 on W. Captures genes whose expression
 #'     level scales with component mass activation (always positive for nonneg input).}
 #' }
@@ -4638,6 +4684,7 @@ plotNmfDEHeatmap.TDRObj <-
     .panel.height = 3,
     .feature.font.size = 7,
     .show.landmark.labels = FALSE,
+    .label.substr.rm = "",
     ...
   ) {
 
@@ -4721,7 +4768,8 @@ plotNmfDEHeatmap.TDRObj <-
       .panel.width = .panel.width,
       .panel.height = .panel.height,
       .feature.font.size = .feature.font.size,
-      .show.landmark.labels = .show.landmark.labels
+      .show.landmark.labels = .show.landmark.labels,
+      .label.substr.rm = .label.substr.rm
     )
 
   }
@@ -4943,7 +4991,7 @@ plotPlsDE.TDRObj <-
                                                       title.hjust = 0.5)) +
       ggplot2::geom_point(size = I(x = .point.size)) +
       ggplot2::scale_color_viridis_c(
-        option = "magma",
+        option = "plasma",
         name = comp.name
       ) +
       ggplot2::labs(
@@ -5130,6 +5178,7 @@ plotPlsDEHeatmap.TDRObj <-
     .panel.height = 3,
     .feature.font.size = 7,
     .show.landmark.labels = FALSE,
+    .label.substr.rm = "",
     ...
   ) {
 
@@ -5186,7 +5235,8 @@ plotPlsDEHeatmap.TDRObj <-
       .panel.width = .panel.width,
       .panel.height = .panel.height,
       .feature.font.size = .feature.font.size,
-      .show.landmark.labels = .show.landmark.labels
+      .show.landmark.labels = .show.landmark.labels,
+      .label.substr.rm = .label.substr.rm
     )
 
   }
