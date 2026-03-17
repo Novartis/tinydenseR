@@ -3845,9 +3845,9 @@ get.specDE.TDRObj <-
 #' Mass-Diffusion NMF for Density-Contrast Differential Expression
 #'
 #' Decomposes a nonnegative, graph-smoothed, density-weighted expression matrix
-#' into additive mass programs via NMF. Unlike \code{get.specDE} (SVD on signed,
-#' double-centered M.local), nmfDE operates on nonnegative mass matrices and
-#' supports a literal "transported mass" interpretation.
+#' into additive mass programs via NMF. nmfDE operates on nonnegative mass
+#' matrices derived from positive and negative density-contrast regions,
+#' supporting a parts-based "transported mass" interpretation.
 #'
 #' @details
 #' nmfDE answers: "What are the dominant nonneg expression programs that carry
@@ -3941,7 +3941,9 @@ get.specDE.TDRObj <-
 #'     \item{params}{List: parameters used}
 #'   }
 #'
-#' @seealso \code{\link{get.lm}} (required predecessor), \code{\link{get.specDE}} (SVD variant),
+#' @seealso \code{\link{get.lm}} (required predecessor),
+#'   \code{\link{get.specDE}} (specDE: SVD-based peer method),
+#'   \code{\link{get.plsDE}} (plsDE: PLS-based peer method),
 #'   \code{\link{plotNmfDE}} (visualization), \code{\link{plotNmfDEHeatmap}} (heatmap)
 #'
 #' @examples

@@ -72,8 +72,9 @@ When component is NULL, displays a diagnostic overview of all components.
 \item DE-dominated (functional): lower region, moderate/low Ak
 \item Strong components: bright color (large d_k), regardless of Ak/Sk
 }
-Unlike specDE, variance cannot be cleanly partitioned: d_k indicates overall
-component strength but not independent variance explained.
+NMF components are not orthogonal, so variance cannot be cleanly partitioned
+per component. The NMF scaling diagonal d_k indicates overall component
+strength rather than independent variance explained.
 }
 \examples{
 \dontrun{

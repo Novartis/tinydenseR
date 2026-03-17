@@ -123,7 +123,8 @@ bioc_pkgs <-
                               (installed.packages() |>
                                  rownames())]]
 if (length(bioc_pkgs) > 0) {
-  BiocManager::install(pkgs = bioc_pkgs)
+  BiocManager::install(pkgs = bioc_pkgs,
+                       update = FALSE)
 }
 
 unlink(temp_file)
@@ -203,7 +204,7 @@ lm.cells <-
     tinydenseR::get.map()
 
 # Visualize results
-tinydenseR::plotPCA(.tdr.obj = lm.cells,
+tinydenseR::plotPCA(x = lm.cells,
                     .point.size = 1,
                     .panel.size = 1.5)
 ```
@@ -321,13 +322,13 @@ three replicates each.
 library(tinydenseR)
 #> Loading required package: Matrix
 library(tidyverse)
-#> ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
-#> ✔ dplyr     1.1.4     ✔ readr     2.1.5
-#> ✔ forcats   1.0.1     ✔ stringr   1.5.2
-#> ✔ ggplot2   4.0.0     ✔ tibble    3.3.0
-#> ✔ lubridate 1.9.4     ✔ tidyr     1.3.1
-#> ✔ purrr     1.1.0
-#> ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+#> ── Attaching core tidyverse packages ───────── tidyverse 2.0.0 ──
+#> ✔ dplyr     1.2.0     ✔ readr     2.2.0
+#> ✔ forcats   1.0.1     ✔ stringr   1.6.0
+#> ✔ ggplot2   4.0.2     ✔ tibble    3.3.1
+#> ✔ lubridate 1.9.5     ✔ tidyr     1.3.2
+#> ✔ purrr     1.2.1
+#> ── Conflicts ─────────────────────────── tidyverse_conflicts() ──
 #> ✖ tidyr::expand() masks Matrix::expand()
 #> ✖ dplyr::filter() masks stats::filter()
 #> ✖ dplyr::lag()    masks stats::lag()
@@ -368,132 +369,7 @@ if (curl::has_internet()) {
 
 }
 #> Downloading trajectory data from miloR repository...
-#> Loading required package: SingleCellExperiment
-#> Loading required package: SummarizedExperiment
-#> Loading required package: MatrixGenerics
-#> Loading required package: matrixStats
-#> 
-#> Attaching package: 'matrixStats'
-#> 
-#> The following object is masked from 'package:dplyr':
-#> 
-#>     count
-#> 
-#> 
-#> Attaching package: 'MatrixGenerics'
-#> 
-#> The following objects are masked from 'package:matrixStats':
-#> 
-#>     colAlls, colAnyNAs, colAnys, colAvgsPerRowSet, colCollapse,
-#>     colCounts, colCummaxs, colCummins, colCumprods, colCumsums,
-#>     colDiffs, colIQRDiffs, colIQRs, colLogSumExps, colMadDiffs,
-#>     colMads, colMaxs, colMeans2, colMedians, colMins, colOrderStats,
-#>     colProds, colQuantiles, colRanges, colRanks, colSdDiffs, colSds,
-#>     colSums2, colTabulates, colVarDiffs, colVars, colWeightedMads,
-#>     colWeightedMeans, colWeightedMedians, colWeightedSds,
-#>     colWeightedVars, rowAlls, rowAnyNAs, rowAnys, rowAvgsPerColSet,
-#>     rowCollapse, rowCounts, rowCummaxs, rowCummins, rowCumprods,
-#>     rowCumsums, rowDiffs, rowIQRDiffs, rowIQRs, rowLogSumExps,
-#>     rowMadDiffs, rowMads, rowMaxs, rowMeans2, rowMedians, rowMins,
-#>     rowOrderStats, rowProds, rowQuantiles, rowRanges, rowRanks,
-#>     rowSdDiffs, rowSds, rowSums2, rowTabulates, rowVarDiffs, rowVars,
-#>     rowWeightedMads, rowWeightedMeans, rowWeightedMedians,
-#>     rowWeightedSds, rowWeightedVars
-#> 
-#> Loading required package: GenomicRanges
-#> Loading required package: stats4
-#> Loading required package: BiocGenerics
-#> 
-#> Attaching package: 'BiocGenerics'
-#> 
-#> The following objects are masked from 'package:lubridate':
-#> 
-#>     intersect, setdiff, union
-#> 
-#> The following objects are masked from 'package:dplyr':
-#> 
-#>     combine, intersect, setdiff, union
-#> 
-#> The following object is masked from 'package:tinydenseR':
-#> 
-#>     plotPCA
-#> 
-#> The following objects are masked from 'package:stats':
-#> 
-#>     IQR, mad, sd, var, xtabs
-#> 
-#> The following objects are masked from 'package:base':
-#> 
-#>     anyDuplicated, aperm, append, as.data.frame, basename, cbind,
-#>     colnames, dirname, do.call, duplicated, eval, evalq, Filter, Find,
-#>     get, grep, grepl, intersect, is.unsorted, lapply, Map, mapply,
-#>     match, mget, order, paste, pmax, pmax.int, pmin, pmin.int,
-#>     Position, rank, rbind, Reduce, rownames, sapply, saveRDS, setdiff,
-#>     table, tapply, union, unique, unsplit, which.max, which.min
-#> 
-#> Loading required package: S4Vectors
-#> 
-#> Attaching package: 'S4Vectors'
-#> 
-#> The following objects are masked from 'package:lubridate':
-#> 
-#>     second, second<-
-#> 
-#> The following objects are masked from 'package:dplyr':
-#> 
-#>     first, rename
-#> 
-#> The following object is masked from 'package:tidyr':
-#> 
-#>     expand
-#> 
-#> The following objects are masked from 'package:Matrix':
-#> 
-#>     expand, unname
-#> 
-#> The following object is masked from 'package:utils':
-#> 
-#>     findMatches
-#> 
-#> The following objects are masked from 'package:base':
-#> 
-#>     expand.grid, I, unname
-#> 
-#> Loading required package: IRanges
-#> 
-#> Attaching package: 'IRanges'
-#> 
-#> The following object is masked from 'package:lubridate':
-#> 
-#>     %within%
-#> 
-#> The following objects are masked from 'package:dplyr':
-#> 
-#>     collapse, desc, slice
-#> 
-#> The following object is masked from 'package:purrr':
-#> 
-#>     reduce
-#> 
-#> Loading required package: GenomeInfoDb
-#> Loading required package: Biobase
-#> Welcome to Bioconductor
-#> 
-#>     Vignettes contain introductory material; view with
-#>     'browseVignettes()'. To cite Bioconductor, see
-#>     'citation("Biobase")', and for packages 'citation("pkgname")'.
-#> 
-#> 
-#> Attaching package: 'Biobase'
-#> 
-#> The following object is masked from 'package:MatrixGenerics':
-#> 
-#>     rowMedians
-#> 
-#> The following objects are masked from 'package:matrixStats':
-#> 
-#>     anyMissing, rowMedians
-#> 
+#> Loading required namespace: SingleCellExperiment
 #> Successfully fetched trajectory data with 500 cells and 500 features
 ```
 
@@ -548,7 +424,7 @@ lm.cells <- tinydenseR::setup.tdr.obj(
     )
 
 # Map all cells to landmarks
-lm.cells <- tinydenseR::get.map(.tdr.obj = lm.cells,
+lm.cells <- tinydenseR::get.map(x = lm.cells,
                                .verbose = FALSE)
 ```
 
@@ -588,17 +464,17 @@ lm.cells$map$fdens |>
 # Test for differential density between conditions
 # Results stored in lm.cells$map$lm[["default"]]
 lm.cells <- tinydenseR::get.lm(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .design = .design,
-    .verbose = FALSE 
+    .verbose = FALSE
 )
-#> Warning in tinydenseR::get.lm(.tdr.obj = lm.cells, .design = .design, .verbose
-#> = FALSE): q-value estimation is not recommended for fewer than 100 tests. Using
-#> BH instead.
+#> Warning in get.lm.TDRObj(x = lm.cells, .design = .design, .verbose = FALSE):
+#> q-value estimation is not recommended for fewer than 100 tests. Using BH
+#> instead.
 
 # Perform differential expression analysis
 lm.cells <- tinydenseR::get.pbDE(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .design = .design, 
     .verbose = FALSE
 )
@@ -611,8 +487,8 @@ Landmarks with differential density:
 ``` r
 # Show density fold changes between conditions
 tinydenseR::plotPCA(
-    .tdr.obj = lm.cells,
-    .feature = lm.cells$map$lm[["default"]]$fit$coefficients[,"ConditionB"],
+    x = lm.cells,
+    .feature = lm.cells$results$lm[["default"]]$fit$coefficients[,"ConditionB"],
     .panel.size = 1.5,
     .point.size = 1,
     .color.label = "estimated density\nlog2 fold change",
@@ -621,13 +497,13 @@ tinydenseR::plotPCA(
 
 # Highlight significantly different regions
 tinydenseR::plotPCA(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .feature = ifelse(
-        test = lm.cells$map$lm[["default"]]$fit$coefficients[,"ConditionB"] < 0,
+        test = lm.cells$results$lm[["default"]]$fit$coefficients[,"ConditionB"] < 0,
         yes = "less abundant",
         no = "more abundant") |>
         ifelse(
-            test = lm.cells$map$lm[["default"]]$fit$pca.weighted.q[,"ConditionB"] < 0.1,
+            test = lm.cells$results$lm[["default"]]$fit$pca.weighted.q[,"ConditionB"] < 0.1,
             no = "not sig.") |>
         factor(levels = c("less abundant", "not sig.", "more abundant")),
     .cat.feature.color = Color.Palette[1,c(1,6,2)],
@@ -650,20 +526,20 @@ red.design <- model.matrix(object = ~ Replicate,
 
 # Fit reduced model (stored in lm.cells$map$lm[["reduced"]])
 lm.cells <- tinydenseR::get.lm(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .design = red.design,
     .model.name = "reduced",
     .verbose = FALSE 
 )
-#> Warning in tinydenseR::get.lm(.tdr.obj = lm.cells, .design = red.design, :
-#> q-value estimation is not recommended for fewer than 100 tests. Using BH
-#> instead.
+#> Warning in get.lm.TDRObj(x = lm.cells, .design = red.design, .model.name =
+#> "reduced", : q-value estimation is not recommended for fewer than 100 tests.
+#> Using BH instead.
 
 # Compute sample embedding using full vs reduced model comparison
 # Embedding stored in lm.cells$map$embedding$pePC[["Condition"]]
 lm.cells <-
   tinydenseR::get.embedding(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .full.model = "default",
     .term.of.interest = "Condition",
     .red.model = "reduced",
@@ -677,7 +553,7 @@ lm.cells <-
 ``` r
 # Embed samples based on differences along Condition
 tinydenseR::plotSampleEmbedding(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .embedding = "pePC",
     .sup.embed.slot = "Condition",
     .color.by = "Condition",
@@ -697,22 +573,22 @@ tinydenseR::plotSampleEmbedding(
 
 ``` r
 # Find most downregulated gene in condition B
-most_down_gene <- sort(.dea$coefficients[,"ConditionB"])[1] |> names()
+most_down_gene <- sort(lm.cells$results$pb$default$all$coefficients[,"ConditionB"])[1] |> names()
 
 tinydenseR::plotPCA(
-    .tdr.obj = lm.cells,
-    .feature = lm.cells$landmarks[,most_down_gene],
+    x = lm.cells,
+    .feature = lm.cells$assay$expr[,most_down_gene],
     .panel.size = 1.5,
     .point.size = 1,
     .color.label = most_down_gene
 )
 
 # Find most upregulated gene in condition B  
-most_up_gene <- sort(.dea$coefficients[,"ConditionB"], decreasing = TRUE)[1] |> names()
+most_up_gene <- sort(lm.cells$results$pb$default$all$coefficients[,"ConditionB"], decreasing = TRUE)[1] |> names()
 
 tinydenseR::plotPCA(
-    .tdr.obj = lm.cells,
-    .feature = lm.cells$landmarks[,most_up_gene],
+    x = lm.cells,
+    .feature = lm.cells$assay$expr[,most_up_gene],
     .panel.size = 1.5,
     .point.size = 1,
     .color.label = most_up_gene
@@ -728,11 +604,11 @@ tinydenseR::plotPCA(
 ``` r
 # Add feature statistics for interactive exploration
 lm.cells <- 
-  tinydenseR::get.features(.tdr.obj = lm.cells)
+  tinydenseR::get.features(x = lm.cells)
 
 # Create interactive plot with hover information
 tinydenseR::plotPCA(
-    .tdr.obj = lm.cells,
+    x = lm.cells,
     .hover.stats = "marker",
     .panel.size = 1.5,
     .point.size = 1
