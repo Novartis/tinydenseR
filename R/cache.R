@@ -207,6 +207,37 @@
   }
 }
 
+#' Access per-cell map data for a single sample
+#'
+#' Retrieves per-cell data (cluster IDs, cell type IDs, nearest landmarks,
+#' or fuzzy graph) for a single sample, transparently reading from on-disk
+#' cache when caching is active or from in-memory slots otherwise.
+#'
+#' @param x A \code{\linkS4class{TDRObj}} processed through \code{get.map()}.
+#' @param .slot Character. One of \code{"celltyping.ids"},
+#'   \code{"clustering.ids"}, \code{"nearest.landmarks"}, \code{"fuzzy.graph"}.
+#' @param .sample Character. Sample identifier (must match a name in
+#'   \code{names(x@@cells)}).
+#' @return The per-cell object for that sample and slot: a named character
+#'   vector (for \code{*ids}), an integer matrix (for
+#'   \code{nearest.landmarks}), or a sparse matrix (for
+#'   \code{fuzzy.graph}).
+#'
+#' @seealso \code{\link{get.map}}, \code{\link{tdr_cache_validate}}
+#'
+#' @examples
+#' \dontrun{
+#' # Get cell type labels for the first sample
+#' ct <- get.cellmap(x = lm.obj,
+#'                   .slot = "celltyping.ids",
+#'                   .sample = names(lm.obj$cells)[1])
+#' }
+#' @export
+get.cellmap <- function(x, .slot, .sample) {
+  if (!is.TDRObj(x)) stop("x must be a TDRObj.")
+  .tdr_get_map_slot(x, slot_name = .slot, sample_name = .sample)
+}
+
 #' Validate that all on-disk cache files are intact
 #'
 #' Checks every entry in the cache manifest for file existence and,
