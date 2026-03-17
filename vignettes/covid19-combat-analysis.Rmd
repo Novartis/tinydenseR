@@ -1,0 +1,680 @@
+---
+title: "COVID-19 PBMC Analysis with tinydenseR: Identifying Dysregulated Cell States"
+author: "Pedro Milanez-Almeida"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+vignette: >
+  %\VignetteIndexEntry{COVID-19 PBMC Analysis with tinydenseR}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE,
+  dpi = 300,
+  out.width = "100%",
+  eval = TRUE
+)
+```
+
+## Introduction
+
+This vignette demonstrates how `tinydenseR` can be applied to a real-world
+clinical scRNA-seq dataset to identify dysregulated cell states in COVID-19
+patients. We use PBMC data from the COMBAT (COvid-19 Multi-omics Blood
+ATlas) consortium to show how differential density analysis combined with
+PLS-based decomposition (plsDE) reveals:
+
+1. **Dysregulated monocyte states** in early critical COVID-19 relative to mild
+   disease — captured by plsDE component 1 (plsDE1) scores and loadings.
+2. **Expanded immature cell populations** and **depleted pDCs** in critical cases — captured by plsDE component 2 (plsDE2).
+
+### Analysis Overview
+
+The core workflow follows four steps:
+
+1. `RunTDR()` — build landmarks from an on-disk count matrix and compute
+   sample-level density profiles.
+2. Visualize landmark and sample embeddings — inspect the UMAP of landmarks
+   and the sample PCA to confirm biological structure.
+3. `get.lm()` with contrasts — perform differential density analysis while
+   controlling for covariates (sex, age, time since symptom onset).
+4. `get.plsDE()` — decompose the density contrast into interpretable
+   components that jointly capture differential abundance and differential
+   expression.
+
+### Data Source
+
+The COMBAT dataset is available from CELLxGENE
+([link](https://datasets.cellxgene.cziscience.com/687c09ff-731a-4e3d-ac07-4c29c33a6338.h5ad)). The original study is described in:
+
+> COMBAT Consortium. *A blood atlas of COVID-19 defines hallmarks of disease
+> severity and specificity.* Cell 185, 916–938 (2022).
+
+## Setup
+
+### Load Packages
+
+```{r load-packages}
+library(tinydenseR)
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(patchwork)
+library(limma)
+library(anndataR)
+library(BPCells)
+```
+
+### Load and Prepare Data
+
+We read the COMBAT `.h5ad` file, keeping data on disk via `anndataR` and
+`BPCells` for memory efficiency. This section shows the key preprocessing
+steps; adjust file paths to match your local setup.
+
+```{r load-data}
+# Path to the downloaded h5ad file
+file_path <- "~/sandbox/COVID19_COMBAT/derived_data/COMBAT.h5ad"
+
+# Access h5ad keeping data on disk
+h5ad <- 
+  anndataR::read_h5ad(
+    path = file_path,
+    as = "HDF5AnnData")
+
+# Extract metadata and feature information
+feature_metadata <- h5ad$var
+metadata <- h5ad$obs
+```
+
+### Quality Control and Filtering
+
+We apply basic QC thresholds and restrict the analysis to healthy volunteers
+(HV) and COVID-19 patients with mild, severe, or critical disease. Samples
+with fewer than 200 cells are excluded.
+
+```{r qc-filter}
+# Basic QC: minimum 1000 UMI and 500 genes per cell
+keep.QC.cells <- 
+  (metadata$QC_total_UMI >= 1000) & 
+  (metadata$QC_ngenes >= 500)
+
+# Keep only HV, MILD, SEV, and CRIT patients with >= 200 cells
+smpl.to.keep <-
+  metadata$scRNASeq_sample_ID[
+    metadata$Source %in% c("HV", "COVID_MILD", "COVID_SEV", "COVID_CRIT")
+  ] |> 
+  table() |>
+  (\(x) names(x[x >= 200]))()
+
+metadata <-
+  metadata[keep.QC.cells & (metadata$scRNASeq_sample_ID %in% smpl.to.keep), ]
+```
+
+### Prepare the On-Disk Count Matrix
+
+We use `BPCells` to store the count matrix on disk and subset it to QC-passing
+cells with unique gene symbols.
+
+```{r ondisk-matrix}
+# Remove duplicated gene symbols
+keep.unique.genes <- !duplicated(feature_metadata$feature_name)
+feature_metadata <- feature_metadata[keep.unique.genes, ] |> droplevels()
+
+# Write BPCells on-disk matrix
+ondisk_path <- 
+  "~/sandbox/COVID19_COMBAT/derived_data/COMBAT_COVID_ondisk/"
+
+ondisk.data <-
+  BPCells::open_matrix_anndata_hdf5(
+    path = file_path,
+    group = "/X")
+
+BPCells::write_matrix_dir(
+  mat = ondisk.data, 
+  dir = ondisk_path,
+  overwrite = TRUE)
+
+# Re-open and subset
+ondisk.mat <-
+  BPCells::open_matrix_dir(dir = ondisk_path)
+
+ondisk.mat <-
+  ondisk.mat[keep.unique.genes, keep.QC.cells & (metadata$scRNASeq_sample_ID %in% smpl.to.keep)]
+
+rownames(x = ondisk.mat) <- feature_metadata$feature_name
+```
+
+### Prepare Metadata Covariates
+
+We encode disease severity as ordered factor levels and binarize time since
+symptom onset into "early" and "late" to allow for non-linear effects. We
+also create a combined `Source_TSO.binary` variable for the contrast design.
+
+```{r prepare-metadata}
+metadata <-
+  metadata |>
+  dplyr::mutate(
+    Source = factor(
+      x = Source,
+      levels = c("HV", "COVID_MILD", "COVID_SEV", "COVID_CRIT")),
+    TimeSinceOnset = ifelse(
+      test = Source != "HV", 
+      yes = TimeSinceOnset, 
+      no = -1)
+  ) |>
+  droplevels()
+```
+
+## Step 1: Build Landmarks with `RunTDR()`
+
+`RunTDR()` is the main entry point. It creates landmark cells, builds a
+neighborhood graph, computes sample-level density profiles, and maps cell type
+annotations — all in a single call.
+
+```{r run-tdr}
+lm.cells <-
+  tinydenseR::RunTDR(
+    x = ondisk.mat,
+    .sample.var = "scRNASeq_sample_ID", 
+    .cell.meta = metadata,
+    .assay.type = "RNA",
+    .celltype.vec = "cell_type",
+    .label.confidence = 0.5,
+    .verbose = FALSE
+  )
+```
+
+## Step 2: Visualize Landmark and Sample Embeddings
+
+Before statistical testing, we inspect the landmark UMAP and sample PCA to
+confirm that the data exhibits the expected biological structure.
+
+### Landmark UMAP
+
+The UMAP of landmarks reveals major immune cell populations. Each point is a
+landmark colored by its unsupervised cluster assignment.
+
+```{r umap-clustering, fig.width=10, fig.height=4}
+tinydenseR::plotUMAP(
+  x = lm.cells,
+  .plot.title = "COMBAT landmarks"
+)
+```
+
+We can overlay reference-based cell type annotations to identify clusters:
+
+```{r umap-celltype, fig.width=10, fig.height=4}
+tinydenseR::plotUMAP(
+  x = lm.cells,
+  .feature = lm.cells$landmark.annot$celltyping$ids,
+  .plot.title = "COMBAT landmarks (cell types)"
+)  +
+  ggplot2::guides(color = ggplot2::guide_legend(
+    override.aes = list(size = 5),
+    ncol = 2))
+```
+
+We can also project individual gene expression (e.g., canonical markers) onto
+the UMAP to validate cell identities:
+
+```{r umap-markers, fig.width=10, fig.height=4}
+# Classical monocyte marker
+p1 <- 
+  tinydenseR::plotUMAP(
+  x = lm.cells,
+  .feature = lm.cells$landmarks[, "LYZ"],
+  .plot.title = "LYZ (classical monocytes)")
+# MHC class II
+p2 <- 
+  tinydenseR::plotUMAP(
+    x = lm.cells,
+     .feature = lm.cells$landmarks[, "HLA-DRA"],
+     .plot.title = "HLA-DRA (MHC class II)")
+# T cell marker
+p3 <- 
+  tinydenseR::plotUMAP(
+    x = lm.cells,
+     .feature = lm.cells$landmarks[, "CD3E"],
+     .plot.title = "CD3E (T cells)")
+
+p1 | p2 | p3
+```
+
+### Sample PCA
+
+The sample PCA provides a low-dimensional view of inter-sample variation based
+on their density profiles across landmarks. The color encodes sample library
+size (log10 total cells).
+
+```{r sample-pca, fig.width=10, fig.height=4}
+tinydenseR::plotSampleEmbedding(
+  x = lm.cells,
+  .embedding = "pca",
+  .color.by = "log10.n.cells"
+)
+```
+
+## Step 3: Differential Density Analysis with `get.lm()`
+
+### Encoding Covariates
+
+We binarize time since onset into "early" vs. "late" and create a composite
+factor that crosses disease severity with timing. This allows us to define
+biologically meaningful contrasts while controlling for confounders.
+
+```{r encode-covariates}
+# Binarize TimeSinceOnset
+lm.cells@metadata <-
+  dplyr::mutate(
+    .data = lm.cells@metadata,
+    TSO.binary = 
+      dplyr::case_when(
+        Source == "HV" ~ "uninfected",
+        Source != "HV" ~ ifelse(
+          TimeSinceOnset > median(TimeSinceOnset[Source != "HV"]),
+          "late", "early")
+      ) |>
+      factor(levels = c("uninfected", "early", "late"))
+  )
+
+# Standardize Age encoding
+lm.cells$metadata$Age <-
+  make.names(lm.cells$metadata$Age) |>
+  gsub(pattern = "^X", replacement = "Age.", fixed = FALSE)
+
+# Create composite Source x TSO variable
+lm.cells$metadata$Source_TSO.binary <-
+  paste(lm.cells$metadata$Source,
+        lm.cells$metadata$TSO.binary,
+        sep = "_") |>
+          gsub(pattern = "^HV_|^COVID_", 
+          replacement = "",
+           fixed = FALSE) |>
+            factor(levels = c("uninfected", "MILD_early", "MILD_late", "SEV_early", "SEV_late", "CRIT_early", "CRIT_late"))
+```
+
+### Design and Contrast Matrices
+
+We set up a cell-means design with `~ 0 + Source_TSO.binary + sex + Age`,
+so that `sex` and `Age` are controlled for in every contrast. The contrast
+matrix defines the biologically interesting comparisons.
+
+```{r design-contrast}
+# Design matrix (cell-means model controlling for sex and Age)
+.design <- 
+  model.matrix(~ 0 + Source_TSO.binary + sex + Age,
+               data = lm.cells$metadata) |> 
+  (\(x) {
+    colnames(x) <- gsub("^Source_TSO.binary", "", colnames(x))
+    x
+  })()
+
+# Contrast matrix
+.contrast.matrix <- 
+  limma::makeContrasts(
+    # Average early COVID vs healthy
+    earlyInfectionVSuninfected =
+      ((MILD_early + SEV_early + CRIT_early) / 3) -
+      uninfected,
+    
+    # Average late COVID vs early COVID
+    lateInfectionVSearlyInfection =
+      ((MILD_late + SEV_late + CRIT_late) / 3) -
+      ((MILD_early + SEV_early + CRIT_early) / 3),
+    
+    # Critical vs mild within early timepoint
+    CRIT_earlyVSMILD_early =
+      CRIT_early - MILD_early,
+    
+    levels = .design
+  )
+```
+
+### Fit the Model
+
+`get.lm()` fits a limma model to the log-transformed fuzzy density profiles
+across landmarks, applying the contrast matrix. This identifies which
+landmarks are differentially abundant between conditions — analogous to
+finding differentially expressed genes in bulk RNA-seq, but at the level of
+cell density.
+
+```{r fit-lm}
+lm.cells <- 
+  tinydenseR::get.lm(
+    x = lm.cells,
+    .design = .design,
+    .contrasts = .contrast.matrix,
+    .model.name = "contrast.Source_TSO.binary",
+    .verbose = TRUE
+  )
+```
+
+### Visualize Differential Density
+
+We can now overlay the q-values and fold-change directions onto the landmark
+UMAP. This highlights which cell states are significantly expanding or
+depleting. The key contrast for the main result is early CRIT vs MILD.
+
+```{r da-umap, fig.width=10, fig.height=4}
+# get coloring based on fold-change direction and significance for each contrast
+q.earlyVsHV.c <-
+  ifelse(
+    test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$coefficients[, "earlyInfectionVSuninfected"] < 0,
+    yes = "lower density",
+    no = "higher density") |>
+      ifelse(
+        test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$pca.weighted.q[, "earlyInfectionVSuninfected"] < 0.1,
+        no = "not sig.") |>
+          factor(
+            levels = c("lower density", "not sig.", "higher density"))
+
+q.lateVsEarly.c <-
+  ifelse(
+    test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$coefficients[, "lateInfectionVSearlyInfection"] < 0,
+    yes = "lower density",
+    no = "higher density") |>
+      ifelse(
+        test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$pca.weighted.q[, "lateInfectionVSearlyInfection"] < 0.1,
+        no = "not sig.") |>
+          factor(
+            levels = c("lower density", "not sig.", "higher density"))
+
+q.critVsMild.c <-
+  ifelse(
+    test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$coefficients[, "CRIT_earlyVSMILD_early"] < 0,
+    yes = "lower density",
+    no = "higher density") |>
+      ifelse(
+        test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$pca.weighted.q[, "CRIT_earlyVSMILD_early"] < 0.1,
+        no = "not sig.") |>
+          factor(
+            levels = c("lower density", "not sig.", "higher density"))
+
+# Early COVID vs healthy
+q.earlyVsHV <-
+  tinydenseR::plotUMAP(
+    x = lm.cells,
+    .feature = q.earlyVsHV.c,
+    .plot.title = "early COVID vs healthy",
+    .cat.feature.color = unname(obj = Color.Palette[1, c(1, 6, 2)]),
+    .color.label = "q < 0.1"
+  ) +
+  ggplot2::theme(plot.subtitle = ggplot2::element_blank())
+
+# Late vs early COVID
+q.lateVsEarly <-
+  tinydenseR::plotUMAP(
+    x = lm.cells,
+    .feature = q.lateVsEarly.c,
+    .plot.title = "COVID: late vs early",
+    .cat.feature.color = unname(obj = Color.Palette[1, c(1, 6, 2)]),
+    .color.label = "q < 0.1"
+  ) +
+  ggplot2::theme(plot.subtitle = ggplot2::element_blank())
+
+# Early CRIT vs MILD — the key contrast
+q.critVsMild <-
+  tinydenseR::plotUMAP(
+    x = lm.cells,
+    .feature = q.critVsMild.c,
+    .plot.title = "early: CRIT vs MILD",
+    .cat.feature.color = unname(obj = Color.Palette[1, c(1, 6, 2)]),
+    .color.label = "q < 0.1"
+  ) +
+  ggplot2::theme(plot.subtitle = ggplot2::element_blank())
+
+(q.earlyVsHV | q.lateVsEarly | q.critVsMild) +
+  patchwork::plot_layout(guides = "collect") &
+  ggplot2::theme(legend.position = "bottom",
+                 legend.justification = "center")
+```
+
+### Sample Embeddings by Contrast
+
+We can also compute supervised sample embeddings (partial-effect PCs) for
+each contrast, providing a low-dimensional score that summarizes how each
+sample deviates along a contrast direction.
+
+```{r sample-embed, fig.width=10, fig.height=4}
+# Compute sample embeddings for each contrast
+for (contrast in colnames(lm.cells$results$lm$contrast.Source_TSO.binary$fit$coefficients)) {
+  lm.cells <-
+    tinydenseR::get.embedding(
+      x = lm.cells,
+      .full.model = "contrast.Source_TSO.binary",
+      .contrast.of.interest = contrast,
+      .verbose = TRUE
+    )
+}
+
+# Visualize pePC1 for the early CRIT vs MILD contrast
+(tinydenseR::plotSampleEmbedding(
+  x = lm.cells,
+  .embedding = "pePC",
+  .color.by = "Source",
+  .sup.embed.slot = "CRIT_earlyVSMILD_early",
+  .x.by = "Source_TSO.binary"
+) +
+     ggplot2::theme(axis.text.x = ggplot2::element_text(vjust = 1,
+                                                        hjust = 1,
+                                                        angle = 30),
+                    axis.title.x = ggplot2::element_blank()))
+
+# Same plot, just highlighting the contrast groups
+lm.cells$metadata |>
+  cbind(lm.cells$sample.embed$pepc$CRIT_earlyVSMILD_early$coord) |>
+  (\(x)
+   ggplot2::ggplot(data = x,
+                   mapping = ggplot2::aes(x = Source_TSO.binary,
+                                          y = pePC1)) +
+     ggplot2::theme_bw() +
+     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                    axis.text.x = ggplot2::element_text(vjust = 1,
+                                                        hjust = 1,
+                                                        angle = 30),
+                    axis.title.x = ggplot2::element_blank(),
+                    legend.title = ggplot2::element_blank()) +
+     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5))) +
+     ggplot2::scale_color_manual(values = unname(obj = tinydenseR::Color.Palette[1,c(5,1:3)])) +
+     ggplot2::geom_boxplot(outliers = FALSE,
+                           color = 
+                             (levels(x = x$Source_TSO.binary)  %in% 
+                             c("CRIT_early",
+                               "MILD_early")) |>
+                             ifelse(yes = "black",
+                                          no = "grey90")) +
+     ggplot2::geom_point(mapping = ggplot2::aes(color = Source),
+                         size = I(x = 1),
+                         position = ggplot2::position_jitter(height = 0,
+                                                             width = 0.2,
+                                                             seed = 123),
+                         alpha = ifelse(test = x$Source_TSO.binary %in% 
+                                          c("CRIT_early",
+                                            "MILD_early"),
+                                        yes = 1,
+                                        no = 0.25)) +
+     ggplot2::labs(title = "early: CRIT vs MILD",
+                   y = paste0("pePC1 (",
+                              round(x = lm.cells$sample.embed$pepc$CRIT_earlyVSMILD_early$perc.tot.var.exp,
+                                    digits = 1),
+                              "%)")) +
+     ggh4x::force_panelsizes(rows = grid::unit(x = 2,
+                                               units = "in"),
+                             col = grid::unit(x = 2,
+                                              units = "in"))
+  )()
+
+```
+
+### Beeswarm Summary
+
+`plotBeeswarm()` provides a compact overview of which landmark clusters are
+significantly enriched or depleted across multiple contrasts simultaneously.
+
+```{r beeswarm, fig.width=10, fig.height=4}
+tinydenseR::plotBeeswarm(
+    x = lm.cells,
+    .model.name = "contrast.Source_TSO.binary",
+    .coefs = c("earlyInfectionVSuninfected",
+               "lateInfectionVSearlyInfection",
+               "CRIT_earlyVSMILD_early"),
+    .label.substr.rm = "group",
+    .split.by = "clustering",
+    .perc.plot = FALSE,
+    .q.from = "pca.weighted.q",
+    .swarm.title = "COMBAT landmarks") |> 
+  (\(x)
+   x +
+     ggplot2::facet_grid(cols = ggplot2::vars(facets), 
+                         scales = "fixed", 
+                         labeller = ggplot2::as_labeller(
+                           c(
+                             "earlyInfectionVSuninfected" = "early COVID vs healthy",
+                             "lateInfectionVSearlyInfection" = "COVID: late vs early",
+                             "CRIT_earlyVSMILD_early" = "early: CRIT vs MILD"
+                           ))) +
+     ggh4x::force_panelsizes(cols = ggplot2::unit(x = 1.5,
+                                                  units = "in"),
+                             rows = ggplot2::unit(x = (unique(x = x$data$split.by) |>
+                                                         length()) * 0.2,
+                                                  units = "in"))
+  )()
+```
+
+## Step 4: Decomposing the Density Contrast with `get.plsDE()`
+
+Differential density analysis tells us where changes occur across the
+landmark landscape, but not what molecular features drive those changes.
+`get.plsDE()` bridges this gap by decomposing the density contrast into PLS
+components whose loadings reveal the genes underlying the signal.
+
+We focus on the early CRIT vs MILD contrast, which captures the most
+clinically actionable comparison — the cellular features that distinguish
+patients who progress to critical illness from those with mild disease at an
+early time point.
+
+```{r run-plsDE}
+lm.cells <-
+  tinydenseR::get.plsDE(
+    x = lm.cells,
+    .coef.col = "CRIT_earlyVSMILD_early",
+    .model.name = "contrast.Source_TSO.binary",
+    .verbose = TRUE
+  )
+```
+
+### plsDE1: Dysregulated Monocyte States
+
+plsDE1 captures the dominant signal distinguishing early critical from mild
+COVID-19. Examining its scores and loadings reveals that classical monocytes
+are at the center of this dysregulation.
+
+```{r plsDE1-scores, fig.width=10, fig.height=4}
+tinydenseR::plotPlsDE(
+  x = lm.cells,
+  .coef.col = "CRIT_earlyVSMILD_early",
+  .plsDE.dim = 1,
+  .point.size = 0.1
+)
+```
+
+The left panel shows landmark scores: landmarks in the monocyte region carry
+the strongest positive plsDE1 scores, indicating that this component is driven
+by monocyte-state variation. The right panel confirms tight coupling between
+plsDE1 scores and the density contrast (Y).
+
+The plsDE1 gene loadings identify the molecular signatures underlying
+this signal. Positive loadings indicate features upregulated in the direction
+of the contrast (CRIT > MILD), while negative loadings indicate
+downregulation.
+
+```{r plsDE1-heatmap, fig.width=8, fig.height=6}
+tinydenseR::plotPlsDEHeatmap(
+  x = lm.cells,
+  .coef.col = "CRIT_earlyVSMILD_early",
+  .plsDE.dim = 1,
+  .order.by = "plsDE.dim",
+  .feature.font.size = I(x = 5)
+)
+```
+
+#### Interpretation
+
+plsDE1 loadings highlight pro-inflammatory and innate immune genes
+being upregulated in critical cases — consistent with the hyperinflammatory
+monocyte phenotype that has been reported in critical COVID-19. Negative
+loadings correspond to genes involved in antigen presentation and
+classical monocyte identity (e.g., HLA class II genes), reflecting the
+loss of antigen-presenting capacity previously documented in critical
+patients.
+
+### plsDE2: Expanded Immature Cells and Depleted pDCs
+
+plsDE2 captures a secondary axis of variation. Inspecting the positive scores
+reveals that this component is driven by landmarks in regions annotated as
+progenitor or immature cell populations — consistent with emergency
+hematopoiesis and the well-documented expansion of immature myeloid cells
+in critical COVID-19 PBMC. The most negative scores correspond to landmarks in the plasmacytoid dendritic cell (pDC) region, which are known to be depleted in critical COVID-19.
+
+```{r plsDE2-scores, fig.width=10, fig.height=4}
+tinydenseR::plotPlsDE(
+  x = lm.cells,
+  .coef.col = "CRIT_earlyVSMILD_early",
+  .plsDE.dim = 2,
+  .point.size = 0.1
+)
+```
+
+```{r plsDE2-heatmap, fig.width=8, fig.height=6}
+tinydenseR::plotPlsDEHeatmap(
+  x = lm.cells,
+  .coef.col = "CRIT_earlyVSMILD_early",
+  .plsDE.dim = 2,
+  .order.by = "plsDE.dim",
+  .feature.font.size = I(x = 5)
+)
+```
+
+#### Interpretation
+
+plsDE2 positive loadings highlight genes associated with immature or progenitor cell states (e.g., stem cell markers, cell-cycle genes) being positively loaded,
+reflecting the expansion of these populations in critical COVID-19. Negative loading on the other hand are markers of plasmacytoid dendritic cells (pDCs) and, to a lesser extent, effector memory T cells, highlighting their depletion early in critical COVID-19. These findings aligns with reports of the role pDCs in most severe COVID-19 cases, and, more importantly, emergency myelopoiesis producing immature, dysfunctional cells that enter circulation during critical infection.
+
+## Summary
+
+This analysis demonstrates the full `tinydenseR` workflow on a real clinical
+dataset:
+
+| Step | Function | Purpose |
+|------|----------|---------|
+| 1 | `RunTDR()` | Build landmarks, graph, and density profiles |
+| 2 | `plotUMAP()`, `plotSampleEmbedding()` | Validate biological structure |
+| 3 | `get.lm()` with contrasts | Differential density testing, controlling for sex, age, and time since onset |
+| 4 | `get.plsDE()` | Decompose density contrast into interpretable gene programs |
+
+The key biological findings are:
+
+- plsDE1 identifies dysregulated monocyte states in early critical
+  COVID-19, with loadings pointing to pro-inflammatory activation and loss of
+  antigen-presenting function in classical monocytes.
+- plsDE2 reveals expanded immature cell populations, consistent with emergency hematopoiesis, and depleted pDCs in critical cases.
+
+These results are obtained from a single unified framework that handles
+differential density analysis while controlling for covariates through the
+contrast design in `get.lm()`, followed by molecular decomposition via
+`get.plsDE()`.
+
+## Session Info
+
+```{r session-info}
+sessionInfo()
+```
