@@ -16,6 +16,7 @@ Collate:
     'simulate.R'
     'dispatch.R'
     'Color.Palette.R'
+    'sim_trajectory_tdr.R'
     'cache.R'
     'celltype.R'
     'elbow.finder.R'
