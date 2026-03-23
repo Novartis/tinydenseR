@@ -3494,128 +3494,13 @@ get.embedding.TDRObj <-
       colnames(x = concordance.weights) <- comp.names
     }
 
-    # -----------------------------------------------------------------------
-    # Y-weighted loadings: loading of t_kc against Y0-weighted expression
-    #
-    # Replaces X_j with (Y0 ⊙ X_j) in the loading computation:
-    #   pearson: cor(t_kc, (Y0 ⊙ X_j)_c)    — unitless, scale-invariant
-    #   ols:     t_kc' (Y0 ⊙ X_j) / ||t_kc||^2  — units: expression × log2-FC
-    #   spearman: NA (ranking Y0 ⊙ X_j destroys additive landmark decomposition)
-    #
-    # Landmarks with Y0 ≈ 0 (no density change) contribute nothing.
-    # Landmarks where score sign and Y0 sign disagree have their contribution
-    # reversed, directly suppressing structural counterweight signal.
-    #
-    # Sparsity: row-scaling X.sparse by Y0.vec preserves the sparsity pattern
-    # (only nonzero entries of X are scaled), so all sparse-BLAS paths
-    # (crossprod, colSums) remain O(nnz).
-    #
-    # Centering trick: since sum(t_kc) = 0, the column-mean of (Y0 ⊙ X_j)
-    # drops out of the numerator, so we can work directly with X.sparse
-    # without materializing a dense centered product.
-    #
-    # Only computed when Y0.vec is provided. NA for spearman.
-    # -----------------------------------------------------------------------
-
-    y.weighted.loadings <-
-      if (is.null(x = Y0.vec) || .method == "spearman") {
-
-        matrix(data = NA_real_,
-               nrow = n.genes,
-               ncol = ncomp,
-               dimnames = list(colnames(x = X.sparse), comp.names))
-
-      } else if (.method == "pearson") {
-
-        # Sufficient statistics for sd((Y0 ⊙ X_j)_c), precomputed once.
-        # crossprod(X.sparse, Y0.vec) is O(nnz): only nonzero X entries contribute.
-        # crossprod(X.sparse^2, Y0.vec^2) is O(nnz): X^2 preserves sparsity pattern.
-        col.sums.y0x <-
-          as.numeric(x = Matrix::crossprod(x = X.sparse, y = Y0.vec))
-
-        col.sumsq.y0x <-
-          as.numeric(x = Matrix::crossprod(x = X.sparse^2, y = Y0.vec^2))
-
-        gene.sd.y0x <-
-          sqrt(x = pmax(col.sumsq.y0x - (col.sums.y0x^2) / n, 0) /
-                 (n - 1))
-
-        yw.loadings <-
-          seq_len(length.out = ncomp) |>
-          stats::setNames(nm = comp.names) |>
-          lapply(FUN = function(k) {
-
-            score.k <-
-              scores[, k] - mean(x = scores[, k])
-
-            sd.score <-
-              sqrt(x = sum(score.k^2) / (n - 1))
-
-            if (sd.score < .Machine$double.eps) {
-              return(rep(x = NA_real_, times = n.genes))
-            }
-
-            # Numerator: cov(t_kc, Y0 ⊙ X_j)
-            # = (1/(n-1)) t_kc' diag(Y0) X  (centering drops out since sum(t_kc)=0)
-            num <-
-              (Matrix::crossprod(x = X.sparse,
-                                 y = Y0.vec * score.k) |>
-                 as.numeric()) / (n - 1)
-
-            r <-
-              num / (sd.score * gene.sd.y0x)
-
-            # Genes with zero Y0-weighted variance: set to 0
-            r[gene.sd.y0x < .Machine$double.eps] <-
-              0
-
-            return(r)
-
-          }) |>
-          do.call(what = cbind)
-
-        yw.loadings
-
-      } else {
-
-        # OLS: t_kc' diag(Y0) X / ||t_kc||^2
-        seq_len(length.out = ncomp) |>
-          stats::setNames(nm = comp.names) |>
-          lapply(FUN = function(k) {
-
-            score.k <-
-              scores[, k] - mean(x = scores[, k])
-
-            denom <-
-              sum(score.k^2)
-
-            if (denom < .Machine$double.eps) {
-              return(rep(x = NA_real_, times = n.genes))
-            }
-
-            (Matrix::crossprod(x = X.sparse,
-                               y = Y0.vec * score.k) |>
-               as.numeric()) /
-              denom
-
-          }) |>
-          do.call(what = cbind)
-
-      }
-
-    if (!is.null(x = Y0.vec) && .method != "spearman") {
-      rownames(x = y.weighted.loadings) <- colnames(x = X.sparse)
-      colnames(x = y.weighted.loadings) <- comp.names
-    }
-
     rownames(x = loadings) <-
       colnames(x = X.sparse)
     
     return(
       list(
         loadings             = loadings,
-        concordance.weights  = concordance.weights,
-        y.weighted.loadings  = y.weighted.loadings
+        concordance.weights  = concordance.weights
       )
     )
     
@@ -4916,18 +4801,6 @@ get.nmfDE.TDRObj <-
 #'       shrinks genes whose signal is driven by structural balancing to near zero
 #'       while preserving sign and ranking direction for genuine contrast-associated
 #'       genes.}
-#'     \item{y.weighted.loadings}{Matrix (genes/markers x K): density-contrast-weighted
-#'       feature loadings. Replaces gene expression \eqn{X_j} with density-contrast-weighted
-#'       expression \eqn{Y_0 \odot X_j} in the loading computation, using the same method
-#'       as \code{.loading.method} (Pearson correlation or OLS regression). Landmarks with
-#'       \eqn{Y_0 \approx 0} (no density change) contribute nothing to the loading;
-#'       landmarks where score sign and \eqn{Y_0} sign disagree have their contribution
-#'       reversed, directly suppressing structural counterweight signal. Use for ranking
-#'       genes in \code{fgsea::fgsea} when standard \code{loadings} (or concordance-filtered
-#'       loadings) still show residual counterweight-driven enrichment. Units: unitless
-#'       Pearson \eqn{r} when \code{.loading.method = "pearson"};
-#'       expression \eqn{\times} log2-FC when \code{"ols"}.
-#'       \code{NA} when \code{.loading.method = "spearman"}.}
 #'     \item{Y.alignment}{Numeric vector (K): |cor(Y, score_k)| per component}
 #'     \item{smoothness}{Numeric vector (K): Laplacian smoothness per score vector}
 #'     \item{Y}{Numeric vector: the density contrast used, centered to mean zero (Y - mean(Y)).
@@ -4961,10 +4834,6 @@ get.nmfDE.TDRObj <-
 #'   Ak = lm.obj$plsDE$Infection$Y.alignment,
 #'   Sk = lm.obj$plsDE$Infection$smoothness
 #' )
-#'
-#' # Y-weighted loadings for counterweight-resistant gene ranking
-#' yw  <- lm.obj$plsDE$Infection$y.weighted.loadings[, "plsDE1"]
-#' # fgsea::fgsea(pathways = ..., stats = sort(yw, decreasing = TRUE))
 #' }
 #'
 #' @param ... Additional arguments passed to methods.
@@ -5413,7 +5282,6 @@ get.plsDE.TDRObj <-
 
     loadings            <- .loadings.res$loadings
     concordance.weights <- .loadings.res$concordance.weights
-    y.weighted.loadings <- .loadings.res$y.weighted.loadings
     
     # -------------------------------------------------------------------------
     # Laplacian smoothness (Sk)
@@ -5449,7 +5317,6 @@ get.plsDE.TDRObj <-
         y.loadings = Q.vec,
         loadings = loadings,
         concordance.weights = concordance.weights,
-        y.weighted.loadings = y.weighted.loadings,
         Y.alignment = Y.alignment,
         smoothness = smoothness,
         Y = Y,
@@ -5502,8 +5369,6 @@ get.plsDE.TDRObj <-
       message("  $loadings     : ", n.genes, " features x ", .ncomp, " components (", .loading.method, ")")
       message("  $concordance.weights : ", n.genes, " features x ", .ncomp,
               " components (soft concordance, NA if spearman)")
-      message("  $y.weighted.loadings : ", n.genes, " features x ", .ncomp,
-              " components (Y0-weighted ", .loading.method, ", NA if spearman)")
       message("  $Y.alignment  : Ak (|cor(Y, score)|)")
       message("  $smoothness   : Sk (Laplacian smoothness)")
     }
