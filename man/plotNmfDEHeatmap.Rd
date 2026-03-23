@@ -24,6 +24,7 @@ plotNmfDEHeatmap(x, ...)
   .panel.height = 3,
   .feature.font.size = 7,
   .show.landmark.labels = FALSE,
+  .label.substr.rm = "",
   ...
 )
 }
@@ -84,6 +85,8 @@ options than strips. Default \code{c("cividis", "rocket", "inferno", "mako", "ma
 
 \item{.show.landmark.labels}{Logical: show landmark IDs on x-axis? Default FALSE
 (usually too many to display).}
+
+\item{.label.substr.rm}{Character substring to remove from density contrast label (default "").}
 }
 \value{
 A ggplot2 object (or patchwork composition with annotation strips).

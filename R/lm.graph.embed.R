@@ -743,14 +743,14 @@ get.map.TDRObj <-
            .cl.ct.to.ign = NULL,
            .verbose = TRUE,
            .seed = 123,
-           .label.confidence = 0.8,
+           .label.confidence = 0.5,
            .cache.on.disk = TRUE,
            .cache.dir = NULL,
            ...){
     .tdr.obj <- x
     
     # R CMD check appeasement for non-standard evaluation in dplyr and collapse
-    cell.pop <- id <- value <- ri <- i <- j <- landmark <- cell <- label <- x <- confidence <-
+    ref.idx <- N <- cell.pop <- id <- value <- ri <- i <- j <- landmark <- cell <- label <- x <- confidence <-
       NULL
     
     if(.label.confidence < 0.5 || .label.confidence > 1){
@@ -876,7 +876,7 @@ get.map.TDRObj <-
     .cache.meta <- NULL
     if (isTRUE(x = .cache.on.disk)) {
       if (is.null(x = .cache.dir)) {
-        .cache.dir <- file.path(dirname(.tdr.obj@cells[[1]]), "tdr_cache")
+        .cache.dir <- file.path(getwd(), "tdr_cache")
       }
       .run_key <- .tdr_make_run_key()
       .run_cache_dir <- file.path(.cache.dir, .run_key)
@@ -1033,6 +1033,11 @@ get.map.TDRObj <-
           collapse::fmutate(confidence = x / collapse::fsum(x)) |>
           collapse::fungroup() |>
           collapse::fsubset(confidence >= .label.confidence) |>
+          collapse::roworderv(cols = "confidence",
+                              decreasing = TRUE) |>
+          collapse::fgroup_by(cell,
+                              sort = FALSE) |>
+          collapse::ffirst() |>
           (\(x)
            {
              label <- 
@@ -1073,6 +1078,11 @@ get.map.TDRObj <-
               collapse::fmutate(confidence = x / collapse::fsum(x)) |>
               collapse::fungroup() |>
               collapse::fsubset(confidence >= .label.confidence) |>
+              collapse::roworderv(cols = "confidence",
+                                  decreasing = TRUE) |>
+              collapse::fgroup_by(cell,
+                                  sort = FALSE) |>
+              collapse::ffirst() |>
               (\(x)
                {
                  label <- 
@@ -1098,7 +1108,7 @@ get.map.TDRObj <-
           
           raw.exprs <-
             .get_sample_matrix(.source, .tdr.obj, cells.idx) |>
-            methods::as(object = "dgCMatrix")
+            methods::as(Class = "dgCMatrix")
           
           # Map query
           query <-
@@ -1116,7 +1126,7 @@ get.map.TDRObj <-
           nn <-
             annoy_search(
               X = query,
-              k = 1,
+              k = 10,
               ann = .tdr.obj@integration$symphony.obj$ref.knn.idx,
               #search_k = search_k,
               #prep_data = TRUE,
@@ -1126,17 +1136,59 @@ get.map.TDRObj <-
               verbose = FALSE
             )
           
+          #res2$cell.celltyping <-
+          #  as.character(x = .tdr.obj@integration$symphony.obj$meta_data[[
+          #    .tdr.obj@integration$symphony.obj$celltype.col.name
+          #  ]])[nn$idx[,1,drop = TRUE]] |>
+          #  stats::setNames(nm = colnames(x = raw.exprs))  
+          
+          #res2$lm.celltyping <-
+          #  as.character(x = .tdr.obj@integration$symphony.obj$meta_data[[
+          #    .tdr.obj@integration$symphony.obj$celltype.col.name
+          #  ]])[nn$idx[!cells.of.interest,1,drop = TRUE]] |>
+          #  stats::setNames(nm = colnames(x = raw.exprs)[!cells.of.interest])  
+          
           res2$cell.celltyping <-
-            as.character(x = .tdr.obj@integration$symphony.obj$meta_data[[
+            data.frame(cell = rep(x = ncol(x = raw.exprs) |>
+                                    seq_len(),
+                                  times = ncol(x = nn$idx)),
+                       ref.idx = as.vector(x = nn$idx)) |>
+            dplyr::mutate(label = as.character(x = .tdr.obj@integration$symphony.obj$meta_data[[
               .tdr.obj@integration$symphony.obj$celltype.col.name
-            ]])[nn$idx[,1,drop = TRUE]] |>
-            stats::setNames(nm = colnames(x = raw.exprs))  
+            ]])[ref.idx]) |>
+            dplyr::select(-ref.idx) |>
+            collapse::fgroup_by(cell,
+                                label,
+                                sort = FALSE) |>
+            collapse::fcount() |>
+            collapse::fgroup_by(cell,
+                                label,
+                                sort = FALSE) |>
+            collapse::fmutate(confidence = N / ncol(x = nn$idx)) |>
+            collapse::fungroup() |>
+            collapse::fsubset(confidence >= .label.confidence) |>
+            collapse::roworderv(cols = "confidence",
+                                decreasing = TRUE) |>
+            collapse::fgroup_by(cell,
+                                sort = FALSE) |>
+            collapse::ffirst() |>
+            (\(x)
+             {
+               label <- 
+                 rep(x = "..low.confidence..",
+                     times = ncol(x = raw.exprs))
+               
+               label[x$cell] <-
+                 x$label
+               
+               stats::setNames(object = label,
+                               nm = colnames(x = raw.exprs)
+               )
+            }
+            )()
           
           res2$lm.celltyping <-
-            as.character(x = .tdr.obj@integration$symphony.obj$meta_data[[
-              .tdr.obj@integration$symphony.obj$celltype.col.name
-            ]])[nn$idx[!cells.of.interest,1,drop = TRUE]] |>
-            stats::setNames(nm = colnames(x = raw.exprs)[!cells.of.interest])  
+            res2$cell.celltyping[!cells.of.interest]
           
         }
         

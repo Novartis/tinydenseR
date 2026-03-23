@@ -15,7 +15,7 @@ get.map(x, ...)
   .cl.ct.to.ign = NULL,
   .verbose = TRUE,
   .seed = 123,
-  .label.confidence = 0.8,
+  .label.confidence = 0.5,
   .cache.on.disk = TRUE,
   .cache.dir = NULL,
   ...

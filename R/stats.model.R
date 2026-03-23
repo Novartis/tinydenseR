@@ -795,7 +795,7 @@ get.pbDE.TDRObj <-
     .population.name = "all",
     .force.recalc = FALSE,
     .verbose = TRUE,
-    .label.confidence = 0.8,
+    .label.confidence = 0.5,
     ...
   ) {
     .tdr.obj <- x
@@ -953,6 +953,11 @@ get.pbDE.TDRObj <-
                    collapse::fmutate(confidence = x / collapse::fsum(x)) |>
                    collapse::fungroup() |>
                    collapse::fsubset(confidence >= .label.confidence) |>
+                   collapse::roworderv(cols = "confidence",
+                                       decreasing = TRUE) |>
+                   collapse::fgroup_by(cell,
+                                       sort = FALSE) |>
+                   collapse::ffirst() |>
                    (\(x)
                     {
                       label <-
@@ -1312,7 +1317,7 @@ get.dea <- function(
     .id = NULL,
     .id.from = NULL,
     .verbose = TRUE,
-    .label.confidence = 0.8
+    .label.confidence = 0.5
 ) {
   .Deprecated("get.pbDE", 
               msg = "get.dea() is deprecated. Use get.pbDE() instead, which stores results in .tdr.obj$pbDE.")
@@ -1493,7 +1498,7 @@ get.markerDE.TDRObj <-
     .model.name = "default",
     .comparison.name = NULL,
     .force.recalc = FALSE,
-    .label.confidence = 0.8,
+    .label.confidence = 0.5,
     ...
   ) {
     .tdr.obj <- x
@@ -1598,6 +1603,11 @@ get.markerDE.TDRObj <-
                    collapse::fmutate(confidence = x / collapse::fsum(x)) |>
                    collapse::fungroup() |>
                    collapse::fsubset(confidence >= .label.confidence) |>
+                   collapse::roworderv(cols = "confidence",
+                                       decreasing = TRUE) |>
+                   collapse::fgroup_by(cell,
+                                       sort = FALSE) |>
+                   collapse::ffirst() |>
                    (\(x)
                     {
                       label <-
@@ -1678,6 +1688,11 @@ get.markerDE.TDRObj <-
                      collapse::fmutate(confidence = x / collapse::fsum(x)) |>
                      collapse::fungroup() |>
                      collapse::fsubset(confidence >= .label.confidence) |>
+                     collapse::roworderv(cols = "confidence",
+                                         decreasing = TRUE) |>
+                     collapse::fgroup_by(cell,
+                                         sort = FALSE) |>
+                     collapse::ffirst() |>
                      (\(x)
                       {
                         label <-
@@ -2159,7 +2174,7 @@ get.marker <- function(
     .id1 = NULL,
     .id2 = "..all.other.landmarks..",
     .id.from = "clustering",
-    .label.confidence = 0.8
+    .label.confidence = 0.5
 ) {
   .Deprecated("get.markerDE", 
               msg = "get.marker() is deprecated. Use get.markerDE() instead, which stores results in .tdr.obj$markerDE.")
@@ -3300,7 +3315,10 @@ get.embedding.TDRObj <-
 .compute.loadings <-
   function(scores,
            X.sparse,
-           .method = c("pearson", "ols", "spearman")) {
+           .method = c("pearson", "ols", "spearman"),
+           Y0.vec = NULL,
+           post.sd.vec = NULL,
+           muX = NULL) {
     
     .method <-
       match.arg(arg = .method,
@@ -3398,10 +3416,208 @@ get.embedding.TDRObj <-
       
     }
     
+    # -----------------------------------------------------------------------
+    # Per-gene soft concordance weights
+    #
+    # c_jk = clip( A_jk / N_jk, 0, 1 ) where
+    #   N_jk = t_kc' Xc  (full loading numerator; sum(t_kc) = 0 so muX drops out)
+    #   A_jk = (s_k * t_kc)' Xc  (soft-concordant portion)
+    #   s_ki = pnorm( Y0_i * sign(t_kci) / post.sd_i )
+    #   post.sd_i defaults to 0 (hard threshold) if post.sd.vec is NULL
+    #
+    # Not defined for spearman (NA).
+    # Not computed when Y0.vec is NULL.
+    # -----------------------------------------------------------------------
+
+    concordance.weights <-
+      if (is.null(x = Y0.vec) || .method == "spearman") {
+        
+        matrix(data = NA_real_,
+               nrow = n.genes,
+               ncol = ncomp,
+               dimnames = list(colnames(x = X.sparse), comp.names))
+        
+      } else {
+        
+        sapply(
+          X   = seq_len(length.out = ncomp),
+          FUN = function(k) {
+            
+            score.k <- scores[, k] - mean(x = scores[, k])
+            
+            # Full loading numerator: t_kc' X (muX term = 0 since sum(t_kc)=0)
+            full.num <-
+              as.numeric(x = Matrix::crossprod(x = X.sparse, y = score.k))
+            
+            # Soft concordance indicator: pnorm( Y0 * sign(t_kc) / post.sd )
+            # When t_kc = 0: sign returns 0 -> argument = 0 -> pnorm(0) = 0.5 (neutral)
+            # When post.sd.vec is NULL: use hard threshold (indicator of sign agreement)
+            if (is.null(x = post.sd.vec)) {
+              s.vec <- as.numeric(x = sign(x = score.k) == sign(x = Y0.vec) &
+                                    Y0.vec != 0)
+            } else {
+              s.vec <- stats::pnorm(
+                q = Y0.vec * sign(x = score.k) / post.sd.vec
+              )
+              # sign(0) = 0 -> argument = 0 -> pnorm(0) = 0.5; already correct
+            }
+            
+            # Concordant numerator: (s * t_kc)' Xc
+            # Note: sum(s * t_kc) != 0 in general, so muX correction IS needed
+            s.t <- s.vec * score.k
+            conc.num <-
+              as.numeric(x = Matrix::crossprod(x = X.sparse, y = s.t)) -
+              muX * sum(s.t)
+            
+            # Concordance fraction
+            near.zero <-
+              abs(x = full.num) <
+              (.Machine$double.eps * max(abs(x = full.num), 1))
+            
+            cw <-
+              ifelse(
+                test = near.zero,
+                yes  = 0.5,
+                no   = conc.num / full.num
+              )
+            
+            # Clip to [0, 1]
+            pmax(0, pmin(1, cw))
+            
+          }
+        )
+        
+      }
+
+    if (!is.null(x = Y0.vec) && .method != "spearman") {
+      rownames(x = concordance.weights) <- colnames(x = X.sparse)
+      colnames(x = concordance.weights) <- comp.names
+    }
+
+    # -----------------------------------------------------------------------
+    # Y-weighted loadings: loading of t_kc against Y0-weighted expression
+    #
+    # Replaces X_j with (Y0 ⊙ X_j) in the loading computation:
+    #   pearson: cor(t_kc, (Y0 ⊙ X_j)_c)    — unitless, scale-invariant
+    #   ols:     t_kc' (Y0 ⊙ X_j) / ||t_kc||^2  — units: expression × log2-FC
+    #   spearman: NA (ranking Y0 ⊙ X_j destroys additive landmark decomposition)
+    #
+    # Landmarks with Y0 ≈ 0 (no density change) contribute nothing.
+    # Landmarks where score sign and Y0 sign disagree have their contribution
+    # reversed, directly suppressing structural counterweight signal.
+    #
+    # Sparsity: row-scaling X.sparse by Y0.vec preserves the sparsity pattern
+    # (only nonzero entries of X are scaled), so all sparse-BLAS paths
+    # (crossprod, colSums) remain O(nnz).
+    #
+    # Centering trick: since sum(t_kc) = 0, the column-mean of (Y0 ⊙ X_j)
+    # drops out of the numerator, so we can work directly with X.sparse
+    # without materializing a dense centered product.
+    #
+    # Only computed when Y0.vec is provided. NA for spearman.
+    # -----------------------------------------------------------------------
+
+    y.weighted.loadings <-
+      if (is.null(x = Y0.vec) || .method == "spearman") {
+
+        matrix(data = NA_real_,
+               nrow = n.genes,
+               ncol = ncomp,
+               dimnames = list(colnames(x = X.sparse), comp.names))
+
+      } else if (.method == "pearson") {
+
+        # Sufficient statistics for sd((Y0 ⊙ X_j)_c), precomputed once.
+        # crossprod(X.sparse, Y0.vec) is O(nnz): only nonzero X entries contribute.
+        # crossprod(X.sparse^2, Y0.vec^2) is O(nnz): X^2 preserves sparsity pattern.
+        col.sums.y0x <-
+          as.numeric(x = Matrix::crossprod(x = X.sparse, y = Y0.vec))
+
+        col.sumsq.y0x <-
+          as.numeric(x = Matrix::crossprod(x = X.sparse^2, y = Y0.vec^2))
+
+        gene.sd.y0x <-
+          sqrt(x = pmax(col.sumsq.y0x - (col.sums.y0x^2) / n, 0) /
+                 (n - 1))
+
+        yw.loadings <-
+          seq_len(length.out = ncomp) |>
+          stats::setNames(nm = comp.names) |>
+          lapply(FUN = function(k) {
+
+            score.k <-
+              scores[, k] - mean(x = scores[, k])
+
+            sd.score <-
+              sqrt(x = sum(score.k^2) / (n - 1))
+
+            if (sd.score < .Machine$double.eps) {
+              return(rep(x = NA_real_, times = n.genes))
+            }
+
+            # Numerator: cov(t_kc, Y0 ⊙ X_j)
+            # = (1/(n-1)) t_kc' diag(Y0) X  (centering drops out since sum(t_kc)=0)
+            num <-
+              (Matrix::crossprod(x = X.sparse,
+                                 y = Y0.vec * score.k) |>
+                 as.numeric()) / (n - 1)
+
+            r <-
+              num / (sd.score * gene.sd.y0x)
+
+            # Genes with zero Y0-weighted variance: set to 0
+            r[gene.sd.y0x < .Machine$double.eps] <-
+              0
+
+            return(r)
+
+          }) |>
+          do.call(what = cbind)
+
+        yw.loadings
+
+      } else {
+
+        # OLS: t_kc' diag(Y0) X / ||t_kc||^2
+        seq_len(length.out = ncomp) |>
+          stats::setNames(nm = comp.names) |>
+          lapply(FUN = function(k) {
+
+            score.k <-
+              scores[, k] - mean(x = scores[, k])
+
+            denom <-
+              sum(score.k^2)
+
+            if (denom < .Machine$double.eps) {
+              return(rep(x = NA_real_, times = n.genes))
+            }
+
+            (Matrix::crossprod(x = X.sparse,
+                               y = Y0.vec * score.k) |>
+               as.numeric()) /
+              denom
+
+          }) |>
+          do.call(what = cbind)
+
+      }
+
+    if (!is.null(x = Y0.vec) && .method != "spearman") {
+      rownames(x = y.weighted.loadings) <- colnames(x = X.sparse)
+      colnames(x = y.weighted.loadings) <- comp.names
+    }
+
     rownames(x = loadings) <-
       colnames(x = X.sparse)
     
-    return(loadings)
+    return(
+      list(
+        loadings             = loadings,
+        concordance.weights  = concordance.weights,
+        y.weighted.loadings  = y.weighted.loadings
+      )
+    )
     
   }
 
@@ -3753,7 +3969,7 @@ get.specDE.TDRObj <-
     loadings <-
       .compute.loadings(scores = scores,
                         X.sparse = X,
-                        .method = .loading.method)
+                        .method = .loading.method)$loadings
     
     # -------------------------------------------------------------------------
     # Variance explained
@@ -4368,14 +4584,14 @@ get.nmfDE.TDRObj <-
     loadings.mass <-
       .compute.loadings(scores = W,
                         X.sparse = X0,
-                        .method = .loading.method)
+                        .method = .loading.method)$loadings
     
     # Variant 2: DE semantics -- loadings of centered X on signed scores
     # Interpretation: genes associated with net positive vs negative mass along contrast
     loadings.de <-
       .compute.loadings(scores = signed.scores,
                         X.sparse = X0,
-                        .method = .loading.method)
+                        .method = .loading.method)$loadings
     
     # -------------------------------------------------------------------------
     # Reconstruction quality (global, not per-component)
@@ -4583,6 +4799,38 @@ get.nmfDE.TDRObj <-
 #' with Y. With permuted Y, Ak collapses. Setting \code{.YX.interaction = FALSE}
 #' removes Y from the data matrix entirely, providing a diagnostic comparator.
 #'
+#' \strong{Structural score constraints and the balancing effect:}
+#' The score vectors computed by plsDE are structurally mean-zero across landmarks. This
+#' is a mathematical consequence of column-centering \code{M.local}: for any weight vector
+#' \code{w}, the score \code{t = M.local w} satisfies \code{sum(t) = 0}. As a result, a
+#' dominant positive pole (landmarks with large positive scores) must be balanced by
+#' compensatory negative scores somewhere on the manifold.
+#'
+#' In datasets where a small number of biologically extreme landmarks simultaneously have
+#' large |Y_c| and unusual expression profiles (large row-wise expression norm), these
+#' landmarks can dominate the first PLS component. The compensatory negative region may
+#' then appear coherent and strong, mimicking a genuine opposing biological program.
+#'
+#' \strong{Distinguishing genuine signal from structural counterweight}: the
+#' \code{plotPlsDE} scatter panel colors landmarks by their \emph{raw} (uncentered)
+#' density contrast coefficient. If landmarks with large negative scores show near-zero
+#' or positive raw coefficients, they are geometric counterweights rather than genuinely
+#' depleted populations. Conversely (depending on contrast direction and component),
+#' large-magnitude positive-score landmarks with near-zero raw Y may also reflect
+#' structural balance.
+#'
+#' \strong{Pre-analysis diagnostic}: if unexpected strong balancing is observed, compute
+#' the row-wise interaction norm distribution before running plsDE:
+#' \preformatted{
+#' Yc <- coef.mat[, .coef.col]; Yc <- Yc - mean(Yc)
+#' # Xc: size-factor-normalized, log2-transformed, column-centered expression
+#' row_norms <- sqrt(rowSums((Yc * as.matrix(Xc))^2))
+#' quantile(row_norms)
+#' }
+#' A heavily right-skewed distribution (max >> Q75, or top 10 landmarks holding >20% of
+#' Frobenius norm squared) indicates dominant leverage; reduce \code{.lazy.alpha} or
+#' winsorize \code{Yc} before proceeding.
+#'
 #' @note plsDE is designed as an exploratory tool to help interpret density
 #'   changes in terms of the features driving them. It does not provide
 #'   gene-level p-values or formal multiple testing correction. For rigorous
@@ -4609,6 +4857,13 @@ get.nmfDE.TDRObj <-
 #'   tau = .tau.mult * mean(degree). Default 1.
 #' @param .lazy.alpha Numeric in (0, 1]: mixing parameter for lazy random walk.
 #'   P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).
+#'   Values < 1 reduce the spatial propagation range of expression scores on the graph,
+#'   making the decomposition more local. This is particularly useful when the density
+#'   contrast is dominated by a single biologically extreme population: reducing
+#'   \code{.lazy.alpha} limits how far the structural score counterweight (see Details)
+#'   propagates to distant manifold regions. Try 0.5 as a first step when strong
+#'   unexpected balancing is observed. Values < 1 also incidentally damp oscillations
+#'   on sparse/irregular graphs.
 #' @param .YX.interaction Logical: if TRUE (default), construct
 #'   M.local = P diag(Y) Xc (Y-weighted interaction). Loadings capture features
 #'   driving the density contrast through both differential abundance (population
@@ -4616,6 +4871,10 @@ get.nmfDE.TDRObj <-
 #'   (graph-smoothed expression only; Y appears only on the response side).
 #'   The FALSE mode is less comprehensive — it misses DA markers unless their
 #'   expression independently covaries with Y.
+#'   Note: Y is centered before forming diag(Y), so the interaction weights landmarks
+#'   by deviation from the mean coefficient, not from zero. Landmarks with below-average
+#'   (but still positive) raw coefficients receive a negative weight, contributing to
+#'   the structural opposite pole in the decomposition.
 #' @param .loading.method Character: method for computing feature loadings. 
 #'   \code{"pearson"} computes Pearson correlation between component scores
 #'   and centered expression (scale-invariant, fast sparse-BLAS path).
@@ -4636,9 +4895,45 @@ get.nmfDE.TDRObj <-
 #'       OLS regression, or Spearman rank correlation, depending on
 #'       \code{.loading.method}); positive = upregulated with Y,
 #'       negative = downregulated}
+#'     \item{concordance.weights}{Matrix (genes/markers x K): per-gene soft
+#'       concordance weight \eqn{c_{jk} \in [0,1]} for each component. For gene
+#'       \eqn{j} and component \eqn{k}, \eqn{c_{jk}} is the fraction of the OLS
+#'       loading numerator (\eqn{t_{k}^\top X_{c,j}}) attributable to landmarks
+#'       where the PLS score and the raw density contrast coefficient agree in sign,
+#'       weighted by the posterior probability that each landmark's coefficient is
+#'       genuinely nonzero and concordant:
+#'       \eqn{s_{k,i} = \Phi(Y_{0,i} \cdot \operatorname{sign}(t_{k,c,i}) /
+#'       \hat\sigma_i)}, where \eqn{\hat\sigma_i = \sqrt{s^{2,\text{post}}_i}
+#'       \cdot \text{stdev.unscaled}_{i,c}} is the limma eBayes posterior standard
+#'       deviation. \eqn{c_{jk} = 1}: loading arises entirely from concordant,
+#'       statistically confident landmarks; \eqn{c_{jk} = 0}: loading arises
+#'       entirely from discordant or high-uncertainty landmarks (structural
+#'       counterweight); \eqn{c_{jk} = 0.5}: neutral (near-zero loading or
+#'       near-zero/highly-uncertain coefficient). \code{NA} for
+#'       \code{.loading.method = "spearman"} (rank-based numerators are not
+#'       additively decomposable). Multiply \code{loadings} by
+#'       \code{concordance.weights} before passing to \code{fgsea::fgsea}: this
+#'       shrinks genes whose signal is driven by structural balancing to near zero
+#'       while preserving sign and ranking direction for genuine contrast-associated
+#'       genes.}
+#'     \item{y.weighted.loadings}{Matrix (genes/markers x K): density-contrast-weighted
+#'       feature loadings. Replaces gene expression \eqn{X_j} with density-contrast-weighted
+#'       expression \eqn{Y_0 \odot X_j} in the loading computation, using the same method
+#'       as \code{.loading.method} (Pearson correlation or OLS regression). Landmarks with
+#'       \eqn{Y_0 \approx 0} (no density change) contribute nothing to the loading;
+#'       landmarks where score sign and \eqn{Y_0} sign disagree have their contribution
+#'       reversed, directly suppressing structural counterweight signal. Use for ranking
+#'       genes in \code{fgsea::fgsea} when standard \code{loadings} (or concordance-filtered
+#'       loadings) still show residual counterweight-driven enrichment. Units: unitless
+#'       Pearson \eqn{r} when \code{.loading.method = "pearson"};
+#'       expression \eqn{\times} log2-FC when \code{"ols"}.
+#'       \code{NA} when \code{.loading.method = "spearman"}.}
 #'     \item{Y.alignment}{Numeric vector (K): |cor(Y, score_k)| per component}
 #'     \item{smoothness}{Numeric vector (K): Laplacian smoothness per score vector}
-#'     \item{Y}{Numeric vector: the centered density contrast used}
+#'     \item{Y}{Numeric vector: the density contrast used, centered to mean zero (Y - mean(Y)).
+#'       Note: this differs from the raw coefficient by a constant shift. Use the raw
+#'       coefficient from the model fit for scientific interpretation of absolute density changes.}
+#'     \item{Y.mean}{Numeric: mean of the density contrast used (mean(Y))}
 #'     \item{M.local}{Matrix (optional): the interaction matrix (if .store.M = TRUE)}
 #'     \item{params}{List: parameters used}
 #'   }
@@ -4666,6 +4961,10 @@ get.nmfDE.TDRObj <-
 #'   Ak = lm.obj$plsDE$Infection$Y.alignment,
 #'   Sk = lm.obj$plsDE$Infection$smoothness
 #' )
+#'
+#' # Y-weighted loadings for counterweight-resistant gene ranking
+#' yw  <- lm.obj$plsDE$Infection$y.weighted.loadings[, "plsDE1"]
+#' # fgsea::fgsea(pathways = ..., stats = sort(yw, decreasing = TRUE))
 #' }
 #'
 #' @param ... Additional arguments passed to methods.
@@ -5096,10 +5395,25 @@ get.plsDE.TDRObj <-
       message("Computing gene/marker loadings (", .loading.method, ")...")
     }
     
-    loadings <-
-      .compute.loadings(scores = T.mat,
-                        X.sparse = X,
-                        .method = .loading.method)
+    # Compute posterior SD from limma eBayes slots
+    .fit <- .tdr.obj@results$lm[[.model.name]]$fit
+    post.sd.vec <-
+      sqrt(x = .fit$s2.post) *
+      .fit$stdev.unscaled[, .coef.col]
+
+    .loadings.res <-
+      .compute.loadings(
+        scores      = T.mat,
+        X.sparse    = X,
+        .method     = .loading.method,
+        Y0.vec      = coef.mat[, .coef.col],
+        post.sd.vec = post.sd.vec,
+        muX         = muX
+      )
+
+    loadings            <- .loadings.res$loadings
+    concordance.weights <- .loadings.res$concordance.weights
+    y.weighted.loadings <- .loadings.res$y.weighted.loadings
     
     # -------------------------------------------------------------------------
     # Laplacian smoothness (Sk)
@@ -5134,9 +5448,12 @@ get.plsDE.TDRObj <-
         x.loadings = P.mat,
         y.loadings = Q.vec,
         loadings = loadings,
+        concordance.weights = concordance.weights,
+        y.weighted.loadings = y.weighted.loadings,
         Y.alignment = Y.alignment,
         smoothness = smoothness,
         Y = Y,
+        Y.mean = mean(x = coef.mat[, .coef.col]),
         params = list(
           model.name = .model.name,
           coef.col = .coef.col,
@@ -5183,6 +5500,10 @@ get.plsDE.TDRObj <-
       message("  $scores       : ", n.landmarks, " landmarks x ", .ncomp, " components")
       message("  $gene.weights : ", n.genes, " features x ", .ncomp, " components (PLS w)")
       message("  $loadings     : ", n.genes, " features x ", .ncomp, " components (", .loading.method, ")")
+      message("  $concordance.weights : ", n.genes, " features x ", .ncomp,
+              " components (soft concordance, NA if spearman)")
+      message("  $y.weighted.loadings : ", n.genes, " features x ", .ncomp,
+              " components (Y0-weighted ", .loading.method, ", NA if spearman)")
       message("  $Y.alignment  : Ak (|cor(Y, score)|)")
       message("  $smoothness   : Sk (Laplacian smoothness)")
     }

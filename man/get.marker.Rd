@@ -12,7 +12,7 @@ get.marker(
   .id1 = NULL,
   .id2 = "..all.other.landmarks..",
   .id.from = "clustering",
-  .label.confidence = 0.8
+  .label.confidence = 0.5
 )
 }
 \arguments{

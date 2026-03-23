@@ -23,6 +23,7 @@ plotPlsDEHeatmap(x, ...)
   .panel.height = 3,
   .feature.font.size = 7,
   .show.landmark.labels = FALSE,
+  .label.substr.rm = "",
   ...
 )
 }
@@ -78,6 +79,8 @@ Default \code{c("cividis", "rocket", "inferno", "mako", "magma")}.}
 \item{.feature.font.size}{Numeric: font size for feature labels. Default 7.}
 
 \item{.show.landmark.labels}{Logical: show landmark IDs on x-axis? Default FALSE.}
+
+\item{.label.substr.rm}{Character substring to remove from density contrast label (default "").}
 }
 \value{
 A ggplot2 object (gtable composition with annotation strips).

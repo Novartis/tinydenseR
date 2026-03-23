@@ -3215,7 +3215,8 @@ plotSpecDE.TDRObj <-
   .panel.height = 3,
   .feature.font.size = 7,
   .show.landmark.labels = FALSE,
-  .label.substr.rm = ""
+  .label.substr.rm = "",
+  .Y.label.suffix = "(centered)"
 ) {
 
   # R CMD check appeasement
@@ -3601,7 +3602,7 @@ plotSpecDE.TDRObj <-
                                  fill = loading)) +
     ggplot2::geom_raster() +
     ggplot2::scale_fill_viridis_c(
-      option = "turbo",
+      option = "plasma",
       name = .loading.label,
       guide = ggplot2::guide_colorbar(
         direction = "vertical",
@@ -3663,12 +3664,12 @@ plotSpecDE.TDRObj <-
 
       .option.this <-
         if (dim.name %in% colnames(x = scores.ordered)) {
-          "plasma"
+          "turbo"
         } else {
           .viridis.options.annot[d]
         }
 
-      # Legend title: show "(centered)" for density contrast
+      # Legend title: show Y label suffix for density contrast
       legend.title <-
         if (identical(x = dim.name, y = gsub(pattern = .label.substr.rm,
                                             replacement = "",
@@ -3676,7 +3677,7 @@ plotSpecDE.TDRObj <-
                                             fixed = FALSE))) {
           paste0(
             dim.name,
-            "\n(centered)")
+            "\n", .Y.label.suffix)
         } else {
           dim.name
         }
@@ -4091,6 +4092,7 @@ plotSpecDE.TDRObj <-
 #' @param .feature.font.size Numeric: font size for feature labels. Default 7.
 #' @param .show.landmark.labels Logical: show landmark IDs on x-axis? Default FALSE
 #'   (usually too many to display).
+#' @param .label.substr.rm Character substring to remove from density contrast label (default "").
 #'
 #' @return A ggplot2 object (or patchwork composition with annotation strips).
 #'
@@ -4585,6 +4587,7 @@ plotNmfDE.TDRObj <-
 #' @param .feature.font.size Numeric: font size for feature labels. Default 7.
 #' @param .show.landmark.labels Logical: show landmark IDs on x-axis? Default FALSE
 #'   (usually too many to display).
+#' @param .label.substr.rm Character substring to remove from density contrast label (default "").
 #'
 #' @return A ggplot2 object (or patchwork composition with annotation strips).
 #'
@@ -4800,7 +4803,16 @@ plotNmfDEHeatmap.TDRObj <-
 #' \strong{Component view} (\code{.plsDE.dim = integer}):
 #' \itemize{
 #'   \item Left panel: UMAP (or PCA) embedding colored by PLS scores (diverging scale)
-#'   \item Right panel: Scatter of Y vs PLS scores (essential for interpretation)
+#'   \item Right panel: Scatter of centered Y vs PLS scores, colored by raw (uncentered)
+#'     density contrast coefficient — essential for distinguishing genuine contrast signal
+#'     from structural score balancing
+#'   \item Right panel scatter note: landmarks are colored by their \emph{raw} (uncentered)
+#'     density contrast coefficient (not the centered Y on the x-axis). This is intentional:
+#'     if a cluster of landmarks with negative scores shows warm raw-Y colors (near zero or
+#'     positive raw coefficient), it is likely a structural geometric counterweight rather
+#'     than a genuinely depleted population. The same reasoning applies in reverse:
+#'     large-magnitude positive-score landmarks with near-zero raw Y may reflect structural
+#'     balance from the opposite side, depending on contrast direction.
 #' }
 #'
 #' \strong{Diagnostic view} (\code{.plsDE.dim = NULL}):
@@ -4809,6 +4821,9 @@ plotNmfDEHeatmap.TDRObj <-
 #'   \item Y-axis: Y-alignment (Ak); higher = stronger density coupling
 #'   \item Color: |q_k| (Y-loading magnitude; larger = more Y variance captured)
 #'   \item Labels: Component indices (1, 2, ...)
+#'   \item Warning: high Ak + high Sk (top-left region of the diagnostic plot) is the
+#'     typical pattern for a component dominated by a single extreme population. Inspect
+#'     the corresponding component view and score-vs-Y scatter before interpreting gene loadings.
 #' }
 #'
 #' Ak is high by construction for early components: NIPALS PLS1 maximizes
@@ -4991,7 +5006,7 @@ plotPlsDE.TDRObj <-
                                                       title.hjust = 0.5)) +
       ggplot2::geom_point(size = I(x = .point.size)) +
       ggplot2::scale_color_viridis_c(
-        option = "plasma",
+        option = "turbo",
         name = comp.name
       ) +
       ggplot2::labs(
@@ -5088,8 +5103,10 @@ plotPlsDE.TDRObj <-
 #'   Default 50.
 #' @param .order.by Controls landmark ordering. One of:
 #'   \describe{
-#'     \item{\code{"dens.contrast"}}{(default) Order by centered density contrast
-#'       from \code{.coef.col}.}
+#'     \item{\code{"dens.contrast"}}{(default) Order by the raw (uncentered) density contrast
+#'       coefficient from \code{.coef.col}, placing genuinely unaffected landmarks
+#'       (raw Y \eqn{\approx} 0) in the middle of the heatmap rather than at an arbitrary
+#'       position determined by the mean.}
 #'     \item{\code{"plsDE.dim"}}{Order by the selected \code{.plsDE.dim} score(s).}
 #'     \item{A numeric matrix with column names}{Landmarks are sorted by columns
 #'       sequentially (first column primary, etc.) and each column is displayed as
@@ -5108,6 +5125,7 @@ plotPlsDE.TDRObj <-
 #' @param .panel.height Numeric: height of expression heatmap panel in inches. Default 3.
 #' @param .feature.font.size Numeric: font size for feature labels. Default 7.
 #' @param .show.landmark.labels Logical: show landmark IDs on x-axis? Default FALSE.
+#' @param .label.substr.rm Character substring to remove from density contrast label (default "").
 #'
 #' @return A ggplot2 object (gtable composition with annotation strips).
 #'
@@ -5121,7 +5139,20 @@ plotPlsDE.TDRObj <-
 #' \strong{Loadings}:
 #' Uses OLS regression loadings (Xc ~ score_k): each loading is the slope of a
 #' per-gene regression on the component score, capturing marker-component association.
-#' Positive loadings = genes upregulated with Y; negative = downregulated.
+#' Positive loadings = genes upregulated in high-score (high-Y) landmarks; negative
+#' loadings = genes upregulated in low-score landmarks. In datasets with structural
+#' score balancing (see \code{get.plsDE} Details), large-magnitude loadings at either
+#' end of the ranking may partially reflect the geometric mean-zero constraint rather
+#' than genuine differential expression. Use the raw Y annotation strip and the
+#' \code{plotPlsDE} scatter to assess whether extreme-loading features correspond to
+#' landmarks with genuine density contrast signal.
+#'
+#' Caution: depending on the direction of the contrast and the component, large-magnitude
+#' features at either the positive or negative end of the loading ranking may reflect
+#' structural score balancing (geometric mean-zero constraint) rather than genuine
+#' biology. Always cross-reference with the raw Y annotation strip: a feature with a
+#' large negative loading that is highly expressed in landmarks with near-zero raw Y is
+#' likely characterizing a structural counterweight region.
 #'
 #' \strong{Expression normalization} (RNA only):
 #' \enumerate{
@@ -5134,7 +5165,9 @@ plotPlsDE.TDRObj <-
 #'
 #' \strong{Annotation strips}:
 #' \enumerate{
-#'   \item Density contrast (centered Y)
+#'   \item Density contrast: raw (uncentered) log2 fold change from the linear model.
+#'     Zero = no density change. Positive = enriched in the contrast direction;
+#'     negative = depleted.
 #'   \item plsDE scores for all dimensions in \code{.plsDE.dim}
 #'   \item Custom annotations (\code{.order.by} matrix columns, \code{.add.annot} columns)
 #' }
@@ -5216,16 +5249,21 @@ plotPlsDEHeatmap.TDRObj <-
     names(x = loadings) <-
       rownames(x = plsDE.res$loadings)
 
+    # Use raw (uncentered) coefficient for annotation — scientifically meaningful zero
+    Y.raw <-
+      .tdr.obj@results$lm[[.model.name]]$fit$coefficients[, .coef.col]
+
     # Dispatch to shared builder
     .plotDEHeatmap(
       .tdr.obj = .tdr.obj,
       .coef.col = .coef.col,
       .loadings = loadings,
       .scores = plsDE.res$coord[, .plsDE.dim, drop = FALSE],
-      .Y = plsDE.res$Y,
+      .Y = Y.raw,
       .method.name = "plsDE",
       .dim.string = "plsDE.dim",
       .row.annot.title = "loadings",
+      .Y.label.suffix = "(raw log2 FC)",
       .n.features = .n.features,
       .order.by = .order.by,
       .add.annot = .add.annot,

@@ -14,7 +14,7 @@ get.dea(
   .id = NULL,
   .id.from = NULL,
   .verbose = TRUE,
-  .label.confidence = 0.8
+  .label.confidence = 0.5
 )
 }
 \arguments{

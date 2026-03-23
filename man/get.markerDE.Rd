@@ -19,7 +19,7 @@ get.markerDE(x, ...)
   .model.name = "default",
   .comparison.name = NULL,
   .force.recalc = FALSE,
-  .label.confidence = 0.8,
+  .label.confidence = 0.5,
   ...
 )
 }

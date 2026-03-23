@@ -21,7 +21,7 @@ get.pbDE(x, ...)
   .population.name = "all",
   .force.recalc = FALSE,
   .verbose = TRUE,
-  .label.confidence = 0.8,
+  .label.confidence = 0.5,
   ...
 )
 }

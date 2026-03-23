@@ -488,6 +488,11 @@ celltyping.TDRObj <-
       collapse::fmutate(confidence = x / collapse::fsum(x)) |>
       collapse::fungroup() |>
       collapse::fsubset(confidence >= .label.confidence) |>
+      collapse::roworderv(cols = "confidence",
+                          decreasing = TRUE) |>
+      collapse::fgroup_by(cell,
+                          sort = FALSE) |>
+      collapse::ffirst() |>
       (\(x)
        {
          lbl <-
