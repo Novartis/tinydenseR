@@ -5249,9 +5249,11 @@ plotPlsDEHeatmap.TDRObj <-
     names(x = loadings) <-
       rownames(x = plsDE.res$loadings)
 
-    # Use raw (uncentered) coefficient for annotation — scientifically meaningful zero
+    # Use raw (uncentered) coefficient for annotation — scientifically meaningful zero.
+    # Use params$model.name (not the .model.name argument) to mirror how plotPlsDE
+    # already retrieves the raw Y for its scatter-plot color column.
     Y.raw <-
-      .tdr.obj@results$lm[[.model.name]]$fit$coefficients[, .coef.col]
+      .tdr.obj@results$lm[[plsDE.res$params$model.name]]$fit$coefficients[, .coef.col]
 
     # Dispatch to shared builder
     .plotDEHeatmap(
