@@ -50,7 +50,14 @@ tau * I (self-loops) to SNN before row-normalizing. Default FALSE.}
 tau = .tau.mult * mean(degree). Default 1.}
 
 \item{.lazy.alpha}{Numeric in (0, 1]: mixing parameter for lazy random walk.
-P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).}
+P_lazy = (1 - alpha) * I + alpha * P. Default 1 (standard walk).
+Values < 1 reduce the spatial propagation range of expression scores on the graph,
+making the decomposition more local. This is particularly useful when the density
+contrast is dominated by a single biologically extreme population: reducing
+\code{.lazy.alpha} limits how far the structural score counterweight (see Details)
+propagates to distant manifold regions. Try 0.5 as a first step when strong
+unexpected balancing is observed. Values < 1 also incidentally damp oscillations
+on sparse/irregular graphs.}
 
 \item{.YX.interaction}{Logical: if TRUE (default), construct
 M.local = P diag(Y) Xc (Y-weighted interaction). Loadings capture features
@@ -58,7 +65,11 @@ driving the density contrast through both differential abundance (population
 markers) and differential expression. If FALSE, construct M.local = P Xc
 (graph-smoothed expression only; Y appears only on the response side).
 The FALSE mode is less comprehensive — it misses DA markers unless their
-expression independently covaries with Y.}
+expression independently covaries with Y.
+Note: Y is centered before forming diag(Y), so the interaction weights landmarks
+by deviation from the mean coefficient, not from zero. Landmarks with below-average
+(but still positive) raw coefficients receive a negative weight, contributing to
+the structural opposite pole in the decomposition.}
 
 \item{.loading.method}{Character: method for computing feature loadings.
 \code{"pearson"} computes Pearson correlation between component scores
@@ -82,9 +93,33 @@ The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$plsDE[[.coef.
 OLS regression, or Spearman rank correlation, depending on
 \code{.loading.method}); positive = upregulated with Y,
 negative = downregulated}
+\item{concordance.weights}{Matrix (genes/markers x K): per-gene soft
+concordance weight \eqn{c_{jk} \in [0,1]} for each component. For gene
+\eqn{j} and component \eqn{k}, \eqn{c_{jk}} is the fraction of the OLS
+loading numerator (\eqn{t_{k}^\top X_{c,j}}) attributable to landmarks
+where the PLS score and the raw density contrast coefficient agree in sign,
+weighted by the posterior probability that each landmark's coefficient is
+genuinely nonzero and concordant:
+\eqn{s_{k,i} = \Phi(Y_{0,i} \cdot \operatorname{sign}(t_{k,c,i}) /
+      \hat\sigma_i)}, where \eqn{\hat\sigma_i = \sqrt{s^{2,\text{post}}_i}
+      \cdot \text{stdev.unscaled}_{i,c}} is the limma eBayes posterior standard
+deviation. \eqn{c_{jk} = 1}: loading arises entirely from concordant,
+statistically confident landmarks; \eqn{c_{jk} = 0}: loading arises
+entirely from discordant or high-uncertainty landmarks (structural
+counterweight); \eqn{c_{jk} = 0.5}: neutral (near-zero loading or
+near-zero/highly-uncertain coefficient). \code{NA} for
+\code{.loading.method = "spearman"} (rank-based numerators are not
+additively decomposable). Multiply \code{loadings} by
+\code{concordance.weights} before passing to \code{fgsea::fgsea}: this
+shrinks genes whose signal is driven by structural balancing to near zero
+while preserving sign and ranking direction for genuine contrast-associated
+genes.}
 \item{Y.alignment}{Numeric vector (K): |cor(Y, score_k)| per component}
 \item{smoothness}{Numeric vector (K): Laplacian smoothness per score vector}
-\item{Y}{Numeric vector: the centered density contrast used}
+\item{Y}{Numeric vector: the density contrast used, centered to mean zero (Y - mean(Y)).
+Note: this differs from the raw coefficient by a constant shift. Use the raw
+coefficient from the model fit for scientific interpretation of absolute density changes.}
+\item{Y.mean}{Numeric: mean of the density contrast used (mean(Y))}
 \item{M.local}{Matrix (optional): the interaction matrix (if .store.M = TRUE)}
 \item{params}{List: parameters used}
 }
@@ -156,6 +191,38 @@ because the expression matrix Xc sits between: the product is large only when
 features exist whose Y-weighted, graph-smoothed expression genuinely covaries
 with Y. With permuted Y, Ak collapses. Setting \code{.YX.interaction = FALSE}
 removes Y from the data matrix entirely, providing a diagnostic comparator.
+
+\strong{Structural score constraints and the balancing effect:}
+The score vectors computed by plsDE are structurally mean-zero across landmarks. This
+is a mathematical consequence of column-centering \code{M.local}: for any weight vector
+\code{w}, the score \code{t = M.local w} satisfies \code{sum(t) = 0}. As a result, a
+dominant positive pole (landmarks with large positive scores) must be balanced by
+compensatory negative scores somewhere on the manifold.
+
+In datasets where a small number of biologically extreme landmarks simultaneously have
+large |Y_c| and unusual expression profiles (large row-wise expression norm), these
+landmarks can dominate the first PLS component. The compensatory negative region may
+then appear coherent and strong, mimicking a genuine opposing biological program.
+
+\strong{Distinguishing genuine signal from structural counterweight}: the
+\code{plotPlsDE} scatter panel colors landmarks by their \emph{raw} (uncentered)
+density contrast coefficient. If landmarks with large negative scores show near-zero
+or positive raw coefficients, they are geometric counterweights rather than genuinely
+depleted populations. Conversely (depending on contrast direction and component),
+large-magnitude positive-score landmarks with near-zero raw Y may also reflect
+structural balance.
+
+\strong{Pre-analysis diagnostic}: if unexpected strong balancing is observed, compute
+the row-wise interaction norm distribution before running plsDE:
+\preformatted{
+Yc <- coef.mat[, .coef.col]; Yc <- Yc - mean(Yc)
+# Xc: size-factor-normalized, log2-transformed, column-centered expression
+row_norms <- sqrt(rowSums((Yc * as.matrix(Xc))^2))
+quantile(row_norms)
+}
+A heavily right-skewed distribution (max >> Q75, or top 10 landmarks holding >20\% of
+Frobenius norm squared) indicates dominant leverage; reduce \code{.lazy.alpha} or
+winsorize \code{Yc} before proceeding.
 }
 \note{
 plsDE is designed as an exploratory tool to help interpret density

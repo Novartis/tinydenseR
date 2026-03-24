@@ -53,7 +53,16 @@ or a detailed component-level view showing embedding and Y-vs-score scatter.
 \strong{Component view} (\code{.plsDE.dim = integer}):
 \itemize{
 \item Left panel: UMAP (or PCA) embedding colored by PLS scores (diverging scale)
-\item Right panel: Scatter of Y vs PLS scores (essential for interpretation)
+\item Right panel: Scatter of centered Y vs PLS scores, colored by raw (uncentered)
+density contrast coefficient — essential for distinguishing genuine contrast signal
+from structural score balancing
+\item Right panel scatter note: landmarks are colored by their \emph{raw} (uncentered)
+density contrast coefficient (not the centered Y on the x-axis). This is intentional:
+if a cluster of landmarks with negative scores shows warm raw-Y colors (near zero or
+positive raw coefficient), it is likely a structural geometric counterweight rather
+than a genuinely depleted population. The same reasoning applies in reverse:
+large-magnitude positive-score landmarks with near-zero raw Y may reflect structural
+balance from the opposite side, depending on contrast direction.
 }
 
 \strong{Diagnostic view} (\code{.plsDE.dim = NULL}):
@@ -62,6 +71,9 @@ or a detailed component-level view showing embedding and Y-vs-score scatter.
 \item Y-axis: Y-alignment (Ak); higher = stronger density coupling
 \item Color: |q_k| (Y-loading magnitude; larger = more Y variance captured)
 \item Labels: Component indices (1, 2, ...)
+\item Warning: high Ak + high Sk (top-left region of the diagnostic plot) is the
+typical pattern for a component dominated by a single extreme population. Inspect
+the corresponding component view and score-vs-Y scatter before interpreting gene loadings.
 }
 
 Ak is high by construction for early components: NIPALS PLS1 maximizes

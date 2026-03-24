@@ -50,8 +50,10 @@ Default 50.}
 
 \item{.order.by}{Controls landmark ordering. One of:
 \describe{
-\item{\code{"dens.contrast"}}{(default) Order by centered density contrast
-from \code{.coef.col}.}
+\item{\code{"dens.contrast"}}{(default) Order by the raw (uncentered) density contrast
+coefficient from \code{.coef.col}, placing genuinely unaffected landmarks
+(raw Y \eqn{\approx} 0) in the middle of the heatmap rather than at an arbitrary
+position determined by the mean.}
 \item{\code{"plsDE.dim"}}{Order by the selected \code{.plsDE.dim} score(s).}
 \item{A numeric matrix with column names}{Landmarks are sorted by columns
 sequentially (first column primary, etc.) and each column is displayed as
@@ -101,7 +103,20 @@ then \emph{ordered} by signed loading (highest positive at top, most negative at
 \strong{Loadings}:
 Uses OLS regression loadings (Xc ~ score_k): each loading is the slope of a
 per-gene regression on the component score, capturing marker-component association.
-Positive loadings = genes upregulated with Y; negative = downregulated.
+Positive loadings = genes upregulated in high-score (high-Y) landmarks; negative
+loadings = genes upregulated in low-score landmarks. In datasets with structural
+score balancing (see \code{get.plsDE} Details), large-magnitude loadings at either
+end of the ranking may partially reflect the geometric mean-zero constraint rather
+than genuine differential expression. Use the raw Y annotation strip and the
+\code{plotPlsDE} scatter to assess whether extreme-loading features correspond to
+landmarks with genuine density contrast signal.
+
+Caution: depending on the direction of the contrast and the component, large-magnitude
+features at either the positive or negative end of the loading ranking may reflect
+structural score balancing (geometric mean-zero constraint) rather than genuine
+biology. Always cross-reference with the raw Y annotation strip: a feature with a
+large negative loading that is highly expressed in landmarks with near-zero raw Y is
+likely characterizing a structural counterweight region.
 
 \strong{Expression normalization} (RNA only):
 \enumerate{
@@ -114,7 +129,9 @@ Positive loadings = genes upregulated with Y; negative = downregulated.
 
 \strong{Annotation strips}:
 \enumerate{
-\item Density contrast (centered Y)
+\item Density contrast: raw (uncentered) log2 fold change from the linear model.
+Zero = no density change. Positive = enriched in the contrast direction;
+negative = depleted.
 \item plsDE scores for all dimensions in \code{.plsDE.dim}
 \item Custom annotations (\code{.order.by} matrix columns, \code{.add.annot} columns)
 }
