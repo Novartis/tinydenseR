@@ -3499,7 +3499,7 @@ get.embedding.TDRObj <-
     
     return(
       list(
-        loadings             = loadings,
+        raw.loadings         = loadings,
         concordance.weights  = concordance.weights
       )
     )
@@ -4776,10 +4776,15 @@ get.nmfDE.TDRObj <-
 #'     \item{feature.weights}{Matrix (genes x K): PLS feature weight vectors w (unit-norm)}
 #'     \item{x.loadings}{Matrix (genes x K): PLS deflation loadings p}
 #'     \item{y.loadings}{Numeric vector (K): PLS Y-loadings q (scalar per component)}
-#'     \item{loadings}{Matrix (genes x K): feature loadings per component (Pearson r,
+#'     \item{raw.loadings}{Matrix (genes x K): raw feature loadings per component (Pearson r,
 #'       OLS regression, or Spearman rank correlation, depending on
 #'       \code{.loading.method}); positive = upregulated with Y,
 #'       negative = downregulated}
+#'     \item{loadings}{Matrix (genes x K): concordance-filtered feature loadings,
+#'       defined as \code{raw.loadings * concordance.weights} for Pearson/OLS.
+#'       For \code{.loading.method = "spearman"}, \code{concordance.weights}
+#'       are \code{NA} and \code{loadings = raw.loadings}. Positive = upregulated
+#'       with Y, negative = downregulated.}
 #'     \item{concordance.weights}{Matrix (genes/markers x K): per-gene soft
 #'       concordance weight \eqn{c_{jk} \in [0,1]} for each component. For gene
 #'       \eqn{j} and component \eqn{k}, \eqn{c_{jk}} is the fraction of the OLS
@@ -4796,11 +4801,8 @@ get.nmfDE.TDRObj <-
 #'       counterweight); \eqn{c_{jk} = 0.5}: neutral (near-zero loading or
 #'       near-zero/highly-uncertain coefficient). \code{NA} for
 #'       \code{.loading.method = "spearman"} (rank-based numerators are not
-#'       additively decomposable). Multiply \code{loadings} by
-#'       \code{concordance.weights} before passing to \code{fgsea::fgsea}: this
-#'       shrinks genes whose signal is driven by structural balancing to near zero
-#'       while preserving sign and ranking direction for genuine contrast-associated
-#'       genes.}
+#'       additively decomposable). Compare \code{raw.loadings} to
+#'       \code{loadings} to assess attenuation of structural balancing effects.}
 #'     \item{Y.alignment}{Numeric vector (K): |cor(Y, score_k)| per component}
 #'     \item{smoothness}{Numeric vector (K): Laplacian smoothness per score vector}
 #'     \item{Y}{Numeric vector: the density contrast used, centered to mean zero (Y - mean(Y)).
@@ -4826,7 +4828,8 @@ get.nmfDE.TDRObj <-
 #'
 #' # Access results
 #' lm.obj$plsDE$Infection$scores[, "plsDE1"]      # PLS scores (Y-aligned)
-#' lm.obj$plsDE$Infection$loadings[, "plsDE1"]     # gene loadings (Pearson, OLS or Spearman)
+#' lm.obj$plsDE$Infection$loadings[, "plsDE1"]      # concordance-filtered gene loadings
+#' lm.obj$plsDE$Infection$raw.loadings[, "plsDE1"]  # raw gene loadings before concordance filtering
 #'
 #' # Diagnostic table
 #' data.frame(
@@ -5280,8 +5283,14 @@ get.plsDE.TDRObj <-
         muX         = muX
       )
 
-    loadings            <- .loadings.res$loadings
+    raw.loadings        <- .loadings.res$raw.loadings
     concordance.weights <- .loadings.res$concordance.weights
+    loadings            <-
+      if (all(is.na(x = concordance.weights))) {
+        raw.loadings
+      } else {
+        raw.loadings * concordance.weights
+      }
     
     # -------------------------------------------------------------------------
     # Laplacian smoothness (Sk)
@@ -5315,6 +5324,7 @@ get.plsDE.TDRObj <-
         gene.weights = W.mat,
         x.loadings = P.mat,
         y.loadings = Q.vec,
+        raw.loadings = raw.loadings,
         loadings = loadings,
         concordance.weights = concordance.weights,
         Y.alignment = Y.alignment,
@@ -5366,7 +5376,9 @@ get.plsDE.TDRObj <-
       message("\nResults stored in: .tdr.obj$plsDE$", .coef.col)
       message("  $scores       : ", n.landmarks, " landmarks x ", .ncomp, " components")
       message("  $gene.weights : ", n.genes, " features x ", .ncomp, " components (PLS w)")
-      message("  $loadings     : ", n.genes, " features x ", .ncomp, " components (", .loading.method, ")")
+          message("  $raw.loadings : ", n.genes, " features x ", .ncomp, " components (", .loading.method, ")")
+          message("  $loadings     : ", n.genes, " features x ", .ncomp,
+            " components (concordance-filtered; raw for spearman)")
       message("  $concordance.weights : ", n.genes, " features x ", .ncomp,
               " components (soft concordance, NA if spearman)")
       message("  $Y.alignment  : Ak (|cor(Y, score)|)")
