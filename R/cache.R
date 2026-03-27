@@ -16,10 +16,87 @@
 
 # ──────────────────────────────────────────────────────────────────────
 # Internal on-disk caching helpers for large get.map() slots
+#
+# Cache files are written to the system temporary directory and are
+# intended to be ephemeral — they exist only for the duration of the
+# current R session.  An explicit cleanup finalizer ensures the cache
+# is removed when the session ends (see .tdr_cache_register_cleanup).
 # ──────────────────────────────────────────────────────────────────────
 
 # Current schema version — bump when cache format changes
-.TDR_CACHE_SCHEMA_VERSION <- 1L
+.TDR_CACHE_SCHEMA_VERSION <- 2L
+
+# ── Package-private environment for session-end cleanup ──────────────
+# A strong-referenced environment that lives for the duration of the R
+# session.  reg.finalizer(..., onexit = TRUE) is attached to it once
+# per session so that all registered cache directories are removed when
+# the session exits (or when the environment is garbage-collected).
+.tdr_cleanup_env <- new.env(parent = emptyenv())
+.tdr_cleanup_env$registered_dirs <- character(0)
+.tdr_cleanup_env$finalizer_set   <- FALSE
+
+#' Register a cache directory for automatic removal at session end
+#'
+#' Adds \code{cache_dir} to a package-private registry and, on first
+#' call, attaches a \code{reg.finalizer(..., onexit = TRUE)} to a
+#' package-private environment so that all registered directories are
+#' deleted when the R session terminates.
+#'
+#' @param cache_dir Character path of the cache directory to register.
+#' @return Invisible \code{NULL}.
+#' @keywords internal
+.tdr_cache_register_cleanup <- function(cache_dir) {
+  .tdr_cleanup_env$registered_dirs <- unique(c(
+    .tdr_cleanup_env$registered_dirs, cache_dir
+  ))
+  if (!isTRUE(.tdr_cleanup_env$finalizer_set)) {
+    reg.finalizer(
+      e = .tdr_cleanup_env,
+      f = function(env) {
+        dirs <- env$registered_dirs
+        for (d in dirs) {
+          if (dir.exists(d)) {
+            unlink(d, recursive = TRUE, force = TRUE)
+          }
+        }
+      },
+      onexit = TRUE
+    )
+    .tdr_cleanup_env$finalizer_set <- TRUE
+  }
+  invisible(NULL)
+}
+
+#' Remove a single cache directory from the cleanup registry
+#'
+#' Called by \code{tdr_cache_cleanup()} after manually deleting a cache
+#' so that the finalizer does not attempt a redundant \code{unlink()}.
+#'
+#' @param cache_dir Character path to deregister.
+#' @return Invisible \code{NULL}.
+#' @keywords internal
+.tdr_cache_deregister <- function(cache_dir) {
+  .tdr_cleanup_env$registered_dirs <- setdiff(
+    .tdr_cleanup_env$registered_dirs, cache_dir
+  )
+  invisible(NULL)
+}
+
+#' Return the root temporary cache directory for this R session
+#'
+#' All \code{get.map()} cache runs are stored under
+#' \code{<tempdir()>/tinydenseR_cache/}.  The directory is created
+#' lazily on first call.
+#'
+#' @return Character scalar — the session-level cache root path.
+#' @keywords internal
+.tdr_cache_root <- function() {
+  root <- file.path(tempdir(), "tinydenseR_cache")
+  if (!dir.exists(root)) {
+    dir.create(root, recursive = TRUE, showWarnings = FALSE)
+  }
+  root
+}
 
 #' Generate a unique run key for cache directory isolation
 #'
@@ -49,7 +126,7 @@
 #'   \code{"fuzzy.graph"}.
 #' @param sample_name Character – sample identifier (used as file stem).
 #' @param compress Passed to \code{saveRDS}. Default \code{FALSE} for speed.
-#' @return A metadata list with path, slot, sample, bytes, md5, and schema_v.
+#' @return A metadata list with path, slot, sample, bytes, and schema_v.
 #' @keywords internal
 .tdr_cache_write <- function(object,
                              cache_dir,
@@ -80,15 +157,11 @@
   
   file.rename(from = tmp, to = target)
   
-  # Compute md5 checksum for later verification
-  md5 <- unname(tools::md5sum(target))
-  
   list(
     path     = target,
     slot     = slot_name,
     sample   = sample_name,
     bytes    = file.size(target),
-    md5      = md5,
     schema_v = .TDR_CACHE_SCHEMA_VERSION
   )
 }
@@ -96,11 +169,9 @@
 #' Read a cached slot from disk
 #'
 #' @param meta_record A metadata list produced by \code{.tdr_cache_write}.
-#' @param verify Logical; if \code{TRUE}, verify the MD5 checksum before
-#'   deserializing.  Default \code{FALSE} for speed.
 #' @return The deserialized R object.
 #' @keywords internal
-.tdr_cache_read <- function(meta_record, verify = FALSE) {
+.tdr_cache_read <- function(meta_record) {
   if (!file.exists(meta_record$path)) {
     stop("Cache file missing: ", meta_record$path,
          "\nRe-run get.map() to regenerate or set .cache.on.disk = FALSE.")
@@ -112,17 +183,6 @@
     stop("Cache schema mismatch: file has v", meta_record$schema_v,
          " but current code expects v", .TDR_CACHE_SCHEMA_VERSION,
          ".\nRe-run get.map() to regenerate.")
-  }
-  
-  # Optional checksum verification
-  if (isTRUE(verify) && !is.null(meta_record$md5)) {
-    current_md5 <- unname(tools::md5sum(meta_record$path))
-    if (!identical(current_md5, meta_record$md5)) {
-      stop("Cache checksum mismatch for ", meta_record$path,
-           "\nExpected: ", meta_record$md5,
-           "\nGot:      ", current_md5,
-           "\nThe file may be corrupted. Re-run get.map().")
-    }
   }
   
   readRDS(file = meta_record$path)
@@ -240,23 +300,23 @@ get.cellmap <- function(x, .slot, .sample) {
 
 #' Validate that all on-disk cache files are intact
 #'
-#' Checks every entry in the cache manifest for file existence and,
-#' optionally, MD5 checksum integrity.  This function is called
-#' automatically (in quiet mode) when entering \code{get.lm()},
-#' \code{get.pbDE()}, \code{get.specDE()}, \code{get.nmfDE()}, and
-#' \code{get.plsDE()} so that broken caches are caught early.
+#' Checks every entry in the cache manifest for file existence.  This
+#' function is called automatically (in quiet mode) when entering
+#' \code{get.lm()}, \code{get.pbDE()}, \code{get.specDE()},
+#' \code{get.nmfDE()}, and \code{get.plsDE()} so that broken caches
+#' are caught early.
+#'
+#' Because the cache is ephemeral (stored under \code{tempdir()} and
+#' cleaned up at session end), heavyweight checksum verification is no
+#' longer performed.  Only file existence and schema version are checked.
 #'
 #' @param .tdr.obj A tinydenseR object with \code{$map$.cache} populated.
-#' @param .verify.checksum Logical; if \code{TRUE}, also verify MD5
-#'   checksums.  Default \code{FALSE} for speed.
 #' @param .verbose Logical; if \code{TRUE}, print a summary.  Default
 #'   \code{TRUE}.
 #' @return The (unmodified) \code{.tdr.obj}, invisibly.  Stops with an
-#'   error if any file is missing or any checksum mismatches and
-#'   \code{.verify.checksum = TRUE}.
+#'   error if any cached file is missing.
 #' @export
 tdr_cache_validate <- function(.tdr.obj,
-                               .verify.checksum = FALSE,
                                .verbose = TRUE) {
   
   cache <- .tdr.obj@density$.cache
@@ -276,7 +336,6 @@ tdr_cache_validate <- function(.tdr.obj,
   
   n_ok      <- 0L
   n_missing <- 0L
-  n_bad_md5 <- 0L
   problems  <- character(0)
   
   for (slot_name in names(cache$manifests)) {
@@ -291,16 +350,6 @@ tdr_cache_validate <- function(.tdr.obj,
                              " -> ", meta$path))
       } else {
         n_ok <- n_ok + 1L
-        if (isTRUE(.verify.checksum) && !is.null(meta$md5)) {
-          current_md5 <- unname(tools::md5sum(meta$path))
-          if (!identical(current_md5, meta$md5)) {
-            n_bad_md5 <- n_bad_md5 + 1L
-            problems <- c(problems,
-                          paste0("CHECKSUM MISMATCH: ", slot_name, "/",
-                                 sample_name, " (expected ", meta$md5,
-                                 ", got ", current_md5, ")"))
-          }
-        }
       }
     }
   }
@@ -313,9 +362,7 @@ tdr_cache_validate <- function(.tdr.obj,
   }
   
   if (isTRUE(.verbose)) {
-    msg <- paste0("Cache OK: ", n_ok, " file(s) verified")
-    if (isTRUE(.verify.checksum)) msg <- paste0(msg, " (with MD5)")
-    msg <- paste0(msg, ".")
+    msg <- paste0("Cache OK: ", n_ok, " file(s) verified.")
     message(msg)
   }
   
@@ -334,16 +381,17 @@ tdr_cache_validate <- function(.tdr.obj,
 .tdr_cache_validate_quiet <- function(.tdr.obj) {
   cache <- .tdr.obj@density$.cache
   if (is.null(cache) || !isTRUE(cache$on.disk)) return(invisible(NULL))
-  tdr_cache_validate(.tdr.obj, .verify.checksum = FALSE, .verbose = FALSE)
+  tdr_cache_validate(.tdr.obj, .verbose = FALSE)
   invisible(NULL)
 }
 
 #' Remove all cached files for a tinydenseR object
 #'
-#' Deletes the on-disk cache directory and strips cache metadata from the
-#' object. After cleanup, the large slots (clustering$ids, celltyping$ids,
-#' nearest.landmarks, fuzzy.graph) will be \code{NULL} and must be regenerated
-#' via \code{get.map()}.
+#' Deletes the on-disk cache directory, deregisters it from the
+#' session-end cleanup finalizer, and strips cache metadata from the
+#' object.  After cleanup, the large slots (clustering$ids,
+#' celltyping$ids, nearest.landmarks, fuzzy.graph) will be \code{NULL}
+#' and must be regenerated via \code{get.map()}.
 #'
 #' @param .tdr.obj A tinydenseR object with \code{$map$.cache} populated.
 #' @return Updated \code{.tdr.obj} with cache removed.
@@ -352,6 +400,7 @@ tdr_cache_cleanup <- function(.tdr.obj) {
   cache_root <- .tdr.obj@density$.cache$root
   if (!is.null(cache_root) && dir.exists(cache_root)) {
     unlink(cache_root, recursive = TRUE)
+    .tdr_cache_deregister(cache_root)
     message("Removed cache directory: ", cache_root)
   }
   .tdr.obj@density$.cache <- NULL
@@ -374,8 +423,8 @@ tdr_cache_cleanup <- function(.tdr.obj) {
 #' # After running get.map() with on-disk caching
 #' tdr_cache_info(lm.cells)
 #' # On-disk cache: ACTIVE
-#' # Directory:     /data/tdr_cache/run_20260302_143012_a7f3c1b2
-#' # Schema:        v1
+#' # Directory:     /tmp/RtmpXXXXXX/tinydenseR_cache/run_20260302_143012_a7f3c1b2
+#' # Schema:        v2
 #' # Slots:         clustering.ids, celltyping.ids, nearest.landmarks, fuzzy.graph
 #' # Samples:       6
 #' # Files:         24  (4 slots x 6 samples)

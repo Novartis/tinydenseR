@@ -20,7 +20,7 @@
 \item{compress}{Passed to \code{saveRDS}. Default \code{FALSE} for speed.}
 }
 \value{
-A metadata list with path, slot, sample, bytes, md5, and schema_v.
+A metadata list with path, slot, sample, bytes, and schema_v.
 }
 \description{
 Writes \code{object} to an RDS file inside \code{cache_dir/slot_name/}

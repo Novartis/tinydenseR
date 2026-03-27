@@ -4,13 +4,10 @@
 \alias{.tdr_cache_read}
 \title{Read a cached slot from disk}
 \usage{
-.tdr_cache_read(meta_record, verify = FALSE)
+.tdr_cache_read(meta_record)
 }
 \arguments{
 \item{meta_record}{A metadata list produced by \code{.tdr_cache_write}.}
-
-\item{verify}{Logical; if \code{TRUE}, verify the MD5 checksum before
-deserializing.  Default \code{FALSE} for speed.}
 }
 \value{
 The deserialized R object.

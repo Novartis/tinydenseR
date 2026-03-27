@@ -24,8 +24,8 @@ Useful for interactive inspection and debugging.
 # After running get.map() with on-disk caching
 tdr_cache_info(lm.cells)
 # On-disk cache: ACTIVE
-# Directory:     /data/tdr_cache/run_20260302_143012_a7f3c1b2
-# Schema:        v1
+# Directory:     /tmp/RtmpXXXXXX/tinydenseR_cache/run_20260302_143012_a7f3c1b2
+# Schema:        v2
 # Slots:         clustering.ids, celltyping.ids, nearest.landmarks, fuzzy.graph
 # Samples:       6
 # Files:         24  (4 slots x 6 samples)

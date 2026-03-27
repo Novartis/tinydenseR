@@ -4,26 +4,27 @@
 \alias{tdr_cache_validate}
 \title{Validate that all on-disk cache files are intact}
 \usage{
-tdr_cache_validate(.tdr.obj, .verify.checksum = FALSE, .verbose = TRUE)
+tdr_cache_validate(.tdr.obj, .verbose = TRUE)
 }
 \arguments{
 \item{.tdr.obj}{A tinydenseR object with \code{$map$.cache} populated.}
-
-\item{.verify.checksum}{Logical; if \code{TRUE}, also verify MD5
-checksums.  Default \code{FALSE} for speed.}
 
 \item{.verbose}{Logical; if \code{TRUE}, print a summary.  Default
 \code{TRUE}.}
 }
 \value{
 The (unmodified) \code{.tdr.obj}, invisibly.  Stops with an
-error if any file is missing or any checksum mismatches and
-\code{.verify.checksum = TRUE}.
+error if any cached file is missing.
 }
 \description{
-Checks every entry in the cache manifest for file existence and,
-optionally, MD5 checksum integrity.  This function is called
-automatically (in quiet mode) when entering \code{get.lm()},
-\code{get.pbDE()}, \code{get.specDE()}, \code{get.nmfDE()}, and
-\code{get.plsDE()} so that broken caches are caught early.
+Checks every entry in the cache manifest for file existence.  This
+function is called automatically (in quiet mode) when entering
+\code{get.lm()}, \code{get.pbDE()}, \code{get.specDE()},
+\code{get.nmfDE()}, and \code{get.plsDE()} so that broken caches
+are caught early.
+}
+\details{
+Because the cache is ephemeral (stored under \code{tempdir()} and
+cleaned up at session end), heavyweight checksum verification is no
+longer performed.  Only file existence and schema version are checked.
 }
