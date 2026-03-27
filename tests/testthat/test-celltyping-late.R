@@ -451,5 +451,5 @@ test_that("R2: old vs new workflow produces equivalent composition", {
 
 test_that("label.confidence is stored in config by get.map", {
   obj <- .build_mapped_obj()
-  expect_equal(obj@config$label.confidence, 0.8)
+  expect_equal(obj@config$label.confidence, 0.5)
 })

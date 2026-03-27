@@ -444,8 +444,10 @@ celltyping.TDRObj <-
   .label.confidence <- if (!is.null(.tdr.obj@config$label.confidence)) {
     .tdr.obj@config$label.confidence
   } else {
-    0.8
+    0.5
   }
+
+  .tdr_validate_label_confidence(.label.confidence)
   
   cache <- .tdr.obj@density$.cache
   is_cached <- !is.null(cache) && isTRUE(cache$on.disk)
@@ -474,41 +476,14 @@ celltyping.TDRObj <-
     # 3. Sum weights per (cell, label), compute confidence
     # 4. Assign label if confidence >= threshold, else "..low.confidence.."
     new_celltype_ids[[sn]] <-
-      Matrix::summary(object = fgraph) |>
-      dplyr::rename(cell = i,
-                    landmark = j) |>
-      dplyr::mutate(label = as.character(x = ct_ids[landmark])) |>
-      dplyr::select(-landmark) |>
-      collapse::fgroup_by(cell,
-                          label,
-                          sort = FALSE) |>
-      collapse::fsum() |>
-      collapse::fgroup_by(cell,
-                          sort = FALSE) |>
-      collapse::fmutate(confidence = x / collapse::fsum(x)) |>
-      collapse::fungroup() |>
-      collapse::fsubset(confidence >= .label.confidence) |>
-      collapse::roworderv(cols = "confidence",
-                          decreasing = TRUE) |>
-      collapse::fgroup_by(cell,
-                          sort = FALSE) |>
-      collapse::ffirst() |>
-      (\(x)
-       {
-         lbl <-
-           rep(x = "..low.confidence..",
-               times = n_cells)
-         
-         lbl[x$cell] <-
-           x$label
-         
-         # Recover original cell names from clustering IDs (same ordering)
-         cell_names <- names(.tdr_get_map_slot(.tdr.obj, "clustering.ids", sn))
-         
-         stats::setNames(object = lbl,
-                         nm = cell_names)
-       }
-      )()
+      .tdr_transfer_labels(
+        .method = "fuzzy",
+        .label.confidence = .label.confidence,
+        .n.cells = n_cells,
+        .cell.names = names(.tdr_get_map_slot(.tdr.obj, "clustering.ids", sn)),
+        .fgraph = fgraph,
+        .landmark.labels = ct_ids
+      )
     
     # Write to on-disk cache if active
     if (is_cached) {
