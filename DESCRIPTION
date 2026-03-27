@@ -18,6 +18,7 @@ Collate:
     'Color.Palette.R'
     'sim_trajectory_tdr.R'
     'cache.R'
+    'label.transfer.R'
     'celltype.R'
     'elbow.finder.R'
     'goi.R'
@@ -31,7 +32,8 @@ Collate:
 VignetteBuilder: knitr
 Depends: 
     R (>= 4.1),
-    Matrix
+    Matrix,
+    grDevices
 LazyData: true
 Suggests: 
     testthat (>= 3.0.0),
