@@ -30,7 +30,7 @@ get.marker(
 
 \item{.id.from}{"clustering" or "celltyping".}
 
-\item{.label.confidence}{Numeric (0.5-1): minimum confidence for cell assignment (default: 0.8).}
+\item{.label.confidence}{Numeric (0-1): minimum confidence for cell assignment (default: 0.5).}
 }
 \value{
 A .tdr.obj with results stored in .tdr.obj$markerDE$.deprecated.call$result.

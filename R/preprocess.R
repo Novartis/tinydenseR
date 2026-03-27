@@ -150,9 +150,10 @@ get.cells.list.mat <-
 
 #' Create .cells Object from Seurat v5 Object
 #'
-#' Converts a Seurat v5 object with layered data into tinydenseR's .cells format. Handles Seurat's 
-#' v5 assay structure where data is split across multiple layers. Each sample's cells are extracted, 
-#' combined across layers, and saved as temporary RDS files.
+#' Converts a Seurat v5 object with layered data into tinydenseR's .cells format. Can handle Seurat's 
+#' v5 assay structure where data is split across multiple layers if all cells in a single sample are contained
+#' within a single layer (for example, samples 1:3 in layer \code{x} and sample 4:6 in layer \code{y}). If cells within
+#' a sample are split across layers, an error is thrown.
 #'
 #' @param .seurat.obj Seurat v5 object containing layered RNA data. Must use Assay5 class.
 #' @param .meta Data frame with sample-level metadata. Rownames must be sample IDs matching values 
@@ -162,10 +163,14 @@ get.cells.list.mat <-
 #' @param .assay Character: assay name to extract. Default "RNA".
 #' @param .layer.pattern Character: pattern to match layer names. Default "counts" matches layers 
 #'   containing count data (e.g., "counts.Sample1", "counts.Sample2"). Uses \code{fixed = TRUE} matching.
+#' @param .layer.name.source Character: optional metadata column mapping each cell to a layer label.
+#'  If provided, only cells where this column matches the current layer label are included for that sample.
+#'   This allows for more flexible layer naming schemes. Default NULL (no additional filtering).
 #' @param .min.cells.per.sample Integer: minimum cells required per sample. Samples with fewer cells 
 #'   are excluded. Default 10.
 #' @param .compress Logical: compress RDS files? Default FALSE for faster I/O.
 #' @param .verbose Logical: print progress messages? Default TRUE.
+#' @param .dest.path Character: optional directory path to save \code{.cells} RDS files. If NULL, files are saved as temporary files.
 #'   
 #' @return Named list of file paths to temporary RDS files, one per sample. Only includes samples 
 #'   meeting minimum cell threshold and present in \code{.meta}.
@@ -176,8 +181,8 @@ get.cells.list.mat <-
 #' \enumerate{
 #'   \item Identifies all layers matching \code{.layer.pattern}
 #'   \item Finds common genes across all layers
-#'   \item Extracts cells for each sample across matching layers
-#'   \item Combines layer data into single sparse matrix per sample
+#'   \item Validates each sample maps to one layer (when multiple layers are present)
+#'   \item Extracts and combines sample cells from matching layer data into one sparse matrix per sample
 #'   \item Saves as temporary RDS files for memory-efficient processing
 #' }
 #' 
@@ -236,9 +241,11 @@ get.cells.Seurat5 <-
            .sample.var,
            .assay = "RNA",
            .layer.pattern = "counts",
+           .layer.name.source = NULL,
            .min.cells.per.sample = 10,
            .compress = FALSE,
-           .verbose = TRUE){
+           .verbose = TRUE,
+           .dest.path = NULL){
     
     if(!inherits(x = .seurat.obj,
                  what = "Seurat")){
@@ -257,6 +264,11 @@ get.cells.Seurat5 <-
     
     if(!(.assay %in% names(x = .seurat.obj@assays))){
       stop(paste0("Assay '", .assay, "' not found in Seurat object"))
+    }
+    
+    if(!inherits(x = .seurat.obj@assays[[.assay]],
+                 what = "Assay5")){
+      stop(paste0("Assay '", .assay, "' is not an Assay5 object. Use get.cells.Seurat for Seurat v4 assays."))
     }
     
     if(!inherits(x = .layer.pattern,
@@ -287,6 +299,11 @@ get.cells.Seurat5 <-
            value = TRUE,
            fixed = TRUE)
     
+     if((length(x = .available.layers) > 1) && 
+       is.null(x = .layer.name.source)){
+      warning("Multiple layers found matching pattern and .layer.name.source is NULL. Valid samples must have cells in only one layer.")
+     }
+      
     if(length(x = .available.layers) == 0){
       stop(paste0("No layers found matching pattern '", .layer.pattern, "' in assay '", .assay, "'"))
     }
@@ -324,7 +341,7 @@ get.cells.Seurat5 <-
       names(x = .sample.cell.counts)[.sample.cell.counts >= .min.cells.per.sample] |> 
       (\(x)
        x[x %in% rownames(x = .meta)]
-       )()
+      )()
     
     if(.verbose){
       cat("Found", length(x = .unique.samples), "total samples,", length(x = .valid.samples), "with >=", .min.cells.per.sample, "cells\n")
@@ -333,14 +350,58 @@ get.cells.Seurat5 <-
     if(length(x = .valid.samples) == 0){
       stop("No samples meet the minimum cell count requirement")
     }
+
+    if(!is.null(x = .layer.name.source)){
+      if(!inherits(x = .layer.name.source,
+                   what = "character") ||
+         length(x = .layer.name.source) != 1){
+        stop(".layer.name.source must be a single character string")
+      }
+
+      if(!(.layer.name.source %in% colnames(x = .seurat.obj@meta.data))){
+        stop(paste0(".layer.name.source '", .layer.name.source, "' not found in Seurat object metadata"))
+      }
+    }
+
+    if(!is.null(x = .dest.path)){
+      dir.create(path = file.path(.dest.path, "TDRdata"),
+                 recursive = TRUE,
+                 showWarnings = FALSE)
+    }
+
+    .sample.meta <-
+      .seurat.obj@meta.data
+
+    .layer.cell.names <-
+      lapply(X = .available.layers,
+             FUN = function(layer){
+               colnames(x = SeuratObject::LayerData(object = .seurat.obj,
+                                                    assay = .assay,
+                                                    layer = layer))
+             })
+    names(x = .layer.cell.names) <- .available.layers
+    
+    if(!is.null(x = .layer.name.source)){
+      
+      # ensure counts from each sample come from only one layer, otherwise error
+      table(.sample.meta[[.sample.var]],
+            .sample.meta[[.layer.name.source]]) |> 
+        (\(x)
+         rowSums(x = x > 0)[.valid.samples] > 1
+         )() |>
+        any() |>
+        (\(x)
+         if(x){
+           stop("When working with multiple layers, each sample must have counts from only one layer.")
+         }
+        )()
+        
+    }
     
     # Create .cells object
     .cells <-
-      .valid.samples |>
-      (\(x)
-       `names<-`(x = x, value = x)
-      )() |>
-      lapply(FUN = function(smpl){
+      lapply(X = .valid.samples,
+             FUN = function(smpl){
         
         if(.verbose){
           .progress <-
@@ -349,54 +410,135 @@ get.cells.Seurat5 <-
           cat("Processing sample", smpl, "(", .progress, "%)\n")
         }
         
-        # Create temporary file for this sample
-        uri <-
-          tempfile(fileext = ".RDS")
-        
-        # Get cells belonging to this sample
-        .cells.in.smpl <-
-          .seurat.obj@meta.data[[.sample.var]] == smpl
-        
-        if(sum(.cells.in.smpl) == 0){
+        if(is.null(x = .dest.path)){
+          
+          # Create temporary file for this sample
+          uri <-
+            tempfile(pattern = paste0(smpl, "."),
+                     fileext = ".RDS") 
+          
+        } else{
+          
+          # Create file path for this sample in Seurat.data/RDS directory
+          uri <-
+            file.path(.dest.path,
+                      "TDRdata",
+                      paste0(smpl,
+                             ".RDS")) 
+          
+        }
+        .sample.cells <-
+          rownames(x = .sample.meta)[.sample.meta[[.sample.var]] == smpl]
+
+        .layers.with.sample <-
+          names(x = which(x = vapply(X = .layer.cell.names,
+                                     FUN = function(cells){
+                                       any(cells %in% .sample.cells)
+                                     },
+                                     FUN.VALUE = logical(length = 1))))
+
+        if(length(x = .layers.with.sample) == 0){
           return(NULL)
         }
-        
-        # Extract and combine count data from all layers for this sample
+
+        if(length(x = .layers.with.sample) > 1){
+          stop(paste0("Sample '", smpl, "' has cells across multiple layers: ",
+                      paste0(.layers.with.sample, collapse = ", "),
+                      ". Each sample must have cells from only one layer."))
+        }
+
         .sample.counts <-
-          .available.layers |>
+          .layers.with.sample |>
           lapply(FUN = function(layer){
-            
-            # Extract the count matrix for the sample from this layer
-            SeuratObject::LayerData(object = .seurat.obj,
-                                    assay = .assay,
-                                    layer = layer)[.genes.names,
-                                                   .cells.in.smpl,
-                                                   drop = FALSE]
-            
+            .layer.data <-
+              SeuratObject::LayerData(object = .seurat.obj,
+                                      assay = .assay,
+                                      layer = layer)
+
+            .layer.cells <-
+              colnames(x = .layer.data)
+
+            if(!is.null(x = .layer.name.source)){
+              .layer.label <- layer
+
+              if(startsWith(x = layer,
+                            prefix = .layer.pattern)){
+                .layer.label <-
+                  substr(x = layer,
+                         start = nchar(x = .layer.pattern) + 1,
+                         stop = nchar(x = layer))
+              }
+
+              .layer.label <-
+                sub(pattern = "^[._-]+",
+                    replacement = "",
+                    x = .layer.label)
+
+              .layer.labels <-
+                unique(x = c(
+                  layer,
+                  .layer.label
+                ))
+
+              .candidate.cells <-
+                rownames(x = .sample.meta)[
+                  .sample.meta[[.sample.var]] == smpl &
+                    as.character(x = .sample.meta[[.layer.name.source]]) %in% .layer.labels
+                ]
+            } else {
+              .candidate.cells <- .sample.cells
+            }
+
+            .cells.in.layer <-
+              intersect(x = .layer.cells,
+                        y = .candidate.cells)
+
+            if(length(x = .cells.in.layer) == 0){
+              return(NULL)
+            }
+
+            .layer.data[.genes.names,
+                        .cells.in.layer,
+                        drop = FALSE]
           }) |>
-          do.call(what = cbind)
-        
-        # Convert to dgCMatrix and save
-        .sample.counts |>
-          methods::as(Class = "dgCMatrix") |>
           (\(x)
-           saveRDS(object = x,
-                   file = uri,
-                   compress = .compress)
+           x[lengths(x = x) > 0]
           )()
-        
+
+        if(length(x = .sample.counts) == 0){
+          return(NULL)
+        }
+
+        .sample.counts <-
+          do.call(what = cbind,
+                  args = .sample.counts) |>
+          methods::as(Class = "dgCMatrix")
+
+        saveRDS(object = .sample.counts,
+                file = uri,
+                compress = .compress)
+
         return(uri)
-        
-      }) |>
-      (\(x)
-       x[lengths(x = x) > 0]
-      )()
+
+      })
+
+    names(x = .cells) <- .valid.samples
+    .cells <- .cells[!vapply(X = .cells,
+                             FUN = is.null,
+                             FUN.VALUE = logical(length = 1))]
     
     if(.verbose){
       cat("Successfully created .cells object with", length(x = .cells), "samples\n")
     }
     
-    return(.cells[rownames(x = .meta)])
+    # organize .cells list to match order of rows of .meta
+    .meta.sample.names <-
+      rownames(x = .meta)
+    
+    .meta.sample.names <-
+      .meta.sample.names[.meta.sample.names %in% names(x = .cells)]
+    
+    return(.cells[.meta.sample.names])
     
   }
 
@@ -1598,8 +1740,8 @@ get.meta <-
       }
       
       return(get.meta.HDF5AnnData(.h5ad.obj = .obj,
-                                   .sample.var = .sample.var,
-                                   .verbose = .verbose))
+                                  .sample.var = .sample.var,
+                                  .verbose = .verbose))
       
     } else if(inherits(x = .obj, what = c("DataFrame","tibble","data.table","data.frame"))) {
       
@@ -1607,12 +1749,12 @@ get.meta <-
       if(isTRUE(x = .verbose)){
         cat("Input is a data frame, attempting to filter to sample-level metadata...\n")
       }
-
+      
       # Check if .sample.var is a column in the data frame
       if(!(.sample.var %in% colnames(x = .obj))){
         stop(paste0(".sample.var '", .sample.var, "' not found in input data frame"))
       }
-
+      
       # Identify sample-level columns (where all values within each sample are identical)
       .sample.level.cols <-
         .obj |>
@@ -1626,39 +1768,39 @@ get.meta <-
                        dplyr::where(fn = all))
         )() |>
         colnames()
-
-      # Always include the sample variable itself
-    .sample.level.cols <-
-      c(.sample.var, .sample.level.cols)
-    
-    # Identify excluded columns  
-    .all.cols <-
-      colnames(x = .obj)
-    
-    .excluded.cols <-
-      .all.cols[!.all.cols %in% .sample.level.cols]
-    
-    if(length(x = .excluded.cols) > 0 && .verbose){
-      warning(paste0("Excluded ", length(x = .excluded.cols), 
-                     " cell-level columns from .meta: ",
-                     paste0(.excluded.cols, collapse = ", ")))
-    }
-    
-    # Extract sample-wise metadata for sample-level columns only
-    .sample.meta <-
-      .obj[, .sample.level.cols, drop = FALSE] |>
-      dplyr::distinct() |>
-      as.data.frame() |>
-      (\(x)
-       `rownames<-`(x = x, value = x[[.sample.var]])
-      )()
-    
-    if(.verbose){
-      cat("Extracted metadata for", nrow(x = .sample.meta), "samples with", ncol(x = .sample.meta), "sample-level variables\n")
-    }
       
-    return(.sample.meta)
-
+      # Always include the sample variable itself
+      .sample.level.cols <-
+        c(.sample.var, .sample.level.cols)
+      
+      # Identify excluded columns  
+      .all.cols <-
+        colnames(x = .obj)
+      
+      .excluded.cols <-
+        .all.cols[!.all.cols %in% .sample.level.cols]
+      
+      if(length(x = .excluded.cols) > 0 && .verbose){
+        warning(paste0("Excluded ", length(x = .excluded.cols), 
+                       " cell-level columns from .meta: ",
+                       paste0(.excluded.cols, collapse = ", ")))
+      }
+      
+      # Extract sample-wise metadata for sample-level columns only
+      .sample.meta <-
+        .obj[, .sample.level.cols, drop = FALSE] |>
+        dplyr::distinct() |>
+        as.data.frame() |>
+        (\(x)
+         `rownames<-`(x = x, value = x[[.sample.var]])
+        )()
+      
+      if(.verbose){
+        cat("Extracted metadata for", nrow(x = .sample.meta), "samples with", ncol(x = .sample.meta), "sample-level variables\n")
+      }
+      
+      return(.sample.meta)
+      
     } else {
       
       stop("Input type not supported. .obj must be a Seurat, SingleCellExperiment, or HDF5AnnData object")

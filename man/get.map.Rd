@@ -17,7 +17,6 @@ get.map(x, ...)
   .seed = 123,
   .label.confidence = 0.5,
   .cache.on.disk = TRUE,
-  .cache.dir = NULL,
   ...
 )
 }
@@ -47,7 +46,7 @@ calculations. Only one value allowed; merge multiple populations first via \code
 
 \item{.seed}{Integer seed for reproducibility (default 123).}
 
-\item{.label.confidence}{Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
+\item{.label.confidence}{Numeric scalar in \code{[0,1]} controlling the minimum posterior confidence required
 to assign a cell to a landmark‑derived cluster/celltype label.}
 
 \item{.cache.on.disk}{Logical (default TRUE). When \code{TRUE}, four large per-sample
@@ -55,15 +54,14 @@ slots (\code{clustering$ids}, \code{celltyping$ids}, \code{nearest.landmarks},
 \code{fuzzy.graph}) are serialized to disk as uncompressed RDS files and evicted
 from memory. Downstream accessors (e.g.\ in \code{get.pbDE}, \code{goi.summary})
 read them back lazily on a per-sample basis. Set to \code{FALSE} to keep everything
-in memory (original behaviour).}
+in memory (original behaviour).
 
-\item{.cache.dir}{Character path to the directory where cached slot files are stored.
-Default \code{NULL}: a \code{tdr_cache/<run_key>/} subdirectory is created inside
-the same parent directory that holds the per-sample expression RDS files
-(\code{dirname(.tdr.obj$cells[[1]])}). Set to a persistent path (e.g.
-\code{"/scratch/my_project/cache"}) if you plan to \code{saveRDS} the object
-and reload it in a future session or if the expression RDS files reside in
-\code{tempdir()} (which is deleted when the R session ends).}
+Cache files are stored under the system temporary directory
+(\code{tempdir()}) and are automatically removed when the R session
+ends via a registered finalizer.  This means the cache is
+\strong{ephemeral} and never persists across R sessions.  There are
+no implications for reproducibility since the cache only stores
+intermediate results that are recomputed deterministically.}
 }
 \value{
 Updated \code{.tdr.obj} with \code{$map} component containing:
@@ -111,8 +109,20 @@ For each sample, the function:
 \item Loads expression data and normalizes (size factors for RNA, marker subset for cytometry)
 \item Projects to PCA/Harmony space (matching landmark processing)
 \item Uses landmark UMAP model to compute fuzzy graph (cell-landmark edge weights) and find nearest landmarks
-\item Assigns clusters/cell types by nearest landmark
+\item Assigns clusters/cell types by confidence-thresholded voting
 \item Aggregates fuzzy graph edge weights into landmark densities per sample
+}
+
+\strong{Label transfer confidence model:}
+\itemize{
+\item Without \code{.ref.obj}: label confidence is the normalized fuzzy-mass ratio,
+\eqn{\mathrm{conf}(c,\ell)=\sum_{m\in\ell}w_{c,m}/\sum_m w_{c,m}},
+where \eqn{w_{c,m}} are UMAP-derived cell-landmark connection strengths.
+\item With \code{.ref.obj}: label confidence is kNN voting frequency in reference space,
+\eqn{\mathrm{conf}(c,\ell)=N_{c,\ell}/k} with \eqn{k=10} nearest neighbors.
+\item In both modes, a label is accepted only if
+\eqn{\mathrm{conf}(c,\ell) \ge {.label.confidence}}; otherwise
+the cell is labeled \code{"..low.confidence.."}.
 }
 
 \strong{Reference-Based Cell Typing:}
@@ -120,7 +130,7 @@ For each sample, the function:
 When \code{.ref.obj} is provided:
 \itemize{
 \item Expression is mapped to reference via Symphony
-\item Cell types assigned by nearest neighbor in reference embedding
+\item Cell types assigned by kNN voting (k = 10) in reference embedding
 \item Landmark cell types updated and used for visualization/statistics
 \item Replaces any existing manual cell type annotations
 }

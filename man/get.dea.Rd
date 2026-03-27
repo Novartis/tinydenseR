@@ -40,10 +40,10 @@ Only cells whose fuzzy mass ratio to the target landmarks meets the confidence t
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 
-\item{.label.confidence}{Numeric scalar in \code{[0.5,1]} controlling the minimum posterior
+\item{.label.confidence}{Numeric scalar in \code{[0,1]} controlling the minimum posterior
 confidence required to assign a cell to a set of target landmarks (used when \code{.id.idx} is
 provided). For each cell, the ratio of fuzzy membership mass to the target landmarks vs total
-fuzzy mass is computed; cells below this threshold are excluded from aggregation. Default 0.8.}
+fuzzy mass is computed; cells below this threshold are excluded from aggregation. Default 0.5.}
 }
 \value{
 A list containing DE analysis results (legacy format). Use \code{get.pbDE()} instead
