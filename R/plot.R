@@ -3209,14 +3209,13 @@ plotSpecDE.TDRObj <-
   .order.by = "dens.contrast",
   .add.annot = NULL,
   .order.decreasing = FALSE,
-  .viridis.options.annot = c("cividis", "rocket", "inferno", "mako", "magma"),
+  .viridis.options.annot = c("cividis", "rocket", "inferno", "mako", "magma", "turbo"),
   .annot.panel.height = 0.15,
   .panel.width = 4,
   .panel.height = 3,
   .feature.font.size = 7,
   .show.landmark.labels = FALSE,
-  .label.substr.rm = "",
-  .Y.label.suffix = "(centered)"
+  .label.substr.rm = ""
 ) {
 
   # R CMD check appeasement
@@ -3664,23 +3663,14 @@ plotSpecDE.TDRObj <-
 
       .option.this <-
         if (dim.name %in% colnames(x = scores.ordered)) {
-          "turbo"
+          "Purple-Green"
         } else {
           .viridis.options.annot[d]
         }
 
       # Legend title: show Y label suffix for density contrast
       legend.title <-
-        if (identical(x = dim.name, y = gsub(pattern = .label.substr.rm,
-                                            replacement = "",
-                                            x = .coef.col,
-                                            fixed = FALSE))) {
-          paste0(
-            dim.name,
-            "\n", .Y.label.suffix)
-        } else {
           dim.name
-        }
 
       ggplot2::ggplot(data = dim.df,
                       mapping = ggplot2::aes(x = landmark,
@@ -3706,6 +3696,19 @@ plotSpecDE.TDRObj <-
                 title.position = "top",
                 title.hjust = 0
               ))
+          } else if (identical(x = .option.this, y = "Purple-Green")) {
+            ggplot2::scale_fill_gradientn(
+              colours = grDevices::hcl.colors(256, palette = "Purple-Green"),
+              rescaler = function(x, to = c(0, 1), from = range(x, na.rm = TRUE)) {
+                scales::rescale_mid(x, to, from, mid = 0)
+              },
+              name = legend.title,
+              guide = ggplot2::guide_colorbar(
+                direction = "vertical",
+                barwidth = grid::unit(x = 0.15, units = "in"),
+                barheight = grid::unit(x = 0.5, units = "in"),
+                title.position = "top",
+                title.hjust = 0))
           } else {
             ggplot2::scale_fill_viridis_c(
               option = .option.this,
@@ -5005,9 +5008,13 @@ plotPlsDE.TDRObj <-
       ggplot2::guides(color = ggplot2::guide_colorbar(title.position = "top",
                                                       title.hjust = 0.5)) +
       ggplot2::geom_point(size = I(x = .point.size)) +
-      ggplot2::scale_color_viridis_c(
-        option = "turbo",
-        name = comp.name
+      ggplot2::scale_color_gradientn(
+        colours = grDevices::hcl.colors(256, palette = "Purple-Green"),
+        rescaler = function(x, to = c(0, 1), from = range(x, na.rm = TRUE)) {
+          scales::rescale_mid(x, to, from, mid = 0)
+        },
+        name = comp.name,
+        guide = ggplot2::guide_colorbar(title.position = "top", title.hjust = 0.5)
       ) +
       ggplot2::labs(
         title = comp.name,
@@ -5265,7 +5272,6 @@ plotPlsDEHeatmap.TDRObj <-
       .method.name = "plsDE",
       .dim.string = "plsDE.dim",
       .row.annot.title = "loadings",
-      .Y.label.suffix = "(raw log2 FC)",
       .n.features = .n.features,
       .order.by = .order.by,
       .add.annot = .add.annot,

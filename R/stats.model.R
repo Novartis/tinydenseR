@@ -683,10 +683,10 @@ get.lm.TDRObj <-
 #' @param .force.recalc Logical: if TRUE, overwrite existing results in the specified slot 
 #'   (default FALSE). If FALSE and slot already exists, an error is thrown.
 #' @param .verbose Logical: print progress messages? Default TRUE.
-#' @param .label.confidence Numeric scalar in \code{[0.5,1]} controlling the minimum posterior
+#' @param .label.confidence Numeric scalar in \code{[0,1]} controlling the minimum posterior
 #'   confidence required to assign a cell to a set of target landmarks (used when \code{.id.idx} is
 #'   provided). For each cell, the ratio of fuzzy membership mass to the target landmarks vs total
-#'   fuzzy mass is computed; cells below this threshold are excluded from aggregation. Default 0.8.
+#'   fuzzy mass is computed; cells below this threshold are excluded from aggregation. Default 0.5.
 #'   
 #' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}:
 #'   \describe{
@@ -799,13 +799,11 @@ get.pbDE.TDRObj <-
     ...
   ) {
     .tdr.obj <- x
+
+    .tdr_validate_label_confidence(.label.confidence)
     
     i <- j <- landmark <- cell <- label <- x <- confidence <-
       NULL
-    
-    if(.label.confidence < 0.5 || .label.confidence > 1){
-      stop(".label.confidence must be between 0.5 and 1")
-    }
     
     if(!is.null(x = .geneset.ls)){
       if(.tdr.obj@config$assay.type != "RNA"){
@@ -937,41 +935,16 @@ get.pbDE.TDRObj <-
       .lm.idx <-
         lapply(X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graph"),
                FUN = function(smpl) {
-                 
                  in.and.out <-
-                   Matrix::summary(object = smpl) |>
-                   dplyr::rename(cell = i,
-                                 landmark = j) |>
-                   dplyr::mutate(label = tmp.lbl[landmark]) |>
-                   dplyr::select(-landmark) |>
-                   collapse::fgroup_by(cell,
-                                       label,
-                                       sort = FALSE) |>
-                   collapse::fsum() |>
-                   collapse::fgroup_by(cell,
-                                       sort = FALSE) |>
-                   collapse::fmutate(confidence = x / collapse::fsum(x)) |>
-                   collapse::fungroup() |>
-                   collapse::fsubset(confidence >= .label.confidence) |>
-                   collapse::roworderv(cols = "confidence",
-                                       decreasing = TRUE) |>
-                   collapse::fgroup_by(cell,
-                                       sort = FALSE) |>
-                   collapse::ffirst() |>
-                   (\(x)
-                    {
-                      label <-
-                        rep(x = "..low.confidence..",
-                            times = nrow(x = smpl))
-                      
-                      label[x$cell] <-
-                        x$label
-                      
-                      label
-                      
-                   }
-                   )()
-                 
+                   .tdr_transfer_labels(
+                     .method = "fuzzy",
+                     .label.confidence = .label.confidence,
+                     .n.cells = nrow(x = smpl),
+                     .cell.names = seq_len(length.out = nrow(x = smpl)),
+                     .fgraph = smpl,
+                     .landmark.labels = tmp.lbl
+                   )
+
                  which(x = in.and.out == "in")
                  
                })
@@ -1319,6 +1292,8 @@ get.dea <- function(
     .verbose = TRUE,
     .label.confidence = 0.5
 ) {
+  .tdr_validate_label_confidence(.label.confidence)
+
   .Deprecated("get.pbDE", 
               msg = "get.dea() is deprecated. Use get.pbDE() instead, which stores results in .tdr.obj$pbDE.")
   
@@ -1375,8 +1350,8 @@ get.dea <- function(
 #' @param .comparison.name Character: A name for this comparison. If NULL (default), auto-generated 
 #'   from .id1 and .id2 values (e.g., "cluster.1_vs_all" or "cluster.1_vs_cluster.2").
 #' @param .force.recalc Logical: If TRUE, recalculate even if results exist (default: FALSE).
-#' @param .label.confidence Numeric (0.5-1): minimum confidence threshold for cell-to-population
-#'   assignment when using \code{.id1.idx} or \code{.id2.idx} (default: 0.8). For each cell, the
+#' @param .label.confidence Numeric (0-1): minimum confidence threshold for cell-to-population
+#'   assignment when using \code{.id1.idx} or \code{.id2.idx} (default: 0.5). For each cell, the
 #'   fraction of its fuzzy graph weight falling on "in" vs "out" landmarks is computed; cells below
 #'   this threshold are excluded as low-confidence assignments.
 #'   
@@ -1502,13 +1477,11 @@ get.markerDE.TDRObj <-
     ...
   ) {
     .tdr.obj <- x
+
+    .tdr_validate_label_confidence(.label.confidence)
     
     i <- j <- landmark <- cell <- label <- x <- confidence <-
       NULL
-    
-    if(.label.confidence < 0.5 || .label.confidence > 1){
-      stop(".label.confidence must be between 0.5 and 1")
-    }
     
     if(!is.null(x = .geneset.ls)){
       if(.tdr.obj@config$assay.type != "RNA"){
@@ -1587,41 +1560,16 @@ get.markerDE.TDRObj <-
       .lm1.idx <-
         lapply(X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graph"),
                FUN = function(smpl) {
-                 
                  in.and.out <-
-                   Matrix::summary(object = smpl) |>
-                   dplyr::rename(cell = i,
-                                 landmark = j) |>
-                   dplyr::mutate(label = tmp.lbl1[landmark]) |>
-                   dplyr::select(-landmark) |>
-                   collapse::fgroup_by(cell,
-                                       label,
-                                       sort = FALSE) |>
-                   collapse::fsum() |>
-                   collapse::fgroup_by(cell,
-                                       sort = FALSE) |>
-                   collapse::fmutate(confidence = x / collapse::fsum(x)) |>
-                   collapse::fungroup() |>
-                   collapse::fsubset(confidence >= .label.confidence) |>
-                   collapse::roworderv(cols = "confidence",
-                                       decreasing = TRUE) |>
-                   collapse::fgroup_by(cell,
-                                       sort = FALSE) |>
-                   collapse::ffirst() |>
-                   (\(x)
-                    {
-                      label <-
-                        rep(x = "..low.confidence..",
-                            times = nrow(x = smpl))
-                      
-                      label[x$cell] <-
-                        x$label
-                      
-                      label
-                      
-                   }
-                   )()
-                 
+                   .tdr_transfer_labels(
+                     .method = "fuzzy",
+                     .label.confidence = .label.confidence,
+                     .n.cells = nrow(x = smpl),
+                     .cell.names = seq_len(length.out = nrow(x = smpl)),
+                     .fgraph = smpl,
+                     .landmark.labels = tmp.lbl1
+                   )
+
                  which(x = in.and.out == "in")
                  
                })
@@ -1672,41 +1620,16 @@ get.markerDE.TDRObj <-
         .lm2.idx <-
           lapply(X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graph"),
                  FUN = function(smpl) {
-                   
                    in.and.out <-
-                     Matrix::summary(object = smpl) |>
-                     dplyr::rename(cell = i,
-                                   landmark = j) |>
-                     dplyr::mutate(label = tmp.lbl2[landmark]) |>
-                     dplyr::select(-landmark) |>
-                     collapse::fgroup_by(cell,
-                                         label,
-                                         sort = FALSE) |>
-                     collapse::fsum() |>
-                     collapse::fgroup_by(cell,
-                                         sort = FALSE) |>
-                     collapse::fmutate(confidence = x / collapse::fsum(x)) |>
-                     collapse::fungroup() |>
-                     collapse::fsubset(confidence >= .label.confidence) |>
-                     collapse::roworderv(cols = "confidence",
-                                         decreasing = TRUE) |>
-                     collapse::fgroup_by(cell,
-                                         sort = FALSE) |>
-                     collapse::ffirst() |>
-                     (\(x)
-                      {
-                        label <-
-                          rep(x = "..low.confidence..",
-                              times = nrow(x = smpl))
-                        
-                        label[x$cell] <-
-                          x$label
-                        
-                        label
-                        
-                     }
-                     )()
-                   
+                     .tdr_transfer_labels(
+                       .method = "fuzzy",
+                       .label.confidence = .label.confidence,
+                       .n.cells = nrow(x = smpl),
+                       .cell.names = seq_len(length.out = nrow(x = smpl)),
+                       .fgraph = smpl,
+                       .landmark.labels = tmp.lbl2
+                     )
+
                    which(x = in.and.out == "in")
                    
                  })
@@ -2161,7 +2084,7 @@ get.markerDE.TDRObj <-
 #' @param .id1 Cluster/celltype IDs for group 1.
 #' @param .id2 Reference group IDs. Default \code{"..all.other.landmarks.."}.
 #' @param .id.from "clustering" or "celltyping".
-#' @param .label.confidence Numeric (0.5-1): minimum confidence for cell assignment (default: 0.8).
+#' @param .label.confidence Numeric (0-1): minimum confidence for cell assignment (default: 0.5).
 #'
 #' @return A .tdr.obj with results stored in .tdr.obj$markerDE$.deprecated.call$result.
 #' @seealso \code{\link{get.markerDE}}
@@ -2176,6 +2099,8 @@ get.marker <- function(
     .id.from = "clustering",
     .label.confidence = 0.5
 ) {
+  .tdr_validate_label_confidence(.label.confidence)
+
   .Deprecated("get.markerDE", 
               msg = "get.marker() is deprecated. Use get.markerDE() instead, which stores results in .tdr.obj$markerDE.")
   

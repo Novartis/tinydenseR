@@ -68,10 +68,10 @@ population-specific DE results under the same model.}
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 
-\item{.label.confidence}{Numeric scalar in \code{[0.5,1]} controlling the minimum posterior
+\item{.label.confidence}{Numeric scalar in \code{[0,1]} controlling the minimum posterior
 confidence required to assign a cell to a set of target landmarks (used when \code{.id.idx} is
 provided). For each cell, the ratio of fuzzy membership mass to the target landmarks vs total
-fuzzy mass is computed; cells below this threshold are excluded from aggregation. Default 0.8.}
+fuzzy mass is computed; cells below this threshold are excluded from aggregation. Default 0.5.}
 }
 \value{
 The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}:

@@ -62,8 +62,8 @@ from .id1 and .id2 values (e.g., "cluster.1_vs_all" or "cluster.1_vs_cluster.2")
 
 \item{.force.recalc}{Logical: If TRUE, recalculate even if results exist (default: FALSE).}
 
-\item{.label.confidence}{Numeric (0.5-1): minimum confidence threshold for cell-to-population
-assignment when using \code{.id1.idx} or \code{.id2.idx} (default: 0.8). For each cell, the
+\item{.label.confidence}{Numeric (0-1): minimum confidence threshold for cell-to-population
+assignment when using \code{.id1.idx} or \code{.id2.idx} (default: 0.5). For each cell, the
 fraction of its fuzzy graph weight falling on "in" vs "out" landmarks is computed; cells below
 this threshold are excluded as low-confidence assignments.}
 }
