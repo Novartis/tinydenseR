@@ -636,7 +636,7 @@ get.graph.TDRObj <-
 #'   calculations. Only one value allowed; merge multiple populations first via \code{celltyping}.
 #' @param .verbose Logical for progress messages (default TRUE).
 #' @param .seed Integer seed for reproducibility (default 123).
-#' @param .label.confidence Numeric scalar in \code{[0.5,1]} controlling the minimum posterior confidence required
+#' @param .label.confidence Numeric scalar in \code{[0,1]} controlling the minimum posterior confidence required
 #'   to assign a cell to a landmark‑derived cluster/celltype label.
 #' @param .cache.on.disk Logical (default TRUE). When \code{TRUE}, four large per-sample
 #'   slots (\code{clustering$ids}, \code{celltyping$ids}, \code{nearest.landmarks},
@@ -644,13 +644,13 @@ get.graph.TDRObj <-
 #'   from memory. Downstream accessors (e.g.\ in \code{get.pbDE}, \code{goi.summary})
 #'   read them back lazily on a per-sample basis. Set to \code{FALSE} to keep everything
 #'   in memory (original behaviour).
-#' @param .cache.dir Character path to the directory where cached slot files are stored.
-#'   Default \code{NULL}: a \code{tdr_cache/<run_key>/} subdirectory is created inside
-#'   the same parent directory that holds the per-sample expression RDS files
-#'   (\code{dirname(.tdr.obj$cells[[1]])}). Set to a persistent path (e.g.
-#'   \code{"/scratch/my_project/cache"}) if you plan to \code{saveRDS} the object
-#'   and reload it in a future session or if the expression RDS files reside in
-#'   \code{tempdir()} (which is deleted when the R session ends).
+#'
+#'   Cache files are stored under the system temporary directory
+#'   (\code{tempdir()}) and are automatically removed when the R session
+#'   ends via a registered finalizer.  This means the cache is
+#'   \strong{ephemeral} and never persists across R sessions.  There are
+#'   no implications for reproducibility since the cache only stores
+#'   intermediate results that are recomputed deterministically.
 #'   
 #' @return Updated \code{.tdr.obj} with \code{$map} component containing:
 #'   \itemize{
@@ -692,14 +692,24 @@ get.graph.TDRObj <-
 #' 1. Loads expression data and normalizes (size factors for RNA, marker subset for cytometry)
 #' 2. Projects to PCA/Harmony space (matching landmark processing)
 #' 3. Uses landmark UMAP model to compute fuzzy graph (cell-landmark edge weights) and find nearest landmarks
-#' 4. Assigns clusters/cell types by nearest landmark
+#' 4. Assigns clusters/cell types by confidence-thresholded voting
 #' 5. Aggregates fuzzy graph edge weights into landmark densities per sample
+#'
+#' \strong{Label transfer confidence model:}
+#' - Without `.ref.obj`: label confidence is the normalized fuzzy-mass ratio,
+#'   \eqn{\mathrm{conf}(c,\ell)=\sum_{m\in\ell}w_{c,m}/\sum_m w_{c,m}},
+#'   where \eqn{w_{c,m}} are UMAP-derived cell-landmark connection strengths.
+#' - With `.ref.obj`: label confidence is kNN voting frequency in reference space,
+#'   \eqn{\mathrm{conf}(c,\ell)=N_{c,\ell}/k} with \eqn{k=10} nearest neighbors.
+#' - In both modes, a label is accepted only if
+#'   \eqn{\mathrm{conf}(c,\ell) \ge {.label.confidence}}; otherwise
+#'   the cell is labeled `"..low.confidence.."`.
 #' 
 #' \strong{Reference-Based Cell Typing:}
 #' 
 #' When \code{.ref.obj} is provided:
 #' - Expression is mapped to reference via Symphony
-#' - Cell types assigned by nearest neighbor in reference embedding
+#' - Cell types assigned by kNN voting (k = 10) in reference embedding
 #' - Landmark cell types updated and used for visualization/statistics
 #' - Replaces any existing manual cell type annotations
 #' 
@@ -745,17 +755,14 @@ get.map.TDRObj <-
            .seed = 123,
            .label.confidence = 0.5,
            .cache.on.disk = TRUE,
-           .cache.dir = NULL,
            ...){
     .tdr.obj <- x
+
+    .tdr_validate_label_confidence(.label.confidence)
     
     # R CMD check appeasement for non-standard evaluation in dplyr and collapse
     ref.idx <- N <- cell.pop <- id <- value <- ri <- i <- j <- landmark <- cell <- label <- x <- confidence <-
       NULL
-    
-    if(.label.confidence < 0.5 || .label.confidence > 1){
-      stop(".label.confidence must be between 0.5 and 1")
-    }
     
     # Persist label confidence for downstream refresh (e.g. late celltyping)
     .tdr.obj@config$label.confidence <- .label.confidence
@@ -869,19 +876,17 @@ get.map.TDRObj <-
     # not file paths, so dirname() would fail).
     backend <- .tdr.obj@config$backend
     if (is.null(backend)) backend <- "files"
-    if (backend != "files" && isTRUE(.cache.on.disk) && is.null(.cache.dir)) {
+    if (backend != "files" && isTRUE(.cache.on.disk)) {
       .cache.on.disk <- FALSE
     }
 
     .cache.meta <- NULL
     if (isTRUE(x = .cache.on.disk)) {
-      if (is.null(x = .cache.dir)) {
-        .cache.dir <- file.path(getwd(), "tdr_cache")
-      }
       .run_key <- .tdr_make_run_key()
-      .run_cache_dir <- file.path(.cache.dir, .run_key)
+      .run_cache_dir <- file.path(.tdr_cache_root(), .run_key)
       dir.create(.run_cache_dir, recursive = TRUE, showWarnings = FALSE)
       .tdr_cache_sweep_orphans(.run_cache_dir)
+      .tdr_cache_register_cleanup(.run_cache_dir)
       .cache.meta <- list(
         root    = .run_cache_dir,
         on.disk = TRUE,
@@ -1019,39 +1024,14 @@ get.map.TDRObj <-
         }
         
         res2$cell.clustering <-
-          Matrix::summary(object = res2$fgraph) |>
-          dplyr::rename(cell = i,
-                        landmark = j) |>
-          dplyr::mutate(label = as.character(x = .tdr.obj@landmark.annot$clustering$ids[landmark])) |>
-          dplyr::select(-landmark) |>
-          collapse::fgroup_by(cell,
-                              label,
-                              sort = FALSE) |>
-          collapse::fsum() |>
-          collapse::fgroup_by(cell,
-                              sort = FALSE) |>
-          collapse::fmutate(confidence = x / collapse::fsum(x)) |>
-          collapse::fungroup() |>
-          collapse::fsubset(confidence >= .label.confidence) |>
-          collapse::roworderv(cols = "confidence",
-                              decreasing = TRUE) |>
-          collapse::fgroup_by(cell,
-                              sort = FALSE) |>
-          collapse::ffirst() |>
-          (\(x)
-           {
-             label <- 
-               rep(x = "..low.confidence..",
-                   times = nrow(x = mat.exprs))
-             
-             label[x$cell] <-
-               x$label
-             
-             stats::setNames(object = label,
-                             nm = rownames(x = mat.exprs)
-             )
-          }
-          )()
+          .tdr_transfer_labels(
+            .method = "fuzzy",
+            .label.confidence = .label.confidence,
+            .n.cells = nrow(x = mat.exprs),
+            .cell.names = rownames(x = mat.exprs),
+            .fgraph = res2$fgraph,
+            .landmark.labels = .tdr.obj@landmark.annot$clustering$ids
+          )
         
         if(is.null(x = .tdr.obj@integration$symphony.obj)){
           
@@ -1064,39 +1044,14 @@ get.map.TDRObj <-
             }
             
             res2$cell.celltyping <-
-              Matrix::summary(object = res2$fgraph) |>
-              dplyr::rename(cell = i,
-                            landmark = j) |>
-              dplyr::mutate(label = as.character(x = .tdr.obj@landmark.annot$celltyping$ids[landmark])) |>
-              dplyr::select(-landmark) |>
-              collapse::fgroup_by(cell,
-                                  label,
-                                  sort = FALSE) |>
-              collapse::fsum() |>
-              collapse::fgroup_by(cell,
-                                  sort = FALSE) |>
-              collapse::fmutate(confidence = x / collapse::fsum(x)) |>
-              collapse::fungroup() |>
-              collapse::fsubset(confidence >= .label.confidence) |>
-              collapse::roworderv(cols = "confidence",
-                                  decreasing = TRUE) |>
-              collapse::fgroup_by(cell,
-                                  sort = FALSE) |>
-              collapse::ffirst() |>
-              (\(x)
-               {
-                 label <- 
-                   rep(x = "..low.confidence..",
-                       times = nrow(x = mat.exprs))
-                 
-                 label[x$cell] <-
-                   x$label
-                 
-                 stats::setNames(object = label,
-                                 nm = rownames(x = mat.exprs)
-                 )
-              }
-              )()
+              .tdr_transfer_labels(
+                .method = "fuzzy",
+                .label.confidence = .label.confidence,
+                .n.cells = nrow(x = mat.exprs),
+                .cell.names = rownames(x = mat.exprs),
+                .fgraph = res2$fgraph,
+                .landmark.labels = .tdr.obj@landmark.annot$celltyping$ids
+              )
             
           }
           
@@ -1149,43 +1104,16 @@ get.map.TDRObj <-
           #  stats::setNames(nm = colnames(x = raw.exprs)[!cells.of.interest])  
           
           res2$cell.celltyping <-
-            data.frame(cell = rep(x = ncol(x = raw.exprs) |>
-                                    seq_len(),
-                                  times = ncol(x = nn$idx)),
-                       ref.idx = as.vector(x = nn$idx)) |>
-            dplyr::mutate(label = as.character(x = .tdr.obj@integration$symphony.obj$meta_data[[
-              .tdr.obj@integration$symphony.obj$celltype.col.name
-            ]])[ref.idx]) |>
-            dplyr::select(-ref.idx) |>
-            collapse::fgroup_by(cell,
-                                label,
-                                sort = FALSE) |>
-            collapse::fcount() |>
-            collapse::fgroup_by(cell,
-                                label,
-                                sort = FALSE) |>
-            collapse::fmutate(confidence = N / ncol(x = nn$idx)) |>
-            collapse::fungroup() |>
-            collapse::fsubset(confidence >= .label.confidence) |>
-            collapse::roworderv(cols = "confidence",
-                                decreasing = TRUE) |>
-            collapse::fgroup_by(cell,
-                                sort = FALSE) |>
-            collapse::ffirst() |>
-            (\(x)
-             {
-               label <- 
-                 rep(x = "..low.confidence..",
-                     times = ncol(x = raw.exprs))
-               
-               label[x$cell] <-
-                 x$label
-               
-               stats::setNames(object = label,
-                               nm = colnames(x = raw.exprs)
-               )
-            }
-            )()
+            .tdr_transfer_labels(
+              .method = "knn_vote",
+              .label.confidence = .label.confidence,
+              .n.cells = ncol(x = raw.exprs),
+              .cell.names = colnames(x = raw.exprs),
+              .nn.idx = nn$idx,
+              .ref.labels = .tdr.obj@integration$symphony.obj$meta_data[[
+                .tdr.obj@integration$symphony.obj$celltype.col.name
+              ]]
+            )
           
           res2$lm.celltyping <-
             res2$cell.celltyping[!cells.of.interest]

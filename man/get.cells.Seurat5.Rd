@@ -10,9 +10,11 @@ get.cells.Seurat5(
   .sample.var,
   .assay = "RNA",
   .layer.pattern = "counts",
+  .layer.name.source = NULL,
   .min.cells.per.sample = 10,
   .compress = FALSE,
-  .verbose = TRUE
+  .verbose = TRUE,
+  .dest.path = NULL
 )
 }
 \arguments{
@@ -29,21 +31,28 @@ each cell belongs to (e.g., "sample_id", "Sample", "orig.ident").}
 \item{.layer.pattern}{Character: pattern to match layer names. Default "counts" matches layers
 containing count data (e.g., "counts.Sample1", "counts.Sample2"). Uses \code{fixed = TRUE} matching.}
 
+\item{.layer.name.source}{Character: optional metadata column mapping each cell to a layer label.
+If provided, only cells where this column matches the current layer label are included for that sample.
+This allows for more flexible layer naming schemes. Default NULL (no additional filtering).}
+
 \item{.min.cells.per.sample}{Integer: minimum cells required per sample. Samples with fewer cells
 are excluded. Default 10.}
 
 \item{.compress}{Logical: compress RDS files? Default FALSE for faster I/O.}
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
+
+\item{.dest.path}{Character: optional directory path to save \code{.cells} RDS files. If NULL, files are saved as temporary files.}
 }
 \value{
 Named list of file paths to temporary RDS files, one per sample. Only includes samples
 meeting minimum cell threshold and present in \code{.meta}.
 }
 \description{
-Converts a Seurat v5 object with layered data into tinydenseR's .cells format. Handles Seurat's
-v5 assay structure where data is split across multiple layers. Each sample's cells are extracted,
-combined across layers, and saved as temporary RDS files.
+Converts a Seurat v5 object with layered data into tinydenseR's .cells format. Can handle Seurat's
+v5 assay structure where data is split across multiple layers if all cells in a single sample are contained
+within a single layer (for example, samples 1:3 in layer \code{x} and sample 4:6 in layer \code{y}). If cells within
+a sample are split across layers, an error is thrown.
 }
 \details{
 Seurat v5 uses a layered assay structure where data for different samples may be stored in
@@ -51,8 +60,8 @@ separate layers. This function:
 \enumerate{
 \item Identifies all layers matching \code{.layer.pattern}
 \item Finds common genes across all layers
-\item Extracts cells for each sample across matching layers
-\item Combines layer data into single sparse matrix per sample
+\item Validates each sample maps to one layer (when multiple layers are present)
+\item Extracts and combines sample cells from matching layer data into one sparse matrix per sample
 \item Saves as temporary RDS files for memory-efficient processing
 }
 
