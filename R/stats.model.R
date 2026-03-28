@@ -2992,7 +2992,7 @@ get.embedding.TDRObj <-
 
 
 # =============================================================================
-# Internal helpers shared by get.specDE, get.nmfDE, get.plsDE
+# Internal helpers shared by get.specDE, get.nmfDE, get.plsD
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -3969,7 +3969,7 @@ get.specDE.TDRObj <-
 #'
 #' @seealso \code{\link{get.lm}} (required predecessor),
 #'   \code{\link{get.specDE}} (specDE: SVD-based peer method),
-#'   \code{\link{get.plsDE}} (plsDE: PLS-based peer method),
+#'   \code{\link{get.plsD}} (plsD: PLS-based peer method),
 #'   \code{\link{plotNmfDE}} (visualization), \code{\link{plotNmfDEHeatmap}} (heatmap)
 #'
 #' @examples
@@ -4540,16 +4540,16 @@ get.nmfDE.TDRObj <-
   }
 
 
-#' Graph-Diffused, Density Contrast-Aligned PLS for Differential Expression
+#' Graph-Diffused, Density Contrast-Aligned PLS Decomposition (plsD)
 #'
 #' Decomposes an expression interaction matrix M.local via NIPALS PLS1
-#' against the density-contrast vector Y. plsDE identifies features that drive
+#' against the density-contrast vector Y. plsD generates candidate features that drive
 #' the density contrast — including population markers (DA), differentially
 #' expressed genes (DE), and their mixture — by maximizing covariance between
 #' graph-smoothed expression and Y.
 #'
 #' @details
-#' plsDE is an \strong{interpretive decomposition}, not a formal hypothesis test.
+#' plsD is an \strong{interpretive decomposition}, not a formal hypothesis test.
 #' It answers: "What features — through expression patterns, population identity,
 #' or both — explain the density contrast?" Loadings reflect this combined signal:
 #' markers of depleted populations carry negative loadings (high expression where
@@ -4558,7 +4558,7 @@ get.nmfDE.TDRObj <-
 #'
 #' When \code{.YX.interaction = TRUE} (default), the interaction term diag(Y)
 #' bakes the density contrast into the data matrix:
-#' M.local = P \%*\% diag(Y) \%*\% Xc. This gives plsDE comprehensive scope:
+#' M.local = P \%*\% diag(Y) \%*\% Xc. This gives plsD comprehensive scope:
 #' it captures DA markers, DE genes, and their interplay in a single
 #' decomposition. The interaction amplifies expression signal in landmarks
 #' with strong density contrast, making the method sensitive even to subtle DE
@@ -4595,14 +4595,14 @@ get.nmfDE.TDRObj <-
 #' \strong{Ak (Y-alignment):} Measures how strongly component scores covary with
 #' density contrast Y. Ak is high by construction for the leading components:
 #' NIPALS PLS1 maximizes covariance with Y at every deflation step. Components
-#' are ordered by extraction (plsDE1 = highest covariance with Y).
+#' are ordered by extraction (plsD1 = highest covariance with Y).
 #'
 #' \strong{Sk (graph smoothness):} Derived from the normalized Laplacian applied to
 #' score vectors. High Sk indicates large-scale, graph-smooth structure.
 #'
 #' \strong{About Y appearing on both sides (when .YX.interaction = TRUE):}
 #' Y appears in both the data matrix (via diag(Y) in M.local) and the PLS objective
-#' (maximize covariance with Y). This is intentional: it gives plsDE comprehensive
+#' (maximize covariance with Y). This is intentional: it gives plsD comprehensive
 #' sensitivity to features driving density changes. The design is not circular
 #' because the expression matrix Xc sits between: the product is large only when
 #' features exist whose Y-weighted, graph-smoothed expression genuinely covaries
@@ -4610,7 +4610,7 @@ get.nmfDE.TDRObj <-
 #' removes Y from the data matrix entirely, providing a diagnostic comparator.
 #'
 #' \strong{Structural score constraints and the balancing effect:}
-#' The score vectors computed by plsDE are structurally mean-zero across landmarks. This
+#' The score vectors computed by plsD are structurally mean-zero across landmarks. This
 #' is a mathematical consequence of column-centering \code{M.local}: for any weight vector
 #' \code{w}, the score \code{t = M.local w} satisfies \code{sum(t) = 0}. As a result, a
 #' dominant positive pole (landmarks with large positive scores) must be balanced by
@@ -4622,7 +4622,7 @@ get.nmfDE.TDRObj <-
 #' then appear coherent and strong, mimicking a genuine opposing biological program.
 #'
 #' \strong{Distinguishing genuine signal from structural counterweight}: the
-#' \code{plotPlsDE} scatter panel colors landmarks by their \emph{raw} (uncentered)
+#' \code{plotPlsD} scatter panel colors landmarks by their \emph{raw} (uncentered)
 #' density contrast coefficient. If landmarks with large negative scores show near-zero
 #' or positive raw coefficients, they are geometric counterweights rather than genuinely
 #' depleted populations. Conversely (depending on contrast direction and component),
@@ -4630,7 +4630,7 @@ get.nmfDE.TDRObj <-
 #' structural balance.
 #'
 #' \strong{Pre-analysis diagnostic}: if unexpected strong balancing is observed, compute
-#' the row-wise interaction norm distribution before running plsDE:
+#' the row-wise interaction norm distribution before running plsD:
 #' \preformatted{
 #' Yc <- coef.mat[, .coef.col]; Yc <- Yc - mean(Yc)
 #' # Xc: size-factor-normalized, log2-transformed, column-centered expression
@@ -4641,12 +4641,12 @@ get.nmfDE.TDRObj <-
 #' Frobenius norm squared) indicates dominant leverage; reduce \code{.lazy.alpha} or
 #' winsorize \code{Yc} before proceeding.
 #'
-#' @note plsDE is designed as an exploratory tool to help interpret density
+#' @note plsD is designed as an exploratory tool to help interpret density
 #'   changes in terms of the features driving them. It does not provide
 #'   gene-level p-values or formal multiple testing correction. For rigorous
 #'   differential expression testing with p-values following field standards,
 #'   use \code{\link{get.pbDE}} (pseudobulk DE via edgeR/limma) or
-#'   \code{\link{get.markerDE}} (marker-level DE). plsDE complements these
+#'   \code{\link{get.markerDE}} (marker-level DE). plsD complements these
 #'   methods by providing a multivariate, graph-aware decomposition that
 #'   captures joint DA/DE patterns not visible in gene-by-gene tests.
 #'
@@ -4675,7 +4675,7 @@ get.nmfDE.TDRObj <-
 #'   unexpected balancing is observed. Values < 1 also incidentally damp oscillations
 #'   on sparse/irregular graphs.
 #' @param .YX.interaction Logical: if TRUE (default), construct
-#'   M.local = P diag(Y) Xc (Y-weighted interaction). Loadings capture features
+#'   M.local = P diag(Y) Xc (Y-weighted interaction). Loadings capture candidate features
 #'   driving the density contrast through both differential abundance (population
 #'   markers) and differential expression. If FALSE, construct M.local = P Xc
 #'   (graph-smoothed expression only; Y appears only on the response side).
@@ -4695,7 +4695,7 @@ get.nmfDE.TDRObj <-
 #'   (robust to outliers and nonlinearity; slower, O(nnz * log(m_g) * K)).
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #'
-#' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$plsDE[[.coef.col]]}:
+#' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$plsD[[.coef.col]]}:
 #'   \describe{
 #'     \item{scores}{Matrix (landmarks x K): PLS scores (oriented so positive = aligned with Y)}
 #'     \item{feature.weights}{Matrix (genes x K): PLS feature weight vectors w (unit-norm)}
@@ -4741,37 +4741,37 @@ get.nmfDE.TDRObj <-
 #' @seealso \code{\link{get.lm}} (required predecessor),
 #'   \code{\link{get.specDE}} (specDE: SVD-based peer method),
 #'   \code{\link{get.nmfDE}} (nmfDE: NMF-based peer method),
-#'   \code{\link{plotPlsDE}} (visualization), \code{\link{plotPlsDEHeatmap}} (heatmap)
+#'   \code{\link{plotPlsD}} (visualization), \code{\link{plotPlsDHeatmap}} (heatmap)
 #'
 #' @examples
 #' \dontrun{
 #' # After fitting linear model
 #' lm.obj <- get.lm(lm.obj, .design = design)
 #'
-#' # Run plsDE for "Infection" coefficient
-#' lm.obj <- get.plsDE(lm.obj, .coef.col = "Infection")
+#' # Run plsD for "Infection" coefficient
+#' lm.obj <- get.plsD(lm.obj, .coef.col = "Infection")
 #'
 #' # Access results
-#' lm.obj$plsDE$Infection$scores[, "plsDE1"]      # PLS scores (Y-aligned)
-#' lm.obj$plsDE$Infection$loadings[, "plsDE1"]      # concordance-filtered gene loadings
-#' lm.obj$plsDE$Infection$raw.loadings[, "plsDE1"]  # raw gene loadings before concordance filtering
+#' lm.obj$plsD$Infection$scores[, "plsD1"]      # PLS scores (Y-aligned)
+#' lm.obj$plsD$Infection$loadings[, "plsD1"]      # concordance-filtered gene loadings
+#' lm.obj$plsD$Infection$raw.loadings[, "plsD1"]  # raw gene loadings before concordance filtering
 #'
 #' # Diagnostic table
 #' data.frame(
-#'   component = colnames(lm.obj$plsDE$Infection$scores),
-#'   Ak = lm.obj$plsDE$Infection$Y.alignment,
-#'   Sk = lm.obj$plsDE$Infection$smoothness
+#'   component = colnames(lm.obj$plsD$Infection$scores),
+#'   Ak = lm.obj$plsD$Infection$Y.alignment,
+#'   Sk = lm.obj$plsD$Infection$smoothness
 #' )
 #' }
 #'
 #' @param ... Additional arguments passed to methods.
 #' @export
 #'
-get.plsDE <- function(x, ...) UseMethod("get.plsDE")
+get.plsD <- function(x, ...) UseMethod("get.plsD")
 
-#' @rdname get.plsDE
+#' @rdname get.plsD
 #' @export
-get.plsDE.TDRObj <-
+get.plsD.TDRObj <-
   function(x,
            .coef.col,
            .model.name = "default",
@@ -4824,7 +4824,7 @@ get.plsDE.TDRObj <-
     # -------------------------------------------------------------------------
     
     if (isTRUE(x = .verbose)) {
-      message("\n=== plsDE: Graph-Diffused, Density Contrast-Aligned PLS for Differential Expression ===")
+      message("\n=== plsD: Graph-Diffused, Density Contrast-Aligned PLS Decomposition ===")
       message("Coefficient: ", .coef.col)
     }
     
@@ -5105,7 +5105,7 @@ get.plsDE.TDRObj <-
       if (isTRUE(x = .verbose)) {
         Ak <-
           abs(x = stats::cor(x = Y, y = t.score))
-        message(sprintf("  plsDE%d: cov = %.2f, Ak = %.4f, q = %.4f, resid.var(Y) = %.4f",
+        message(sprintf("  plsD%d: cov = %.2f, Ak = %.4f, q = %.4f, resid.var(Y) = %.4f",
                         k,
                         abs(x = sum(t.score * Y)),
                         Ak,
@@ -5124,7 +5124,7 @@ get.plsDE.TDRObj <-
     }
     
     if (.ncomp == 0L) {
-      stop("plsDE: no components could be extracted (M' Y ~ 0 on first step).")
+      stop("plsD: no components could be extracted (M' Y ~ 0 on first step).")
     }
     
     # -------------------------------------------------------------------------
@@ -5163,7 +5163,7 @@ get.plsDE.TDRObj <-
     # -------------------------------------------------------------------------
     
     comp.names <-
-      paste0("plsDE", seq_len(length.out = .ncomp))
+      paste0("plsD", seq_len(length.out = .ncomp))
     
     colnames(x = W.mat) <-
       colnames(x = T.mat) <-
@@ -5298,7 +5298,7 @@ get.plsDE.TDRObj <-
     }
     
     if (isTRUE(x = .verbose)) {
-      message("\nResults stored in: .tdr.obj$plsDE$", .coef.col)
+      message("\nResults stored in: .tdr.obj$plsD$", .coef.col)
       message("  $scores       : ", n.landmarks, " landmarks x ", .ncomp, " components")
       message("  $gene.weights : ", n.genes, " features x ", .ncomp, " components (PLS w)")
           message("  $raw.loadings : ", n.genes, " features x ", .ncomp, " components (", .loading.method, ")")

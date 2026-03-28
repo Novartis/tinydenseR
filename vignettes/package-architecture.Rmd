@@ -93,7 +93,7 @@ get.pbDE()            --> results$pb
 get.markerDE()        --> results$marker
 get.specDE()          --> results$spec
 get.nmfDE()           --> results$nmf
-get.plsDE()           --> results$pls
+get.plsD()           --> results$pls
 ```
 
 A typical workflow looks like:
@@ -134,7 +134,7 @@ get.lm.Seurat <- function(x, ...) {
 ```
 
 Functions in this tier: `get.graph()`, `get.lm()`, `get.embedding()`,
-`get.specDE()`, `get.nmfDE()`, `get.plsDE()`, `get.features()`,
+`get.specDE()`, `get.nmfDE()`, `get.plsD()`, `get.features()`,
 `lm.cluster()`, `celltyping()`.
 
 ### Tier 2: Needs Source Data
@@ -170,7 +170,7 @@ All `plot*()` functions follow this pattern: `plotPCA()`, `plotUMAP()`,
 `plotSampleEmbedding()`, `plotTradStats()`, `plotTradPerc()`,
 `plotDensity()`, `plotPbDE()`, `plotDEA()`, `plotMarkerDE()`,
 `plotHeatmap()`, `plotSpecDE()`, `plotSpecDEHeatmap()`, `plotNmfDE()`,
-`plotNmfDEHeatmap()`, `plotPlsDE()`, `plotPlsDEHeatmap()`.
+`plotNmfDEHeatmap()`, `plotPlsD()`, `plotPlsDHeatmap()`.
 
 ## Backend Data Flow
 

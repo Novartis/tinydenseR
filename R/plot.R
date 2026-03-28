@@ -3178,7 +3178,7 @@ plotSpecDE.TDRObj <-
 # Internal: Shared DE heatmap builder
 # ==========================================================================
 
-# Workhorse behind plotSpecDEHeatmap, plotNmfDEHeatmap, plotPlsDEHeatmap.
+# Workhorse behind plotSpecDEHeatmap, plotNmfDEHeatmap, plotPlsDHeatmap.
 # Each thin wrapper validates method-specific inputs, extracts
 # loadings / scores / Y, then dispatches here.
 #
@@ -3187,7 +3187,7 @@ plotSpecDE.TDRObj <-
 # @param .loadings      Named numeric vector: loadings for the primary dim
 # @param .scores        Matrix: scores for selected dims (landmarks x dims)
 # @param .Y             Named numeric vector: density contrast (centered)
-# @param .method.name   Character: "specDE", "nmfDE", or "plsDE"
+# @param .method.name   Character: "specDE", "nmfDE", or "plsD"
 # @param .dim.string    Character: method-specific .order.by option
 # @param .loading.label Character: legend title for the row annotation bar
 # @param .row.annot.title Character or NULL: title above the row annot bar
@@ -4782,28 +4782,28 @@ plotNmfDEHeatmap.TDRObj <-
 
 
 
-#' Plot plsDE Scores (Diagnostic and Component Views)
+#' Plot plsD Scores (Diagnostic and Component Views)
 #'
-#' Visualize plsDE results: either a diagnostic overview of all components
+#' Visualize plsD results: either a diagnostic overview of all components
 #' or a detailed component-level view showing embedding and Y-vs-score scatter.
 #'
 #' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
-#'   (anndataR) object after \code{get.plsDE()}.
-#' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$plsDE}.
-#' @param .plsDE.dim Integer or NULL: component to visualize (1-indexed). If NULL,
+#'   (anndataR) object after \code{get.plsD()}.
+#' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$plsD}.
+#' @param .plsD.dim Integer or NULL: component to visualize (1-indexed). If NULL,
 #'   plots Ak vs Sk diagnostic scatter for all components.
 #' @param .embed Character: either \code{"umap"} or \code{"pca"}. Default "umap".
 #' @param .point.size Numeric: point size for scatter plots. Default 1.
 #' @param .label.size Numeric: label size for diagnostic scatter plots. Default 3.
-#'   Applies only if .plsDE.dim is NULL.
+#'   Applies only if .plsD.dim is NULL.
 #' @param .panel.size Numeric: panel size in inches. Default 2.
 #' @param .seed Integer: random seed for point ordering. Default 123.
 #'
-#' @return A ggplot2 object (if \code{.plsDE.dim = NULL}) or a patchwork composition
-#'   (if \code{.plsDE.dim} is integer).
+#' @return A ggplot2 object (if \code{.plsD.dim = NULL}) or a patchwork composition
+#'   (if \code{.plsD.dim} is integer).
 #'
 #' @details
-#' \strong{Component view} (\code{.plsDE.dim = integer}):
+#' \strong{Component view} (\code{.plsD.dim = integer}):
 #' \itemize{
 #'   \item Left panel: UMAP (or PCA) embedding colored by PLS scores (diverging scale)
 #'   \item Right panel: Scatter of centered Y vs PLS scores, colored by raw (uncentered)
@@ -4818,7 +4818,7 @@ plotNmfDEHeatmap.TDRObj <-
 #'     balance from the opposite side, depending on contrast direction.
 #' }
 #'
-#' \strong{Diagnostic view} (\code{.plsDE.dim = NULL}):
+#' \strong{Diagnostic view} (\code{.plsD.dim = NULL}):
 #' \itemize{
 #'   \item X-axis: Smoothness (Sk); higher = large-scale graph-smooth structure
 #'   \item Y-axis: Y-alignment (Ak); higher = stronger density coupling
@@ -4833,32 +4833,32 @@ plotNmfDEHeatmap.TDRObj <-
 #' covariance with Y at every deflation step. The diagnostic scatter is most
 #' useful for identifying which components are also graph-smooth (high Sk).
 #'
-#' @seealso \code{\link{get.plsDE}} for computing plsDE, \code{\link{plotPlsDEHeatmap}}
+#' @seealso \code{\link{get.plsD}} for computing plsD, \code{\link{plotPlsDHeatmap}}
 #'   for expression heatmaps
 #'
 #' @examples
 #' \dontrun{
-#' # After running plsDE
-#' lm.obj <- get.plsDE(lm.obj, .coef.col = "Infection")
+#' # After running plsD
+#' lm.obj <- get.plsD(lm.obj, .coef.col = "Infection")
 #'
 #' # Diagnostic overview
-#' plotPlsDE(lm.obj, .coef.col = "Infection", .plsDE.dim = NULL)
+#' plotPlsD(lm.obj, .coef.col = "Infection", .plsD.dim = NULL)
 #'
 #' # Visualize first component
-#' plotPlsDE(lm.obj, .coef.col = "Infection", .plsDE.dim = 1)
+#' plotPlsD(lm.obj, .coef.col = "Infection", .plsD.dim = 1)
 #' }
 #'
 #' @param ... Additional arguments passed to methods.
 #' @export
-plotPlsDE <- function(x, ...) UseMethod("plotPlsDE")
+plotPlsD <- function(x, ...) UseMethod("plotPlsD")
 
-#' @rdname plotPlsDE
+#' @rdname plotPlsD
 #' @export
-plotPlsDE.TDRObj <-
+plotPlsD.TDRObj <-
   function(
     x,
     .coef.col,
-    .plsDE.dim = NULL,
+    .plsD.dim = NULL,
     .embed = "umap",
     .point.size = 1,
     .label.size = 3,
@@ -4886,31 +4886,31 @@ plotPlsDE.TDRObj <-
     if (is.null(x = .tdr.obj@results$pls[[.coef.col]])) {
       avail <-
         if (is.null(x = .tdr.obj@results$pls)) {
-          "none (run get.plsDE() first)"
+          "none (run get.plsD() first)"
         } else {
           paste(names(x = .tdr.obj@results$pls), collapse = ", ")
         }
-      stop("plsDE results for '", .coef.col, "' not found.\n",
+      stop("plsD results for '", .coef.col, "' not found.\n",
            "Available: ", avail)
     }
 
-    plsDE.res <-
+    plsD.res <-
       .tdr.obj@results$pls[[.coef.col]]
 
     # -------------------------------------------------------------------------
     # Diagnostic view: Sk x Ak scatter, colored by |q_k|
     # -------------------------------------------------------------------------
 
-    if (is.null(x = .plsDE.dim)) {
+    if (is.null(x = .plsD.dim)) {
 
       diag.df <-
         data.frame(
-          component = gsub(pattern = "plsDE",
+          component = gsub(pattern = "plsD",
                            replacement = "",
-                           x = names(x = plsDE.res$smoothness)),
-          Sk = plsDE.res$smoothness,
-          Ak = plsDE.res$Y.alignment,
-          qk = abs(x = plsDE.res$y.loadings)
+                           x = names(x = plsD.res$smoothness)),
+          Sk = plsD.res$smoothness,
+          Ak = plsD.res$Y.alignment,
+          qk = abs(x = plsD.res$y.loadings)
         )
 
       p <-
@@ -4927,7 +4927,7 @@ plotPlsDE.TDRObj <-
                                       high = unname(obj = Color.Palette[1,2]),
                                       name = expression("|" * q[k] * "|")) +
         ggplot2::labs(
-          title = paste0("plsDE diagnostics: ", .coef.col),
+          title = paste0("plsD diagnostics: ", .coef.col),
           x = "Smoothness (Sk)",
           y = "Y-alignment (Ak)"
         ) +
@@ -4949,21 +4949,21 @@ plotPlsDE.TDRObj <-
     # Component view: embedding + Y-vs-score scatter
     # -------------------------------------------------------------------------
 
-    if (!is.numeric(x = .plsDE.dim) ||
-        length(x = .plsDE.dim) != 1 ||
-        .plsDE.dim < 1 ||
-        .plsDE.dim > ncol(x = plsDE.res$coord)) {
-      stop(".plsDE.dim must be an integer between 1 and ", ncol(x = plsDE.res$coord))
+    if (!is.numeric(x = .plsD.dim) ||
+        length(x = .plsD.dim) != 1 ||
+        .plsD.dim < 1 ||
+        .plsD.dim > ncol(x = plsD.res$coord)) {
+      stop(".plsD.dim must be an integer between 1 and ", ncol(x = plsD.res$coord))
     }
 
-    .plsDE.dim <-
-      as.integer(x = .plsDE.dim)
+    .plsD.dim <-
+      as.integer(x = .plsD.dim)
 
     comp.name <-
-      colnames(x = plsDE.res$coord)[.plsDE.dim]
+      colnames(x = plsD.res$coord)[.plsD.dim]
 
     score.vec <-
-      plsDE.res$coord[, .plsDE.dim]
+      plsD.res$coord[, .plsD.dim]
 
     # Check UMAP exists
     if (.embed == "umap" && is.null(x = .tdr.obj@landmark.embed$umap$coord)) {
@@ -4990,13 +4990,13 @@ plotPlsDE.TDRObj <-
       )()
 
     # Get Y (centered)
-    Y.vec <- plsDE.res$Y
+    Y.vec <- plsD.res$Y
 
     scatter.df <-
       data.frame(
         Y = Y.vec,
         score = score.vec,
-        col = .tdr.obj@results$lm[[plsDE.res$params$model.name]]$fit$coefficients[, plsDE.res$params$coef.col]
+        col = .tdr.obj@results$lm[[plsD.res$params$model.name]]$fit$coefficients[, plsD.res$params$coef.col]
       )
 
     # Panel 1: Embedding colored by PLS scores (diverging scale, centered at 0)
@@ -5057,9 +5057,9 @@ plotPlsDE.TDRObj <-
       ggplot2::labs(
         title = paste0(.coef.col, " vs ", comp.name),
         subtitle = sprintf("Ak = %.2f, Sk = %.2f, q = %.4f",
-                           plsDE.res$Y.alignment[.plsDE.dim],
-                           plsDE.res$smoothness[.plsDE.dim],
-                           plsDE.res$y.loadings[.plsDE.dim]),
+                           plsD.res$Y.alignment[.plsD.dim],
+                           plsD.res$smoothness[.plsD.dim],
+                           plsD.res$y.loadings[.plsD.dim]),
         x = paste0("Density contrast", "\n(centered ", .coef.col, ")"),
         y = comp.name,
         color = paste0(.coef.col,
@@ -5088,17 +5088,17 @@ plotPlsDE.TDRObj <-
   }
 
 
-#' Plot plsDE Expression Heatmap
+#' Plot plsD Expression Heatmap
 #'
 #' Creates an expression heatmap with landmarks as columns and top-loaded
-#' features as rows. Landmarks are ordered by plsDE scores (or custom ordering),
+#' features as rows. Landmarks are ordered by plsD scores (or custom ordering),
 #' and features are ranked by absolute regression loading. For RNA data,
 #' expression is properly normalized, log-transformed, and centered.
 #'
 #' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
-#'   (anndataR) object after \code{get.plsDE()}.
-#' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$plsDE}.
-#' @param .plsDE.dim Integer or integer vector: plsDE component(s) to use for:
+#'   (anndataR) object after \code{get.plsD()}.
+#' @param .coef.col Character: coefficient name matching a slot in \code{.tdr.obj$plsD}.
+#' @param .plsD.dim Integer or integer vector: plsD component(s) to use for:
 #'   (1) ranking features by absolute loading, and (2) ordering landmarks (if
 #'   \code{.order.by = NULL}). If vector (e.g., \code{c(1, 2)}), the first dimension
 #'   is used for feature ranking, and landmarks are sorted by all dimensions sequentially.
@@ -5114,14 +5114,14 @@ plotPlsDE.TDRObj <-
 #'       coefficient from \code{.coef.col}, placing genuinely unaffected landmarks
 #'       (raw Y \eqn{\approx} 0) in the middle of the heatmap rather than at an arbitrary
 #'       position determined by the mean.}
-#'     \item{\code{"plsDE.dim"}}{Order by the selected \code{.plsDE.dim} score(s).}
+#'     \item{\code{"plsD.dim"}}{Order by the selected \code{.plsD.dim} score(s).}
 #'     \item{A numeric matrix with column names}{Landmarks are sorted by columns
 #'       sequentially (first column primary, etc.) and each column is displayed as
 #'       an annotation strip with the column name as legend title.}
 #'   }
 #' @param .add.annot Numeric matrix with column names: displayed as annotation strips.
 #'   These are added as additional annotation strips after the density contrast and before
-#'   plsDE score strips.
+#'   plsD score strips.
 #' @param .order.decreasing Logical: sort landmarks in decreasing order? Default FALSE.
 #' @param .viridis.options.annot Character vector: viridis color options for annotation
 #'   strips. Cycled if fewer options than strips.
@@ -5139,7 +5139,7 @@ plotPlsDE.TDRObj <-
 #' @details
 #' \strong{Feature selection and ordering}:
 #' Features are \emph{selected} by absolute regression loading for the first element of
-#' \code{.plsDE.dim}. For RNA, the top \code{.n.features/2} positive and top
+#' \code{.plsD.dim}. For RNA, the top \code{.n.features/2} positive and top
 #' \code{.n.features/2} negative-loaded features are selected. Selected features are
 #' then \emph{ordered} by signed loading (highest positive at top, most negative at bottom).
 #'
@@ -5148,10 +5148,10 @@ plotPlsDE.TDRObj <-
 #' per-gene regression on the component score, capturing marker-component association.
 #' Positive loadings = genes upregulated in high-score (high-Y) landmarks; negative
 #' loadings = genes upregulated in low-score landmarks. In datasets with structural
-#' score balancing (see \code{get.plsDE} Details), large-magnitude loadings at either
+#' score balancing (see \code{get.plsD} Details), large-magnitude loadings at either
 #' end of the ranking may partially reflect the geometric mean-zero constraint rather
 #' than genuine differential expression. Use the raw Y annotation strip and the
-#' \code{plotPlsDE} scatter to assess whether extreme-loading features correspond to
+#' \code{plotPlsD} scatter to assess whether extreme-loading features correspond to
 #' landmarks with genuine density contrast signal.
 #'
 #' Caution: depending on the direction of the contrast and the component, large-magnitude
@@ -5175,37 +5175,37 @@ plotPlsDE.TDRObj <-
 #'   \item Density contrast: raw (uncentered) log2 fold change from the linear model.
 #'     Zero = no density change. Positive = enriched in the contrast direction;
 #'     negative = depleted.
-#'   \item plsDE scores for all dimensions in \code{.plsDE.dim}
+#'   \item plsD scores for all dimensions in \code{.plsD.dim}
 #'   \item Custom annotations (\code{.order.by} matrix columns, \code{.add.annot} columns)
 #' }
 #'
-#' @seealso \code{\link{get.plsDE}} for computing plsDE, \code{\link{plotPlsDE}}
+#' @seealso \code{\link{get.plsD}} for computing plsD, \code{\link{plotPlsD}}
 #'   for score visualization
 #'
 #' @examples
 #' \dontrun{
-#' # After running plsDE
-#' lm.obj <- get.plsDE(lm.obj, .coef.col = "Infection")
+#' # After running plsD
+#' lm.obj <- get.plsD(lm.obj, .coef.col = "Infection")
 #'
-#' # Basic heatmap using plsDE1
-#' plotPlsDEHeatmap(lm.obj, .coef.col = "Infection", .plsDE.dim = 1)
+#' # Basic heatmap using plsD1
+#' plotPlsDHeatmap(lm.obj, .coef.col = "Infection", .plsD.dim = 1)
 #'
-#' # Order by plsDE dimension scores
-#' plotPlsDEHeatmap(lm.obj, .coef.col = "Infection", .plsDE.dim = 1,
-#'                  .order.by = "plsDE.dim")
+#' # Order by plsD dimension scores
+#' plotPlsDHeatmap(lm.obj, .coef.col = "Infection", .plsD.dim = 1,
+#'                  .order.by = "plsD.dim")
 #' }
 #'
 #' @param ... Additional arguments passed to methods.
 #' @export
-plotPlsDEHeatmap <- function(x, ...) UseMethod("plotPlsDEHeatmap")
+plotPlsDHeatmap <- function(x, ...) UseMethod("plotPlsDHeatmap")
 
-#' @rdname plotPlsDEHeatmap
+#' @rdname plotPlsDHeatmap
 #' @export
-plotPlsDEHeatmap.TDRObj <-
+plotPlsDHeatmap.TDRObj <-
   function(
     x,
     .coef.col,
-    .plsDE.dim = 1,
+    .plsD.dim = 1,
     .model.name = "default",
     .n.features = 50,
     .order.by = "dens.contrast",
@@ -5224,53 +5224,53 @@ plotPlsDEHeatmap.TDRObj <-
 
     .tdr.obj <- x
 
-    # Validate plsDE results
+    # Validate plsD results
     if (is.null(x = .tdr.obj@results$pls[[.coef.col]])) {
       avail <-
         if (is.null(x = .tdr.obj@results$pls)) {
-          "none (run get.plsDE() first)"
+          "none (run get.plsD() first)"
         } else {
           paste(names(x = .tdr.obj@results$pls), collapse = ", ")
         }
-      stop("plsDE results for '", .coef.col, "' not found.\n",
+      stop("plsD results for '", .coef.col, "' not found.\n",
            "Available: ", avail)
     }
 
-    plsDE.res <-
+    plsD.res <-
       .tdr.obj@results$pls[[.coef.col]]
 
-    # Validate .plsDE.dim
-    if (!is.numeric(x = .plsDE.dim) ||
-        any(.plsDE.dim < 1) ||
-        any(.plsDE.dim > ncol(x = plsDE.res$coord))) {
-      stop(".plsDE.dim must be integer(s) between 1 and ",
-           ncol(x = plsDE.res$coord))
+    # Validate .plsD.dim
+    if (!is.numeric(x = .plsD.dim) ||
+        any(.plsD.dim < 1) ||
+        any(.plsD.dim > ncol(x = plsD.res$coord))) {
+      stop(".plsD.dim must be integer(s) between 1 and ",
+           ncol(x = plsD.res$coord))
     }
 
-    .plsDE.dim <-
-      as.integer(x = .plsDE.dim)
+    .plsD.dim <-
+      as.integer(x = .plsD.dim)
 
     loadings <-
-      plsDE.res$loadings[, .plsDE.dim[1]]
+      plsD.res$loadings[, .plsD.dim[1]]
 
     names(x = loadings) <-
-      rownames(x = plsDE.res$loadings)
+      rownames(x = plsD.res$loadings)
 
     # Use raw (uncentered) coefficient for annotation — scientifically meaningful zero.
-    # Use params$model.name (not the .model.name argument) to mirror how plotPlsDE
+    # Use params$model.name (not the .model.name argument) to mirror how plotPlsD
     # already retrieves the raw Y for its scatter-plot color column.
     Y.raw <-
-      .tdr.obj@results$lm[[plsDE.res$params$model.name]]$fit$coefficients[, .coef.col]
+      .tdr.obj@results$lm[[plsD.res$params$model.name]]$fit$coefficients[, .coef.col]
 
     # Dispatch to shared builder
     .plotDEHeatmap(
       .tdr.obj = .tdr.obj,
       .coef.col = .coef.col,
       .loadings = loadings,
-      .scores = plsDE.res$coord[, .plsDE.dim, drop = FALSE],
+      .scores = plsD.res$coord[, .plsD.dim, drop = FALSE],
       .Y = Y.raw,
-      .method.name = "plsDE",
-      .dim.string = "plsDE.dim",
+      .method.name = "plsD",
+      .dim.string = "plsD.dim",
       .row.annot.title = "loadings",
       .n.features = .n.features,
       .order.by = .order.by,

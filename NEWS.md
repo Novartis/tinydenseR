@@ -49,7 +49,7 @@ in memory:
 
 This dramatically reduces peak RAM usage for large single-cell datasets.
 All downstream functions (`goi.summary()`, `get.lm()`, `get.pbDE()`,
-`get.specDE()`, `get.nmfDE()`, `get.plsDE()`) read from the cache
+`get.specDE()`, `get.nmfDE()`, `get.plsD()`) read from the cache
 transparently.
 
 ### Cache management functions
@@ -74,7 +74,7 @@ transparently.
   prevent concurrent-write clobbering.
 - **Automatic validation** — `get.lm()`, `get.pbDE()`, and
   `.validate.DE.inputs()` (used by `get.specDE()`, `get.nmfDE()`,
-  `get.plsDE()`) silently validate the cache on entry.
+  `get.plsD()`) silently validate the cache on entry.
 
 ### Disabling caching
 

@@ -31,11 +31,11 @@ This vignette demonstrates how `tinydenseR` can be applied to a real-world
 clinical scRNA-seq dataset to identify dysregulated cell states in COVID-19
 patients. We use PBMC data from the COMBAT (COvid-19 Multi-omics Blood
 ATlas) consortium to show how differential density analysis combined with
-PLS-based decomposition (plsDE) reveals:
+PLS-based decomposition (plsD) reveals:
 
 1. **Dysregulated monocyte states** in early critical COVID-19 relative to mild
-   disease — captured by plsDE component 1 (plsDE1) scores and loadings.
-2. **Expanded immature cell populations** and **depleted pDCs** in critical cases — captured by plsDE component 2 (plsDE2).
+   disease — captured by plsD component 1 (plsD1) scores and loadings.
+2. **Expanded immature cell populations** and **depleted pDCs** in critical cases — captured by plsD component 2 (plsD2).
 
 ### Analysis Overview
 
@@ -47,7 +47,7 @@ The core workflow follows four steps:
    and the sample PCA to confirm biological structure.
 3. `get.lm()` with contrasts — perform differential density analysis while
    controlling for covariates (sex, age, time since symptom onset).
-4. `get.plsDE()` — decompose the density contrast into interpretable
+4. `get.plsD()` — decompose the density contrast into interpretable
    components that jointly capture differential abundance and differential
    expression.
 
@@ -550,11 +550,11 @@ tinydenseR::plotBeeswarm(
   )()
 ```
 
-## Step 4: Decomposing the Density Contrast with `get.plsDE()`
+## Step 4: Decomposing the Density Contrast with `get.plsD()`
 
 Differential density analysis tells us where changes occur across the
 landmark landscape, but not what molecular features drive those changes.
-`get.plsDE()` bridges this gap by decomposing the density contrast into PLS
+`get.plsD()` bridges this gap by decomposing the density contrast into PLS
 components whose loadings reveal the genes underlying the signal.
 
 We focus on the early CRIT vs MILD contrast, which captures the most
@@ -562,9 +562,9 @@ clinically actionable comparison — the cellular features that distinguish
 patients who progress to critical illness from those with mild disease at an
 early time point.
 
-```{r run-plsDE}
+```{r run-plsD}
 lm.cells <-
-  tinydenseR::get.plsDE(
+  tinydenseR::get.plsD(
     x = lm.cells,
     .coef.col = "CRIT_earlyVSMILD_early",
     .model.name = "contrast.Source_TSO.binary",
@@ -572,44 +572,44 @@ lm.cells <-
   )
 ```
 
-### plsDE1: Dysregulated Monocyte States
+### plsD1: Dysregulated Monocyte States
 
-plsDE1 captures the dominant signal distinguishing early critical from mild
+plsD1 captures the dominant signal distinguishing early critical from mild
 COVID-19. Examining its scores and loadings reveals that classical monocytes
 are at the center of this dysregulation.
 
-```{r plsDE1-scores, fig.width=10, fig.height=4}
-tinydenseR::plotPlsDE(
+```{r plsD1-scores, fig.width=10, fig.height=4}
+tinydenseR::plotPlsD(
   x = lm.cells,
   .coef.col = "CRIT_earlyVSMILD_early",
-  .plsDE.dim = 1,
+  .plsD.dim = 1,
   .point.size = 0.1
 )
 ```
 
 The left panel shows landmark scores: landmarks in the monocyte region carry
-the strongest positive plsDE1 scores, indicating that this component is driven
+the strongest positive plsD1 scores, indicating that this component is driven
 by monocyte-state variation. The right panel confirms tight coupling between
-plsDE1 scores and the density contrast (Y).
+plsD1 scores and the density contrast (Y).
 
-The plsDE1 gene loadings identify the molecular signatures underlying
+The plsD1 gene loadings identify the molecular signatures underlying
 this signal. Positive loadings indicate features upregulated in the direction
 of the contrast (CRIT > MILD), while negative loadings indicate
 downregulation.
 
-```{r plsDE1-heatmap, fig.width=8, fig.height=6}
-tinydenseR::plotPlsDEHeatmap(
+```{r plsD1-heatmap, fig.width=8, fig.height=6}
+tinydenseR::plotPlsDHeatmap(
   x = lm.cells,
   .coef.col = "CRIT_earlyVSMILD_early",
-  .plsDE.dim = 1,
-  .order.by = "plsDE.dim",
+  .plsD.dim = 1,
+  .order.by = "plsD.dim",
   .feature.font.size = I(x = 5)
 )
 ```
 
 #### Interpretation
 
-plsDE1 loadings highlight pro-inflammatory and innate immune genes
+plsD1 loadings highlight pro-inflammatory and innate immune genes
 being upregulated in critical cases — consistent with the hyperinflammatory
 monocyte phenotype that has been reported in critical COVID-19. Negative
 loadings correspond to genes involved in antigen presentation and
@@ -617,36 +617,36 @@ classical monocyte identity (e.g., HLA class II genes), reflecting the
 loss of antigen-presenting capacity previously documented in critical
 patients.
 
-### plsDE2: Expanded Immature Cells and Depleted pDCs
+### plsD2: Expanded Immature Cells and Depleted pDCs
 
-plsDE2 captures a secondary axis of variation. Inspecting the positive scores
+plsD2 captures a secondary axis of variation. Inspecting the positive scores
 reveals that this component is driven by landmarks in regions annotated as
 progenitor or immature cell populations — consistent with emergency
 hematopoiesis and the well-documented expansion of immature myeloid cells
 in critical COVID-19 PBMC. The most negative scores correspond to landmarks in the plasmacytoid dendritic cell (pDC) region, which are known to be depleted in critical COVID-19.
 
-```{r plsDE2-scores, fig.width=10, fig.height=4}
-tinydenseR::plotPlsDE(
+```{r plsD2-scores, fig.width=10, fig.height=4}
+tinydenseR::plotPlsD(
   x = lm.cells,
   .coef.col = "CRIT_earlyVSMILD_early",
-  .plsDE.dim = 2,
+  .plsD.dim = 2,
   .point.size = 0.1
 )
 ```
 
-```{r plsDE2-heatmap, fig.width=8, fig.height=6}
-tinydenseR::plotPlsDEHeatmap(
+```{r plsD2-heatmap, fig.width=8, fig.height=6}
+tinydenseR::plotPlsDHeatmap(
   x = lm.cells,
   .coef.col = "CRIT_earlyVSMILD_early",
-  .plsDE.dim = 2,
-  .order.by = "plsDE.dim",
+  .plsD.dim = 2,
+  .order.by = "plsD.dim",
   .feature.font.size = I(x = 5)
 )
 ```
 
 #### Interpretation
 
-plsDE2 positive loadings highlight genes associated with immature or progenitor cell states (e.g., stem cell markers, cell-cycle genes) being positively loaded,
+plsD2 positive loadings highlight genes associated with immature or progenitor cell states (e.g., stem cell markers, cell-cycle genes) being positively loaded,
 reflecting the expansion of these populations in critical COVID-19. Negative loading on the other hand are markers of plasmacytoid dendritic cells (pDCs) and, to a lesser extent, effector memory T cells, highlighting their depletion early in critical COVID-19. These findings aligns with reports of the role pDCs in most severe COVID-19 cases, and, more importantly, emergency myelopoiesis producing immature, dysfunctional cells that enter circulation during critical infection.
 
 ## Summary
@@ -659,19 +659,19 @@ dataset:
 | 1 | `RunTDR()` | Build landmarks, graph, and density profiles |
 | 2 | `plotUMAP()`, `plotSampleEmbedding()` | Validate biological structure |
 | 3 | `get.lm()` with contrasts | Differential density testing, controlling for sex, age, and time since onset |
-| 4 | `get.plsDE()` | Decompose density contrast into interpretable gene programs |
+| 4 | `get.plsD()` | Decompose density contrast into interpretable gene programs |
 
 The key biological findings are:
 
-- plsDE1 identifies dysregulated monocyte states in early critical
+- plsD1 identifies dysregulated monocyte states in early critical
   COVID-19, with loadings pointing to pro-inflammatory activation and loss of
   antigen-presenting function in classical monocytes.
-- plsDE2 reveals expanded immature cell populations, consistent with emergency hematopoiesis, and depleted pDCs in critical cases.
+- plsD2 reveals expanded immature cell populations, consistent with emergency hematopoiesis, and depleted pDCs in critical cases.
 
 These results are obtained from a single unified framework that handles
 differential density analysis while controlling for covariates through the
 contrast design in `get.lm()`, followed by molecular decomposition via
-`get.plsDE()`.
+`get.plsD()`.
 
 ## Session Info
 

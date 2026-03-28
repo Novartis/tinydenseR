@@ -167,6 +167,6 @@ data.frame(
 \seealso{
 \code{\link{get.lm}} (required predecessor),
 \code{\link{get.specDE}} (specDE: SVD-based peer method),
-\code{\link{get.plsDE}} (plsDE: PLS-based peer method),
+\code{\link{get.plsD}} (plsD: PLS-based peer method),
 \code{\link{plotNmfDE}} (visualization), \code{\link{plotNmfDEHeatmap}} (heatmap)
 }

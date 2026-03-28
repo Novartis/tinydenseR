@@ -172,7 +172,7 @@ test_that("all plot generics exist and are functions", {
     "plotSamplePCA", "plotSampleEmbedding", "plotTradStats",
     "plotTradPerc", "plotDensity", "plotPbDE", "plotDEA",
     "plotMarkerDE", "plotHeatmap", "plotSpecDE", "plotSpecDEHeatmap",
-    "plotNmfDE", "plotNmfDEHeatmap", "plotPlsDE", "plotPlsDEHeatmap"
+    "plotNmfDE", "plotNmfDEHeatmap", "plotPlsD", "plotPlsDHeatmap"
   )
   for (fn_name in plot_fns) {
     fn <- get(fn_name, envir = asNamespace("tinydenseR"))
@@ -189,7 +189,7 @@ test_that("all plot .TDRObj methods exist", {
     "plotDEA.TDRObj", "plotMarkerDE.TDRObj", "plotHeatmap.TDRObj",
     "plotSpecDE.TDRObj", "plotSpecDEHeatmap.TDRObj",
     "plotNmfDE.TDRObj", "plotNmfDEHeatmap.TDRObj",
-    "plotPlsDE.TDRObj", "plotPlsDEHeatmap.TDRObj"
+    "plotPlsD.TDRObj", "plotPlsDHeatmap.TDRObj"
   )
   for (fn_name in plot_methods) {
     fn <- get(fn_name, envir = asNamespace("tinydenseR"))

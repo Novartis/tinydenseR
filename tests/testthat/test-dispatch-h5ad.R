@@ -136,7 +136,7 @@ test_that("all HDF5AnnData dispatch methods exist", {
     "celltyping.HDF5AnnData", "lm.cluster.HDF5AnnData",
     "get.features.HDF5AnnData", "get.embedding.HDF5AnnData",
     "get.specDE.HDF5AnnData", "get.nmfDE.HDF5AnnData",
-    "get.plsDE.HDF5AnnData",
+    "get.plsD.HDF5AnnData",
     "get.landmarks.HDF5AnnData", "get.map.HDF5AnnData",
     "get.pbDE.HDF5AnnData", "get.markerDE.HDF5AnnData",
     "goi.summary.HDF5AnnData"
@@ -157,8 +157,8 @@ test_that("all HDF5AnnData plot dispatch methods exist", {
     "plotDEA.HDF5AnnData", "plotMarkerDE.HDF5AnnData",
     "plotHeatmap.HDF5AnnData", "plotSpecDE.HDF5AnnData",
     "plotSpecDEHeatmap.HDF5AnnData", "plotNmfDE.HDF5AnnData",
-    "plotNmfDEHeatmap.HDF5AnnData", "plotPlsDE.HDF5AnnData",
-    "plotPlsDEHeatmap.HDF5AnnData"
+    "plotNmfDEHeatmap.HDF5AnnData", "plotPlsD.HDF5AnnData",
+    "plotPlsDHeatmap.HDF5AnnData"
   )
   for (fn_name in plot_methods) {
     fn <- get(fn_name, envir = asNamespace("tinydenseR"))

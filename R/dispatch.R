@@ -381,27 +381,27 @@ get.nmfDE.HDF5AnnData <- function(x, ...) {
 }
 
 # ======================================================================
-# get.plsDE Seurat / SCE wrappers (Tier 1)
+# get.plsD Seurat / SCE wrappers (Tier 1)
 # ======================================================================
 
 #' @export
-get.plsDE.Seurat <- function(x, ...) {
+get.plsD.Seurat <- function(x, ...) {
   tdr <- GetTDR(x)
-  tdr <- get.plsDE.TDRObj(tdr, ...)
+  tdr <- get.plsD.TDRObj(tdr, ...)
   SetTDR(x, tdr)
 }
 
 #' @export
-get.plsDE.SingleCellExperiment <- function(x, ...) {
+get.plsD.SingleCellExperiment <- function(x, ...) {
   tdr <- GetTDR(x)
-  tdr <- get.plsDE.TDRObj(tdr, ...)
+  tdr <- get.plsD.TDRObj(tdr, ...)
   SetTDR(x, tdr)
 }
 
 #' @export
-get.plsDE.HDF5AnnData <- function(x, ...) {
+get.plsD.HDF5AnnData <- function(x, ...) {
   tdr <- GetTDR(x)
-  tdr <- get.plsDE.TDRObj(tdr, ...)
+  tdr <- get.plsD.TDRObj(tdr, ...)
   SetTDR(x, tdr)
 }
 
@@ -461,10 +461,10 @@ plotNmfDE.Seurat <- function(x, ...) plotNmfDE.TDRObj(GetTDR(x), ...)
 plotNmfDEHeatmap.Seurat <- function(x, ...) plotNmfDEHeatmap.TDRObj(GetTDR(x), ...)
 
 #' @export
-plotPlsDE.Seurat <- function(x, ...) plotPlsDE.TDRObj(GetTDR(x), ...)
+plotPlsD.Seurat <- function(x, ...) plotPlsD.TDRObj(GetTDR(x), ...)
 
 #' @export
-plotPlsDEHeatmap.Seurat <- function(x, ...) plotPlsDEHeatmap.TDRObj(GetTDR(x), ...)
+plotPlsDHeatmap.Seurat <- function(x, ...) plotPlsDHeatmap.TDRObj(GetTDR(x), ...)
 
 # ======================================================================
 # Plot function SingleCellExperiment wrappers (Phase 3)
@@ -522,10 +522,10 @@ plotNmfDE.SingleCellExperiment <- function(x, ...) plotNmfDE.TDRObj(GetTDR(x), .
 plotNmfDEHeatmap.SingleCellExperiment <- function(x, ...) plotNmfDEHeatmap.TDRObj(GetTDR(x), ...)
 
 #' @export
-plotPlsDE.SingleCellExperiment <- function(x, ...) plotPlsDE.TDRObj(GetTDR(x), ...)
+plotPlsD.SingleCellExperiment <- function(x, ...) plotPlsD.TDRObj(GetTDR(x), ...)
 
 #' @export
-plotPlsDEHeatmap.SingleCellExperiment <- function(x, ...) plotPlsDEHeatmap.TDRObj(GetTDR(x), ...)
+plotPlsDHeatmap.SingleCellExperiment <- function(x, ...) plotPlsDHeatmap.TDRObj(GetTDR(x), ...)
 
 # ======================================================================
 # Plot function HDF5AnnData wrappers (Phase 3)
@@ -583,7 +583,7 @@ plotNmfDE.HDF5AnnData <- function(x, ...) plotNmfDE.TDRObj(GetTDR(x), ...)
 plotNmfDEHeatmap.HDF5AnnData <- function(x, ...) plotNmfDEHeatmap.TDRObj(GetTDR(x), ...)
 
 #' @export
-plotPlsDE.HDF5AnnData <- function(x, ...) plotPlsDE.TDRObj(GetTDR(x), ...)
+plotPlsD.HDF5AnnData <- function(x, ...) plotPlsD.TDRObj(GetTDR(x), ...)
 
 #' @export
-plotPlsDEHeatmap.HDF5AnnData <- function(x, ...) plotPlsDEHeatmap.TDRObj(GetTDR(x), ...)
+plotPlsDHeatmap.HDF5AnnData <- function(x, ...) plotPlsDHeatmap.TDRObj(GetTDR(x), ...)

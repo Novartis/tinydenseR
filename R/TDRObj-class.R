@@ -250,13 +250,13 @@ TDRObj <- function(...) {
     }
   }
 
-  # specDE / pbDE / markerDE / nmfDE / plsDE / interact.plot → results$...
+  # specDE / pbDE / markerDE / nmfDE / plsD / interact.plot → results$...
   for (pair in list(
     c("specDE",       "spec"),
     c("pbDE",         "pb"),
     c("markerDE",     "marker"),
     c("nmfDE",        "nmf"),
-    c("plsDE",        "pls"),
+    c("plsD",        "pls"),
     c("interact.plot","features")
   )) {
     old_nm <- pair[1]; new_nm <- pair[2]
@@ -315,7 +315,7 @@ setMethod("$", "TDRObj", function(x, name) {
     "pbDE"             = slot(x, "results")$pb,
     "markerDE"         = slot(x, "results")$marker,
     "nmfDE"            = slot(x, "results")$nmf,
-    "plsDE"            = slot(x, "results")$pls,
+    "plsD"            = slot(x, "results")$pls,
     "interact.plot"    = slot(x, "results")$features,
     "symphony.obj"     = slot(x, "integration")$symphony.obj,
     stop("Unknown slot name: ", name)
@@ -340,7 +340,7 @@ setReplaceMethod("$", "TDRObj", function(x, name, value) {
     "pbDE"             = { s <- slot(x, "results"); s$pb <- value; slot(x, "results") <- s },
     "markerDE"         = { s <- slot(x, "results"); s$marker <- value; slot(x, "results") <- s },
     "nmfDE"            = { s <- slot(x, "results"); s$nmf <- value; slot(x, "results") <- s },
-    "plsDE"            = { s <- slot(x, "results"); s$pls <- value; slot(x, "results") <- s },
+    "plsD"            = { s <- slot(x, "results"); s$pls <- value; slot(x, "results") <- s },
     "interact.plot"    = { s <- slot(x, "results"); s$features <- value; slot(x, "results") <- s },
     "symphony.obj"     = { s <- slot(x, "integration"); s$symphony.obj <- value; slot(x, "integration") <- s },
     stop("Unknown slot name: ", name)
@@ -386,7 +386,7 @@ setAs("list", "TDRObj", function(from) {
     pbDE             = "results",
     markerDE         = "results",
     nmfDE            = "results",
-    plsDE            = "results",
+    plsD            = "results",
     interact.plot    = "results",
     symphony.obj     = "integration"
   )
