@@ -630,10 +630,6 @@ get.graph.TDRObj <-
 #'   Only compatible with RNA assays. Replaces any existing \code{$graph$celltyping}.
 #' @param .celltype.col.name Column name in \code{.ref.obj$meta_data} containing cell type labels 
 #'   (default "cell_type"). Only relevant when \code{.ref.obj} is provided.
-#' @param .cl.ct.to.ign Optional cluster or cell type name to exclude from downstream statistics. 
-#'   Use for biologically irrelevant populations (e.g., erythrocytes in PBMC, which likely 
-#'   represent technical artifacts). Cells in this population are mapped but excluded from density 
-#'   calculations. Only one value allowed; merge multiple populations first via \code{celltyping}.
 #' @param .verbose Logical for progress messages (default TRUE).
 #' @param .seed Integer seed for reproducibility (default 123).
 #' @param .label.confidence Numeric scalar in \code{[0,1]} controlling the minimum posterior confidence required
@@ -655,8 +651,7 @@ get.graph.TDRObj <-
 #' @return Updated \code{.tdr.obj} with \code{$map} component containing:
 #'   \itemize{
 #'     \item \code{fdens}: Matrix of fuzzy graph densities (landmarks × samples). Each entry is 
-#'       the sum of cell-landmark edge weights for that sample, normalized by sample size and 
-#'       excluding ignored populations.
+#'       the sum of cell-landmark edge weights for that sample, normalized by sample size.
 #'     \item \code{Y}: Matrix of log2-transformed densities (landmarks × samples): 
 #'       \code{log2(fdens + 0.5)}. Used by \code{get.lm()} for linear modeling and 
 #'       \code{get.embedding()} for unsupervised embeddings.
@@ -674,8 +669,6 @@ get.graph.TDRObj <-
 #'       cell type per sample. Used for "traditional" compositional statistics.
 #'     \item \code{nearest.landmarks}: List of matrices (one per sample) with nearest landmark indices 
 #'       for all cells from UMAP transform.
-#'     \item \code{cl.ct.to.ign}: Character value recording which cluster/cell type was excluded 
-#'       from statistics (NULL if none).
 #'     \item \code{.cache}: (When \code{.cache.on.disk = TRUE}) List with \code{root} (cache
 #'       directory path), \code{on.disk} flag, \code{schema_v}, and \code{manifests} holding
 #'       per-sample file metadata for each cached slot. The four large slots above are set
@@ -729,9 +722,6 @@ get.graph.TDRObj <-
 #'   get.graph() |>
 #'   get.map()
 #' 
-#' # Exclude erythrocytes from PBMC statistics
-#' lm.cells <- get.map(lm.cells, .cl.ct.to.ign = "Erythrocytes")
-#' 
 #' # Use Symphony reference for cell typing (RNA data only)
 #' ref <- readRDS("pbmc_reference.rds")
 #' lm.cells <- get.map(lm.cells, 
@@ -750,7 +740,6 @@ get.map.TDRObj <-
            .source = NULL,
            .ref.obj = NULL,
            .celltype.col.name = "cell_type",
-           .cl.ct.to.ign = NULL,
            .verbose = TRUE,
            .seed = 123,
            .label.confidence = 0.5,
@@ -763,6 +752,16 @@ get.map.TDRObj <-
     # R CMD check appeasement for non-standard evaluation in dplyr and collapse
     ref.idx <- N <- cell.pop <- id <- value <- ri <- i <- j <- landmark <- cell <- label <- x <- confidence <-
       NULL
+    
+    # Reject removed argument .cl.ct.to.ign if passed via ...
+    if (".cl.ct.to.ign" %in% names(list(...))) {
+      stop(
+        "The '.cl.ct.to.ign' argument has been removed from get.map().\n",
+        "Cell type / cluster exclusion must now be performed upstream ",
+        "(e.g., by subsetting cells before running the pipeline).\n",
+        "See ?get.map for the updated workflow."
+      )
+    }
     
     # Persist label confidence for downstream refresh (e.g. late celltyping)
     .tdr.obj@config$label.confidence <- .label.confidence
@@ -820,54 +819,13 @@ get.map.TDRObj <-
       
     }
     
-    # Validate and identify populations to exclude from statistics
-    if(!is.null(x = .cl.ct.to.ign)){
-      
-      if(length(x = .cl.ct.to.ign) > 1){
-        stop("Please provide only one cluster or cell type to ignore.\nTo exclude multiple populations, merge them first using celltyping().")
+    # Determine cell type levels for fdens filtering (all populations kept)
+    .ct.to.keep <-
+      if(is.null(x = .ref.obj)){
+        levels(x = .tdr.obj@landmark.annot$celltyping$ids)
+      } else {
+        unique(x = .ref.obj$meta_data[[.celltype.col.name]])
       }
-      
-      # Check if specified population exists in clustering, celltyping, or reference
-      if(!(.cl.ct.to.ign %in% levels(x = .tdr.obj@landmark.annot$clustering$ids)) &
-         !((.cl.ct.to.ign %in% levels(x = .tdr.obj@landmark.annot$celltyping$ids)) |
-           ((.cl.ct.to.ign %in% .ref.obj$meta_data[[.celltype.col.name]])))){
-        stop("The cluster or cell type '", .cl.ct.to.ign, "' was not found.\nCheck clustering IDs, celltyping IDs, or reference metadata.")
-      }
-      
-      # Build keep lists excluding the ignored population
-      .cl.to.keep <-
-        levels(x = .tdr.obj@landmark.annot$clustering$ids)[
-          !(levels(x = .tdr.obj@landmark.annot$clustering$ids) %in%
-              .cl.ct.to.ign)
-        ]
-      
-      .ct.to.keep <-
-        if(is.null(x = .ref.obj)){
-          levels(x = .tdr.obj@landmark.annot$celltyping$ids)[
-            !(levels(x = .tdr.obj@landmark.annot$celltyping$ids) %in%
-                .cl.ct.to.ign)
-          ]
-        } else {
-          unique(x = .ref.obj$meta_data[[.celltype.col.name]])[
-            !(unique(x = .ref.obj$meta_data[[.celltype.col.name]]) %in%
-                .cl.ct.to.ign)
-          ]
-        }
-      
-    } else {
-      
-      # Keep all populations
-      .cl.to.keep <-
-        levels(x = .tdr.obj@landmark.annot$clustering$ids)
-      
-      .ct.to.keep <-
-        if(is.null(x = .ref.obj)){
-          levels(x = .tdr.obj@landmark.annot$celltyping$ids)
-        } else {
-          unique(x = .ref.obj$meta_data[[.celltype.col.name]])
-        }
-      
-    }
     
     set.seed(seed = .seed)
     
@@ -1147,30 +1105,18 @@ get.map.TDRObj <-
         smpl.fdens <-
           if(ncol(x = res2$fgraph) == nrow(x = .tdr.obj@assay$expr)){
             Matrix::colSums(x = res2$fgraph[
-              if(length(x = .cl.to.keep) !=
-                 (levels(x = .tdr.obj@landmark.annot$clustering$ids) |>
-                  length())){
-                (res2$cell.clustering %in% .cl.to.keep)
+              if(!is.null(x = .ct.to.keep)){
+                (res2$cell.celltyping %in% .ct.to.keep)
               } else {
-                if(!is.null(x = .ct.to.keep)){
-                  (res2$cell.celltyping %in% .ct.to.keep)
-                } else {
-                  1:nrow(x = res2$fgraph)
-                }
-              },])
+                1:nrow(x = res2$fgraph)
+              }, , drop = FALSE])
           } else {
             Matrix::rowSums(x = res2$fgraph[,
-              if(length(x = .cl.to.keep) !=
-                 (levels(x = .tdr.obj@landmark.annot$clustering$ids) |>
-                  length())){
-                (res2$cell.clustering %in% .cl.to.keep)
+              if(!is.null(x = .ct.to.keep)){
+                (res2$cell.celltyping %in% .ct.to.keep)
               } else {
-                if(!is.null(x = .ct.to.keep)){
-                  (res2$cell.celltyping %in% .ct.to.keep)
-                } else {
-                  1:nrow(x = res2$fgraph)
-                }
-              }])
+                1:nrow(x = res2$fgraph)
+              }, drop = FALSE])
           }
         
         smpl.n.cells <- nrow(x = res2$embedding)
@@ -1361,9 +1307,6 @@ get.map.TDRObj <-
       (\(x)
        x[,colnames(x = x) |>
            sort()]
-      )() |> 
-      (\(x)
-       x[,!(colnames(x = x) %in% .cl.ct.to.ign)]
       )()
     
     .tdr.obj@density$composition$clustering$cell.count[
@@ -1388,9 +1331,6 @@ get.map.TDRObj <-
         (\(x)
          x[,colnames(x = x) |>
              sort()]
-        )() |> 
-        (\(x)
-         x[,!(colnames(x = x) %in% .cl.ct.to.ign)]
         )()
       
       .tdr.obj@density$composition$celltyping$cell.count[
@@ -1403,8 +1343,7 @@ get.map.TDRObj <-
       
     }
     
-    .tdr.obj@density$ignored <-
-      .cl.ct.to.ign
+    .tdr.obj@density$ignored <- NULL
     
     return(.tdr.obj)
     

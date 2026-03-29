@@ -470,6 +470,69 @@ test_that("RunTDR.SingleCellExperiment with DelayedMatrix and .celltype.vec", {
   expect_true(!is.null(tdr.obj@config$celltype.vec))
 })
 
+test_that("RunTDR.SingleCellExperiment + celltype.vec produces valid fdens (drop=FALSE regression)", {
+  skip_on_cran()
+  skip_if_not_installed("BPCells")
+  skip_if_not_installed("DelayedArray")
+  skip_if_not_installed("SingleCellExperiment")
+
+  # This test guards against the regression where fgraph subsetting
+
+  # by celltype-confidence filter can reduce to a single row, causing
+  # Matrix::colSums to receive a vector instead of a matrix when
+  # drop = FALSE is not applied. (GitHub issue: 'x' must be an array
+  # of at least two dimensions.)
+  sce <- .make_test_sce(n_cells = 100, n_genes = 50, n_samples = 4,
+                        use_delayed = TRUE)
+
+  SummarizedExperiment::colData(sce)$cell_type <- rep(
+    c("TypeA", "TypeB", "TypeC", "TypeD"), length.out = ncol(sce)
+  )
+
+  bp_dir <- file.path(withr::local_tempdir(), "bp_sce_ct_fdens")
+  result <- RunTDR(sce, .sample.var = "sample_id",
+                   .celltype.vec = "cell_type",
+                   .bpcells.dir = bp_dir,
+                   .verbose = FALSE)
+
+  tdr.obj <- S4Vectors::metadata(result)$tdr.obj
+
+  # fdens must be a numeric matrix with one column per sample
+  expect_true(!is.null(tdr.obj@density$fdens))
+  expect_true(is.numeric(tdr.obj@density$fdens))
+  expect_equal(ncol(tdr.obj@density$fdens), nrow(tdr.obj@metadata))
+  # fdens values must be non-negative (they are fuzzy membership sums)
+  expect_true(all(tdr.obj@density$fdens >= 0))
+})
+
+test_that("fgraph subsetting preserves matrix structure with drop = FALSE", {
+  skip_on_cran()
+
+  # Directly validate that subsetting a sparse matrix by a logical vector
+  # that selects only 1 row does NOT drop to a vector when drop = FALSE.
+  # This is the unit-level guard for the fdens computation fix.
+  set.seed(42)
+  fg <- Matrix::Matrix(
+    matrix(rpois(20, 3), nrow = 5, ncol = 4,
+           dimnames = list(paste0("cell", 1:5), paste0("lm", 1:4))),
+    sparse = TRUE
+  )
+
+  # Selecting 1 row WITHOUT drop = FALSE produces a vector
+  one_row <- c(FALSE, TRUE, FALSE, FALSE, FALSE)
+  expect_false(is.matrix(fg[one_row, ]) || methods::is(fg[one_row, ], "Matrix"))
+
+  # Selecting 1 row WITH drop = FALSE preserves matrix
+  expect_true(methods::is(fg[one_row, , drop = FALSE], "Matrix"))
+  expect_equal(nrow(fg[one_row, , drop = FALSE]), 1L)
+
+  # colSums works on the preserved matrix
+  expect_equal(
+    length(Matrix::colSums(fg[one_row, , drop = FALSE])),
+    ncol(fg)
+  )
+})
+
 test_that("RunTDR.SingleCellExperiment with DelayedMatrix and .min.cells.per.sample filtering", {
   skip_on_cran()
   skip_if_not_installed("BPCells")
