@@ -24,7 +24,7 @@ plotMarkerDE(x, ...)
 }
 \arguments{
 \item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
-(anndataR) object with marker results from \code{get.markerDE}.}
+(anndataR) object with marker results from \code{get.pbDE(.mode = "marker")}.}
 
 \item{...}{Additional arguments passed to methods.}
 
@@ -55,9 +55,9 @@ if \code{.de.obj} is NULL.}
 A \code{ggplot} heatmap showing log fold changes per feature and coefficient.
 }
 \description{
-Visualizes marker identification results from \code{get.markerDE} as a colored heatmap showing
-log fold changes with significance overlays. Uses the new storage pattern where results are
-stored in \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]}.
+Visualizes marker identification results from \code{get.pbDE(.mode = "marker")} as a colored
+heatmap showing log fold changes with significance overlays. Results are stored in
+\code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]}.
 }
 \details{
 The plot shows:
@@ -72,9 +72,9 @@ between group 1 and group 2 (or all other landmarks).
 }
 \examples{
 \dontrun{
-# After running get.markerDE
-lm.cells <- get.markerDE(lm.cells, .id1 = "cluster.3", 
-                         .comparison.name = "cluster3_markers")
+# After running get.pbDE in marker mode
+lm.cells <- get.pbDE(lm.cells, .mode = "marker", .id = "cluster.3",
+                     .result.name = "cluster3_markers")
 
 # Visualize marker results
 plotMarkerDE(lm.cells, .comparison.name = "cluster3_markers",
@@ -83,5 +83,5 @@ plotMarkerDE(lm.cells, .comparison.name = "cluster3_markers",
 
 }
 \seealso{
-\code{\link{get.markerDE}}, \code{\link{plotPbDE}}
+\code{\link{get.pbDE}}, \code{\link{plotPbDE}}
 }

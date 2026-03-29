@@ -138,7 +138,7 @@ plotBeeswarm(result, .coefs = "ConditionB")
 ```
 
 This uniformity extends to all analysis and plotting functions in the
-package: `get.pbDE()`, `get.markerDE()`, `get.specDE()`, `get.nmfDE()`,
+package: `get.pbDE()`, `get.specDE()`, `get.nmfDE()`,
 `get.plsD()`, `plotUMAP()`, `plotHeatmap()`, and so on.
 
 ## How It Works: GetTDR / SetTDR

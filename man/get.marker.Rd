@@ -2,7 +2,7 @@
 % Please edit documentation in R/stats.model.R
 \name{get.marker}
 \alias{get.marker}
-\title{Deprecated: Use get.markerDE instead}
+\title{Deprecated: Use get.pbDE(.mode = "marker") instead}
 \usage{
 get.marker(
   .tdr.obj,
@@ -33,12 +33,11 @@ get.marker(
 \item{.label.confidence}{Numeric (0-1): minimum confidence for cell assignment (default: 0.5).}
 }
 \value{
-A .tdr.obj with results stored in .tdr.obj$markerDE$.deprecated.call$result.
+A .tdr.obj with results stored in .tdr.obj$markerDE.
 }
 \description{
-\code{get.marker()} has been renamed to \code{\link{get.markerDE}()} for API consistency.
-This function is deprecated and will be removed in a future release.
+\code{get.marker()} is deprecated. Use \code{\link{get.pbDE}(.mode = "marker")} instead.
 }
 \seealso{
-\code{\link{get.markerDE}}
+\code{\link{get.pbDE}}
 }

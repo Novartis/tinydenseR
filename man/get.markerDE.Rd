@@ -3,7 +3,7 @@
 \name{get.markerDE}
 \alias{get.markerDE}
 \alias{get.markerDE.TDRObj}
-\title{Marker Gene/Protein Identification via Pairwise Comparison}
+\title{Marker Gene/Protein Identification (Deprecated)}
 \usage{
 get.markerDE(x, ...)
 
@@ -27,150 +27,40 @@ get.markerDE(x, ...)
 \item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
 (anndataR) object processed through \code{get.map()}.}
 
-\item{...}{Additional arguments passed to methods.}
+\item{...}{Additional arguments passed to \code{get.pbDE}.}
 
-\item{.source}{The raw data object for non-file backends. \code{NULL} (default) for
-the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.
-Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.}
+\item{.source}{The raw data object (or NULL for file backend).}
 
-\item{.geneset.ls}{Optional named list of character vectors defining gene sets for GSVA enrichment.
-Only for RNA data.}
+\item{.geneset.ls}{Optional named list of character vectors for GSVA. RNA only.}
 
-\item{.id1.idx}{Optional integer vector specifying landmark indices for group 1. When provided,
-the \code{.label.confidence} pipeline determines which cells confidently belong to this
-landmark set based on their fuzzy graph weights.}
+\item{.id1.idx}{Optional integer vector of landmark indices for group 1.}
 
-\item{.id2.idx}{Optional integer vector specifying landmark indices for group 2. When provided,
-the \code{.label.confidence} pipeline determines which cells confidently belong to this
-landmark set based on their fuzzy graph weights.}
+\item{.id2.idx}{Optional integer vector of landmark indices for group 2.}
 
-\item{.id1}{Character vector of cluster/celltype IDs for group 1 (test group). Required if
-\code{.id1.idx} not provided.}
+\item{.id1}{Character vector of cluster/celltype IDs for group 1.}
 
-\item{.id2}{Character vector of cluster/celltype IDs for group 2 (reference group). Default
-\code{"..all.other.landmarks.."} compares group 1 to all other cells. Can specify specific IDs
-for pairwise comparisons.}
+\item{.id2}{Character vector of IDs for group 2. Default \code{"..all.other.landmarks.."}.}
 
-\item{.id.from}{Character: "clustering" (default) or "celltyping". Source of IDs in \code{.id1}
-and \code{.id2}.}
+\item{.id.from}{Character: "clustering" or "celltyping".}
 
-\item{.model.name}{Character: A name for the analysis model (default: "default"). Used for
-organizing multiple analyses.}
+\item{.model.name}{Character: model name (default "default").}
 
-\item{.comparison.name}{Character: A name for this comparison. If NULL (default), auto-generated
-from .id1 and .id2 values (e.g., "cluster.1_vs_all" or "cluster.1_vs_cluster.2").}
+\item{.comparison.name}{Character: comparison name, passed as \code{.result.name}.}
 
-\item{.force.recalc}{Logical: If TRUE, recalculate even if results exist (default: FALSE).}
+\item{.force.recalc}{Logical: recalculate even if results exist? Default FALSE.}
 
-\item{.label.confidence}{Numeric (0-1): minimum confidence threshold for cell-to-population
-assignment when using \code{.id1.idx} or \code{.id2.idx} (default: 0.5). For each cell, the
-fraction of its fuzzy graph weight falling on "in" vs "out" landmarks is computed; cells below
-this threshold are excluded as low-confidence assignments.}
+\item{.label.confidence}{Numeric (0-1): confidence threshold. Default 0.5.}
 }
 \value{
-The input \code{.tdr.obj} with results stored in
-\code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]} as a limma MArrayLM fit object
-with moderated statistics and additional slots:
-\describe{
-\item{\code{coefficients}}{Log fold changes (features x coefficients), nested in fit}
-\item{\code{p.value}}{P-values (features x coefficients), nested in fit}
-\item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
-\item{\code{smpl.outlier.1}}{Logical vector: samples excluded from group 1}
-\item{\code{smpl.outlier.2}}{Logical vector: samples excluded from group 2}
-\item{\code{id1.idx}}{List of integer vectors: cells included per sample for group 1}
-\item{\code{id2.idx}}{List of integer vectors: cells included per sample for group 2}
-\item{\code{n.pseudo1}}{Integer vector: pseudobulk cell counts per sample for group 1}
-\item{\code{n.pseudo2}}{Integer vector: pseudobulk cell counts per sample for group 2}
-\item{\code{geneset}}{(RNA only, if \code{.geneset.ls} provided) GSVA fit object with \code{$adj.p} and \code{$E} (enrichment scores)}
-}
+The modified \code{x} with results stored in \code{$markerDE}.
 }
 \description{
-Identifies marker genes/proteins that distinguish one cell subset from another (or all others) by
-performing pseudobulk differential expression between groups. Unlike \code{get.pbDE} which tests
-experimental conditions, this compares cell populations to find defining features. Useful for
-characterizing clusters and validating cell type annotations.
-}
-\details{
-The marker identification workflow:
-\enumerate{
-\item \strong{Cell selection}: Extract cells belonging to group 1 (\code{.id1}) and group 2
-(\code{.id2})
-\item \strong{Pseudobulk aggregation}:
-\itemize{
-\item RNA: Sum raw counts across cells within each group per sample
-\item Cytometry: Compute column medians of marker expression across cells within each group per sample
-}
-\item \strong{Outlier removal}: (RNA only) Exclude samples with <10\\% of average pseudobulk cell count from either group
-\item \strong{Paired comparison}: Fit model \code{~ .ids + .pairs} where \code{.ids} is the group indicator (.id1 vs .id2) and \code{.pairs} controls for sample of origin (blocking factor)
-\item \strong{Statistical testing}: limma-voom with TMM normalization (RNA) or limma (cytometry)
-\item \strong{FDR correction}: Adjust p-values across all features
-}
+\ifelse{html}{\href{https://lifecycle.r-lib.org/articles/stages.html#deprecated}{\figure{lifecycle-deprecated.svg}{options: alt='[Deprecated]'}}}{\strong{[Deprecated]}}
 
-\strong{Common use cases:}
-\itemize{
-\item \strong{One-vs-all}: Default \code{.id2 = "..all.other.landmarks.."} finds markers that
-uniquely identify a cluster
-\item \strong{Pairwise}: Specify both \code{.id1} and \code{.id2} to compare two specific
-populations (e.g., CD4 vs CD8 T cells)
-\item \strong{Combined groups}: Provide multiple IDs in \code{.id1} to find markers for a
-meta-population
-}
-
-\strong{Interpreting results:}
-\itemize{
-\item Positive logFC: Higher expression in group 1 (potential markers)
-\item Negative logFC: Higher expression in group 2 (anti-markers)
-\item Look for both high fold change AND statistical significance
-}
-
-\strong{Difference from get.pbDE:}
-\itemize{
-\item \code{get.pbDE}: Tests experimental conditions (treatment vs control) within populations
-\item \code{get.markerDE}: Tests cell populations (cluster A vs B) within the same experiment
-}
-}
-\examples{
-\dontrun{
-# After mapping and clustering
-lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
-  get.landmarks() |> get.graph() |> get.map()
-
-# Find markers for cluster 1 vs all others (stored in .tdr.obj$markerDE)
-lm.cells <- get.markerDE(lm.cells,
-                         .id1 = "cluster.1",
-                         .id.from = "clustering",
-                         .comparison.name = "cluster1_vs_all")
-
-# Access results
-marker.results <- lm.cells$markerDE$default$cluster1_vs_all
-
-# Top upregulated markers (accessing .id1 coefficient)
-top.markers <- rownames(marker.results$coefficients)[
-  marker.results$adj.p[, ".id1"] < 0.05 & 
-  marker.results$coefficients[, ".id1"] > 1
-]
-
-# Pairwise comparison: CD4 T cells vs CD8 T cells
-lm.cells <- get.markerDE(lm.cells,
-                         .id1 = c("cluster.1", "cluster.3"),  # CD4 T clusters
-                         .id2 = c("cluster.2", "cluster.4"),  # CD8 T clusters
-                         .id.from = "clustering",
-                         .comparison.name = "cd4_vs_cd8")
-
-# With gene set enrichment
-hallmark.sets <- list(
-  "GLYCOLYSIS" = c("HK2", "PFKP", "LDHA"),
-  "OXIDATIVE_PHOS" = c("ATP5A", "COX5A", "NDUFA4")
-)
-lm.cells <- get.markerDE(lm.cells,
-                         .id1 = "cluster.1",
-                         .geneset.ls = hallmark.sets,
-                         .comparison.name = "cluster1_gsva")
-}
-
+\code{get.markerDE()} is deprecated. Use \code{\link{get.pbDE}(.mode = "marker")} instead.
+This function dispatches to \code{get.pbDE} with \code{.mode = "marker"}.
 }
 \seealso{
-\code{\link{get.map}} (required), \code{\link{get.pbDE}} for condition-based DE,
-\code{\link{plotHeatmap}} for visualizing expression patterns, \code{\link{plotMarkerDE}}
-for visualizing marker results
+\code{\link{get.pbDE}}
 }
+\keyword{internal}

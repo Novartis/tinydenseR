@@ -379,10 +379,11 @@ tinydenseR::plotPbDE(
 .dea.0.5$coefficients
 
 lm.cells.DA.0.5 <-
-  tinydenseR::get.markerDE(
-    .tdr.obj = lm.cells.DA.0.5,
-    .id1 = "cluster.4",
-    .comparison.name = "cluster4_vs_all"
+  tinydenseR::get.pbDE(
+    x = lm.cells.DA.0.5,
+    .mode = "marker",
+    .id = "cluster.4",
+    .result.name = "cluster4_vs_all"
   )
 
 tinydenseR::plotMarkerDE(
@@ -695,10 +696,11 @@ tinydenseR::plotPbDE(
 .dea.5$coefficients
 
 lm.cells.DA.5 <-
-  tinydenseR::get.markerDE(
-    .tdr.obj = lm.cells.DA.5,
-    .id1 = "cluster.3",
-    .comparison.name = "cluster3_vs_all"
+  tinydenseR::get.pbDE(
+    x = lm.cells.DA.5,
+    .mode = "marker",
+    .id = "cluster.3",
+    .result.name = "cluster3_vs_all"
   )
 
 tinydenseR::plotMarkerDE(
@@ -1009,10 +1011,11 @@ tinydenseR::plotPbDE(
 .dea.50$coefficients
 
 lm.cells.DA.50 <-
-  tinydenseR::get.markerDE(
-    .tdr.obj = lm.cells.DA.50,
-    .id1 = "cluster.2",
-    .comparison.name = "cluster2_vs_all"
+  tinydenseR::get.pbDE(
+    x = lm.cells.DA.50,
+    .mode = "marker",
+    .id = "cluster.2",
+    .result.name = "cluster2_vs_all"
   )
 
 tinydenseR::plotMarkerDE(

@@ -90,7 +90,7 @@ get.lm()         --> results$lm (fit, trad)
     |                 sample.embed (pca)
     v
 get.pbDE()            --> results$pb
-get.markerDE()        --> results$marker
+get.pbDE(.mode="marker") --> results$marker
 get.specDE()          --> results$spec
 get.nmfDE()           --> results$nmf
 get.plsD()           --> results$pls
@@ -152,8 +152,7 @@ get.landmarks.Seurat <- function(x, ...) {
 }
 ```
 
-Functions in this tier: `get.landmarks()`, `get.map()`, `get.pbDE()`,
-`get.markerDE()`.
+Functions in this tier: `get.landmarks()`, `get.map()`, `get.pbDE()`.
 
 ### Tier 3: Read-Only Plots
 

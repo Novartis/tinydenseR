@@ -231,8 +231,8 @@ plsD is designed as an exploratory tool to help interpret density
 changes in terms of the features driving them. It does not provide
 gene-level p-values or formal multiple testing correction. For rigorous
 differential expression testing with p-values following field standards,
-use \code{\link{get.pbDE}} (pseudobulk DE via edgeR/limma) or
-\code{\link{get.markerDE}} (marker-level DE). plsD complements these
+use \code{\link{get.pbDE}} (pseudobulk DE via edgeR/limma, both design and marker modes).
+plsD complements these
 methods by providing a multivariate, graph-aware decomposition that
 captures joint DA/DE patterns not visible in gene-by-gene tests.
 }

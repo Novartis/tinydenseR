@@ -585,7 +585,7 @@ celltyping.TDRObj <-
 
 #' Warn about potentially stale pseudobulk / marker DE results
 #'
-#' Checks whether any \code{get.pbDE()} or \code{get.markerDE()} results
+#' Checks whether any \code{get.pbDE()} results (design or marker mode)
 #' were computed with \code{.id.from = "celltyping"} and emits a warning
 #' if so, since those results now reflect the old celltype labels.
 #'
@@ -612,11 +612,14 @@ celltyping.TDRObj <-
   # Check marker DE results
   if (!is.null(.tdr.obj@results$marker)) {
     for (mn in names(.tdr.obj@results$marker)) {
-      res <- .tdr.obj@results$marker[[mn]]
-      if (!is.null(res$.id.from) && res$.id.from == "celltyping") {
-        warning("Marker DE results for model '", mn,
-                "' were computed with old celltyping labels and may be stale.",
-                call. = FALSE)
+      for (cn in names(.tdr.obj@results$marker[[mn]])) {
+        res <- .tdr.obj@results$marker[[mn]][[cn]]
+        if (!is.null(res$.id.from) && res$.id.from == "celltyping") {
+          warning("Marker DE results for model '", mn,
+                  "', comparison '", cn,
+                  "' were computed with old celltyping labels and may be stale.",
+                  call. = FALSE)
+        }
       }
     }
   }

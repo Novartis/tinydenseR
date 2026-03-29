@@ -2530,12 +2530,12 @@ plotDEA.TDRObj <- function(
 
 #' Plot Marker DE Results
 #'
-#' Visualizes marker identification results from \code{get.markerDE} as a colored heatmap showing 
-#' log fold changes with significance overlays. Uses the new storage pattern where results are 
-#' stored in \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]}.
+#' Visualizes marker identification results from \code{get.pbDE(.mode = "marker")} as a colored
+#' heatmap showing log fold changes with significance overlays. Results are stored in
+#' \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]}.
 #'
 #' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
-#'   (anndataR) object with marker results from \code{get.markerDE}.
+#'   (anndataR) object with marker results from \code{get.pbDE(.mode = "marker")}.
 #' @param .de.obj Optional: Direct DE results object for backward compatibility. If NULL, fetches 
 #'   from \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]}.
 #' @param .model.name Character identifying the model (default "default").
@@ -2562,13 +2562,13 @@ plotDEA.TDRObj <- function(
 #' For marker analysis, the key coefficient is typically ".id1" which represents the difference 
 #' between group 1 and group 2 (or all other landmarks).
 #'
-#' @seealso \code{\link{get.markerDE}}, \code{\link{plotPbDE}}
+#' @seealso \code{\link{get.pbDE}}, \code{\link{plotPbDE}}
 #'
 #' @examples
 #' \dontrun{
-#' # After running get.markerDE
-#' lm.cells <- get.markerDE(lm.cells, .id1 = "cluster.3", 
-#'                          .comparison.name = "cluster3_markers")
+#' # After running get.pbDE in marker mode
+#' lm.cells <- get.pbDE(lm.cells, .mode = "marker", .id = "cluster.3",
+#'                      .result.name = "cluster3_markers")
 #'
 #' # Visualize marker results
 #' plotMarkerDE(lm.cells, .comparison.name = "cluster3_markers",
@@ -2604,7 +2604,7 @@ plotMarkerDE.TDRObj <- function(
       stop("Please provide .comparison.name to fetch results from .tdr.obj$markerDE")
     }
     if(is.null(x = .tdr.obj@results$marker[[.model.name]][[.comparison.name]])){
-      stop(sprintf("No results found at .tdr.obj$markerDE$%s$%s. Run get.markerDE() first.", 
+      stop(sprintf("No results found at .tdr.obj$markerDE$%s$%s. Run get.pbDE(.mode = 'marker') first.", 
                    .model.name, .comparison.name))
     }
     .de.obj <- .tdr.obj@results$marker[[.model.name]][[.comparison.name]]

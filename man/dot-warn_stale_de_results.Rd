@@ -13,7 +13,7 @@
 The (unmodified) \code{.tdr.obj}, invisibly.
 }
 \description{
-Checks whether any \code{get.pbDE()} or \code{get.markerDE()} results
+Checks whether any \code{get.pbDE()} results (design or marker mode)
 were computed with \code{.id.from = "celltyping"} and emits a warning
 if so, since those results now reflect the old celltype labels.
 }

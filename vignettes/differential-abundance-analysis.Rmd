@@ -552,15 +552,16 @@ Please note that the log2FC in density approaches -1 (marked by a dashed red lin
 
 While differential density analysis reveals which populations change in proportion, we can also examine the **marker expression profiles** that define these populations. This helps us understand the biological identity of the affected cell types.
 
-Above we identified differential cell states within cluster 4. Let's use `get.markerDE()` to identify which markers define this cluster compared to all other cells:
+Above we identified differential cell states within cluster 4. Let's use `get.pbDE(.mode = "marker")` to identify which markers define this cluster compared to all other cells:
 
 ```{r marker-identification}
 # Identify markers for cluster 4 (results stored in lm.cells.DA.0.5$markerDE)
 lm.cells.DA.0.5 <-
-  tinydenseR::get.markerDE(
-    .tdr.obj = lm.cells.DA.0.5,
-    .id1 = "cluster.4",
-    .comparison.name = "cluster4_markers"
+  tinydenseR::get.pbDE(
+    x = lm.cells.DA.0.5,
+    .mode = "marker",
+    .id = "cluster.4",
+    .result.name = "cluster4_markers"
   )
 ```
 

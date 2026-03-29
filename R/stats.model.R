@@ -649,130 +649,330 @@ get.lm.TDRObj <-
     
   }
 
+# =============================================================================
+# Internal helpers for pseudobulk aggregation (shared by design and marker modes)
+# =============================================================================
+
+#' Resolve cell indices from labels or raw indices
+#'
+#' Given either label-based (\code{.id}) or index-based (\code{.id.idx}) cell
+#' specification, returns a named list of per-sample integer vectors of cell
+#' indices.
+#'
+#' @param .tdr.obj A TDRObj.
+#' @param .id Character vector of cluster/celltype IDs, or NULL.
+#' @param .id.idx Integer vector of landmark indices, or NULL.
+#' @param .id.from "clustering" or "celltyping".
+#' @param .label.confidence Numeric (0-1) for fuzzy confidence thresholding.
+#' @return Named list (one element per sample) of integer vectors.
+#' @keywords internal
+#' @noRd
+.tdr_resolve_cell_idx <- function(.tdr.obj,
+                                   .id = NULL,
+                                   .id.idx = NULL,
+                                   .id.from = "clustering",
+                                   .label.confidence = 0.5) {
+
+  if (!is.null(x = .id.idx)) {
+
+    n.landmarks <- nrow(x = .tdr.obj@assay$expr)
+    if (!is.null(x = n.landmarks) &&
+        !all(.id.idx %in% seq_len(length.out = n.landmarks))) {
+      stop(paste0(".id.idx must be an integer vector between 1 and ", n.landmarks))
+    }
+
+    tmp.lbl <- rep(x = "out", times = nrow(x = .tdr.obj@assay$expr))
+    tmp.lbl[.id.idx] <- "in"
+
+    lapply(
+      X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graph"),
+      FUN = function(smpl) {
+        in.and.out <-
+          .tdr_transfer_labels(
+            .method = "fuzzy",
+            .label.confidence = .label.confidence,
+            .n.cells = nrow(x = smpl),
+            .cell.names = seq_len(length.out = nrow(x = smpl)),
+            .fgraph = smpl,
+            .landmark.labels = tmp.lbl
+          )
+        which(x = in.and.out == "in")
+      }
+    )
+
+  } else if (!is.null(x = .id)) {
+
+    .id.from <- match.arg(arg = .id.from, choices = c("clustering", "celltyping"))
+
+    if (!all(.id %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))) {
+      stop(paste0(
+        paste0(.id[!(.id %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))],
+               collapse = ", "),
+        " not found in ", .id.from
+      ))
+    }
+
+    lapply(
+      X = .tdr_get_map_slot_all(.tdr.obj, paste0(.id.from, ".ids")),
+      FUN = function(smpl) {
+        which(x = smpl %in% .id)
+      }
+    )
+
+  } else {
+
+    # All cells per sample
+    stats::setNames(
+      object = .tdr.obj@metadata$n.cells,
+      nm = names(x = .tdr.obj@cells)
+    ) |> lapply(FUN = seq_len)
+
+  }
+}
+
+#' Pseudobulk aggregation for RNA data
+#'
+#' Computes fuzzy-weighted pseudobulk expression for each sample (RNA).
+#'
+#' @param .source Raw data object (or NULL for file backend).
+#' @param .tdr.obj A TDRObj.
+#' @param .samples Character vector of sample names.
+#' @param .cell.idx.list Named list of per-sample cell index vectors.
+#' @param .robust If TRUE, wrap per-sample aggregation in tryCatch (return
+#'   zero vector on error).
+#' @return A genes x samples matrix of pseudobulk counts.
+#' @keywords internal
+#' @noRd
+.tdr_pseudobulk_aggregate_rna <- function(.source, .tdr.obj,
+                                           .samples, .cell.idx.list,
+                                           .robust = FALSE) {
+  stats::setNames(object = .samples, nm = .samples) |>
+    lapply(FUN = function(smpl) {
+      exprs.mat <-
+        .get_sample_matrix(.source, .tdr.obj, smpl) |>
+        methods::as(Class = "dgCMatrix")
+
+      .agg_fn <- function() {
+        cell.idx <- .cell.idx.list[[smpl]]
+        wcl <-
+          .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx, , drop = FALSE]
+        wsum <- exprs.mat[, cell.idx] %*% wcl
+        (Matrix::rowSums(x = wsum) / sum(wcl)) *
+          (sum(Matrix::rowSums(x = wcl) > 0))
+      }
+
+      if (isTRUE(x = .robust)) {
+        tryCatch(
+          expr = .agg_fn(),
+          error = function(e) {
+            stats::setNames(
+              object = rep(x = 0, times = nrow(x = exprs.mat)),
+              nm = rownames(x = exprs.mat)
+            )
+          }
+        )
+      } else {
+        .agg_fn()
+      }
+    }) |>
+    do.call(what = cbind)
+}
+
+#' Pseudobulk aggregation for cytometry data
+#'
+#' Computes fuzzy-weighted pseudobulk expression for each sample (cytometry).
+#'
+#' @param .source Raw data object (or NULL for file backend).
+#' @param .tdr.obj A TDRObj.
+#' @param .samples Character vector of sample names.
+#' @param .cell.idx.list Named list of per-sample cell index vectors.
+#' @param .robust If TRUE, wrap per-sample aggregation in tryCatch (return
+#'   zero vector on error).
+#' @return A samples x features matrix of pseudobulk expression.
+#' @keywords internal
+#' @noRd
+.tdr_pseudobulk_aggregate_cyto <- function(.source, .tdr.obj,
+                                            .samples, .cell.idx.list,
+                                            .robust = FALSE) {
+  cols <- colnames(x = .tdr.obj@assay$expr)
+
+  stats::setNames(object = .samples, nm = .samples) |>
+    lapply(FUN = function(smpl) {
+      exprs.mat <- .get_sample_matrix(.source, .tdr.obj, smpl)
+
+      .agg_fn <- function() {
+        cell.idx <- .cell.idx.list[[smpl]]
+        wcl <-
+          .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx, , drop = FALSE]
+        wsum <- Matrix::t(x = exprs.mat[cell.idx, cols]) %*% wcl
+        Matrix::rowSums(x = wsum) / sum(wcl)
+      }
+
+      if (isTRUE(x = .robust)) {
+        tryCatch(
+          expr = .agg_fn(),
+          error = function(e) {
+            stats::setNames(
+              object = rep(x = 0, times = length(x = cols)),
+              nm = cols
+            )
+          }
+        )
+      } else {
+        .agg_fn()
+      }
+    }) |>
+    do.call(what = rbind)
+}
+
 #' Pseudobulk Differential Expression Analysis
 #'
-#' Performs pseudobulk differential expression (DE) analysis for genes/markers. Aggregates cells 
-#' into pseudobulk samples using fuzzy landmark membership, then uses limma-voom (RNA) or limma 
-#' (cytometry) to test for DE. Can restrict analysis to specific clusters/cell types, and optionally 
-#' perform gene set enrichment via GSVA.
+#' Performs pseudobulk differential expression (DE) analysis for genes/markers with two modes.
+#'
+#' \strong{Design mode} (\code{.mode = "design"}): Aggregates cells into pseudobulk samples
+#' using fuzzy landmark membership, then uses limma-voom (RNA) or limma (cytometry) to test for
+#' DE across experimental conditions. Uses a user-supplied design matrix with samples as replicates.
+#'
+#' \strong{Marker mode} (\code{.mode = "marker"}): Identifies marker genes/proteins distinguishing
+#' one cell population from another (or all others) via a within-sample paired comparison. Unlike
+#' design mode which tests experimental conditions, marker mode compares cell populations to find
+#' defining features.
 #'
 #' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
 #'   (anndataR) object processed through \code{get.map()}.
-#' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
-#'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
+#' @param .source The raw data object for non-file backends. \code{NULL} (default) for
+#'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.
 #'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
-#' @param .design Design matrix specifying experimental design. Rows = samples, columns = coefficients.
-#' @param .contrasts Optional contrast matrix for specific comparisons. Create with 
-#'   \code{limma::makeContrasts()}. If NULL, tests all \code{.design} coefficients.
-#' @param .block Optional character: column name in \code{.tdr.obj$metadata} for blocking factor 
-#'   (e.g., "Donor"). Accounts for within-block correlation.
-#' @param .geneset.ls Optional named list of character vectors defining gene sets for GSVA enrichment 
+#' @param .mode Character: analysis mode. One of \code{"design"} or \code{"marker"}.
+#'   If \code{NULL} (default), auto-detected from arguments:
+#'   \itemize{
+#'     \item \code{.design} provided \eqn{\Rightarrow} \code{"design"}
+#'     \item \code{.id}/\code{.id.idx} provided without \code{.design} \eqn{\Rightarrow} \code{"marker"}
+#'   }
+#' @param .design Design matrix specifying experimental design (design mode only). Rows = samples,
+#'   columns = coefficients.
+#' @param .contrasts Optional contrast matrix for specific comparisons (design mode only). Create
+#'   with \code{limma::makeContrasts()}. If NULL, tests all \code{.design} coefficients.
+#' @param .block Optional character: column name in \code{.tdr.obj$metadata} for blocking factor
+#'   (design mode only, e.g., "Donor"). Accounts for within-block correlation.
+#' @param .geneset.ls Optional named list of character vectors defining gene sets for GSVA enrichment
 #'   analysis. Only for RNA data. Example: \code{list("Tcell" = c("CD3D", "CD3E"), "Bcell" = c("CD19", "MS4A1"))}.
-#' @param .id.idx Optional integer vector specifying landmark indices to include. If provided,
-#'   cells are assigned to these landmarks using fuzzy membership confidence (see \code{.label.confidence}).
-#'   Only cells whose fuzzy mass ratio to the target landmarks meets the confidence threshold are included.
-#' @param .id Optional character vector of cluster/celltype IDs to restrict analysis to. Uses 
-#'   \code{.id.from} to determine source.
-#' @param .id.from Character: "clustering" or "celltyping". Source of IDs when \code{.id} is specified.
-#' @param .model.name Character string naming this model fit (default "default"). Results are stored 
-#'   in \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}.
-#' @param .population.name Character string naming this population (default "all"). If \code{.id} is 
-#'   specified and \code{.population.name} is not changed from default, it is auto-set to the value 
-#'   of \code{.id} (or concatenated with "_" if multiple IDs). Enables storing multiple 
-#'   population-specific DE results under the same model.
-#' @param .force.recalc Logical: if TRUE, overwrite existing results in the specified slot 
-#'   (default FALSE). If FALSE and slot already exists, an error is thrown.
+#' @param .id Optional character vector of cluster/celltype IDs. In design mode, restricts
+#'   analysis to cells matching these IDs. In marker mode, defines group 1 (test group).
+#' @param .id.idx Optional integer vector specifying landmark indices. In design mode, restricts
+#'   analysis to cells confidently assigned to these landmarks. In marker mode, defines group 1
+#'   landmark indices.
+#' @param .id2 Character vector of cluster/celltype IDs for group 2 (marker mode only). Default
+#'   \code{"..all.other.landmarks.."} compares group 1 to all other cells. Can specify specific IDs
+#'   for pairwise comparisons.
+#' @param .id2.idx Optional integer vector specifying landmark indices for group 2 (marker mode
+#'   only). When provided, takes priority over \code{.id2}.
+#' @param .id.from Character: \code{"clustering"} or \code{"celltyping"}. Source of IDs in
+#'   \code{.id} and \code{.id2}. Default \code{NULL} (resolved to \code{"clustering"} when needed).
+#' @param .model.name Character string naming this model fit (default \code{"default"}).
+#' @param .result.name Character string naming this result. In design mode defaults to \code{"all"};
+#'   in marker mode auto-generated from \code{.id} and \code{.id2}. Used as the storage key:
+#'   \code{$pbDE[[.model.name]][[.result.name]]} (design) or
+#'   \code{$markerDE[[.model.name]][[.result.name]]} (marker).
+#' @param .population.name \code{NULL}. Deprecated alias for \code{.result.name} (design mode).
+#' @param .comparison.name \code{NULL}. Deprecated alias for \code{.result.name} (marker mode).
+#' @param .force.recalc Logical: if TRUE, overwrite existing results in the specified slot
+#'   (default FALSE).
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #' @param .label.confidence Numeric scalar in \code{[0,1]} controlling the minimum posterior
-#'   confidence required to assign a cell to a set of target landmarks (used when \code{.id.idx} is
-#'   provided). For each cell, the ratio of fuzzy membership mass to the target landmarks vs total
-#'   fuzzy mass is computed; cells below this threshold are excluded from aggregation. Default 0.5.
-#'   
-#' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}:
-#'   \describe{
-#'     \item{\code{fit}}{limma MArrayLM fit object with moderated statistics}
-#'     \item{\code{coefficients}}{Log fold change matrix (features x coefficients)}
-#'     \item{\code{p.value}}{P-values (features x coefficients)}
-#'     \item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
-#'     \item{\code{smpl.outlier}}{Logical vector indicating which samples were excluded as outliers}
-#'     \item{\code{lm.idx}}{Integer vector of landmark indices used for aggregation}
-#'     \item{\code{n.pseudo}}{Integer vector of pseudobulk cell counts per sample}
-#'     \item{\code{geneset}}{(RNA only, if \code{.geneset.ls} provided) GSVA results with \code{$fit} 
-#'       (limma fit), \code{$E} (enrichment scores), \code{$adj.p} (adjusted p-values)}
+#'   confidence required to assign a cell to a set of target landmarks (used when \code{.id.idx} or
+#'   \code{.id2.idx} is provided). Default 0.5.
+#'
+#' @return The modified \code{.tdr.obj} with results stored depending on mode:
+#'   \subsection{Design mode}{Results in \code{.tdr.obj$pbDE[[.model.name]][[.result.name]]}:
+#'     \describe{
+#'       \item{\code{coefficients}}{Log fold change matrix (features x coefficients)}
+#'       \item{\code{p.value}}{P-values (features x coefficients)}
+#'       \item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
+#'       \item{\code{smpl.outlier}}{Logical vector indicating outlier samples}
+#'       \item{\code{id.idx}}{Per-sample list of cell indices used}
+#'       \item{\code{n.pseudo}}{Integer vector of pseudobulk cell counts per sample}
+#'       \item{\code{geneset}}{(RNA + \code{.geneset.ls}) GSVA results}
+#'     }
 #'   }
-#'   
+#'   \subsection{Marker mode}{Results in \code{.tdr.obj$markerDE[[.model.name]][[.result.name]]}:
+#'     \describe{
+#'       \item{\code{coefficients}}{Log fold changes (features x coefficients)}
+#'       \item{\code{p.value}}{P-values (features x coefficients)}
+#'       \item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
+#'       \item{\code{smpl.outlier.1}}{Logical: samples excluded from group 1}
+#'       \item{\code{smpl.outlier.2}}{Logical: samples excluded from group 2}
+#'       \item{\code{id1.idx}}{Per-sample cell indices for group 1}
+#'       \item{\code{id2.idx}}{Per-sample cell indices for group 2}
+#'       \item{\code{n.pseudo1}}{Pseudobulk cell counts per sample for group 1}
+#'       \item{\code{n.pseudo2}}{Pseudobulk cell counts per sample for group 2}
+#'       \item{\code{geneset}}{(RNA + \code{.geneset.ls}) GSVA results}
+#'     }
+#'   }
+#'
 #' @details
-#' The pseudobulk DE workflow:
+#' \subsection{Design mode}{
+#' Tests for DE across experimental conditions using a user-supplied design matrix:
 #' \enumerate{
-#'   \item \strong{Cell selection}: If \code{.id} specified, select cells whose transferred label
-#'     matches the requested population. If \code{.id.idx} specified, select cells whose fuzzy
-#'     membership confidence to the target landmarks meets \code{.label.confidence}. Otherwise
-#'     use all cells.
-#'   \item \strong{Pseudobulk aggregation}: For each sample, compute weighted expression of the
-#'     selected cells using their fuzzy membership across all landmarks:
-#'     \itemize{
-#'       \item RNA: Weighted sum of counts, scaled by effective cell count
-#'       \item Cytometry: Weighted mean of marker expression
-#'     }
-#'   \item \strong{Outlier removal}: (RNA only) Exclude samples with <10\% of average pseudobulk cell count
-#'   \item \strong{Normalization}:
-#'     \itemize{
-#'       \item RNA: TMM normalization (\code{edgeR::calcNormFactors}) + voom transformation for variance modeling
-#'       \item Cytometry: Data used as-is (assumes pre-transformed input)
-#'     }
-#'   \item \strong{Linear modeling}: \code{limma::lmFit} with optional blocking for paired/repeated samples
-#'   \item \strong{Empirical Bayes}: Variance shrinkage via \code{limma::eBayes(robust = TRUE)}
-#'   \item \strong{GSVA} (optional, RNA only): Gene set variation analysis on voom-normalized expression
+#'   \item \strong{Cell selection}: If \code{.id} specified, select matching cells. If
+#'     \code{.id.idx} specified, use fuzzy confidence thresholding. Otherwise use all cells.
+#'   \item \strong{Pseudobulk aggregation}: Fuzzy-weighted expression per sample.
+#'   \item \strong{Outlier removal}: (RNA only) Exclude samples with <10\% of average cell count.
+#'   \item \strong{Normalization}: TMM + voom (RNA) or as-is (cytometry).
+#'   \item \strong{Linear modeling}: \code{limma::lmFit} with optional blocking.
+#'   \item \strong{Empirical Bayes}: \code{limma::eBayes(robust = TRUE)}.
+#'   \item \strong{GSVA} (optional, RNA only): Gene set variation analysis.
 #' }
-#' 
-#' \strong{Cell-centric aggregation:}
-#' Cells are first selected into the population of interest, then their expression is aggregated
-#' using fuzzy membership weights across all landmarks. This approach first determines \emph{which}
-#' cells belong to the population, then lets the fuzzy graph determine \emph{how} each selected
-#' cell's expression is distributed across landmark neighborhoods.
-#' 
-#' \strong{When to use pseudobulk DE:}
-#' \itemize{
-#'   \item Testing treatment effects on gene expression within populations
-#'   \item Comparing expression between conditions using samples as biological replicates
-#'   \item Respects the true experimental design (no pseudoreplication)
 #' }
-#' 
-#' @seealso \code{\link{get.map}} (required), \code{\link{plotPbDE}} for heatmap visualization,
-#'   \code{\link{get.marker}} for marker gene identification, \code{\link{get.specDE}} for 
-#'   density contrast-coupled expression programs
-#'   
+#'
+#' \subsection{Marker mode}{
+#' Compares cell populations via a within-sample paired design (\code{~ .ids + .pairs}):
+#' \enumerate{
+#'   \item \strong{Cell selection}: Extract cells for group 1 (\code{.id}) and group 2 (\code{.id2}).
+#'   \item \strong{Pseudobulk aggregation}: Independent aggregation per group per sample.
+#'   \item \strong{Outlier removal}: (RNA only) Cross-group outlier flagging.
+#'   \item \strong{Paired comparison}: \code{limma::lmFit} with sample-as-pair blocking.
+#' }
+#' Positive logFC = higher in group 1, negative = higher in group 2.
+#' }
+#'
+#' @seealso \code{\link{get.map}} (required), \code{\link{plotPbDE}}, \code{\link{plotMarkerDE}},
+#'   \code{\link{get.specDE}}
+#'
 #' @examples
 #' \dontrun{
 #' # After mapping
 #' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
 #'   get.landmarks() |> get.graph() |> get.map()
-#' 
-#' # DE analysis on all cells (stored in $pbDE$default$all)
+#'
+#' # --- Design mode (default when .design is provided) ---
 #' design <- model.matrix(~ Condition, data = .meta)
 #' lm.cells <- get.pbDE(lm.cells, .design = design)
 #' plotPbDE(lm.cells, .coefs = "ConditionB")
-#' 
-#' # DE within specific cell type (stored in $pbDE$default$tcells)
+#'
+#' # DE within specific cell type
 #' lm.cells <- get.pbDE(lm.cells, .design = design,
 #'                      .id = c("1", "2", "3"),
 #'                      .id.from = "clustering",
-#'                      .population.name = "tcells")
-#' 
-#' # With gene set enrichment
-#' hallmark.sets <- list(
-#'   "INTERFERON_RESPONSE" = c("ISG15", "ISG20", "IFIT1"),
-#'   "INFLAMMATORY_RESPONSE" = c("IL1B", "TNF", "CXCL8")
-#' )
-#' lm.cells <- get.pbDE(lm.cells, .design = design,
-#'                      .geneset.ls = hallmark.sets,
-#'                      .model.name = "gsva_model")
-#' 
+#'                      .result.name = "tcells")
+#'
+#' # --- Marker mode (auto-detected when .id is provided without .design) ---
+#' lm.cells <- get.pbDE(lm.cells, .mode = "marker",
+#'                      .id = "cluster.3",
+#'                      .result.name = "cluster3_markers")
+#' plotMarkerDE(lm.cells, .comparison.name = "cluster3_markers")
+#'
+#' # Pairwise comparison
+#' lm.cells <- get.pbDE(lm.cells, .mode = "marker",
+#'                      .id = c("cluster.1", "cluster.3"),
+#'                      .id2 = c("cluster.2", "cluster.4"),
+#'                      .result.name = "cd4_vs_cd8")
+#'
 #' # Access results
 #' lm.cells$pbDE$default$all$adj.p
-#' lm.cells$pbDE$default$tcells$coefficients
+#' lm.cells$markerDE$default$cluster3_markers$coefficients
 #' }
-#' 
+#'
 #' @param ... Additional arguments passed to methods.
 #' @export
 #'
@@ -784,15 +984,20 @@ get.pbDE.TDRObj <-
   function(
     x,
     .source = NULL,
-    .design,
+    .mode = NULL,
+    .design = NULL,
     .contrasts = NULL,
     .block = NULL,
     .geneset.ls = NULL,
-    .id.idx = NULL,
     .id = NULL,
+    .id.idx = NULL,
+    .id2 = "..all.other.landmarks..",
+    .id2.idx = NULL,
     .id.from = NULL,
     .model.name = "default",
-    .population.name = "all",
+    .result.name = NULL,
+    .population.name = NULL,
+    .comparison.name = NULL,
     .force.recalc = FALSE,
     .verbose = TRUE,
     .label.confidence = 0.5,
@@ -801,467 +1006,586 @@ get.pbDE.TDRObj <-
     .tdr.obj <- x
 
     .tdr_validate_label_confidence(.label.confidence)
-    
-    i <- j <- landmark <- cell <- label <- x <- confidence <-
-      NULL
-    
-    if(!is.null(x = .geneset.ls)){
-      if(.tdr.obj@config$assay.type != "RNA"){
+
+    # R CMD check appeasement
+    i <- j <- landmark <- cell <- label <- x <- confidence <- NULL
+
+    # =========================================================================
+    # Resolve deprecated aliases for .result.name
+    # =========================================================================
+
+    if (!is.null(x = .population.name)) {
+      warning("`.population.name` is deprecated. Use `.result.name` instead.",
+              call. = FALSE)
+      if (is.null(x = .result.name)) .result.name <- .population.name
+    }
+    if (!is.null(x = .comparison.name)) {
+      warning("`.comparison.name` is deprecated. Use `.result.name` instead.",
+              call. = FALSE)
+      if (is.null(x = .result.name)) .result.name <- .comparison.name
+    }
+
+    # =========================================================================
+    # Mode detection & validation
+    # =========================================================================
+
+    .has.design <- !is.null(x = .design)
+    .has.id     <- !is.null(x = .id) || !is.null(x = .id.idx)
+    .has.id2    <- !is.null(x = .id2.idx) ||
+      !identical(x = .id2, y = "..all.other.landmarks..")
+
+    if (is.null(x = .mode)) {
+      if (.has.design && !.has.id2 && is.null(x = .id2.idx)) {
+        .mode <- "design"
+      } else if (.has.design && (.has.id2 || !is.null(x = .id2.idx))) {
+        stop(
+          "Conflicting arguments: .design and .id2/.id2.idx cannot both be provided.\n",
+          "  - For pseudobulk DE comparing samples according to a design matrix, ",
+          "provide .design (and optionally .id/.id.idx to subset to a population).\n",
+          "  - For marker identification comparing cell populations within samples, ",
+          "provide .id/.id.idx (group 1) and .id2/.id2.idx (group 2) without .design.",
+          call. = FALSE
+        )
+      } else if (.has.id) {
+        .mode <- "marker"
+      } else if (!.has.design && !.has.id) {
+        stop(
+          "Cannot determine analysis mode. Provide either:\n",
+          "  - .design (for pseudobulk DE comparing samples across conditions), or\n",
+          "  - .id/.id.idx (for marker identification comparing cell populations).",
+          call. = FALSE
+        )
+      }
+    }
+
+    .mode <- match.arg(arg = .mode, choices = c("design", "marker"))
+
+    if (.mode == "design" && !.has.design) {
+      stop("In design mode, .design is required.", call. = FALSE)
+    }
+    if (.mode == "marker" && .has.design) {
+      stop(
+        ".design is not used in marker mode.\n",
+        "  - For pseudobulk DE comparing samples, use .mode = 'design'.\n",
+        "  - For marker identification, do not provide .design.",
+        call. = FALSE
+      )
+    }
+    if (.mode == "marker" && is.null(x = .id) && is.null(x = .id.idx)) {
+      stop("In marker mode, .id or .id.idx (group 1) is required.", call. = FALSE)
+    }
+    if (.mode == "design" && !is.null(x = .id2.idx)) {
+      warning(".id2.idx is ignored in design mode.", call. = FALSE)
+    }
+    if (.mode == "design" &&
+        !identical(x = .id2, y = "..all.other.landmarks..")) {
+      warning(".id2 is ignored in design mode.", call. = FALSE)
+    }
+    if (.mode == "marker" && !is.null(x = .contrasts)) {
+      warning(".contrasts is not used in marker mode and will be ignored.",
+              call. = FALSE)
+    }
+    if (.mode == "marker" && !is.null(x = .block)) {
+      warning(".block is not used in marker mode and will be ignored.",
+              call. = FALSE)
+    }
+
+    # Validate shared arguments
+    if (!is.null(x = .geneset.ls)) {
+      if (.tdr.obj@config$assay.type != "RNA") {
         stop(".geneset.ls is only supported for RNA assay type")
-      } else if(!is.list(x = .geneset.ls)){
+      } else if (!is.list(x = .geneset.ls)) {
         stop(".geneset.ls must be a list of character vectors")
       }
-    } 
-    
-    if(nrow(x = .design) != length(x = .tdr.obj@cells)){
-      stop("Number of rows in design matrix must be equal to the number of samples")
     }
-    
-    # check if no intercept is present but any of the covariates is a continuous variable
-    no.intercept <-
-      !(any(Matrix::colSums(x = .design == 1) == nrow(x = .design)))
-    
-    num.covariate <-
-      !all(as.vector(x = .design) %in% c(0,1))
-    
-    if(no.intercept & num.covariate){
-      warning("No intercept in the model but at least one of the covariates is a continuous variable. This model is not the same as the one with an intercept because it assumes that the continuous variable is centered at 0.")
-    }
-    
-    #	Check design (source: https://rdrr.io/bioc/edgeR/src/R/glmfit.R)
-    nlib <- length(x = .tdr.obj@cells)
-    .design <- as.matrix(x = .design)
-    if(nrow(x = .design) != nlib) {
-      stop("nrow(design) disagrees with length(x = .tdr.obj$cells)")
-    }
-    ne <- limma::nonEstimable(x = .design)
-    if(!is.null(x = ne)) {
-      stop(paste("Design matrix not of full rank.  The following coefficients not estimable:\n",
-                 paste(ne,
-                       collapse = " ")))
-    }
-    
-    # -------------------------------------------------------------------------
-    # Auto-set .population.name if .id is specified and .population.name is default
-    # -------------------------------------------------------------------------
-    
-    if(!is.null(x = .id) && .population.name == "all"){
-      # Auto-set population name to the specified cluster/celltype ID(s)
-      .population.name <- paste(.id, collapse = "_")
-      if(isTRUE(x = .verbose)){
-        message(sprintf("Auto-setting .population.name to '%s'", .population.name))
-      }
-    }
-    
-    if(!is.null(x = .id.idx) && .population.name == "all"){
-      # Custom indices require explicit naming
-      .population.name <- paste0("idx_", length(x = .id.idx))
-      if(isTRUE(x = .verbose)){
-        message(sprintf("Auto-setting .population.name to '%s' (custom landmark indices)", .population.name))
-      }
-    }
-    
-    # -------------------------------------------------------------------------
-    # Validate on-disk cache (if active) before proceeding
-    # -------------------------------------------------------------------------
-    
-    .tdr_cache_validate_quiet(.tdr.obj)
-    
-    # -------------------------------------------------------------------------
-    # Check if slot already exists
-    # -------------------------------------------------------------------------
-    
-    if(!is.null(x = .tdr.obj@results$pb[[.model.name]][[.population.name]]) && !isTRUE(x = .force.recalc)){
-      stop(paste0("Results for model '", .model.name, "' and population '", .population.name, 
-                  "' already exist in .tdr.obj$pbDE. ",
-                  "Use different names or set .force.recalc = TRUE to overwrite."))
-    }
-    
-    # -------------------------------------------------------------------------
-    # Determine cell indices for aggregation (cell-centric approach)
-    # .lm.idx is a per-sample list of cell indices
-    # -------------------------------------------------------------------------
-    
-    if(is.null(x = .id.idx)){
-      
-      if(!is.null(x = .id)){
-        
-        .id.from <-
-          match.arg(arg = .id.from,
-                    choices = c("clustering",
-                                "celltyping"))
-        
-        if(!all(.id %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))){
-          
-          stop(paste0(paste0(.id[!(.id %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))],
-                             collapse = ", "),
-                      " not found in ",
-                      .id.from))
-          
-        }
-        
-        # Cell-centric: get per-sample cell indices matching the requested population
-        .lm.idx <-
-          lapply(X = .tdr_get_map_slot_all(.tdr.obj, paste0(.id.from, ".ids")),
-                 FUN = function(smpl){
-                   which(x = smpl %in% .id)
-                 })
-        
-      } else {
-        
-        # Use all cells per sample
-        .lm.idx <-
-          stats::setNames(object = .tdr.obj@metadata$n.cells,
-                          nm = names(x = .tdr.obj@cells)) |>
-          lapply(FUN = seq_len)
-        
-      }
-    } else {
-      
-      if(!all(.id.idx %in% (nrow(x = .tdr.obj@assay$expr) |> seq_len()))) {
-        stop(paste0(".id.idx must be an integer vector between 1 and ",
-                    nrow(x = .tdr.obj@assay$expr)))
-      }
-      
-      # Cell-centric: use .label.confidence to determine which cells
-      # confidently belong to the specified landmark set
-      tmp.lbl <-
-        rep(x = "out",
-            times = nrow(x = .tdr.obj@assay$expr))
-      
-      tmp.lbl[.id.idx] <-
-        "in"
-      
-      .lm.idx <-
-        lapply(X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graph"),
-               FUN = function(smpl) {
-                 in.and.out <-
-                   .tdr_transfer_labels(
-                     .method = "fuzzy",
-                     .label.confidence = .label.confidence,
-                     .n.cells = nrow(x = smpl),
-                     .cell.names = seq_len(length.out = nrow(x = smpl)),
-                     .fgraph = smpl,
-                     .landmark.labels = tmp.lbl
-                   )
 
-                 which(x = in.and.out == "in")
-                 
-               })
-      
+    # Resolve .id.from default
+    if (is.null(x = .id.from) && (!is.null(x = .id) || .mode == "marker")) {
+      .id.from <- "clustering"
     }
-    
-    if(isTRUE(x = .verbose)){
-      message(sprintf("\nUsing %s cells for pseudobulk aggregation",
-                      paste(lengths(x = .lm.idx), collapse = ", ")))
-    }
-    
-    # number of cells in each pseudobulk
-    n.pseudo <-
-      lengths(x = .lm.idx)
-    
-    # remove outlier samples with too few cells
-    smpl.outlier <-
-      (n.pseudo / mean(x = n.pseudo)) < 0.1
-    
-    # get pseudobulk
-    if(.tdr.obj@config$assay.type == "RNA"){
-      
-      if(any(smpl.outlier)){
-        warning(paste0("The following samples were removed since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
-                       paste(names(x = smpl.outlier)[smpl.outlier],
-                             collapse = "\n")))
+
+    # Validate on-disk cache
+    .tdr_cache_validate_quiet(.tdr.obj)
+
+    # =========================================================================
+    # DESIGN MODE
+    # =========================================================================
+    if (.mode == "design") {
+
+      .design <- as.matrix(x = .design)
+
+      if (nrow(x = .design) != length(x = .tdr.obj@cells)) {
+        stop("Number of rows in design matrix must be equal to the number of samples")
       }
-      
-      counts <-
-        stats::setNames(object = names(x = .tdr.obj@cells)[!smpl.outlier],
-                        nm = names(x = .tdr.obj@cells)[!smpl.outlier]) |>
-        lapply(FUN = function(smpl){
-          
-          exprs.mat <-
-            .get_sample_matrix(.source, .tdr.obj, smpl)[,.lm.idx[[smpl]]] |>
-            methods::as(Class = "dgCMatrix")
-          
-          wcl <- 
-            .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[.lm.idx[[smpl]],,drop = FALSE]
-          
-          # get weighted sum
-          wsum <-
-            exprs.mat %*% wcl
-          
-          # get weighted mean using sum of weights and scale by number of cells
-          res <-
-            (Matrix::rowSums(x = wsum) / sum(wcl)) * (sum(Matrix::rowSums(x = wcl) > 0))
-          
-          return(res)
-          
-        }) |>
-        do.call(what = cbind)
-      
-      dge <-
-        edgeR::DGEList(counts = counts)
-      
-      tmp.design <-
-        .design[!smpl.outlier,] |>
-        (\(x)
-         x[,Matrix::colSums(x = x == 0) != nrow(x = x),drop = FALSE]
-        )()
-      
-      keep <-
-        edgeR::filterByExpr(y = dge,
-                            design = tmp.design)
-      
-      dge <-
-        dge[keep,,keep.lib.sizes=FALSE]
-      
-      dge <-
-        edgeR::calcNormFactors(object = dge,
-                               method = "TMM")
-      
-      v <- limma::voom(counts = dge,
-                       design = tmp.design,
-                       plot = FALSE)
-      
-      if(!(is.null(x = .block))){
-        
-        if(length(x = .block) != 1){
-          stop("Block must be a vector of length 1")
-        }
-        if(!(.block %in% colnames(x = .tdr.obj@metadata))){
-          stop(paste0(.block,
-                      " not found in metadata"))
-        }
-        
-        if(isTRUE(x = .verbose)){
-          message("\nestimating the intra-block correlation")
-        }
-        
-        # https://support.bioconductor.org/p/125489/#125602
-        # duplicateCorrelation is more general and is THE ONLY SOLUTION when
-        # you want to compare across blocking levels, e.g., comparing diseased
-        # and healthy donors when each donor also contributes before/after treatment samples.
-        dupcor <- 
-          limma::duplicateCorrelation(object = v,
-                                      design = tmp.design,
-                                      block = .tdr.obj@metadata[[.block]][!smpl.outlier])
+
+      # Check design rank (source: https://rdrr.io/bioc/edgeR/src/R/glmfit.R)
+      ne <- limma::nonEstimable(x = .design)
+      if (!is.null(x = ne)) {
+        stop(paste("Design matrix not of full rank.  The following coefficients not estimable:\n",
+                   paste(ne, collapse = " ")))
       }
-      
-      if(isTRUE(x = .verbose)){
-        message("\nfitting linear models")
+
+      # Check intercept + continuous covariate
+      no.intercept <-
+        !(any(Matrix::colSums(x = .design == 1) == nrow(x = .design)))
+      num.covariate <-
+        !all(as.vector(x = .design) %in% c(0, 1))
+      if (no.intercept & num.covariate) {
+        warning("No intercept in the model but at least one of the covariates is a continuous variable. This model is not the same as the one with an intercept because it assumes that the continuous variable is centered at 0.")
       }
-      
-      .de <-
-        limma::lmFit(object = v,
-                     design = tmp.design,
-                     block = if(exists(x = "dupcor")) .tdr.obj@metadata[[.block]][!smpl.outlier] else  NULL,
-                     correlation = if(exists(x = "dupcor")) dupcor$consensus else NULL)
-      
-      if(!is.null(x = .contrasts)){
-        
-        tmp.contrasts <-
-          .contrasts[colnames(x = tmp.design),,drop = FALSE] |>
-          (\(x)
-           x[,Matrix::colSums(x = x == 0) != nrow(x = x),drop = FALSE]
-          )()
-        
-        .de <-
-          limma::contrasts.fit(fit = .de,
-                               contrasts = tmp.contrasts)
-        
-      }
-      
-      .de <-
-        limma::eBayes(fit = .de,
-                      robust = TRUE)
-      
-      .de$adj.p <-
-        apply(X = .de$p.value,
-              MARGIN = 2,
-              FUN = stats::p.adjust,
-              method = "fdr")
-      
-      if(!is.null(x = .geneset.ls)){
-        
-        gsva.es <- 
-          GSVA::gsvaParam(
-            exprData = v$E,
-            geneSets = .geneset.ls,
-            kcdf = "Gaussian",
-            maxDiff = TRUE) |>
-          GSVA::gsva()
-        
-        if(!(is.null(x = .block))){
-          
-          if(isTRUE(x = .verbose)){
-            message("\nestimating the intra-block correlation")
+
+      # --- Auto-set .result.name ---
+      if (is.null(x = .result.name)) {
+        if (!is.null(x = .id)) {
+          .result.name <- paste(.id, collapse = "_")
+          if (isTRUE(x = .verbose)) {
+            message(sprintf("Auto-setting .result.name to '%s'", .result.name))
           }
-          
-          # https://support.bioconductor.org/p/125489/#125602
-          # duplicateCorrelation is more general and is THE ONLY SOLUTION when
-          # you want to compare across blocking levels, e.g., comparing diseased
-          # and healthy donors when each donor also contributes before/after treatment samples.
-          gsva.dupcor <- 
-            limma::duplicateCorrelation(object = gsva.es,
-                                        design = tmp.design,
-                                        block = .tdr.obj@metadata[[.block]][!smpl.outlier])
+        } else if (!is.null(x = .id.idx)) {
+          .result.name <- paste0("idx_", length(x = .id.idx))
+          if (isTRUE(x = .verbose)) {
+            message(sprintf("Auto-setting .result.name to '%s' (custom landmark indices)",
+                            .result.name))
+          }
+        } else {
+          .result.name <- "all"
         }
-        
-        gsva.fit <- 
-          limma::lmFit(object = gsva.es,
-                       design = tmp.design,
-                       block = if(exists(x = "gsva.dupcor")) .tdr.obj@metadata[[.block]][!smpl.outlier] else  NULL,
-                       correlation = if(exists(x = "gsva.dupcor")) gsva.dupcor$consensus else NULL)
-        
-        if(!is.null(x = .contrasts)){
-          
-          gsva.fit <-
-            limma::contrasts.fit(fit = gsva.fit,
-                                 contrasts = tmp.contrasts)
-          
-        }
-        
-        gsva.fit <- 
-          limma::eBayes(fit = gsva.fit,
-                        robust = TRUE)
-        
-        gsva.fit$adj.p <-
-          apply(X = gsva.fit$p.value,
-                MARGIN = 2,
-                FUN = stats::p.adjust,
-                method = "fdr")
-        
-        .de$geneset <-
-          gsva.fit
-        
-        .de$geneset$E <-
-          gsva.es
-        
       }
-      
-    } else {
-      
-      counts <-
-        stats::setNames(object = names(x = .tdr.obj@cells),#[!smpl.outlier],
-                        nm = names(x = .tdr.obj@cells)) |>#[!smpl.outlier]) |>
-        lapply(FUN = function(smpl){
-          
-          exprs.mat <-
-            .get_sample_matrix(.source, .tdr.obj, smpl)
-          
-          exprs.mat <-
-            exprs.mat[.lm.idx[[smpl]],colnames(x = .tdr.obj@assay$expr)]
-          
-          wcl <- 
-            .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[.lm.idx[[smpl]],,drop=FALSE]
-          
-          # get weighted sum
-          wsum <-
-            (Matrix::t(x = exprs.mat) %*% wcl)
-          
-          # get weighted mean using sum of weights
-          res <-
-            Matrix::rowSums(x = wsum) / sum(wcl)
-          
-          return(res)
-          
-        }) |>
-        do.call(what = rbind)
-      
-      tmp.design <-
-        .design |>#[!smpl.outlier,] |>
-        (\(x)
-         x[,Matrix::colSums(x = x == 0) != nrow(x = x),drop = FALSE]
-        )()
-      
-      if(!(is.null(x = .block))){
-        
-        if(length(x = .block) != 1){
-          stop("Block must be a vector of length 1")
-        }
-        if(!(.block %in% colnames(x = .tdr.obj@metadata))){
-          stop(paste0(.block,
-                      " not found in metadata"))
-        }
-        
-        if(isTRUE(x = .verbose)){
-          message("\nestimating the intra-block correlation")
-        }
-        
-        # https://support.bioconductor.org/p/125489/#125602
-        # duplicateCorrelation is more general and is THE ONLY SOLUTION when
-        # you want to compare across blocking levels, e.g., comparing diseased
-        # and healthy donors when each donor also contributes before/after treatment samples.
-        dupcor <- 
-          limma::duplicateCorrelation(object = Matrix::t(x = counts),
-                                      design = tmp.design,
-                                      block = .tdr.obj@metadata[[.block]])#[!smpl.outlier])
+
+      # Check if slot already exists
+      if (!is.null(x = .tdr.obj@results$pb[[.model.name]][[.result.name]]) &&
+          !isTRUE(x = .force.recalc)) {
+        stop(paste0("Results for model '", .model.name, "' and result '", .result.name,
+                    "' already exist in .tdr.obj$pbDE. ",
+                    "Use different names or set .force.recalc = TRUE to overwrite."))
       }
-      
-      if(isTRUE(x = .verbose)){
-        message("\nfitting linear models")
+
+      # --- Resolve cell indices ---
+      .lm.idx <- .tdr_resolve_cell_idx(
+        .tdr.obj, .id = .id, .id.idx = .id.idx,
+        .id.from = if (!is.null(x = .id.from)) .id.from else "clustering",
+        .label.confidence = .label.confidence
+      )
+
+      if (isTRUE(x = .verbose)) {
+        message(sprintf("\nUsing %s cells for pseudobulk aggregation",
+                        paste(lengths(x = .lm.idx), collapse = ", ")))
       }
-      
-      .de <-
-        limma::lmFit(object = Matrix::t(x = counts),
-                     design = tmp.design,
-                     block = if(exists(x = "dupcor")) .tdr.obj@metadata[[.block]] else  NULL,#[!smpl.outlier] else  NULL,
-                     correlation = if(exists(x = "dupcor")) dupcor$consensus else NULL)
-      
-      if(!is.null(x = .contrasts)){
-        
-        tmp.contrasts <-
-          .contrasts[colnames(x = tmp.design),,drop = FALSE] |>
-          (\(x)
-           x[,Matrix::colSums(x = x == 0) != nrow(x = x),drop = FALSE]
-          )()
-        
+
+      n.pseudo <- lengths(x = .lm.idx)
+      smpl.outlier <- (n.pseudo / mean(x = n.pseudo)) < 0.1
+
+      # --- RNA pseudobulk aggregation ---
+      if (.tdr.obj@config$assay.type == "RNA") {
+
+        if (any(smpl.outlier)) {
+          warning(paste0(
+            "The following samples were removed since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
+            paste(names(x = smpl.outlier)[smpl.outlier], collapse = "\n")
+          ))
+        }
+
+        counts <- .tdr_pseudobulk_aggregate_rna(
+          .source, .tdr.obj,
+          .samples = names(x = .tdr.obj@cells)[!smpl.outlier],
+          .cell.idx.list = .lm.idx,
+          .robust = FALSE
+        )
+
+        dge <- edgeR::DGEList(counts = counts)
+
+        tmp.design <-
+          .design[!smpl.outlier, ] |>
+          (\(x) x[, Matrix::colSums(x = x == 0) != nrow(x = x), drop = FALSE])()
+
+        keep <- edgeR::filterByExpr(y = dge, design = tmp.design)
+        dge <- dge[keep, , keep.lib.sizes = FALSE]
+        dge <- edgeR::calcNormFactors(object = dge, method = "TMM")
+        v <- limma::voom(counts = dge, design = tmp.design, plot = FALSE)
+
+        if (!is.null(x = .block)) {
+          if (length(x = .block) != 1) stop("Block must be a vector of length 1")
+          if (!(.block %in% colnames(x = .tdr.obj@metadata))) {
+            stop(paste0(.block, " not found in metadata"))
+          }
+          if (isTRUE(x = .verbose)) message("\nestimating the intra-block correlation")
+          dupcor <-
+            limma::duplicateCorrelation(
+              object = v, design = tmp.design,
+              block = .tdr.obj@metadata[[.block]][!smpl.outlier]
+            )
+        }
+
+        if (isTRUE(x = .verbose)) message("\nfitting linear models")
+
         .de <-
-          limma::contrasts.fit(fit = .de,
-                               contrasts = tmp.contrasts)
-        
+          limma::lmFit(
+            object = v, design = tmp.design,
+            block = if (exists(x = "dupcor")) .tdr.obj@metadata[[.block]][!smpl.outlier] else NULL,
+            correlation = if (exists(x = "dupcor")) dupcor$consensus else NULL
+          )
+
+        if (!is.null(x = .contrasts)) {
+          tmp.contrasts <-
+            .contrasts[colnames(x = tmp.design), , drop = FALSE] |>
+            (\(x) x[, Matrix::colSums(x = x == 0) != nrow(x = x), drop = FALSE])()
+          .de <- limma::contrasts.fit(fit = .de, contrasts = tmp.contrasts)
+        }
+
+        .de <- limma::eBayes(fit = .de, robust = TRUE)
+        .de$adj.p <- apply(X = .de$p.value, MARGIN = 2,
+                           FUN = stats::p.adjust, method = "fdr")
+
+        # GSVA (optional)
+        if (!is.null(x = .geneset.ls)) {
+          gsva.es <-
+            GSVA::gsvaParam(exprData = v$E, geneSets = .geneset.ls,
+                            kcdf = "Gaussian", maxDiff = TRUE) |>
+            GSVA::gsva()
+
+          if (!is.null(x = .block)) {
+            if (isTRUE(x = .verbose)) message("\nestimating the intra-block correlation")
+            gsva.dupcor <-
+              limma::duplicateCorrelation(
+                object = gsva.es, design = tmp.design,
+                block = .tdr.obj@metadata[[.block]][!smpl.outlier]
+              )
+          }
+
+          gsva.fit <-
+            limma::lmFit(
+              object = gsva.es, design = tmp.design,
+              block = if (exists(x = "gsva.dupcor")) .tdr.obj@metadata[[.block]][!smpl.outlier] else NULL,
+              correlation = if (exists(x = "gsva.dupcor")) gsva.dupcor$consensus else NULL
+            )
+
+          if (!is.null(x = .contrasts)) {
+            gsva.fit <- limma::contrasts.fit(fit = gsva.fit, contrasts = tmp.contrasts)
+          }
+
+          gsva.fit <- limma::eBayes(fit = gsva.fit, robust = TRUE)
+          gsva.fit$adj.p <- apply(X = gsva.fit$p.value, MARGIN = 2,
+                                  FUN = stats::p.adjust, method = "fdr")
+          .de$geneset <- gsva.fit
+          .de$geneset$E <- gsva.es
+        }
+
+      } else {
+        # --- Cytometry pseudobulk aggregation ---
+
+        counts <- .tdr_pseudobulk_aggregate_cyto(
+          .source, .tdr.obj,
+          .samples = names(x = .tdr.obj@cells),
+          .cell.idx.list = .lm.idx,
+          .robust = FALSE
+        )
+
+        tmp.design <-
+          .design |>
+          (\(x) x[, Matrix::colSums(x = x == 0) != nrow(x = x), drop = FALSE])()
+
+        if (!is.null(x = .block)) {
+          if (length(x = .block) != 1) stop("Block must be a vector of length 1")
+          if (!(.block %in% colnames(x = .tdr.obj@metadata))) {
+            stop(paste0(.block, " not found in metadata"))
+          }
+          if (isTRUE(x = .verbose)) message("\nestimating the intra-block correlation")
+          dupcor <-
+            limma::duplicateCorrelation(
+              object = Matrix::t(x = counts), design = tmp.design,
+              block = .tdr.obj@metadata[[.block]]
+            )
+        }
+
+        if (isTRUE(x = .verbose)) message("\nfitting linear models")
+
+        .de <-
+          limma::lmFit(
+            object = Matrix::t(x = counts), design = tmp.design,
+            block = if (exists(x = "dupcor")) .tdr.obj@metadata[[.block]] else NULL,
+            correlation = if (exists(x = "dupcor")) dupcor$consensus else NULL
+          )
+
+        if (!is.null(x = .contrasts)) {
+          tmp.contrasts <-
+            .contrasts[colnames(x = tmp.design), , drop = FALSE] |>
+            (\(x) x[, Matrix::colSums(x = x == 0) != nrow(x = x), drop = FALSE])()
+          .de <- limma::contrasts.fit(fit = .de, contrasts = tmp.contrasts)
+        }
+
+        .de <- limma::eBayes(fit = .de, robust = TRUE)
+        .de$adj.p <- apply(X = .de$p.value, MARGIN = 2,
+                           FUN = stats::p.adjust, method = "fdr")
       }
-      
-      .de <-
-        limma::eBayes(fit = .de,
-                      robust = TRUE)
-      
-      .de$adj.p <-
-        apply(X = .de$p.value,
-              MARGIN = 2,
-              FUN = stats::p.adjust,
-              method = "fdr")
-      
+
+      .de$smpl.outlier <- smpl.outlier
+      .de$id.idx <- .lm.idx
+      .de$n.pseudo <- n.pseudo
+
+      # Store results in @results$pb
+      if (is.null(x = .tdr.obj@results$pb)) .tdr.obj@results$pb <- list()
+      if (is.null(x = .tdr.obj@results$pb[[.model.name]])) {
+        .tdr.obj@results$pb[[.model.name]] <- list()
+      }
+      .tdr.obj@results$pb[[.model.name]][[.result.name]] <- .de
+
+      if (isTRUE(x = .verbose)) {
+        message(sprintf("\nResults stored in .tdr.obj$pbDE$%s$%s",
+                        .model.name, .result.name))
+      }
+
+      return(.tdr.obj)
     }
-    
-    .de$smpl.outlier <-
-      smpl.outlier
-    
-    .de$id.idx <-
-      .lm.idx
-    
-    .de$n.pseudo <-
-      n.pseudo
-    
-    # -------------------------------------------------------------------------
-    # Store results in .tdr.obj@results$pb[[.model.name]][[.population.name]]
-    # -------------------------------------------------------------------------
-    
-    if(is.null(x = .tdr.obj@results$pb)){
-      .tdr.obj@results$pb <- list()
+
+    # =========================================================================
+    # MARKER MODE
+    # =========================================================================
+    if (.mode == "marker") {
+
+      if (is.null(x = .id.from)) .id.from <- "clustering"
+      .id.from <- match.arg(arg = .id.from, choices = c("clustering", "celltyping"))
+
+      # --- Resolve group 1 cell indices ---
+      .lm1.idx <- .tdr_resolve_cell_idx(
+        .tdr.obj, .id = .id, .id.idx = .id.idx,
+        .id.from = .id.from,
+        .label.confidence = .label.confidence
+      )
+
+      # --- Resolve group 2 cell indices ---
+      if (!is.null(x = .id2.idx)) {
+
+        # .id2.idx takes priority over .id2
+        .lm2.idx <- .tdr_resolve_cell_idx(
+          .tdr.obj, .id = NULL, .id.idx = .id2.idx,
+          .id.from = .id.from,
+          .label.confidence = .label.confidence
+        )
+
+      } else if ("..all.other.landmarks.." %in% .id2) {
+
+        if (isTRUE(x = .verbose)) message("using `..all.other.landmarks..` for .id2")
+
+        .id2 <- "..all.other.landmarks.."
+
+        # Complement: all cells NOT in group 1
+        .lm2.idx <-
+          seq_along(along.with = .lm1.idx) |>
+          stats::setNames(nm = names(x = .lm1.idx)) |>
+          lapply(FUN = function(smpl) {
+            seq_len(
+              length.out = .tdr.obj@config$sampling$n.cells[smpl]
+            )[-.lm1.idx[[smpl]]]
+          })
+
+      } else {
+
+        # Validate .id2 labels
+        if (!all(.id2 %in% c(
+          unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids) |> as.character()
+        ))) {
+          stop(paste0(
+            paste0(.id2[!(.id2 %in% (
+              unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids) |>
+                as.character()
+            ))], collapse = ", "),
+            " not found in ", .id.from
+          ))
+        }
+
+        .lm2.idx <-
+          lapply(
+            X = .tdr_get_map_slot_all(.tdr.obj, paste0(.id.from, ".ids")),
+            FUN = function(smpl) which(x = smpl %in% .id2)
+          )
+      }
+
+      # --- Auto-generate .result.name ---
+      if (is.null(x = .result.name)) {
+        id1.str <- if (!is.null(x = .id)) paste0(.id, collapse = "_") else
+          paste0("idx", length(x = .id.idx))
+        if (identical(x = .id2, y = "..all.other.landmarks..")) {
+          id2.str <- "all"
+        } else if (!is.null(x = .id2.idx)) {
+          id2.str <- paste0("idx", length(x = .id2.idx))
+        } else {
+          id2.str <- paste0(.id2, collapse = "_")
+        }
+        .result.name <- paste0(id1.str, "_vs_", id2.str)
+      }
+
+      # Initialize storage
+      if (is.null(x = .tdr.obj@results$marker)) .tdr.obj@results$marker <- list()
+      if (is.null(x = .tdr.obj@results$marker[[.model.name]])) {
+        .tdr.obj@results$marker[[.model.name]] <- list()
+      }
+
+      # Check for existing results
+      if (!isTRUE(x = .force.recalc) &&
+          !is.null(x = .tdr.obj@results$marker[[.model.name]][[.result.name]])) {
+        message(sprintf(
+          "Results already exist at .tdr.obj$markerDE$%s$%s. Use .force.recalc = TRUE to recalculate.",
+          .model.name, .result.name
+        ))
+        return(.tdr.obj)
+      }
+
+      # --- Pseudobulk cell counts and outlier detection ---
+      n.pseudo1 <- lengths(x = .lm1.idx)
+      n.pseudo2 <- lengths(x = .lm2.idx)
+
+      smpl.outlier.1 <-
+        (n.pseudo1 / mean(x = c(n.pseudo1, n.pseudo2))) < 0.1
+      smpl.outlier.2 <-
+        (n.pseudo2 / mean(x = c(n.pseudo1, n.pseudo2))) < 0.1
+
+      # --- RNA marker aggregation ---
+      if (.tdr.obj@config$assay.type == "RNA") {
+
+        if (any(smpl.outlier.1)) {
+          warning(paste0(
+            "The following samples were removed from group 1 since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
+            paste(names(x = smpl.outlier.1)[smpl.outlier.1], collapse = "\n")
+          ))
+        }
+        if (any(smpl.outlier.2)) {
+          warning(paste0(
+            "The following samples were removed from group 2 since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
+            paste(names(x = smpl.outlier.2)[smpl.outlier.2], collapse = "\n")
+          ))
+        }
+
+        counts1 <- .tdr_pseudobulk_aggregate_rna(
+          .source, .tdr.obj,
+          .samples = names(x = .tdr.obj@cells)[!smpl.outlier.1],
+          .cell.idx.list = .lm1.idx,
+          .robust = TRUE
+        )
+        colnames(counts1) <- paste0("counts1.", colnames(x = counts1))
+
+        counts2 <- .tdr_pseudobulk_aggregate_rna(
+          .source, .tdr.obj,
+          .samples = names(x = .tdr.obj@cells)[!smpl.outlier.2],
+          .cell.idx.list = .lm2.idx,
+          .robust = TRUE
+        )
+        colnames(counts2) <- paste0("counts2.", colnames(x = counts2))
+
+        dge <- cbind(counts1, counts2) |> edgeR::DGEList()
+
+        .ids <-
+          colnames(x = dge) |>
+          strsplit(split = ".", fixed = TRUE) |>
+          lapply(FUN = "[", i = 1) |>
+          unlist() |>
+          gsub(pattern = "counts", replacement = ".id", fixed = TRUE) |>
+          factor(levels = c(".id2", ".id1"))
+
+        .pairs <-
+          colnames(x = dge) |>
+          gsub(pattern = "^counts1.|^counts2.", replacement = "", fixed = FALSE)
+
+        tmp.design <-
+          stats::model.matrix(object = ~ .ids + .pairs) |>
+          (\(x) `colnames<-`(
+            x = x,
+            value = colnames(x = x) |>
+              gsub(pattern = "^\\.ids|^\\.pairs", replacement = "", fixed = FALSE)
+          ))() |>
+          (\(x) x[, Matrix::colSums(x = x) > 1])()
+
+        keep <- edgeR::filterByExpr(y = dge, design = tmp.design)
+        dge <- dge[keep, , keep.lib.sizes = FALSE]
+        dge <- edgeR::calcNormFactors(object = dge, method = "TMM")
+        v <- limma::voom(counts = dge, design = tmp.design, plot = FALSE)
+
+        .de <- limma::lmFit(object = v, design = tmp.design)
+        .de <- limma::eBayes(fit = .de, robust = TRUE)
+        .de$adj.p <- apply(X = .de$p.value, MARGIN = 2,
+                           FUN = stats::p.adjust, method = "fdr")
+
+        # GSVA (optional)
+        if (!is.null(x = .geneset.ls)) {
+          gsva.es <-
+            GSVA::gsvaParam(exprData = v$E, geneSets = .geneset.ls,
+                            kcdf = "Gaussian", maxDiff = TRUE) |>
+            GSVA::gsva()
+
+          gsva.fit <- limma::lmFit(object = gsva.es, design = tmp.design)
+          gsva.fit <- limma::eBayes(fit = gsva.fit, robust = TRUE)
+          gsva.fit$adj.p <- apply(X = gsva.fit$p.value, MARGIN = 2,
+                                  FUN = stats::p.adjust, method = "fdr")
+          .de$geneset <- gsva.fit
+          .de$geneset$E <- gsva.es
+        }
+
+      } else {
+        # --- Cytometry marker aggregation ---
+
+        counts1 <- .tdr_pseudobulk_aggregate_cyto(
+          .source, .tdr.obj,
+          .samples = names(x = .tdr.obj@cells),
+          .cell.idx.list = .lm1.idx,
+          .robust = TRUE
+        )
+        rownames(counts1) <- paste0("counts1.", rownames(x = counts1))
+
+        counts2 <- .tdr_pseudobulk_aggregate_cyto(
+          .source, .tdr.obj,
+          .samples = names(x = .tdr.obj@cells),
+          .cell.idx.list = .lm2.idx,
+          .robust = TRUE
+        )
+        rownames(counts2) <- paste0("counts2.", rownames(x = counts2))
+
+        counts <- rbind(counts1, counts2) |> Matrix::t()
+
+        .ids <-
+          colnames(x = counts) |>
+          strsplit(split = ".", fixed = TRUE) |>
+          lapply(FUN = "[", i = 1) |>
+          unlist() |>
+          gsub(pattern = "counts", replacement = ".id", fixed = TRUE) |>
+          factor(levels = c(".id2", ".id1"))
+
+        .pairs <-
+          colnames(x = counts) |>
+          gsub(pattern = "^counts1.|^counts2.", replacement = "", fixed = FALSE)
+
+        tmp.design <-
+          stats::model.matrix(object = ~ .ids + .pairs) |>
+          (\(x) `colnames<-`(
+            x = x,
+            value = colnames(x = x) |>
+              gsub(pattern = "^\\.ids|^\\.pairs", replacement = "", fixed = FALSE)
+          ))() |>
+          (\(x) x[, Matrix::colSums(x = x) > 1])()
+
+        .de <- limma::lmFit(object = counts, design = tmp.design)
+        .de <- limma::eBayes(fit = .de, robust = TRUE)
+        .de$adj.p <- apply(X = .de$p.value, MARGIN = 2,
+                           FUN = stats::p.adjust, method = "fdr")
+      }
+
+      .de$smpl.outlier.1 <- smpl.outlier.1
+      .de$smpl.outlier.2 <- smpl.outlier.2
+      .de$id1.idx <- .lm1.idx
+      .de$id2.idx <- .lm2.idx
+      .de$n.pseudo1 <- n.pseudo1
+      .de$n.pseudo2 <- n.pseudo2
+
+      # Store results in @results$marker
+      .tdr.obj@results$marker[[.model.name]][[.result.name]] <- .de
+
+      if (isTRUE(x = .verbose)) {
+        message(sprintf(
+          "\nMarker DE results stored in .tdr.obj$markerDE$%s$%s",
+          .model.name, .result.name
+        ))
+      }
+
+      return(.tdr.obj)
     }
-    
-    if(is.null(x = .tdr.obj@results$pb[[.model.name]])){
-      .tdr.obj@results$pb[[.model.name]] <- list()
-    }
-    
-    .tdr.obj@results$pb[[.model.name]][[.population.name]] <- .de
-    
-    if(isTRUE(x = .verbose)){
-      message(sprintf("\nResults stored in .tdr.obj$pbDE$%s$%s", .model.name, .population.name))
-    }
-    
-    return(.tdr.obj)
-    
   }
 
 #' Pseudobulk Differential Expression Analysis (Deprecated)
@@ -1299,7 +1623,8 @@ get.dea <- function(
   
   # Call get.pbDE and extract results for backward compatibility
   result <- get.pbDE(
-    .tdr.obj = .tdr.obj,
+    x = .tdr.obj,
+    .mode = "design",
     .design = .design,
     .contrasts = .contrasts,
     .block = .block,
@@ -1308,7 +1633,7 @@ get.dea <- function(
     .id = .id,
     .id.from = .id.from,
     .model.name = ".deprecated.call",
-    .population.name = "result",
+    .result.name = "result",
     .force.recalc = TRUE,
     .verbose = .verbose,
     .label.confidence = .label.confidence
@@ -1318,145 +1643,33 @@ get.dea <- function(
   return(result$pbDE$.deprecated.call$result)
 }
 
-#' Marker Gene/Protein Identification via Pairwise Comparison
+#' Marker Gene/Protein Identification (Deprecated)
 #'
-#' Identifies marker genes/proteins that distinguish one cell subset from another (or all others) by 
-#' performing pseudobulk differential expression between groups. Unlike \code{get.pbDE} which tests 
-#' experimental conditions, this compares cell populations to find defining features. Useful for 
-#' characterizing clusters and validating cell type annotations.
+#' @description
+#' `r lifecycle::badge("deprecated")`
+#'
+#' \code{get.markerDE()} is deprecated. Use \code{\link{get.pbDE}(.mode = "marker")} instead.
+#' This function dispatches to \code{get.pbDE} with \code{.mode = "marker"}.
 #'
 #' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
 #'   (anndataR) object processed through \code{get.map()}.
-#' @param .source The raw data object for non-file backends. \code{NULL} (default) for 
-#'   the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object. 
-#'   Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.
-#' @param .geneset.ls Optional named list of character vectors defining gene sets for GSVA enrichment. 
-#'   Only for RNA data.
-#' @param .id1.idx Optional integer vector specifying landmark indices for group 1. When provided,
-#'   the \code{.label.confidence} pipeline determines which cells confidently belong to this 
-#'   landmark set based on their fuzzy graph weights.
-#' @param .id2.idx Optional integer vector specifying landmark indices for group 2. When provided,
-#'   takes priority over \code{.id2} parameter and \code{"..all.other.landmarks.."} mode.
-#'   The \code{.label.confidence} pipeline determines which cells confidently belong to this 
-#'   landmark set based on their fuzzy graph weights.
-#' @param .id1 Character vector of cluster/celltype IDs for group 1 (test group). Required if 
-#'   \code{.id1.idx} not provided.
-#' @param .id2 Character vector of cluster/celltype IDs for group 2 (reference group). Default 
-#'   \code{"..all.other.landmarks.."} compares group 1 to all other cells. Can specify specific IDs 
-#'   for pairwise comparisons.
-#' @param .id.from Character: "clustering" (default) or "celltyping". Source of IDs in \code{.id1} 
-#'   and \code{.id2}.
-#' @param .model.name Character: A name for the analysis model (default: "default"). Used for 
-#'   organizing multiple analyses.
-#' @param .comparison.name Character: A name for this comparison. If NULL (default), auto-generated 
-#'   from .id1 and .id2 values (e.g., "cluster.1_vs_all" or "cluster.1_vs_cluster.2").
-#' @param .force.recalc Logical: If TRUE, recalculate even if results exist (default: FALSE).
-#' @param .label.confidence Numeric (0-1): minimum confidence threshold for cell-to-population
-#'   assignment when using \code{.id1.idx} or \code{.id2.idx} (default: 0.5). For each cell, the
-#'   fraction of its fuzzy graph weight falling on "in" vs "out" landmarks is computed; cells below
-#'   this threshold are excluded as low-confidence assignments.
-#'   
-#' @return The input \code{.tdr.obj} with results stored in 
-#'   \code{.tdr.obj$markerDE[[.model.name]][[.comparison.name]]} as a limma MArrayLM fit object 
-#'   with moderated statistics and additional slots:
-#'   \describe{
-#'     \item{\code{coefficients}}{Log fold changes (features x coefficients), nested in fit}
-#'     \item{\code{p.value}}{P-values (features x coefficients), nested in fit}
-#'     \item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
-#'     \item{\code{smpl.outlier.1}}{Logical vector: samples excluded from group 1}
-#'     \item{\code{smpl.outlier.2}}{Logical vector: samples excluded from group 2}
-#'     \item{\code{id1.idx}}{List of integer vectors: cells included per sample for group 1}
-#'     \item{\code{id2.idx}}{List of integer vectors: cells included per sample for group 2}
-#'     \item{\code{n.pseudo1}}{Integer vector: pseudobulk cell counts per sample for group 1}
-#'     \item{\code{n.pseudo2}}{Integer vector: pseudobulk cell counts per sample for group 2}
-#'     \item{\code{geneset}}{(RNA only, if \code{.geneset.ls} provided) GSVA fit object with \code{$adj.p} and \code{$E} (enrichment scores)}
-#'   }
-#'   
-#' @details
-#' The marker identification workflow:
-#' \enumerate{
-#'   \item \strong{Cell selection}: Extract cells belonging to group 1 (\code{.id1}) and group 2 
-#'     (\code{.id2})
-#'   \item \strong{Pseudobulk aggregation}: 
-#'     \itemize{
-#'       \item RNA: Sum raw counts across cells within each group per sample
-#'       \item Cytometry: Compute column medians of marker expression across cells within each group per sample
-#'     }
-#'   \item \strong{Outlier removal}: (RNA only) Exclude samples with <10\% of average pseudobulk cell count from either group
-#'   \item \strong{Paired comparison}: Fit model \code{~ .ids + .pairs} where \code{.ids} is the group indicator (.id1 vs .id2) and \code{.pairs} controls for sample of origin (blocking factor)
-#'   \item \strong{Statistical testing}: limma-voom with TMM normalization (RNA) or limma (cytometry)
-#'   \item \strong{FDR correction}: Adjust p-values across all features
-#' }
-#' 
-#' \strong{Common use cases:}
-#' \itemize{
-#'   \item \strong{One-vs-all}: Default \code{.id2 = "..all.other.landmarks.."} finds markers that 
-#'     uniquely identify a cluster
-#'   \item \strong{Pairwise}: Specify both \code{.id1} and \code{.id2} to compare two specific 
-#'     populations (e.g., CD4 vs CD8 T cells)
-#'   \item \strong{Combined groups}: Provide multiple IDs in \code{.id1} to find markers for a 
-#'     meta-population
-#' }
-#' 
-#' \strong{Interpreting results:}
-#' \itemize{
-#'   \item Positive logFC: Higher expression in group 1 (potential markers)
-#'   \item Negative logFC: Higher expression in group 2 (anti-markers)
-#'   \item Look for both high fold change AND statistical significance
-#' }
-#' 
-#' \strong{Difference from get.pbDE:}
-#' \itemize{
-#'   \item \code{get.pbDE}: Tests experimental conditions (treatment vs control) within populations
-#'   \item \code{get.markerDE}: Tests cell populations (cluster A vs B) within the same experiment
-#' }
-#' 
-#' @seealso \code{\link{get.map}} (required), \code{\link{get.pbDE}} for condition-based DE,
-#'   \code{\link{plotHeatmap}} for visualizing expression patterns, \code{\link{plotMarkerDE}}
-#'   for visualizing marker results
-#'   
-#' @examples
-#' \dontrun{
-#' # After mapping and clustering
-#' lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
-#'   get.landmarks() |> get.graph() |> get.map()
-#' 
-#' # Find markers for cluster 1 vs all others (stored in .tdr.obj$markerDE)
-#' lm.cells <- get.markerDE(lm.cells,
-#'                          .id1 = "cluster.1",
-#'                          .id.from = "clustering",
-#'                          .comparison.name = "cluster1_vs_all")
-#' 
-#' # Access results
-#' marker.results <- lm.cells$markerDE$default$cluster1_vs_all
-#' 
-#' # Top upregulated markers (accessing .id1 coefficient)
-#' top.markers <- rownames(marker.results$coefficients)[
-#'   marker.results$adj.p[, ".id1"] < 0.05 & 
-#'   marker.results$coefficients[, ".id1"] > 1
-#' ]
-#' 
-#' # Pairwise comparison: CD4 T cells vs CD8 T cells
-#' lm.cells <- get.markerDE(lm.cells,
-#'                          .id1 = c("cluster.1", "cluster.3"),  # CD4 T clusters
-#'                          .id2 = c("cluster.2", "cluster.4"),  # CD8 T clusters
-#'                          .id.from = "clustering",
-#'                          .comparison.name = "cd4_vs_cd8")
-#' 
-#' # With gene set enrichment
-#' hallmark.sets <- list(
-#'   "GLYCOLYSIS" = c("HK2", "PFKP", "LDHA"),
-#'   "OXIDATIVE_PHOS" = c("ATP5A", "COX5A", "NDUFA4")
-#' )
-#' lm.cells <- get.markerDE(lm.cells,
-#'                          .id1 = "cluster.1",
-#'                          .geneset.ls = hallmark.sets,
-#'                          .comparison.name = "cluster1_gsva")
-#' }
-#' 
-#' @param ... Additional arguments passed to methods.
-#' @export
+#' @param .source The raw data object (or NULL for file backend).
+#' @param .geneset.ls Optional named list of character vectors for GSVA. RNA only.
+#' @param .id1.idx Optional integer vector of landmark indices for group 1.
+#' @param .id2.idx Optional integer vector of landmark indices for group 2.
+#' @param .id1 Character vector of cluster/celltype IDs for group 1.
+#' @param .id2 Character vector of IDs for group 2. Default \code{"..all.other.landmarks.."}.
+#' @param .id.from Character: "clustering" or "celltyping".
+#' @param .model.name Character: model name (default "default").
+#' @param .comparison.name Character: comparison name, passed as \code{.result.name}.
+#' @param .force.recalc Logical: recalculate even if results exist? Default FALSE.
+#' @param .label.confidence Numeric (0-1): confidence threshold. Default 0.5.
+#' @param ... Additional arguments passed to \code{get.pbDE}.
 #'
+#' @return The modified \code{x} with results stored in \code{$markerDE}.
+#' @seealso \code{\link{get.pbDE}}
+#' @keywords internal
+#' @export
 get.markerDE <- function(x, ...) UseMethod("get.markerDE")
 
 #' @rdname get.markerDE
@@ -1477,605 +1690,35 @@ get.markerDE.TDRObj <-
     .label.confidence = 0.5,
     ...
   ) {
-    .tdr.obj <- x
+    .Deprecated("get.pbDE",
+                msg = paste0(
+                  "get.markerDE() is soft-deprecated. ",
+                  "Use get.pbDE(x, .mode = 'marker', .id = ..., .id2 = ...) instead.\n",
+                  "get.markerDE() will be removed in a future release."
+                ))
 
-    .tdr_validate_label_confidence(.label.confidence)
-    
-    i <- j <- landmark <- cell <- label <- x <- confidence <-
-      NULL
-    
-    if(!is.null(x = .geneset.ls)){
-      if(.tdr.obj@config$assay.type != "RNA"){
-        stop(".geneset.ls is only supported for RNA assay type")
-      } else if(!is.list(x = .geneset.ls)){
-        stop(".geneset.ls must be a list of character vectors")
-      }
-    } 
-    
-    .id.from <-
-      match.arg(arg = .id.from,
-                choices = c("clustering",
-                            "celltyping"))
-    
-    if(is.null(x = .id1) &&
-       is.null(x = .id1.idx)){
-      stop("Please provide .id1 or .id1.idx")
-    }
-    
-    if(is.null(x = .id2) &&
-       is.null(x = .id2.idx)){
-      stop("Please provide .id2 or .id2.idx")
-    }
-    
-    if(is.null(x = .id1.idx)){
-      if(!all(.id1 %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))){
-        
-        stop(paste0(paste0(.id1[!(.id1 %in% unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids))],
-                           collapse = ", "),
-                    " not found in ",
-                    .id.from))
-        
-      }
-    }
-    
-    if(is.null(x = .id2.idx)){
-      if(!all(.id2 %in% c("..all.other.landmarks..",
-                          unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids) |>
-                          as.character()))){
-        
-        stop(paste0(paste0(.id2[!(.id2 %in% c("..all.other.landmarks..",
-                                              unique(x = .tdr.obj@landmark.annot[[.id.from]]$ids) |>
-                                                as.character()))],
-                           collapse = ", "),
-                    " not found in ",
-                    .id.from))
-        
-      }
-    }
-    
-    if(is.null(x = .id1.idx)){
-      
-      # Cell-centric: get per-sample cell indices matching group 1
-      .lm1.idx <-
-          lapply(X = .tdr_get_map_slot_all(.tdr.obj, paste0(.id.from, ".ids")),
-                 FUN = function(smpl){
-                   which(x = smpl %in% .id1)
-                 })
-      
-    } else {
-      
-      if(!all(.id1.idx %in% (nrow(x = .tdr.obj@assay$expr) |> seq_len()))) {
-        stop(paste0(".id1.idx must be an integer vector between 1 and ",
-                    nrow(x = .tdr.obj@assay$expr)))
-      }
-      
-      # Cell-centric: use .label.confidence to determine which cells
-      # confidently belong to the specified landmark set (group 1)
-      tmp.lbl1 <-
-        rep(x = "out",
-            times = nrow(x = .tdr.obj@assay$expr))
-      
-      tmp.lbl1[.id1.idx] <-
-        "in"
-      
-      .lm1.idx <-
-        lapply(X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graph"),
-               FUN = function(smpl) {
-                 in.and.out <-
-                   .tdr_transfer_labels(
-                     .method = "fuzzy",
-                     .label.confidence = .label.confidence,
-                     .n.cells = nrow(x = smpl),
-                     .cell.names = seq_len(length.out = nrow(x = smpl)),
-                     .fgraph = smpl,
-                     .landmark.labels = tmp.lbl1
-                   )
-
-                 which(x = in.and.out == "in")
-                 
-               })
-      
-    }
-    
-    if(is.null(x = .id2.idx)){
-      
-      if("..all.other.landmarks.." %in% .id2){
-      
-      message("using `..all.other.landmarks..` for .id2")
-      
-      .id2 <- "..all.other.landmarks.."
-      
-      # Cell-centric complement: all cells NOT in group 1
-      .lm2.idx <-
-        seq_along(along.with = .lm1.idx) |>
-        stats::setNames(nm = names(x = .lm1.idx)) |>
-        lapply(FUN = function(smpl){
-          seq_len(length.out = .tdr.obj@config$sampling$n.cells[smpl])[-.lm1.idx[[smpl]]]
-        })
-      
-    } else {
-        
-        # Cell-centric: get per-sample cell indices matching group 2
-        .lm2.idx <-
-          lapply(X = .tdr_get_map_slot_all(.tdr.obj, paste0(.id.from, ".ids")),
-                 FUN = function(smpl){
-                   which(x = smpl %in% .id2)
-                 })
-        
-      }
-    } else {
-        
-        if(!all(.id2.idx %in% (nrow(x = .tdr.obj@assay$expr) |> seq_len()))) {
-          stop(paste0(".id2.idx must be an integer vector between 1 and ",
-                      nrow(x = .tdr.obj@assay$expr)))
-        }
-        
-        # Cell-centric: use .label.confidence to determine which cells
-        # confidently belong to the specified landmark set (group 2)
-        tmp.lbl2 <-
-          rep(x = "out",
-              times = nrow(x = .tdr.obj@assay$expr))
-        
-        tmp.lbl2[.id2.idx] <-
-          "in"
-        
-        .lm2.idx <-
-          lapply(X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graph"),
-                 FUN = function(smpl) {
-                   in.and.out <-
-                     .tdr_transfer_labels(
-                       .method = "fuzzy",
-                       .label.confidence = .label.confidence,
-                       .n.cells = nrow(x = smpl),
-                       .cell.names = seq_len(length.out = nrow(x = smpl)),
-                       .fgraph = smpl,
-                       .landmark.labels = tmp.lbl2
-                     )
-
-                   which(x = in.and.out == "in")
-                   
-                 })
-        
-      }
-    
-    # Auto-generate comparison name if not provided
-    if(is.null(x = .comparison.name)){
-      id1.str <- paste0(.id1, collapse = "_")
-      if(identical(.id2, "..all.other.landmarks..")){
-        id2.str <- "all"
-      } else {
-        id2.str <- paste0(.id2, collapse = "_")
-      }
-      .comparison.name <- paste0(id1.str, "_vs_", id2.str)
-    }
-    
-    # Initialize storage if needed
-    if(is.null(x = .tdr.obj@results$marker)){
-      .tdr.obj@results$marker <- list()
-    }
-    if(is.null(x = .tdr.obj@results$marker[[.model.name]])){
-      .tdr.obj@results$marker[[.model.name]] <- list()
-    }
-    
-    # Check for existing results
-    if(!.force.recalc && !is.null(x = .tdr.obj@results$marker[[.model.name]][[.comparison.name]])){
-      message(sprintf("Results already exist at .tdr.obj$markerDE$%s$%s. Use .force.recalc = TRUE to recalculate.", 
-                      .model.name, .comparison.name))
-      return(.tdr.obj)
-    }
-    
-    # number of cells in each .id1 and .id2 pseudobulks
-    n.pseudo1 <-
-      lengths(x = .lm1.idx)
-    
-    n.pseudo2 <-
-      lengths(x = .lm2.idx)
-    
-    # warn if outlier samples with too few cells are detected
-    smpl.outlier.1 <-
-      (n.pseudo1 /
-         mean(x = c(n.pseudo1,
-                    n.pseudo2))) < 0.1
-    
-    smpl.outlier.2 <-
-      (n.pseudo2 /
-         mean(x = c(n.pseudo1,
-                    n.pseudo2))) < 0.1
-    
-    # get pseudobulk
-    if(.tdr.obj@config$assay.type == "RNA"){
-      
-      if(any(smpl.outlier.1)){
-        warning(paste0("The following samples were removed from .id1 since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
-                       paste(names(x = smpl.outlier.1)[smpl.outlier.1],
-                             collapse = "\n")))
-      }
-      
-      if(any(smpl.outlier.2)){
-        warning(paste0("The following samples were removed from .id2 since they have less than a tenth of the average number of cells in pseudobulks, which can lead to misleading results:\n",
-                       paste(names(x = smpl.outlier.2)[smpl.outlier.2],
-                             collapse = "\n")))
-      }
-      
-      counts1 <-
-        stats::setNames(object = names(x = .tdr.obj@cells)[!smpl.outlier.1],
-                        nm = names(x = .tdr.obj@cells)[!smpl.outlier.1]) |>
-        lapply(FUN = function(smpl){
-          
-          exprs.mat <-
-            .get_sample_matrix(.source, .tdr.obj, smpl) |>
-            methods::as(Class = "dgCMatrix")
-          
-          res <-
-            tryCatch(
-              expr = {
-                
-                cell.idx <- .lm1.idx[[smpl]]
-                
-                wcl <- 
-                  .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx,,drop = FALSE]
-                
-                # get weighted sum
-                wsum <-
-                  exprs.mat[,cell.idx] %*% wcl
-                
-                # get weighted mean using sum of weights and scale by number of cells
-                tmp.res <-
-                  (Matrix::rowSums(x = wsum) / sum(wcl)) * (sum(Matrix::rowSums(x = wcl) > 0))
-                
-                return(tmp.res)
-                
-              },
-              error = function(e) {
-                
-                stats::setNames(object = rep(x = 0,
-                                             times = nrow(x = exprs.mat)),
-                                nm = rownames(x = exprs.mat))
-                
-              })
-          
-          return(res)
-          
-        }) |>
-        do.call(what = cbind) |>
-        (\(x)
-         `colnames<-`(x = x,
-                      value = paste0("counts1.",
-                                     colnames(x = x)))
-        )()
-      
-      counts2 <-
-        stats::setNames(object = names(x = .tdr.obj@cells)[!smpl.outlier.2],
-                        nm = names(x = .tdr.obj@cells)[!smpl.outlier.2]) |>
-        lapply(FUN = function(smpl){
-          
-          exprs.mat <-
-            .get_sample_matrix(.source, .tdr.obj, smpl) |>
-            methods::as(Class = "dgCMatrix")
-          
-          res <-
-            tryCatch(
-              expr = {
-                
-                cell.idx <- .lm2.idx[[smpl]]
-                
-                wcl <- 
-                  .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx,,drop = FALSE]
-                
-                # get weighted sum
-                wsum <-
-                  exprs.mat[,cell.idx] %*% wcl
-                
-                # get weighted mean using sum of weights and scale by number of cells
-                tmp.res <-
-                  (Matrix::rowSums(x = wsum) / sum(wcl)) * (sum(Matrix::rowSums(x = wcl) > 0))
-                
-                return(tmp.res)
-                
-              },
-              error = function(e) {
-                
-                stats::setNames(object = rep(x = 0,
-                                             times = nrow(x = exprs.mat)),
-                                nm = rownames(x = exprs.mat))
-                
-              })
-          
-          return(res)
-          
-        }) |>
-        do.call(what = cbind) |>
-        (\(x)
-         `colnames<-`(x = x,
-                      value = paste0("counts2.",
-                                     colnames(x = x)))
-        )()
-      
-      dge <-
-        cbind(counts1,
-              counts2) |>
-        edgeR::DGEList()
-      
-      .ids <-
-        colnames(x = dge) |>
-        strsplit(split = ".",
-                 fixed = TRUE) |>
-        lapply(FUN = "[",
-               i = 1) |>
-        unlist() |>
-        gsub(pattern = "counts",
-             replacement = ".id",
-             fixed = TRUE) |>
-        factor(levels = c(".id2",
-                          ".id1"))
-      
-      .pairs <-
-        colnames(x = dge) |>
-        gsub(pattern = "^counts1.|^counts2.",
-             replacement = "",
-             fixed = FALSE)
-      
-      tmp.design <-
-        stats::model.matrix(object = ~ .ids + .pairs) |> 
-        (\(x)
-         `colnames<-`(x = x,
-                      value = colnames(x = x) |>
-                        gsub(pattern = "^\\.ids|^\\.pairs",
-                             replacement = "",
-                             fixed = FALSE))
-        )() |> 
-        (\(x)
-         # this is to ensure only true pairs are kept
-         x[,Matrix::colSums(x = x) > 1]
-        )()
-      
-      keep <-
-        edgeR::filterByExpr(y = dge,
-                            design = tmp.design)
-      
-      dge <-
-        dge[keep,,keep.lib.sizes=FALSE]
-      
-      dge <-
-        edgeR::calcNormFactors(object = dge,
-                               method = "TMM")
-      
-      v <-
-        limma::voom(counts = dge,
-                    design = tmp.design,
-                    plot = FALSE)
-      
-      .de <-
-        limma::lmFit(object = v,
-                     design = tmp.design)
-      
-      .de <-
-        limma::eBayes(fit = .de,
-                      robust = TRUE)
-      
-      .de$adj.p <-
-        apply(X = .de$p.value,
-              MARGIN = 2,
-              FUN = stats::p.adjust,
-              method = "fdr")
-      
-      if(!is.null(x = .geneset.ls)){
-        
-        gsva.es <- 
-          GSVA::gsvaParam(
-            exprData = v$E,
-            geneSets = .geneset.ls,
-            kcdf = "Gaussian",
-            maxDiff = TRUE) |>
-          GSVA::gsva()
-        
-        gsva.fit <- 
-          limma::lmFit(object = gsva.es,
-                       design = tmp.design)
-        
-        gsva.fit <- 
-          limma::eBayes(fit = gsva.fit,
-                        robust = TRUE)
-        
-        gsva.fit$adj.p <-
-          apply(X = gsva.fit$p.value,
-                MARGIN = 2,
-                FUN = stats::p.adjust,
-                method = "fdr")
-        
-        .de$geneset <-
-          gsva.fit
-        
-        .de$geneset$E <-
-          gsva.es
-        
-      }
-      
-    } else {
-      
-      counts1 <-
-        stats::setNames(object = names(x = .tdr.obj@cells),
-                        nm = names(x = .tdr.obj@cells)) |>
-        lapply(FUN = function(smpl){
-          
-          exprs.mat <-
-            .get_sample_matrix(.source, .tdr.obj, smpl)
-          
-          cols <-
-            colnames(x = .tdr.obj@assay$expr)
-          
-          res <-
-            tryCatch(
-              expr = {
-                
-                cell.idx <- .lm1.idx[[smpl]]
-                
-                wcl <- 
-                  .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx,,drop = FALSE]
-                
-                # get weighted sum
-                wsum <-
-                  (Matrix::t(x = exprs.mat[cell.idx, cols]) %*% wcl)
-                
-                # get weighted mean using sum of weights
-                tmp.res <-
-                  Matrix::rowSums(x = wsum) / sum(wcl)
-                
-                return(tmp.res)
-                
-              },
-              error = function(e) {
-                
-                stats::setNames(object = rep(x = 0,
-                                             times = length(x = cols)),
-                                nm = cols)
-                
-              })
-          
-          return(res)
-          
-        }) |>
-        do.call(what = rbind)  |>
-        (\(x)
-         `rownames<-`(x = x,
-                      value = paste0("counts1.",
-                                     rownames(x = x)))
-        )()
-      
-      counts2 <-
-        stats::setNames(object = names(x = .tdr.obj@cells),
-                        nm = names(x = .tdr.obj@cells)) |>
-        lapply(FUN = function(smpl){
-          
-          exprs.mat <-
-            .get_sample_matrix(.source, .tdr.obj, smpl)
-          
-          cols <-
-            colnames(x = .tdr.obj@assay$expr)
-          
-          res <-
-            tryCatch(
-              expr = {
-                
-                cell.idx <- .lm2.idx[[smpl]]
-                
-                wcl <- 
-                  .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx,,drop = FALSE]
-                
-                # get weighted sum
-                wsum <-
-                  (Matrix::t(x = exprs.mat[cell.idx, cols]) %*% wcl)
-                
-                # get weighted mean using sum of weights
-                tmp.res <-
-                  Matrix::rowSums(x = wsum) / sum(wcl)
-                
-                return(tmp.res)
-                
-              },
-              error = function(e) {
-                
-                stats::setNames(object = rep(x = 0,
-                                             times = length(x = cols)),
-                                nm = cols)
-                
-              })
-          
-          return(res)
-          
-        }) |>
-        do.call(what = rbind)  |>
-        (\(x)
-         `rownames<-`(x = x,
-                      value = paste0("counts2.",
-                                     rownames(x = x)))
-        )()
-      
-      counts <-
-        rbind(counts1,
-              counts2) |>
-        Matrix::t()
-      
-      .ids <-
-        colnames(x = counts) |>
-        strsplit(split = ".",
-                 fixed = TRUE) |>
-        lapply(FUN = "[",
-               i = 1) |>
-        unlist() |>
-        gsub(pattern = "counts",
-             replacement = ".id",
-             fixed = TRUE) |>
-        factor(levels = c(".id2",
-                          ".id1"))
-      
-      .pairs <-
-        colnames(x = counts) |>
-        gsub(pattern = "^counts1.|^counts2.",
-             replacement = "",
-             fixed = FALSE)
-      
-      tmp.design <-
-        stats::model.matrix(object = ~ .ids + .pairs) |> 
-        (\(x)
-         `colnames<-`(x = x,
-                      value = colnames(x = x) |>
-                        gsub(pattern = "^\\.ids|^\\.pairs",
-                             replacement = "",
-                             fixed = FALSE))
-        )() |> 
-        (\(x)
-         # this is to ensure only true pairs are kept
-         x[,Matrix::colSums(x = x) > 1]
-        )()
-      
-      .de <-
-        limma::lmFit(object = counts,
-                     design = tmp.design)
-      
-      .de <-
-        limma::eBayes(fit = .de,
-                      robust = TRUE)
-      
-      .de$adj.p <-
-        apply(X = .de$p.value,
-              MARGIN = 2,
-              FUN = stats::p.adjust,
-              method = "fdr")
-      
-    }
-    
-    .de$smpl.outlier.1 <-
-      smpl.outlier.1
-    
-    .de$smpl.outlier.2 <-
-      smpl.outlier.2
-    
-    .de$id1.idx <-
-      .lm1.idx
-    
-    .de$id2.idx <-
-      .lm2.idx
-    
-    .de$n.pseudo1 <-
-      n.pseudo1
-    
-    .de$n.pseudo2 <-
-      n.pseudo2
-    
-    # Store results in .tdr.obj
-    .tdr.obj@results$marker[[.model.name]][[.comparison.name]] <- .de
-    
-    message(sprintf("Marker DE results stored at .tdr.obj$markerDE$%s$%s", .model.name, .comparison.name))
-    
-    return(.tdr.obj)
-    
+    get.pbDE.TDRObj(
+      x = x,
+      .source = .source,
+      .mode = "marker",
+      .geneset.ls = .geneset.ls,
+      .id = .id1,
+      .id.idx = .id1.idx,
+      .id2 = .id2,
+      .id2.idx = .id2.idx,
+      .id.from = .id.from,
+      .model.name = .model.name,
+      .result.name = .comparison.name,
+      .force.recalc = .force.recalc,
+      .verbose = TRUE,
+      .label.confidence = .label.confidence,
+      ...
+    )
   }
 
-#' Deprecated: Use get.markerDE instead
+#' Deprecated: Use get.pbDE(.mode = "marker") instead
 #'
-#' \code{get.marker()} has been renamed to \code{\link{get.markerDE}()} for API consistency. 
-#' This function is deprecated and will be removed in a future release.
+#' \code{get.marker()} is deprecated. Use \code{\link{get.pbDE}(.mode = "marker")} instead.
 #'
 #' @param .tdr.obj A tinydenseR object processed through \code{get.map()}.
 #' @param .geneset.ls Optional named list of character vectors for GSVA.
@@ -2086,8 +1729,8 @@ get.markerDE.TDRObj <-
 #' @param .id.from "clustering" or "celltyping".
 #' @param .label.confidence Numeric (0-1): minimum confidence for cell assignment (default: 0.5).
 #'
-#' @return A .tdr.obj with results stored in .tdr.obj$markerDE$.deprecated.call$result.
-#' @seealso \code{\link{get.markerDE}}
+#' @return A .tdr.obj with results stored in .tdr.obj$markerDE.
+#' @seealso \code{\link{get.pbDE}}
 #' @export
 get.marker <- function(
     .tdr.obj,
@@ -2101,20 +1744,21 @@ get.marker <- function(
 ) {
   .tdr_validate_label_confidence(.label.confidence)
 
-  .Deprecated("get.markerDE", 
-              msg = "get.marker() is deprecated. Use get.markerDE() instead, which stores results in .tdr.obj$markerDE.")
-  
-  # Call get.markerDE and return the .tdr.obj directly
-  return(get.markerDE(
-    .tdr.obj = .tdr.obj,
+  .Deprecated("get.pbDE",
+              msg = "get.marker() is deprecated. Use get.pbDE(.mode = 'marker') instead.")
+
+  # Dispatch directly to get.pbDE marker mode
+  return(get.pbDE(
+    x = .tdr.obj,
+    .mode = "marker",
     .geneset.ls = .geneset.ls,
-    .id1.idx = .id1.idx,
-    .id2.idx = .id2.idx,
-    .id1 = .id1,
+    .id = .id1,
+    .id.idx = .id1.idx,
     .id2 = .id2,
+    .id2.idx = .id2.idx,
     .id.from = .id.from,
     .model.name = ".deprecated.call",
-    .comparison.name = "result",
+    .result.name = "result",
     .force.recalc = TRUE,
     .label.confidence = .label.confidence
   ))
@@ -4645,8 +4289,8 @@ get.nmfDE.TDRObj <-
 #'   changes in terms of the features driving them. It does not provide
 #'   gene-level p-values or formal multiple testing correction. For rigorous
 #'   differential expression testing with p-values following field standards,
-#'   use \code{\link{get.pbDE}} (pseudobulk DE via edgeR/limma) or
-#'   \code{\link{get.markerDE}} (marker-level DE). plsD complements these
+#'   use \code{\link{get.pbDE}} (pseudobulk DE via edgeR/limma, both design and marker modes).
+#'   plsD complements these
 #'   methods by providing a multivariate, graph-aware decomposition that
 #'   captures joint DA/DE patterns not visible in gene-by-gene tests.
 #'

@@ -10,15 +10,20 @@ get.pbDE(x, ...)
 \method{get.pbDE}{TDRObj}(
   x,
   .source = NULL,
-  .design,
+  .mode = NULL,
+  .design = NULL,
   .contrasts = NULL,
   .block = NULL,
   .geneset.ls = NULL,
-  .id.idx = NULL,
   .id = NULL,
+  .id.idx = NULL,
+  .id2 = "..all.other.landmarks..",
+  .id2.idx = NULL,
   .id.from = NULL,
   .model.name = "default",
-  .population.name = "all",
+  .result.name = NULL,
+  .population.name = NULL,
+  .comparison.name = NULL,
   .force.recalc = FALSE,
   .verbose = TRUE,
   .label.confidence = 0.5,
@@ -35,99 +40,126 @@ get.pbDE(x, ...)
 the files backend; otherwise a Seurat, SingleCellExperiment, or anndataR AnnData object.
 Used by \code{.get_sample_matrix()} to retrieve per-sample expression matrices.}
 
-\item{.design}{Design matrix specifying experimental design. Rows = samples, columns = coefficients.}
+\item{.mode}{Character: analysis mode. One of \code{"design"} or \code{"marker"}.
+If \code{NULL} (default), auto-detected from arguments:
+\itemize{
+\item \code{.design} provided \eqn{\Rightarrow} \code{"design"}
+\item \code{.id}/\code{.id.idx} provided without \code{.design} \eqn{\Rightarrow} \code{"marker"}
+}}
 
-\item{.contrasts}{Optional contrast matrix for specific comparisons. Create with
-\code{limma::makeContrasts()}. If NULL, tests all \code{.design} coefficients.}
+\item{.design}{Design matrix specifying experimental design (design mode only). Rows = samples,
+columns = coefficients.}
+
+\item{.contrasts}{Optional contrast matrix for specific comparisons (design mode only). Create
+with \code{limma::makeContrasts()}. If NULL, tests all \code{.design} coefficients.}
 
 \item{.block}{Optional character: column name in \code{.tdr.obj$metadata} for blocking factor
-(e.g., "Donor"). Accounts for within-block correlation.}
+(design mode only, e.g., "Donor"). Accounts for within-block correlation.}
 
 \item{.geneset.ls}{Optional named list of character vectors defining gene sets for GSVA enrichment
 analysis. Only for RNA data. Example: \code{list("Tcell" = c("CD3D", "CD3E"), "Bcell" = c("CD19", "MS4A1"))}.}
 
-\item{.id.idx}{Optional integer vector specifying landmark indices to include. If provided,
-cells are assigned to these landmarks using fuzzy membership confidence (see \code{.label.confidence}).
-Only cells whose fuzzy mass ratio to the target landmarks meets the confidence threshold are included.}
+\item{.id}{Optional character vector of cluster/celltype IDs. In design mode, restricts
+analysis to cells matching these IDs. In marker mode, defines group 1 (test group).}
 
-\item{.id}{Optional character vector of cluster/celltype IDs to restrict analysis to. Uses
-\code{.id.from} to determine source.}
+\item{.id.idx}{Optional integer vector specifying landmark indices. In design mode, restricts
+analysis to cells confidently assigned to these landmarks. In marker mode, defines group 1
+landmark indices.}
 
-\item{.id.from}{Character: "clustering" or "celltyping". Source of IDs when \code{.id} is specified.}
+\item{.id2}{Character vector of cluster/celltype IDs for group 2 (marker mode only). Default
+\code{"..all.other.landmarks.."} compares group 1 to all other cells. Can specify specific IDs
+for pairwise comparisons.}
 
-\item{.model.name}{Character string naming this model fit (default "default"). Results are stored
-in \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}.}
+\item{.id2.idx}{Optional integer vector specifying landmark indices for group 2 (marker mode
+only). When provided, takes priority over \code{.id2}.}
 
-\item{.population.name}{Character string naming this population (default "all"). If \code{.id} is
-specified and \code{.population.name} is not changed from default, it is auto-set to the value
-of \code{.id} (or concatenated with "_" if multiple IDs). Enables storing multiple
-population-specific DE results under the same model.}
+\item{.id.from}{Character: \code{"clustering"} or \code{"celltyping"}. Source of IDs in
+\code{.id} and \code{.id2}. Default \code{NULL} (resolved to \code{"clustering"} when needed).}
+
+\item{.model.name}{Character string naming this model fit (default \code{"default"}).}
+
+\item{.result.name}{Character string naming this result. In design mode defaults to \code{"all"};
+in marker mode auto-generated from \code{.id} and \code{.id2}. Used as the storage key:
+\code{$pbDE[[.model.name]][[.result.name]]} (design) or
+\code{$markerDE[[.model.name]][[.result.name]]} (marker).}
+
+\item{.population.name}{\code{NULL}. Deprecated alias for \code{.result.name} (design mode).}
+
+\item{.comparison.name}{\code{NULL}. Deprecated alias for \code{.result.name} (marker mode).}
 
 \item{.force.recalc}{Logical: if TRUE, overwrite existing results in the specified slot
-(default FALSE). If FALSE and slot already exists, an error is thrown.}
+(default FALSE).}
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 
 \item{.label.confidence}{Numeric scalar in \code{[0,1]} controlling the minimum posterior
-confidence required to assign a cell to a set of target landmarks (used when \code{.id.idx} is
-provided). For each cell, the ratio of fuzzy membership mass to the target landmarks vs total
-fuzzy mass is computed; cells below this threshold are excluded from aggregation. Default 0.5.}
+confidence required to assign a cell to a set of target landmarks (used when \code{.id.idx} or
+\code{.id2.idx} is provided). Default 0.5.}
 }
 \value{
-The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$pbDE[[.model.name]][[.population.name]]}:
+The modified \code{.tdr.obj} with results stored depending on mode:
+\subsection{Design mode}{Results in \code{.tdr.obj$pbDE[[.model.name]][[.result.name]]}:
 \describe{
-\item{\code{fit}}{limma MArrayLM fit object with moderated statistics}
 \item{\code{coefficients}}{Log fold change matrix (features x coefficients)}
 \item{\code{p.value}}{P-values (features x coefficients)}
 \item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
-\item{\code{smpl.outlier}}{Logical vector indicating which samples were excluded as outliers}
-\item{\code{lm.idx}}{Integer vector of landmark indices used for aggregation}
+\item{\code{smpl.outlier}}{Logical vector indicating outlier samples}
+\item{\code{id.idx}}{Per-sample list of cell indices used}
 \item{\code{n.pseudo}}{Integer vector of pseudobulk cell counts per sample}
-\item{\code{geneset}}{(RNA only, if \code{.geneset.ls} provided) GSVA results with \code{$fit}
-(limma fit), \code{$E} (enrichment scores), \code{$adj.p} (adjusted p-values)}
+\item{\code{geneset}}{(RNA + \code{.geneset.ls}) GSVA results}
+}
+}
+\subsection{Marker mode}{Results in \code{.tdr.obj$markerDE[[.model.name]][[.result.name]]}:
+\describe{
+\item{\code{coefficients}}{Log fold changes (features x coefficients)}
+\item{\code{p.value}}{P-values (features x coefficients)}
+\item{\code{adj.p}}{FDR-adjusted p-values (features x coefficients)}
+\item{\code{smpl.outlier.1}}{Logical: samples excluded from group 1}
+\item{\code{smpl.outlier.2}}{Logical: samples excluded from group 2}
+\item{\code{id1.idx}}{Per-sample cell indices for group 1}
+\item{\code{id2.idx}}{Per-sample cell indices for group 2}
+\item{\code{n.pseudo1}}{Pseudobulk cell counts per sample for group 1}
+\item{\code{n.pseudo2}}{Pseudobulk cell counts per sample for group 2}
+\item{\code{geneset}}{(RNA + \code{.geneset.ls}) GSVA results}
+}
 }
 }
 \description{
-Performs pseudobulk differential expression (DE) analysis for genes/markers. Aggregates cells
-into pseudobulk samples using fuzzy landmark membership, then uses limma-voom (RNA) or limma
-(cytometry) to test for DE. Can restrict analysis to specific clusters/cell types, and optionally
-perform gene set enrichment via GSVA.
+Performs pseudobulk differential expression (DE) analysis for genes/markers with two modes.
 }
 \details{
-The pseudobulk DE workflow:
+\strong{Design mode} (\code{.mode = "design"}): Aggregates cells into pseudobulk samples
+using fuzzy landmark membership, then uses limma-voom (RNA) or limma (cytometry) to test for
+DE across experimental conditions. Uses a user-supplied design matrix with samples as replicates.
+
+\strong{Marker mode} (\code{.mode = "marker"}): Identifies marker genes/proteins distinguishing
+one cell population from another (or all others) via a within-sample paired comparison. Unlike
+design mode which tests experimental conditions, marker mode compares cell populations to find
+defining features.
+
+\subsection{Design mode}{
+Tests for DE across experimental conditions using a user-supplied design matrix:
 \enumerate{
-\item \strong{Cell selection}: If \code{.id} specified, select cells whose transferred label
-matches the requested population. If \code{.id.idx} specified, select cells whose fuzzy
-membership confidence to the target landmarks meets \code{.label.confidence}. Otherwise
-use all cells.
-\item \strong{Pseudobulk aggregation}: For each sample, compute weighted expression of the
-selected cells using their fuzzy membership across all landmarks:
-\itemize{
-\item RNA: Weighted sum of counts, scaled by effective cell count
-\item Cytometry: Weighted mean of marker expression
+\item \strong{Cell selection}: If \code{.id} specified, select matching cells. If
+\code{.id.idx} specified, use fuzzy confidence thresholding. Otherwise use all cells.
+\item \strong{Pseudobulk aggregation}: Fuzzy-weighted expression per sample.
+\item \strong{Outlier removal}: (RNA only) Exclude samples with <10\\% of average cell count.
+\item \strong{Normalization}: TMM + voom (RNA) or as-is (cytometry).
+\item \strong{Linear modeling}: \code{limma::lmFit} with optional blocking.
+\item \strong{Empirical Bayes}: \code{limma::eBayes(robust = TRUE)}.
+\item \strong{GSVA} (optional, RNA only): Gene set variation analysis.
 }
-\item \strong{Outlier removal}: (RNA only) Exclude samples with <10\\% of average pseudobulk cell count
-\item \strong{Normalization}:
-\itemize{
-\item RNA: TMM normalization (\code{edgeR::calcNormFactors}) + voom transformation for variance modeling
-\item Cytometry: Data used as-is (assumes pre-transformed input)
-}
-\item \strong{Linear modeling}: \code{limma::lmFit} with optional blocking for paired/repeated samples
-\item \strong{Empirical Bayes}: Variance shrinkage via \code{limma::eBayes(robust = TRUE)}
-\item \strong{GSVA} (optional, RNA only): Gene set variation analysis on voom-normalized expression
 }
 
-\strong{Cell-centric aggregation:}
-Cells are first selected into the population of interest, then their expression is aggregated
-using fuzzy membership weights across all landmarks. This approach first determines \emph{which}
-cells belong to the population, then lets the fuzzy graph determine \emph{how} each selected
-cell's expression is distributed across landmark neighborhoods.
-
-\strong{When to use pseudobulk DE:}
-\itemize{
-\item Testing treatment effects on gene expression within populations
-\item Comparing expression between conditions using samples as biological replicates
-\item Respects the true experimental design (no pseudoreplication)
+\subsection{Marker mode}{
+Compares cell populations via a within-sample paired design (\code{~ .ids + .pairs}):
+\enumerate{
+\item \strong{Cell selection}: Extract cells for group 1 (\code{.id}) and group 2 (\code{.id2}).
+\item \strong{Pseudobulk aggregation}: Independent aggregation per group per sample.
+\item \strong{Outlier removal}: (RNA only) Cross-group outlier flagging.
+\item \strong{Paired comparison}: \code{limma::lmFit} with sample-as-pair blocking.
+}
+Positive logFC = higher in group 1, negative = higher in group 2.
 }
 }
 \examples{
@@ -136,34 +168,36 @@ cell's expression is distributed across landmark neighborhoods.
 lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks() |> get.graph() |> get.map()
 
-# DE analysis on all cells (stored in $pbDE$default$all)
+# --- Design mode (default when .design is provided) ---
 design <- model.matrix(~ Condition, data = .meta)
 lm.cells <- get.pbDE(lm.cells, .design = design)
 plotPbDE(lm.cells, .coefs = "ConditionB")
 
-# DE within specific cell type (stored in $pbDE$default$tcells)
+# DE within specific cell type
 lm.cells <- get.pbDE(lm.cells, .design = design,
                      .id = c("1", "2", "3"),
                      .id.from = "clustering",
-                     .population.name = "tcells")
+                     .result.name = "tcells")
 
-# With gene set enrichment
-hallmark.sets <- list(
-  "INTERFERON_RESPONSE" = c("ISG15", "ISG20", "IFIT1"),
-  "INFLAMMATORY_RESPONSE" = c("IL1B", "TNF", "CXCL8")
-)
-lm.cells <- get.pbDE(lm.cells, .design = design,
-                     .geneset.ls = hallmark.sets,
-                     .model.name = "gsva_model")
+# --- Marker mode (auto-detected when .id is provided without .design) ---
+lm.cells <- get.pbDE(lm.cells, .mode = "marker",
+                     .id = "cluster.3",
+                     .result.name = "cluster3_markers")
+plotMarkerDE(lm.cells, .comparison.name = "cluster3_markers")
+
+# Pairwise comparison
+lm.cells <- get.pbDE(lm.cells, .mode = "marker",
+                     .id = c("cluster.1", "cluster.3"),
+                     .id2 = c("cluster.2", "cluster.4"),
+                     .result.name = "cd4_vs_cd8")
 
 # Access results
 lm.cells$pbDE$default$all$adj.p
-lm.cells$pbDE$default$tcells$coefficients
+lm.cells$markerDE$default$cluster3_markers$coefficients
 }
 
 }
 \seealso{
-\code{\link{get.map}} (required), \code{\link{plotPbDE}} for heatmap visualization,
-\code{\link{get.marker}} for marker gene identification, \code{\link{get.specDE}} for
-density contrast-coupled expression programs
+\code{\link{get.map}} (required), \code{\link{plotPbDE}}, \code{\link{plotMarkerDE}},
+\code{\link{get.specDE}}
 }

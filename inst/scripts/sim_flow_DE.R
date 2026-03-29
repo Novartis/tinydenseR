@@ -488,10 +488,11 @@ tinydenseR::plotBeeswarm(
 .dea.0.5$coefficients
 
 lm.cells.DE.0.5 <-
-  tinydenseR::get.markerDE(
-    .tdr.obj = lm.cells.DE.0.5,
-    .id1 = "cluster.4",
-    .comparison.name = "cluster4_vs_all"
+  tinydenseR::get.pbDE(
+    x = lm.cells.DE.0.5,
+    .mode = "marker",
+    .id = "cluster.4",
+    .result.name = "cluster4_vs_all"
   )
 
 tinydenseR::plotMarkerDE(
@@ -817,10 +818,11 @@ tinydenseR::plotBeeswarm(
 .dea.1$coefficients
 
 lm.cells.DE.1 <-
-  tinydenseR::get.markerDE(
-    .tdr.obj = lm.cells.DE.1,
-    .id1 = "cluster.3",
-    .comparison.name = "cluster3_vs_all"
+  tinydenseR::get.pbDE(
+    x = lm.cells.DE.1,
+    .mode = "marker",
+    .id = "cluster.3",
+    .result.name = "cluster3_vs_all"
   )
 
 tinydenseR::plotMarkerDE(
@@ -1145,10 +1147,11 @@ tinydenseR::plotBeeswarm(
 .dea.2$coefficients
 
 lm.cells.DE.2 <-
-  tinydenseR::get.markerDE(
-    .tdr.obj = lm.cells.DE.2,
-    .id1 = "cluster.4",
-    .comparison.name = "cluster4_vs_all"
+  tinydenseR::get.pbDE(
+    x = lm.cells.DE.2,
+    .mode = "marker",
+    .id = "cluster.4",
+    .result.name = "cluster4_vs_all"
   )
 
 tinydenseR::plotMarkerDE(
