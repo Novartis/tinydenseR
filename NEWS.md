@@ -1,5 +1,20 @@
 # tinydenseR 0.0.3.0001
 
+## Removed: `.cl.ct.to.ign` argument from `get.map()`
+
+The `.cl.ct.to.ign` argument has been removed from `get.map()`. This argument
+previously allowed excluding a single cluster or cell type from density and
+compositional statistics while still mapping those cells. This created internal
+inconsistencies between the mapped data and the reported statistics.
+
+**Migration:** Analysts must now perform QC and cell-type/cluster exclusion
+**upstream**, before calling `get.map()`. For example, remove unwanted
+populations (e.g., erythrocytes in PBMC data) by subsetting cells before
+running the pipeline.
+
+Passing `.cl.ct.to.ign` to `get.map()` now produces an informative error
+directing users to the upstream-QC workflow.
+
 ## Removed: `specDE` and `nmfDE` decomposition methods
 
 `get.specDE()`, `get.nmfDE()`, and their associated plotting functions

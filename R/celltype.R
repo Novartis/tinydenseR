@@ -528,9 +528,6 @@ celltyping.TDRObj <-
     }
   )
   
-  # Determine which celltypes to exclude (the previously ignored population)
-  .cl.ct.to.ign <- .tdr.obj@density$ignored
-  
   .tdr.obj@density$composition$celltyping$cell.count <-
     ct_counts |>
     dplyr::bind_rows(.id = "sample") |>
@@ -542,9 +539,6 @@ celltyping.TDRObj <-
     (\(x)
      x[, colnames(x = x) |>
          sort()]
-    )() |>
-    (\(x)
-     x[, !(colnames(x = x) %in% .cl.ct.to.ign)]
     )()
   
   .tdr.obj@density$composition$celltyping$cell.count[

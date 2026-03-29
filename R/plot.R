@@ -637,14 +637,12 @@ plotBeeswarm.TDRObj <-
     if((length(x = .coefs) > 1)){
       
       dat.df <-
-        as.data.frame(x = .stats.obj$fit$coefficients[!(.tdr.obj@landmark.annot[[.split.by]]$ids %in% 
-                                                          .tdr.obj@density$ignored),.coefs]) |>
+        as.data.frame(x = .stats.obj$fit$coefficients[,.coefs]) |>
         tidyr::pivot_longer(cols = tidyselect::everything(),
                             names_to = "split.by",
                             values_to = "value",
                             cols_vary = "slowest") |>
-        dplyr::bind_cols(sig = as.data.frame(x = (.stats.obj$fit[[.q.from]][!(.tdr.obj@landmark.annot[[.split.by]]$ids %in% 
-                                                                                .tdr.obj@density$ignored),.coefs] < .q)) |>
+        dplyr::bind_cols(sig = as.data.frame(x = (.stats.obj$fit[[.q.from]][,.coefs] < .q)) |>
                            tidyr::pivot_longer(cols = tidyselect::everything(),
                                                names_to = "split.by",
                                                values_to = "adj.p",
@@ -676,8 +674,7 @@ plotBeeswarm.TDRObj <-
         dat.df <-
           dplyr::mutate(.data = dat.df,
                         facets = split.by,
-                        split.by = rep(x = .tdr.obj@landmark.annot[[.split.by]]$ids[!(.tdr.obj@landmark.annot[[.split.by]]$ids %in% 
-                                                                               .tdr.obj@density$ignored)] |>
+                        split.by = rep(x = .tdr.obj@landmark.annot[[.split.by]]$ids |>
                                          as.character(),
                                        times = length(x = .coefs))  |> 
                           factor(levels = if(isTRUE(x = .order.ids)){
@@ -731,10 +728,6 @@ plotBeeswarm.TDRObj <-
               
             })
         ) |> 
-        (\(x)
-         x[!(.tdr.obj@landmark.annot[[.split.by]]$ids %in% 
-               .tdr.obj@density$ignored),]
-        )() |>
         droplevels()
       
     }

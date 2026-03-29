@@ -56,7 +56,7 @@ Contains clustering and celltyping sub-lists, each with an $ids factor.}
 
 \item{\code{density}}{list. fdens-centric sample-level analytics (L x N matrices):
 fdens, Y, composition (clustering/celltyping cell counts/percentages),
-ignored, .cache.}
+.cache.}
 
 \item{\code{sample.embed}}{list. Sample-level embeddings (N x k matrices), each with $coord.
 Contains pca, traj, and pepc sub-lists.}

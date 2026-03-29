@@ -34,7 +34,7 @@
 #' @slot graphs list. Landmark-landmark connectivity matrices: adj.matrix, snn, fgraph.
 #' @slot density list. fdens-centric sample-level analytics (L x N matrices):
 #'   fdens, Y, composition (clustering/celltyping cell counts/percentages),
-#'   ignored, .cache.
+#'   .cache.
 #' @slot sample.embed list. Sample-level embeddings (N x k matrices), each with $coord.
 #'   Contains pca, traj, and pepc sub-lists.
 #' @slot cellmap list. Per-cell, per-sample cached lists: cluster.ids, celltype.ids,
@@ -220,8 +220,6 @@ TDRObj <- function(...) {
     if (is.element(".cache", names(m)) && is.null(m$.cache)) {
       args$density$.cache <- NULL
     }
-
-    if (!is.null(m$cl.ct.to.ign)) args$density$ignored <- m$cl.ct.to.ign
 
     if (!is.null(m$clustering)) {
       cl <- m$clustering

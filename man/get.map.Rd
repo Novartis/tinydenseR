@@ -12,7 +12,6 @@ get.map(x, ...)
   .source = NULL,
   .ref.obj = NULL,
   .celltype.col.name = "cell_type",
-  .cl.ct.to.ign = NULL,
   .verbose = TRUE,
   .seed = 123,
   .label.confidence = 0.5,
@@ -36,11 +35,6 @@ Only compatible with RNA assays. Replaces any existing \code{$graph$celltyping}.
 
 \item{.celltype.col.name}{Column name in \code{.ref.obj$meta_data} containing cell type labels
 (default "cell_type"). Only relevant when \code{.ref.obj} is provided.}
-
-\item{.cl.ct.to.ign}{Optional cluster or cell type name to exclude from downstream statistics.
-Use for biologically irrelevant populations (e.g., erythrocytes in PBMC, which likely
-represent technical artifacts). Cells in this population are mapped but excluded from density
-calculations. Only one value allowed; merge multiple populations first via \code{celltyping}.}
 
 \item{.verbose}{Logical for progress messages (default TRUE).}
 
@@ -67,8 +61,7 @@ intermediate results that are recomputed deterministically.}
 Updated \code{.tdr.obj} with \code{$map} component containing:
 \itemize{
 \item \code{fdens}: Matrix of fuzzy graph densities (landmarks × samples). Each entry is
-the sum of cell-landmark edge weights for that sample, normalized by sample size and
-excluding ignored populations.
+the sum of cell-landmark edge weights for that sample, normalized by sample size.
 \item \code{Y}: Matrix of log2-transformed densities (landmarks × samples):
 \code{log2(fdens + 0.5)}. Used by \code{get.lm()} for linear modeling and
 \code{get.embedding()} for unsupervised embeddings.
@@ -86,8 +79,6 @@ per sample. Used for "traditional" compositional statistics.
 cell type per sample. Used for "traditional" compositional statistics.
 \item \code{nearest.landmarks}: List of matrices (one per sample) with nearest landmark indices
 for all cells from UMAP transform.
-\item \code{cl.ct.to.ign}: Character value recording which cluster/cell type was excluded
-from statistics (NULL if none).
 \item \code{.cache}: (When \code{.cache.on.disk = TRUE}) List with \code{root} (cache
 directory path), \code{on.disk} flag, \code{schema_v}, and \code{manifests} holding
 per-sample file metadata for each cached slot. The four large slots above are set
@@ -148,9 +139,6 @@ lm.cells <- setup.tdr.obj(.cells = .cells, .meta = .meta) |>
   get.landmarks(.nHVG = 500) |>
   get.graph() |>
   get.map()
-
-# Exclude erythrocytes from PBMC statistics
-lm.cells <- get.map(lm.cells, .cl.ct.to.ign = "Erythrocytes")
 
 # Use Symphony reference for cell typing (RNA data only)
 ref <- readRDS("pbmc_reference.rds")
