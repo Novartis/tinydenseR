@@ -19,8 +19,7 @@ error if any cached file is missing.
 \description{
 Checks every entry in the cache manifest for file existence.  This
 function is called automatically (in quiet mode) when entering
-\code{get.lm()}, \code{get.pbDE()}, \code{get.specDE()},
-\code{get.nmfDE()}, and \code{get.plsD()} so that broken caches
+\code{get.lm()}, \code{get.pbDE()}, and \code{get.plsD()} so that broken caches
 are caught early.
 }
 \details{

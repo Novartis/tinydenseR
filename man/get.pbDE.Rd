@@ -199,5 +199,5 @@ lm.cells$markerDE$default$cluster3_markers$coefficients
 }
 \seealso{
 \code{\link{get.map}} (required), \code{\link{plotPbDE}}, \code{\link{plotMarkerDE}},
-\code{\link{get.specDE}}
+\code{\link{get.plsD}}
 }

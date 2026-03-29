@@ -250,7 +250,8 @@ TDRObj <- function(...) {
     }
   }
 
-  # specDE / pbDE / markerDE / nmfDE / plsD / interact.plot → results$...
+  # pbDE / markerDE / plsD / interact.plot → results$...
+  # specDE / nmfDE kept for backward compat with serialized objects only
   for (pair in list(
     c("specDE",       "spec"),
     c("pbDE",         "pb"),

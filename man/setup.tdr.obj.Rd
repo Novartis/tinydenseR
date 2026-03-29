@@ -79,7 +79,6 @@ A list object with initialized structure containing:
 \item{\code{$harmony.obj}}{Symphony reference object (populated by \code{get.landmarks})}
 }
 }
-\item{\code{$specDE}}{Spectral DE results (populated by \code{get.specDE})}
 \item{Empty slots}{landmarks, scaled.landmarks, raw.landmarks, pca, graph, map, etc. - populated by downstream functions}
 }
 }

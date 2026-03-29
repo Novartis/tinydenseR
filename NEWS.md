@@ -1,5 +1,16 @@
 # tinydenseR 0.0.3.0001
 
+## Removed: `specDE` and `nmfDE` decomposition methods
+
+`get.specDE()`, `get.nmfDE()`, and their associated plotting functions
+(`plotSpecDE()`, `plotSpecDEHeatmap()`, `plotNmfDE()`, `plotNmfDEHeatmap()`)
+have been removed from the package. **`get.plsD()`** (partial least squares
+decomposition) is the recommended and sole supported decomposition method
+in this family. It is substantially more robust and easier to interpret.
+
+The `$specDE` and `$nmfDE` accessor shims on `TDRObj` are retained for
+backward compatibility with previously serialized objects.
+
 ## S4 TDRObj class (breaking internal change)
 
 The data container has been re-implemented as a formal **S4 class** and
@@ -29,7 +40,7 @@ All analysis and plot functions now dispatch via S3 generics with methods for
   container (e.g., `Seurat@misc$TDRObj`).
 - S3 methods follow a three-step pattern: extract → compute on TDRObj →
   re-embed, so all functions (`get.landmarks()`, `get.graph()`, `get.map()`,
-  `get.pbDE()`, `get.specDE()`, `get.nmfDE()`, `get.plsD()`, all `plot*()`
+  `get.pbDE()`, `get.plsD()`, all `plot*()`
   functions, etc.) work identically on any backend.
 - **`get.meta()`** dispatchers added for all backends.
 - **`get.features()`**: Renamed from `get.lm.features.stats()`.
@@ -175,7 +186,7 @@ in memory:
 
 This dramatically reduces peak RAM usage for large single-cell datasets.
 All downstream functions (`goi.summary()`, `get.lm()`, `get.pbDE()`,
-`get.specDE()`, `get.nmfDE()`, `get.plsD()`) read from the cache
+`get.plsD()`) read from the cache
 transparently.
 
 ### Cache management functions
@@ -199,8 +210,7 @@ transparently.
   (added to `Suggests`), a lock is acquired during the atomic rename to
   prevent concurrent-write clobbering.
 - **Automatic validation** — `get.lm()`, `get.pbDE()`, and
-  `.validate.DE.inputs()` (used by `get.specDE()`, `get.nmfDE()`,
-  `get.plsD()`) silently validate the cache on entry.
+  `.validate.DE.inputs()` (used by `get.plsD()`) silently validate the cache on entry.
 
 ### Disabling caching
 

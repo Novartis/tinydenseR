@@ -117,7 +117,6 @@
 #'         \item{\code{$harmony.obj}}{Symphony reference object (populated by \code{get.landmarks})}
 #'       }
 #'     }
-#'     \item{\code{$specDE}}{Spectral DE results (populated by \code{get.specDE})}
 #'     \item{Empty slots}{landmarks, scaled.landmarks, raw.landmarks, pca, graph, map, etc. - populated by downstream functions}
 #'   }
 #' 
@@ -520,7 +519,7 @@ get.landmarks.TDRObj <-
       if(is.list(.tdr.obj) && !is.null(names(.tdr.obj))){
         expected_names <- c("cells","landmarks","scaled.landmarks","raw.landmarks",
                             "metadata","config","integration","pca","graph","map",
-                            "specDE","pbDE","markerDE","interact.plot")
+                            "specDE","pbDE","markerDE","interact.plot")  # legacy slot names
         if(identical(x = names(x = .tdr.obj), y = expected_names)){
           .tdr.obj <- methods::as(.tdr.obj, "TDRObj")
         } else {

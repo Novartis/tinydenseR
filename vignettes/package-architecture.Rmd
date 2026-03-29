@@ -91,8 +91,6 @@ get.lm()         --> results$lm (fit, trad)
     v
 get.pbDE()            --> results$pb
 get.pbDE(.mode="marker") --> results$marker
-get.specDE()          --> results$spec
-get.nmfDE()           --> results$nmf
 get.plsD()           --> results$pls
 ```
 
@@ -134,7 +132,7 @@ get.lm.Seurat <- function(x, ...) {
 ```
 
 Functions in this tier: `get.graph()`, `get.lm()`, `get.embedding()`,
-`get.specDE()`, `get.nmfDE()`, `get.plsD()`, `get.features()`,
+`get.plsD()`, `get.features()`,
 `lm.cluster()`, `celltyping()`.
 
 ### Tier 2: Needs Source Data
@@ -168,8 +166,8 @@ All `plot*()` functions follow this pattern: `plotPCA()`, `plotUMAP()`,
 `plotBeeswarm()`, `plot2Markers()`, `plotSamplePCA()`,
 `plotSampleEmbedding()`, `plotTradStats()`, `plotTradPerc()`,
 `plotDensity()`, `plotPbDE()`, `plotDEA()`, `plotMarkerDE()`,
-`plotHeatmap()`, `plotSpecDE()`, `plotSpecDEHeatmap()`, `plotNmfDE()`,
-`plotNmfDEHeatmap()`, `plotPlsD()`, `plotPlsDHeatmap()`.
+`plotHeatmap()`,
+`plotPlsD()`, `plotPlsDHeatmap()`.
 
 ## Backend Data Flow
 

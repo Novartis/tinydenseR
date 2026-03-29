@@ -331,56 +331,6 @@ get.embedding.HDF5AnnData <- function(x, ...) {
 }
 
 # ======================================================================
-# get.specDE Seurat / SCE wrappers (Tier 1)
-# ======================================================================
-
-#' @export
-get.specDE.Seurat <- function(x, ...) {
-  tdr <- GetTDR(x)
-  tdr <- get.specDE.TDRObj(tdr, ...)
-  SetTDR(x, tdr)
-}
-
-#' @export
-get.specDE.SingleCellExperiment <- function(x, ...) {
-  tdr <- GetTDR(x)
-  tdr <- get.specDE.TDRObj(tdr, ...)
-  SetTDR(x, tdr)
-}
-
-#' @export
-get.specDE.HDF5AnnData <- function(x, ...) {
-  tdr <- GetTDR(x)
-  tdr <- get.specDE.TDRObj(tdr, ...)
-  SetTDR(x, tdr)
-}
-
-# ======================================================================
-# get.nmfDE Seurat / SCE wrappers (Tier 1)
-# ======================================================================
-
-#' @export
-get.nmfDE.Seurat <- function(x, ...) {
-  tdr <- GetTDR(x)
-  tdr <- get.nmfDE.TDRObj(tdr, ...)
-  SetTDR(x, tdr)
-}
-
-#' @export
-get.nmfDE.SingleCellExperiment <- function(x, ...) {
-  tdr <- GetTDR(x)
-  tdr <- get.nmfDE.TDRObj(tdr, ...)
-  SetTDR(x, tdr)
-}
-
-#' @export
-get.nmfDE.HDF5AnnData <- function(x, ...) {
-  tdr <- GetTDR(x)
-  tdr <- get.nmfDE.TDRObj(tdr, ...)
-  SetTDR(x, tdr)
-}
-
-# ======================================================================
 # get.plsD Seurat / SCE wrappers (Tier 1)
 # ======================================================================
 
@@ -449,18 +399,6 @@ plotMarkerDE.Seurat <- function(x, ...) plotMarkerDE.TDRObj(GetTDR(x), ...)
 plotHeatmap.Seurat <- function(x, ...) plotHeatmap.TDRObj(GetTDR(x), ...)
 
 #' @export
-plotSpecDE.Seurat <- function(x, ...) plotSpecDE.TDRObj(GetTDR(x), ...)
-
-#' @export
-plotSpecDEHeatmap.Seurat <- function(x, ...) plotSpecDEHeatmap.TDRObj(GetTDR(x), ...)
-
-#' @export
-plotNmfDE.Seurat <- function(x, ...) plotNmfDE.TDRObj(GetTDR(x), ...)
-
-#' @export
-plotNmfDEHeatmap.Seurat <- function(x, ...) plotNmfDEHeatmap.TDRObj(GetTDR(x), ...)
-
-#' @export
 plotPlsD.Seurat <- function(x, ...) plotPlsD.TDRObj(GetTDR(x), ...)
 
 #' @export
@@ -510,18 +448,6 @@ plotMarkerDE.SingleCellExperiment <- function(x, ...) plotMarkerDE.TDRObj(GetTDR
 plotHeatmap.SingleCellExperiment <- function(x, ...) plotHeatmap.TDRObj(GetTDR(x), ...)
 
 #' @export
-plotSpecDE.SingleCellExperiment <- function(x, ...) plotSpecDE.TDRObj(GetTDR(x), ...)
-
-#' @export
-plotSpecDEHeatmap.SingleCellExperiment <- function(x, ...) plotSpecDEHeatmap.TDRObj(GetTDR(x), ...)
-
-#' @export
-plotNmfDE.SingleCellExperiment <- function(x, ...) plotNmfDE.TDRObj(GetTDR(x), ...)
-
-#' @export
-plotNmfDEHeatmap.SingleCellExperiment <- function(x, ...) plotNmfDEHeatmap.TDRObj(GetTDR(x), ...)
-
-#' @export
 plotPlsD.SingleCellExperiment <- function(x, ...) plotPlsD.TDRObj(GetTDR(x), ...)
 
 #' @export
@@ -569,18 +495,6 @@ plotMarkerDE.HDF5AnnData <- function(x, ...) plotMarkerDE.TDRObj(GetTDR(x), ...)
 
 #' @export
 plotHeatmap.HDF5AnnData <- function(x, ...) plotHeatmap.TDRObj(GetTDR(x), ...)
-
-#' @export
-plotSpecDE.HDF5AnnData <- function(x, ...) plotSpecDE.TDRObj(GetTDR(x), ...)
-
-#' @export
-plotSpecDEHeatmap.HDF5AnnData <- function(x, ...) plotSpecDEHeatmap.TDRObj(GetTDR(x), ...)
-
-#' @export
-plotNmfDE.HDF5AnnData <- function(x, ...) plotNmfDE.TDRObj(GetTDR(x), ...)
-
-#' @export
-plotNmfDEHeatmap.HDF5AnnData <- function(x, ...) plotNmfDEHeatmap.TDRObj(GetTDR(x), ...)
 
 #' @export
 plotPlsD.HDF5AnnData <- function(x, ...) plotPlsD.TDRObj(GetTDR(x), ...)

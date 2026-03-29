@@ -260,7 +260,5 @@ data.frame(
 }
 \seealso{
 \code{\link{get.lm}} (required predecessor),
-\code{\link{get.specDE}} (specDE: SVD-based peer method),
-\code{\link{get.nmfDE}} (nmfDE: NMF-based peer method),
 \code{\link{plotPlsD}} (visualization), \code{\link{plotPlsDHeatmap}} (heatmap)
 }
