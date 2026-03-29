@@ -1336,7 +1336,8 @@ get.dea <- function(
 #'   the \code{.label.confidence} pipeline determines which cells confidently belong to this 
 #'   landmark set based on their fuzzy graph weights.
 #' @param .id2.idx Optional integer vector specifying landmark indices for group 2. When provided,
-#'   the \code{.label.confidence} pipeline determines which cells confidently belong to this 
+#'   takes priority over \code{.id2} parameter and \code{"..all.other.landmarks.."} mode.
+#'   The \code{.label.confidence} pipeline determines which cells confidently belong to this 
 #'   landmark set based on their fuzzy graph weights.
 #' @param .id1 Character vector of cluster/celltype IDs for group 1 (test group). Required if 
 #'   \code{.id1.idx} not provided.
@@ -1576,7 +1577,9 @@ get.markerDE.TDRObj <-
       
     }
     
-    if("..all.other.landmarks.." %in% .id2){
+    if(is.null(x = .id2.idx)){
+      
+      if("..all.other.landmarks.." %in% .id2){
       
       message("using `..all.other.landmarks..` for .id2")
       
@@ -1591,8 +1594,6 @@ get.markerDE.TDRObj <-
         })
       
     } else {
-      
-      if(is.null(x = .id2.idx)){
         
         # Cell-centric: get per-sample cell indices matching group 2
         .lm2.idx <-
@@ -1601,7 +1602,8 @@ get.markerDE.TDRObj <-
                    which(x = smpl %in% .id2)
                  })
         
-      } else {
+      }
+    } else {
         
         if(!all(.id2.idx %in% (nrow(x = .tdr.obj@assay$expr) |> seq_len()))) {
           stop(paste0(".id2.idx must be an integer vector between 1 and ",
@@ -1635,8 +1637,6 @@ get.markerDE.TDRObj <-
                  })
         
       }
-      
-    }
     
     # Auto-generate comparison name if not provided
     if(is.null(x = .comparison.name)){

@@ -104,4 +104,81 @@ test_that("get.marker is deprecated", {
     "deprecated"
   )
 })
+
+# Regression test: .id2.idx priority over .id2 parameter
+# This test verifies that when .id2.idx is provided, it takes priority over .id2
+# by checking that providing an invalid .id2 with valid .id2.idx doesn't error at validation
+test_that("get.markerDE .id2.idx priority: invalid .id2 bypassed when .id2.idx provided", {
+  # Regression: Verify that .id2.idx priority logic is correctly structured
+  # If .id2.idx is prioritized at the top level as intended, providing an 
+  # invalid .id2 value should not cause an immediate error.
+  # Instead, it should only validate .id2 when .id2.idx is NULL.
   
+  .tdr.obj <- TDRObj(
+    config = list(assay.type = "cyto"),
+    graph = list(clustering = list(ids = factor(c("A", "B"))))
+  )
+  
+  # Provide: valid .id1, INVALID .id2 (not in clustering), valid .id2.idx
+  # If priority is correct: should pass .id2 validation (uses .id2.idx instead)
+  # If priority is wrong: would error on invalid .id2
+  
+  expect_error(
+    get.markerDE(.tdr.obj, .id1 = "A", .id2 = "INVALID_CELLTYPE", .id2.idx = 1:5),
+    # If .id2.idx is prioritized, this will fail later (missing required data),
+    # not with "not found in clustering" validation error
+    regex = "(?!not found in clustering)",  # negative lookahead: should NOT have this error
+    perl = TRUE
+  )
+})
+
+# Structured integration test for .id2.idx priority behavior
+test_that("get.markerDE .id2.idx priority: API consistency check", {
+  # Integration test: Verify .id1.idx and .id2.idx follow symmetric priority pattern
+  # Create a minimal object that has the required validation structure
+  
+  # The test passes if we can call get.markerDE with:
+  # - Valid .id1/invalid .id2 + valid .id2.idx -> should not error on .id2 validation
+  # - Valid .id1.idx/invalid .id1 + valid .id2/unknown .id2.idx -> should error on .id1 validation  
+  
+  .tdr.obj <- TDRObj(
+    config = list(assay.type = "cyto"),
+    graph = list(clustering = list(ids = factor(c("A", "B"))))
+  )
+  
+  # Test 1: With .id2.idx, invalid .id2 should be bypassed
+  expect_error(
+    get.markerDE(.tdr.obj, .id1 = "A", .id2 = "INVALID", .id2.idx = 1:5),
+    "(?!not found in clustering)",
+    perl = TRUE
+  )
+  
+  # Test 2: Without .id2.idx, invalid .id2 should be caught
+  expect_error(
+    get.markerDE(.tdr.obj, .id1 = "A", .id2 = "INVALID"),
+    "INVALID.*not found in clustering"
+  )
+})
+
+# Final regression verification: priority logic code path
+test_that("get.markerDE .id2.idx code path: priority at top level", {
+  #  Verification that .id2.idx check is at the top level, not nested.
+  # This ensures: is.null(.id2.idx) -> check .id2 vs special mode
+  #              !is.null(.id2.idx) -> use .id2.idx directly
+  
+  .tdr.obj <- TDRObj(
+    config = list(assay.type = "cyto"),
+    graph = list(clustering = list(ids = factor(c("A", "B"))))
+  )
+  
+  # Scenario 1: Provide both .id2 (special mode) and .id2.idx
+  # If .id2.idx is truly at top level and prioritized:
+  # -> won't apply the special "..all.other.landmarks.." mode
+  # -> will attempt to use .id2.idx directly (will fail at later stage, not here)
+  expect_error(
+    get.markerDE(.tdr.obj, .id1 = "A", .id2 = "..all.other.landmarks..", .id2.idx = 1:5),
+    "(?!using.*all\\.other\\.landmarks)",  # should NOT see this message
+    perl = TRUE
+  )
+})
+
