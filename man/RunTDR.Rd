@@ -197,6 +197,13 @@ A \code{\linkS4class{TDRObj}}.
 S3 generic that executes the complete tinydenseR analysis pipeline:
 landmark selection, graph construction, optional cell typing, and mapping.
 }
+\details{
+\code{RunTDR} is a convenience wrapper around the explicit step-by-step
+workflow (\code{get.meta → get.cells → setup.tdr.obj → get.landmarks →
+get.graph → get.map → get.embedding}).
+For equivalent inputs, seed, and arguments the two paths produce
+\strong{numerically identical} results.
+}
 \section{Methods (by class)}{
 \itemize{
 \item \code{RunTDR(default)}: Run the pipeline on an existing TDRObj

@@ -9,6 +9,12 @@
 #' S3 generic that executes the complete tinydenseR analysis pipeline:
 #' landmark selection, graph construction, optional cell typing, and mapping.
 #'
+#' \code{RunTDR} is a convenience wrapper around the explicit step-by-step
+#' workflow (\code{get.meta → get.cells → setup.tdr.obj → get.landmarks →
+#' get.graph → get.map → get.embedding}).
+#' For equivalent inputs, seed, and arguments the two paths produce
+#' \strong{numerically identical} results.
+#'
 #' @param x An object to run the pipeline on. See methods for supported types.
 #' @param ... Additional arguments passed to methods.
 #'
@@ -192,7 +198,16 @@ RunTDR.Seurat <- function(x,
     stats::setNames(valid, valid),
     function(s) sort(which(sample_ids == s))
   )
-  .meta <- .meta[names(.cells), , drop = FALSE]
+
+  # Align sample ordering with get.meta() for parity with explicit workflow.
+  # table() sorts names alphabetically, but get.meta() preserves first-
+  # occurrence order.  The explicit workflow feeds get.meta()-ordered .cells
+
+  # to setup.tdr.obj → get.landmarks, so landmark sampling (which depends on
+  # processing order through the RNG stream) must see the same ordering here.
+  .meta_order <- intersect(rownames(.meta), names(.cells))
+  .cells <- .cells[.meta_order]
+  .meta  <- .meta[.meta_order, , drop = FALSE]
 
   # --- .celltype.vec handling ---
   ct_vec <- NULL
@@ -576,7 +591,11 @@ RunTDR.SingleCellExperiment <- function(x,
       stats::setNames(valid, valid),
       function(s) sort(which(sample_ids == s))
     )
-    .meta <- .meta[names(.cells), , drop = FALSE]
+
+    # Align sample ordering with get.meta() for parity with explicit workflow
+    .meta_order <- intersect(rownames(.meta), names(.cells))
+    .cells <- .cells[.meta_order]
+    .meta  <- .meta[.meta_order, , drop = FALSE]
 
     # --- .celltype.vec handling ---
     ct_vec <- NULL
@@ -1664,7 +1683,12 @@ RunTDR.IterableMatrix <- function(x, .cell.meta, ...) {
     dplyr::distinct() |>
     as.data.frame()
   rownames(sample_meta) <- sample_meta[[.sample.var]]
-  sample_meta <- sample_meta[intersect(valid, rownames(sample_meta)),
+
+  # Align sample ordering with first-occurrence order (from dplyr::distinct)
+  # for parity with the explicit get.meta() → get.cells() → setup.tdr.obj()
+  # workflow.  intersect() preserves the order of its first argument, so put
+  # the first-occurrence rownames first.
+  sample_meta <- sample_meta[intersect(rownames(sample_meta), valid),
                              , drop = FALSE]
 
   # --- Build index-based .cells + locked source env ---
