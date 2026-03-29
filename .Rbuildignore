@@ -12,3 +12,4 @@
 ^Meta$
 ^R/spectral\.dea\.R$
 ^inst/dev$
+^\.quarantine$

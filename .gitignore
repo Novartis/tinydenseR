@@ -48,6 +48,9 @@ docs/
 # translation temp files
 po/*~
 
+# Quarantine directory (cleanup staging area)
+.quarantine/
+
 # RStudio Connect folder
 rsconnect/
 
