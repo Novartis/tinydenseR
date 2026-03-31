@@ -1799,23 +1799,32 @@ RunTDR.dgCMatrix <- function(x, .cell.meta, ...) {
     }
   }
 
-  # --- HDF5-backed: zero-copy streaming via BPCells ---
+  # --- HDF5-backed: try zero-copy streaming via BPCells, fall back to chunked ---
   if (requireNamespace("HDF5Array", quietly = TRUE) &&
       methods::is(seed, "HDF5ArraySeed")) {
     h5_path <- HDF5Array::path(seed)
     h5_group <- seed@name
     if (isTRUE(.verbose)) {
-      cat("HDF5-backed DelayedMatrix detected; streaming via BPCells...\n")
+      cat("HDF5-backed DelayedMatrix detected; attempting BPCells streaming...\n")
     }
-    bp_mat <- BPCells::open_matrix_hdf5(path = h5_path, group = h5_group)
-    BPCells::write_matrix_dir(mat = bp_mat, dir = .bpcells.dir)
+    bp_mat <- tryCatch({
+      bp <- BPCells::open_matrix_hdf5(path = h5_path, group = h5_group)
+      BPCells::write_matrix_dir(mat = bp, dir = .bpcells.dir)
+      BPCells::open_matrix_dir(.bpcells.dir)
+    }, error = function(e) NULL)
+
+    if (!is.null(bp_mat)) {
+      if (isTRUE(.verbose)) {
+        cat("BPCells matrix written to: ", .bpcells.dir, "\n")
+      }
+      return(bp_mat)
+    }
     if (isTRUE(.verbose)) {
-      cat("BPCells matrix written to: ", .bpcells.dir, "\n")
+      cat("BPCells cannot read this HDF5 layout; falling back to chunked conversion...\n")
     }
-    return(BPCells::open_matrix_dir(.bpcells.dir))
   }
 
-  # --- Chunked fallback for non-HDF5 backends ---
+  # --- Chunked fallback for non-HDF5 and incompatible-HDF5 backends ---
   if (isTRUE(.verbose)) {
     cat("Converting DelayedMatrix to BPCells on-disk format (chunked)...\n")
   }

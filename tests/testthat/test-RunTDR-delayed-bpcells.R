@@ -187,54 +187,45 @@ test_that(".delayed_to_bpcells with .bpcells.dir = NULL uses tempdir", {
   expect_equal(ncol(result), 201L)
 })
 
-test_that(".delayed_to_bpcells skips conversion for BPCells-backed seed", {
+test_that(".delayed_to_bpcells seed-detection recognises IterableMatrix seeds", {
   skip_on_cran()
   skip_if_not_installed("BPCells")
   skip_if_not_installed("DelayedArray")
 
+  # BPCells IterableMatrix cannot currently be wrapped in DelayedArray
+  # (IterableMatrix does not implement extract_array()), so the
+  # short-circuit branch in .delayed_to_bpcells is unreachable in
+  # practice.  We verify the detection logic directly: the function
+  # checks `methods::is(seed, "IterableMatrix")`, so we ensure that
+  # check works on a real on-disk BPCells matrix.
   set.seed(42)
   dgc <- Matrix::Matrix(
     matrix(rpois(50 * 100, lambda = 5), nrow = 50, ncol = 100,
            dimnames = list(paste0("g", 1:50), paste0("c", 1:100))),
     sparse = TRUE
   )
-  bp_orig <- methods::as(dgc, "IterableMatrix")
-
-  # Write to disk first so we have a proper on-disk IterableMatrix
   bp_disk_dir <- file.path(withr::local_tempdir(), "bp_seed_disk")
-  BPCells::write_matrix_dir(mat = bp_orig, dir = bp_disk_dir)
+  BPCells::write_matrix_dir(
+    mat = methods::as(dgc, "IterableMatrix"), dir = bp_disk_dir
+  )
   bp_disk <- BPCells::open_matrix_dir(bp_disk_dir)
 
-  # Try wrapping in DelayedArray — if BPCells doesn't support this,
-  # skip the test gracefully
-  dmat <- tryCatch(
+  # Confirm it IS an IterableMatrix (the condition .delayed_to_bpcells
+  # uses) and is NOT a valid DelayedArray seed.
+  expect_true(methods::is(bp_disk, "IterableMatrix"))
+  expect_error(
     DelayedArray::DelayedArray(bp_disk),
-    error = function(e) NULL
+    "extract_array"
   )
-  skip_if(is.null(dmat),
-          "BPCells IterableMatrix cannot be wrapped in DelayedArray")
-
-  bp_dir <- file.path(withr::local_tempdir(), "bp_skip_dir")
-
-  out <- capture.output(
-    result <- tinydenseR:::.delayed_to_bpcells(dmat, .bpcells.dir = bp_dir,
-                                                .verbose = TRUE)
-  )
-
-  expect_true(methods::is(result, "IterableMatrix"))
-  expect_true(any(grepl("already BPCells-backed", out, ignore.case = TRUE)))
-  # The .bpcells.dir should NOT have been created
-  expect_false(dir.exists(bp_dir))
 })
 
-test_that(".delayed_to_bpcells streams HDF5-backed DelayedMatrix via zero-copy", {
+test_that(".delayed_to_bpcells converts HDF5-backed DelayedMatrix (fallback path)", {
   skip_on_cran()
   skip_if_not_installed("BPCells")
   skip_if_not_installed("DelayedArray")
   skip_if_not_installed("HDF5Array")
 
   set.seed(42)
-  # Use a dense matrix for HDF5 (BPCells reads dense HDF5 reliably)
   dense_mat <- matrix(rpois(50 * 200, lambda = 5), nrow = 50, ncol = 200,
                       dimnames = list(paste0("g", 1:50), paste0("c", 1:200)))
 
@@ -246,21 +237,29 @@ test_that(".delayed_to_bpcells streams HDF5-backed DelayedMatrix via zero-copy",
 
   bp_dir <- file.path(withr::local_tempdir(), "bp_hdf5")
 
-  # BPCells may not be able to read HDF5Array's format directly;
-  # in that case the chunked fallback should be used.
-  # Either path is acceptable as long as the result is correct.
-  result <- tryCatch(
-    tinydenseR:::.delayed_to_bpcells(dmat, .bpcells.dir = bp_dir,
-                                      .verbose = FALSE),
-    error = function(e) NULL
+  # HDF5Array writes a standard dense HDF5 dataset that BPCells cannot
+  # read via open_matrix_hdf5 (it expects BPCells' own CSC layout).
+  # .delayed_to_bpcells must succeed anyway by falling back to the
+  # chunked conversion path.
+  out <- capture.output(
+    result <- tinydenseR:::.delayed_to_bpcells(dmat, .bpcells.dir = bp_dir,
+                                                .verbose = TRUE)
   )
-  skip_if(is.null(result),
-          "BPCells cannot read this HDF5 format; zero-copy test skipped")
 
   expect_true(methods::is(result, "IterableMatrix"))
   expect_equal(nrow(result), 50L)
   expect_equal(ncol(result), 200L)
   expect_true(dir.exists(bp_dir))
+
+  # Verify the fallback message was emitted
+  expect_true(
+    any(grepl("falling back to chunked", out, ignore.case = TRUE)) ||
+    any(grepl("chunked", out, ignore.case = TRUE))
+  )
+
+  # Verify data integrity: materialise first column and compare
+  bp_col1 <- as.matrix(result[, 1, drop = FALSE])
+  expect_equal(as.numeric(bp_col1), as.numeric(dense_mat[, 1]))
 })
 
 # ======================================================================
