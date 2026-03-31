@@ -821,6 +821,153 @@ RunTDR.SingleCellExperiment <- function(x,
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Internal: rhdf5-based H5AD metadata readers
+# ──────────────────────────────────────────────────────────────────────
+
+#' Detect AnnData format version from root HDF5 attributes
+#'
+#' @param path Character(1). Path to the h5ad file.
+#' @return A list with \code{modern} (logical) and
+#'   \code{encoding_version} (character or NA).
+#' @keywords internal
+#' @noRd
+.h5ad_detect_version <- function(path) {
+  attrs <- rhdf5::h5readAttributes(path, "/")
+  rhdf5::H5close()
+  if ("encoding-type" %in% names(attrs)) {
+    return(list(modern = TRUE,
+                encoding_version = attrs[["encoding-version"]]))
+  }
+  list(modern = FALSE, encoding_version = NA_character_)
+}
+
+#' Read obs metadata from an h5ad file as a data.frame via rhdf5
+#'
+#' Handles both pre-0.8.0 (flat \code{__categories}) and modern (nested
+#' group) AnnData categorical encodings.  Categorical codes of \code{-1}
+#' are mapped to \code{NA}.
+#'
+#' @param path Character(1). Path to the h5ad file.
+#' @return A \code{data.frame} with rownames set to the cell index.
+#' @keywords internal
+#' @noRd
+.h5ad_read_obs <- function(path) {
+  ver    <- .h5ad_detect_version(path)
+  ls_all <- rhdf5::h5ls(path, recursive = TRUE)
+  rhdf5::H5close()
+
+  obs_entries <- ls_all[ls_all$group == "/obs", ]
+
+  if (!ver$modern) {
+    ## -- Pre-0.8.0: __categories pattern ----------------------------------
+    cat_names  <- ls_all[ls_all$group == "/obs/__categories", "name"]
+    col_names  <- obs_entries$name[obs_entries$name != "__categories"]
+    index_key  <- "index"  # always "index" in pre-0.8.0
+
+    result <- list()
+    for (col in col_names) {
+      if (col == index_key) {
+        result[[col]] <- rhdf5::h5read(path, paste0("/obs/", col))
+      } else if (col %in% cat_names) {
+        codes <- rhdf5::h5read(path, paste0("/obs/", col))
+        cats  <- rhdf5::h5read(path, paste0("/obs/__categories/", col))
+        vals  <- rep(NA_character_, length(codes))
+        valid <- codes >= 0L
+        vals[valid] <- cats[codes[valid] + 1L]
+        result[[col]] <- factor(vals, levels = cats)
+      } else {
+        result[[col]] <- rhdf5::h5read(path, paste0("/obs/", col))
+      }
+      rhdf5::H5close()
+    }
+
+    df <- as.data.frame(result, stringsAsFactors = FALSE,
+                         check.names = FALSE)
+    if (index_key %in% names(df)) {
+      rownames(df) <- df[[index_key]]
+      df[[index_key]] <- NULL
+    }
+
+  } else {
+    ## -- Modern (>=0.8.0): nested group categoricals ----------------------
+    result    <- list()
+    index_key <- NULL
+
+    for (i in seq_len(nrow(obs_entries))) {
+      col   <- obs_entries$name[i]
+      otype <- obs_entries$otype[i]
+
+      if (col == "_index" || col == "index") {
+        index_key <- col
+        result[[col]] <- rhdf5::h5read(path, paste0("/obs/", col))
+      } else if (otype == "H5I_GROUP") {
+        codes <- rhdf5::h5read(path, paste0("/obs/", col, "/codes"))
+        cats  <- rhdf5::h5read(path, paste0("/obs/", col, "/categories"))
+        vals  <- rep(NA_character_, length(codes))
+        valid <- codes >= 0L
+        vals[valid] <- cats[codes[valid] + 1L]
+        result[[col]] <- factor(vals, levels = cats)
+      } else {
+        result[[col]] <- rhdf5::h5read(path, paste0("/obs/", col))
+      }
+      rhdf5::H5close()
+    }
+
+    df <- as.data.frame(result, stringsAsFactors = FALSE,
+                         check.names = FALSE)
+    if (!is.null(index_key) && index_key %in% names(df)) {
+      rownames(df) <- df[[index_key]]
+      df[[index_key]] <- NULL
+    }
+  }
+
+  df
+}
+
+#' Read var (gene) names from an h5ad file via rhdf5
+#'
+#' @param path Character(1). Path to the h5ad file.
+#' @return Character vector of gene/feature names.
+#' @keywords internal
+#' @noRd
+.h5ad_read_var_names <- function(path) {
+  ver <- .h5ad_detect_version(path)
+  rhdf5::H5close()
+  if (!ver$modern) {
+    nms <- rhdf5::h5read(path, "/var/index")
+  } else {
+    nms <- tryCatch(
+      rhdf5::h5read(path, "/var/_index"),
+      error = function(e) rhdf5::h5read(path, "/var/index")
+    )
+  }
+  rhdf5::H5close()
+  as.character(nms)
+}
+
+#' Read obs (cell) names from an h5ad file via rhdf5
+#'
+#' @param path Character(1). Path to the h5ad file.
+#' @return Character vector of cell IDs / barcodes.
+#' @keywords internal
+#' @noRd
+.h5ad_read_obs_names <- function(path) {
+  ver <- .h5ad_detect_version(path)
+  rhdf5::H5close()
+  if (!ver$modern) {
+    nms <- rhdf5::h5read(path, "/obs/index")
+  } else {
+    nms <- tryCatch(
+      rhdf5::h5read(path, "/obs/_index"),
+      error = function(e) rhdf5::h5read(path, "/obs/index")
+    )
+  }
+  rhdf5::H5close()
+  as.character(nms)
+}
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Internal: resolve which HDF5 group holds the count matrix in an h5ad
 # ──────────────────────────────────────────────────────────────────────
 
@@ -1036,6 +1183,186 @@ RunTDR.HDF5AnnData <- function(x,
   cell_meta <- as.data.frame(x$obs)
 
   # --- Delegate to .run_tdr_matrix (the proven IterableMatrix path) ---
+  .run_tdr_matrix(
+    x               = bp_mat,
+    .cell.meta      = cell_meta,
+    .sample.var     = .sample.var,
+    .assay.type     = .assay.type,
+    .harmony.var    = .harmony.var,
+    .markers        = .markers,
+    .celltype.vec   = .celltype.vec,
+    .min.cells.per.sample = .min.cells.per.sample,
+    .verbose        = .verbose,
+    .seed           = .seed,
+    .prop.landmarks = .prop.landmarks,
+    .n.threads      = .n.threads,
+    ...
+  )
+}
+
+
+# ======================================================================
+# RunTDR – character (h5ad file path) method
+# ======================================================================
+
+#' @describeIn RunTDR Run the pipeline directly from an h5ad file path
+#'
+#' Reads metadata and gene/cell names from the h5ad file using
+#' \code{rhdf5}, opens the expression matrix with \code{BPCells}, and
+#' delegates to the internal \code{IterableMatrix} pipeline.
+#'
+#' This method supports \strong{all} H5AD format versions, including
+#' pre-0.8.0 files generated by older versions of Python anndata that
+#' are not supported by the \code{anndataR} package.
+#'
+#' @param x Character(1).
+#'   Path to a \code{.h5ad} file.
+#' @param .sample.var Character(1). Column in \code{obs} identifying
+#'   sample membership.
+#' @param .assay.type Character. \code{"RNA"} or \code{"cyto"}.
+#' @param .h5ad.group Character(1) or \code{NULL}. HDF5 group path
+#'   containing the count matrix (e.g. \code{"/layers/counts"} or
+#'   \code{"/X"}). If \code{NULL} (default), auto-detects by probing
+#'   \code{/layers/counts} first, then falling back to \code{/X}.
+#' @param .bpcells.dir Character(1) or \code{NULL}. Directory path for
+#'   the BPCells on-disk matrix. If \code{NULL} (default), uses a
+#'   temporary directory (\code{tempdir()}) that is cleaned up on session
+#'   end. If a path is given and already contains a valid BPCells
+#'   matrix, the conversion step is skipped (cache hit).
+#' @param .harmony.var Character vector of batch variable column names
+#'   in sample-level metadata, or \code{NULL}.
+#' @param .markers Character vector of marker names (required for cyto).
+#' @param .celltype.vec Character(1). Column name in \code{obs}
+#'   containing per-cell type labels, or \code{NULL}.
+#' @param .min.cells.per.sample Integer. Minimum cells for a sample to be
+#'   included.
+#' @param .verbose Logical. Print progress messages.
+#' @param .seed Integer. Random seed.
+#' @param .prop.landmarks Numeric in (0, 1]. Proportion of cells as landmarks.
+#' @param .n.threads Integer. Number of threads.
+#' @param ... Additional arguments passed to pipeline functions.
+#'
+#' @return A \code{\linkS4class{TDRObj}}.
+#'
+#' @export
+RunTDR.character <- function(x,
+                             .sample.var,
+                             .assay.type = "RNA",
+                             .h5ad.group = NULL,
+                             .bpcells.dir = NULL,
+                             .harmony.var = NULL,
+                             .markers = NULL,
+                             .celltype.vec = NULL,
+                             .min.cells.per.sample = 10,
+                             .verbose = TRUE,
+                             .seed = 123,
+                             .prop.landmarks = 0.1,
+                             .n.threads = if (is.hpc()) {
+                               max(RhpcBLASctl::blas_get_num_procs(),
+                                   RhpcBLASctl::omp_get_num_procs(),
+                                   RhpcBLASctl::omp_get_max_threads(),
+                                   na.rm = TRUE)
+                             } else {
+                               parallel::detectCores(logical = TRUE)
+                             },
+                             ...) {
+
+  # --- Input validation ---
+  if (length(x) != 1L) {
+    stop("x must be a single file path (length-1 character string).",
+         call. = FALSE)
+  }
+  if (!file.exists(x)) {
+    stop("File not found: '", x, "'.", call. = FALSE)
+  }
+  if (!grepl("\\.h5ad$", x, ignore.case = TRUE)) {
+    stop("x does not have an .h5ad extension: '", x, "'.", call. = FALSE)
+  }
+  if (!is.character(.sample.var) || length(.sample.var) != 1) {
+    stop(".sample.var must be a single character string.", call. = FALSE)
+  }
+
+  if (!requireNamespace("rhdf5", quietly = TRUE)) {
+    stop("Package 'rhdf5' is required for h5ad file path support. ",
+         "Install it with: BiocManager::install('rhdf5')", call. = FALSE)
+  }
+  if (!requireNamespace("BPCells", quietly = TRUE)) {
+    stop("Package 'BPCells' is required for h5ad file path support. ",
+         "Install it with: BiocManager::install('BPCells')", call. = FALSE)
+  }
+
+  h5ad_path <- normalizePath(x, mustWork = TRUE)
+
+  if (isTRUE(.verbose)) {
+    cat("h5ad file: ", h5ad_path, "\n")
+    ver <- .h5ad_detect_version(h5ad_path)
+    cat("H5AD format: ",
+        if (ver$modern) paste0("modern (", ver$encoding_version, ")")
+        else "pre-0.8.0 (legacy)",
+        "\n")
+  }
+
+  # --- Read cell metadata from obs ---
+  if (isTRUE(.verbose)) cat("Reading obs metadata via rhdf5...\n")
+  cell_meta <- .h5ad_read_obs(h5ad_path)
+
+  if (!(.sample.var %in% colnames(cell_meta))) {
+    stop(".sample.var '", .sample.var, "' not found in h5ad obs. ",
+         "Available columns: ",
+         paste(head(colnames(cell_meta), 20), collapse = ", "),
+         call. = FALSE)
+  }
+
+  # --- Resolve HDF5 group ---
+  group <- .h5ad_resolve_counts_group(h5ad_path, .h5ad.group)
+
+  if (isTRUE(.verbose)) {
+    cat("Using HDF5 group: ", group, "\n")
+  }
+
+  # --- Convert to BPCells on-disk format ---
+  if (is.null(.bpcells.dir)) {
+    .bpcells.dir <- file.path(tempdir(), paste0("bpcells_",
+                              tools::file_path_sans_ext(basename(h5ad_path))))
+  }
+
+  cache_hit <- FALSE
+  if (dir.exists(.bpcells.dir)) {
+    bp_mat <- tryCatch(BPCells::open_matrix_dir(.bpcells.dir),
+                       error = function(e) NULL)
+    if (!is.null(bp_mat)) {
+      cache_hit <- TRUE
+      if (isTRUE(.verbose)) {
+        cat("BPCells cache hit: reusing ", .bpcells.dir, "\n")
+      }
+    }
+  }
+
+  if (!cache_hit) {
+    if (isTRUE(.verbose)) {
+      cat("Converting h5ad matrix to BPCells on-disk format...\n")
+    }
+    h5_mat <- BPCells::open_matrix_anndata_hdf5(h5ad_path, group = group)
+    bp_mat <- BPCells::write_matrix_dir(mat = h5_mat, dir = .bpcells.dir)
+    if (isTRUE(.verbose)) {
+      cat("BPCells matrix written to: ", .bpcells.dir, "\n")
+    }
+    bp_mat <- BPCells::open_matrix_dir(.bpcells.dir)
+  }
+
+  # --- Apply gene names ---
+  gene_names <- .h5ad_read_var_names(h5ad_path)
+  if (length(gene_names) == nrow(bp_mat)) {
+    rownames(bp_mat) <- gene_names
+  }
+
+  # --- Apply cell names ---
+  cell_names <- .h5ad_read_obs_names(h5ad_path)
+  if (length(cell_names) == ncol(bp_mat)) {
+    colnames(bp_mat) <- cell_names
+  }
+
+  # --- Delegate to .run_tdr_matrix ---
   .run_tdr_matrix(
     x               = bp_mat,
     .cell.meta      = cell_meta,
@@ -1985,14 +2312,5 @@ GetTDR.SingleCellExperiment <- function(x, ...) {
   if (is.null(tdr))
     stop("No TDRObj found in SCE metadata slot 'tdr.obj'. ",
          "Run RunTDR() first.")
-  tdr
-}
-
-#' @describeIn GetTDR Extract TDRObj from AnnData uns
-#' @export
-GetTDR.HDF5AnnData <- function(x, ...) {
-  tdr <- x$uns[["tdr.obj"]]
-  if (is.null(tdr))
-    stop("No TDRObj found in AnnData uns slot 'tdr.obj'. Run RunTDR() first.")
   tdr
 }
