@@ -512,3 +512,171 @@ test_that("subset_h5ad is no longer exported", {
   exports <- getNamespaceExports("tinydenseR")
   expect_false("subset_h5ad" %in% exports)
 })
+
+# ======================================================================
+# RunTDR.character tests (file-path-based h5ad support)
+# ======================================================================
+
+test_that("RunTDR.character full pipeline with /X", {
+  skip_if_not_installed("BPCells")
+  skip_if_not_installed("rhdf5")
+  skip_if(!.has_python_anndata(), "python3 with anndata not available")
+  skip_on_cran()
+
+  tmp_h5ad <- withr::local_tempfile(fileext = ".h5ad")
+  bp_dir <- withr::local_tempdir()
+
+  .make_test_h5ad(tmp_h5ad, n_cells = 200, n_genes = 50, n_samples = 4,
+                  use_layers_counts = FALSE)
+
+  result <- RunTDR(tmp_h5ad,
+                   .sample.var = "sample_id",
+                   .bpcells.dir = file.path(bp_dir, "bp"),
+                   .nPC = 3,
+                   .verbose = FALSE)
+
+  expect_s4_class(result, "TDRObj")
+  expect_equal(result@config$backend, "matrix")
+  expect_equal(nrow(result@metadata), 4L)
+  expect_false(is.null(result@density$fdens))
+  expect_true(all(paste0("sample", 1:4) %in% rownames(result@metadata)))
+})
+
+test_that("RunTDR.character full pipeline with /layers/counts", {
+  skip_if_not_installed("BPCells")
+  skip_if_not_installed("rhdf5")
+  skip_if(!.has_python_anndata(), "python3 with anndata not available")
+  skip_on_cran()
+
+  tmp_h5ad <- withr::local_tempfile(fileext = ".h5ad")
+  bp_dir <- withr::local_tempdir()
+
+  .make_test_h5ad(tmp_h5ad, n_cells = 200, n_genes = 50, n_samples = 4,
+                  use_layers_counts = TRUE)
+
+  result <- RunTDR(tmp_h5ad,
+                   .sample.var = "sample_id",
+                   .h5ad.group = "/layers/counts",
+                   .bpcells.dir = file.path(bp_dir, "bp"),
+                   .nPC = 3,
+                   .verbose = FALSE)
+
+  expect_s4_class(result, "TDRObj")
+  expect_equal(result@config$backend, "matrix")
+  expect_equal(nrow(result@metadata), 4L)
+})
+
+test_that("RunTDR.character correct gene and cell names", {
+  skip_if_not_installed("BPCells")
+  skip_if_not_installed("rhdf5")
+  skip_if(!.has_python_anndata(), "python3 with anndata not available")
+  skip_on_cran()
+
+  tmp_h5ad <- withr::local_tempfile(fileext = ".h5ad")
+  bp_dir <- withr::local_tempdir()
+
+  .make_test_h5ad(tmp_h5ad, n_cells = 200, n_genes = 50, n_samples = 4,
+                  use_layers_counts = FALSE)
+
+  expected_genes <- tinydenseR:::.h5ad_read_var_names(tmp_h5ad)
+  expected_cells <- tinydenseR:::.h5ad_read_obs_names(tmp_h5ad)
+
+  result <- RunTDR(tmp_h5ad,
+                   .sample.var = "sample_id",
+                   .bpcells.dir = file.path(bp_dir, "bp"),
+                   .nPC = 3,
+                   .verbose = FALSE)
+
+  mat <- result@config$source.env$mat
+  expect_equal(rownames(mat), expected_genes)
+
+  result_cells <- unlist(lapply(result@cells, function(idx) colnames(mat)[idx]))
+  expect_true(all(result_cells %in% expected_cells))
+})
+
+test_that("RunTDR.character BPCells cache hit", {
+  skip_if_not_installed("BPCells")
+  skip_if_not_installed("rhdf5")
+  skip_if(!.has_python_anndata(), "python3 with anndata not available")
+  skip_on_cran()
+
+  tmp_h5ad <- withr::local_tempfile(fileext = ".h5ad")
+  bp_dir <- file.path(withr::local_tempdir(), "bp_cache")
+
+  .make_test_h5ad(tmp_h5ad, n_cells = 200, n_genes = 50, n_samples = 4,
+                  use_layers_counts = FALSE)
+
+  # First call: creates the BPCells directory
+  result1 <- RunTDR(tmp_h5ad,
+                    .sample.var = "sample_id",
+                    .bpcells.dir = bp_dir,
+                    .nPC = 3,
+                    .verbose = FALSE)
+
+  expect_true(dir.exists(bp_dir))
+  expect_s4_class(result1, "TDRObj")
+
+  # Second call: should hit the cache
+  output <- capture.output(
+    result2 <- RunTDR(tmp_h5ad,
+                      .sample.var = "sample_id",
+                      .bpcells.dir = bp_dir,
+                      .nPC = 3,
+                      .verbose = TRUE),
+    type = "output"
+  )
+
+  expect_true(any(grepl("cache hit", output, ignore.case = TRUE)))
+  expect_s4_class(result2, "TDRObj")
+})
+
+test_that("RunTDR.character errors on missing .sample.var", {
+  skip_if_not_installed("BPCells")
+  skip_if_not_installed("rhdf5")
+  skip_if(!.has_python_anndata(), "python3 with anndata not available")
+  skip_on_cran()
+
+  tmp_h5ad <- withr::local_tempfile(fileext = ".h5ad")
+  .make_test_h5ad(tmp_h5ad, n_cells = 40, n_genes = 10, n_samples = 2)
+
+  expect_error(
+    RunTDR(tmp_h5ad, .sample.var = "nonexistent_column", .verbose = FALSE),
+    "not found in h5ad obs"
+  )
+})
+
+test_that("RunTDR.character errors on non-string .sample.var", {
+  skip_if_not_installed("BPCells")
+  skip_if_not_installed("rhdf5")
+  skip_if(!.has_python_anndata(), "python3 with anndata not available")
+  skip_on_cran()
+
+  tmp_h5ad <- withr::local_tempfile(fileext = ".h5ad")
+  .make_test_h5ad(tmp_h5ad, n_cells = 40, n_genes = 10, n_samples = 2)
+
+  expect_error(
+    RunTDR(tmp_h5ad, .sample.var = 42, .verbose = FALSE),
+    "must be a single character string"
+  )
+})
+
+test_that("HDF5AnnData dispatch methods no longer exist", {
+  # GetTDR and SetTDR .HDF5AnnData methods were removed
+  expect_null(tryCatch(
+    getS3method("GetTDR", "HDF5AnnData"),
+    error = function(e) NULL
+  ))
+  expect_null(tryCatch(
+    getS3method("SetTDR", "HDF5AnnData"),
+    error = function(e) NULL
+  ))
+  # Spot-check: downstream dispatch methods also removed
+  expect_null(tryCatch(
+    getS3method("get.graph", "HDF5AnnData"),
+    error = function(e) NULL
+  ))
+  expect_null(tryCatch(
+    getS3method("plotUMAP", "HDF5AnnData"),
+    error = function(e) NULL
+  ))
+})

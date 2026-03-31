@@ -262,7 +262,7 @@ test_that("GetTDR.SingleCellExperiment errors when no TDRObj stored", {
 })
 
 # ======================================================================
-# RunTDR.HDF5AnnData tests
+# RunTDR.HDF5AnnData and RunTDR.character tests
 # ======================================================================
 
 # Helper: create h5ad via Python anndata (anndataR-written h5ad files
@@ -352,6 +352,63 @@ test_that("RunTDR dispatches to HDF5AnnData method", {
   skip_if_not_installed("anndataR")
   # S3 dispatch reaches RunTDR.HDF5AnnData — verify it is registered
   expect_true(is.function(getS3method("RunTDR", "HDF5AnnData")))
+})
+
+test_that("RunTDR dispatches to character method", {
+  expect_true(is.function(getS3method("RunTDR", "character")))
+})
+
+test_that("RunTDR.character runs full pipeline from h5ad file path", {
+  skip_on_cran()
+  skip_if_not_installed("BPCells")
+  skip_if_not_installed("rhdf5")
+  skip_if(!.has_python_anndata_runtdr(), "python3 with anndata not available")
+
+  tmp_h5ad <- withr::local_tempfile(fileext = ".h5ad")
+  bp_dir <- withr::local_tempdir()
+
+  .make_test_h5ad_runtdr(tmp_h5ad, n_cells = 200, n_genes = 50, n_samples = 4,
+                         use_layers_counts = FALSE)
+
+  result <- RunTDR(tmp_h5ad,
+                   .sample.var = "sample_id",
+                   .assay.type = "RNA",
+                   .bpcells.dir = file.path(bp_dir, "bp"),
+                   .nPC = 3,
+                   .verbose = FALSE,
+                   .seed = 42)
+
+  expect_true(is.TDRObj(result))
+  expect_true(!is.null(result@density$fdens))
+  expect_equal(result@config$backend, "matrix")
+  expect_equal(nrow(result@metadata), 4L)
+})
+
+test_that("RunTDR.character errors on missing file", {
+  expect_error(RunTDR("nonexistent.h5ad", .sample.var = "x"),
+               "File not found")
+})
+
+test_that("RunTDR.character errors on non-h5ad extension", {
+  tmp <- withr::local_tempfile(fileext = ".csv")
+  writeLines("a,b", tmp)
+  expect_error(RunTDR(tmp, .sample.var = "x"),
+               "does not have an \\.h5ad extension")
+})
+
+test_that("RunTDR.character errors on invalid .sample.var", {
+  skip_on_cran()
+  skip_if_not_installed("BPCells")
+  skip_if_not_installed("rhdf5")
+  skip_if(!.has_python_anndata_runtdr(), "python3 with anndata not available")
+
+  tmp_h5ad <- withr::local_tempfile(fileext = ".h5ad")
+  .make_test_h5ad_runtdr(tmp_h5ad, n_cells = 40, n_genes = 10, n_samples = 2)
+
+  expect_error(
+    RunTDR(tmp_h5ad, .sample.var = "NonExistentCol", .verbose = FALSE),
+    "not found in h5ad obs"
+  )
 })
 
 test_that("RunTDR.HDF5AnnData runs full pipeline via S3 dispatch", {
