@@ -30,14 +30,43 @@
 local_pipeline <- function(n_cells = 90, n_markers = 5, n_samples = 4,
                            seed = 42, envir = parent.frame()) {
   set.seed(seed)
-  test_data <- create_test_lm_obj(
-    n_cells = n_cells, n_markers = n_markers, n_samples = n_samples
+
+  # Build per-sample matrices with 3 distinct subpopulations so Leiden
+  # clustering reliably produces >= 2 clusters (uniform-random data
+  # collapses into a single cluster).
+  n_pops <- 3L
+  pop_means <- matrix(c(
+    0.1, 0.1, 0.9, 0.9, 0.5,   # pop 1
+    0.9, 0.1, 0.1, 0.5, 0.9,   # pop 2
+    0.1, 0.9, 0.5, 0.1, 0.1    # pop 3
+  ), nrow = n_pops, ncol = n_markers, byrow = TRUE)
+
+  .cells <- lapply(seq_len(n_samples), function(i) {
+    pops <- sample(seq_len(n_pops), n_cells, replace = TRUE)
+    mat <- pop_means[pops, , drop = FALSE] +
+      matrix(rnorm(n_cells * n_markers, sd = 0.08),
+             nrow = n_cells, ncol = n_markers)
+    mat <- pmax(mat, 0)   # marker values >= 0
+    dimnames(mat) <- list(
+      paste0("sample", i, "_cell_", seq_len(n_cells)),
+      paste0("marker_", seq_len(n_markers))
+    )
+    uri <- tempfile(fileext = ".RDS")
+    saveRDS(mat, uri, compress = FALSE)
+    uri
+  })
+  names(.cells) <- paste0("sample", seq_len(n_samples))
+
+  .meta <- data.frame(
+    row.names = names(.cells),
+    group = rep(c("A", "B"), length.out = n_samples),
+    stringsAsFactors = FALSE
   )
-  withr::defer(cleanup_test_files(test_data), envir = envir)
+  withr::defer(lapply(.cells, unlink), envir = envir)
 
   result <- setup.tdr.obj(
-    .cells = test_data$cells,
-    .meta = test_data$meta,
+    .cells = .cells,
+    .meta = .meta,
     .markers = paste0("marker_", seq_len(n_markers)),
     .assay.type = "cyto",
     .verbose = FALSE
@@ -161,8 +190,8 @@ test_that("cell.perc rows sum to approximately 100", {
   tdr <- local_pipeline()
 
   cc <- tdr@density$composition$clustering$cell.count
-  skip_if(is.null(cc) || ncol(cc) == 0,
-          message = "Degenerate clustering in test fixture")
+  expect_false(is.null(cc) || ncol(cc) == 0,
+               label = "cell.count must have >= 1 cluster column")
   perc <- tdr@density$composition$clustering$cell.perc
   row_sums <- rowSums(perc, na.rm = TRUE)
   # Each sample should have cells so row sums should be ~100

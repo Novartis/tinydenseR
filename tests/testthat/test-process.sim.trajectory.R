@@ -50,7 +50,7 @@ test_that("fetch_trajectory_data works and returns expected structure", {
 })
 
 test_that("fetch_trajectory_data fails gracefully without internet", {
-  skip_if(curl::has_internet(), "Internet connection available")
-  
+  local_mocked_bindings(has_internet = function() FALSE, .package = "curl")
+
   expect_error(fetch_trajectory_data(), "Internet connection required")
 })

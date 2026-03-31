@@ -34,17 +34,23 @@ test_that("plotPCA dispatches on TDRObj", {
 })
 
 test_that("plotHeatmap dispatches on TDRObj", {
-  skip("plotHeatmap requires full pheatmap structure from get.graph")
+  skip_if_not_installed("pheatmap")
+  skip_if_not_installed("gridExtra")
+
   tdr <- create_mock_graph_obj(n_points = 20, n_clusters = 3)
-  # plotHeatmap requires results$clustering, add it
+
+  # Build a real pheatmap object so plotHeatmap can display its $gtable
+  med_exprs <- matrix(runif(6), nrow = 3, ncol = 2,
+                      dimnames = list(paste0("cluster_", 1:3),
+                                     c("marker1", "marker2")))
   tdr@results$clustering <- list(
-    median.exprs = matrix(runif(6), nrow = 3, ncol = 2,
-                          dimnames = list(paste0("cluster_", 1:3),
-                                         c("marker1", "marker2")))
+    median.exprs = med_exprs,
+    pheatmap = pheatmap::pheatmap(med_exprs, silent = TRUE)
   )
+
   p <- plotHeatmap(tdr)
-  expect_true(inherits(p, "gg") || inherits(p, "ggplot") ||
-              inherits(p, "gtable") || inherits(p, "grob"))
+  expect_true(inherits(p, "gtable") || inherits(p, "grob") ||
+              inherits(p, "gg") || inherits(p, "ggplot"))
 })
 
 test_that("plotUMAP dispatches on Seurat", {
