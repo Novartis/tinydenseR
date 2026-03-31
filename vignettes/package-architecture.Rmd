@@ -114,8 +114,11 @@ result <- get.lm(result, .design = design)
 ## S3 Dispatch System
 
 `tinydenseR` uses S3 dispatch to support multiple container types
-(Seurat, SingleCellExperiment, HDF5AnnData) through a single API. The
-dispatch wrappers in `dispatch.R` follow one of three patterns:
+(Seurat, SingleCellExperiment) through a single API. H5AD inputs
+(either as a file path or via `anndataR`) are converted to a bare
+`TDRObj` during `RunTDR()` and do not carry container dispatch
+methods. The dispatch wrappers in `dispatch.R` follow one of three
+patterns:
 
 ### Tier 1: Compute-Only
 
@@ -152,6 +155,26 @@ get.landmarks.Seurat <- function(x, ...) {
 
 Functions in this tier: `get.landmarks()`, `get.map()`, `get.pbDE()`.
 
+Note: `get.markerDE()` is soft-deprecated. Use `get.pbDE(.mode = "marker")`
+instead. The `get.pbDE()` function supports two modes:
+
+- `.mode = "design"` (default) — pseudobulk differential expression
+- `.mode = "marker"` — marker gene/protein identification between groups
+
+### Special Case: `goi.summary()`
+
+`goi.summary()` is a read-only Tier 2 function: it needs `.source` for
+expression access, but it returns a summary data frame rather than
+updating the container.
+
+```{r goi}
+# Example: goi.summary.Seurat
+goi.summary.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  goi.summary.TDRObj(tdr, .source = x, ...)
+}
+```
+
 ### Tier 3: Read-Only Plots
 
 Plot functions only need to read the `TDRObj`; they return a plot object
@@ -185,10 +208,11 @@ appropriate source:
 | `"cytoset"` | flowWorkspace cytoset | `flowCore::exprs(cs[[sample_name]])` |
 
 The `"matrix"` backend is used by `dgCMatrix`, `DelayedMatrix`,
-`IterableMatrix`, and `HDF5AnnData` inputs. In these cases, a reference
-to the matrix is stored in a locked environment within `config$source.env`
-so that `.get_sample_matrix()` can slice into it without copying the
-entire matrix.
+`IterableMatrix`, and H5AD inputs (both `RunTDR.character` and
+`RunTDR.HDF5AnnData`). In these cases, a reference to the matrix is
+stored in a locked environment within `config$source.env` so that
+`.get_sample_matrix()` can slice into it without copying the entire
+matrix.
 
 For the `"seurat"` and `"sce"` backends, the live container object is
 passed as `.source` to Tier 2 functions, which then forward it to

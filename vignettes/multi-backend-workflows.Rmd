@@ -39,7 +39,8 @@ The supported backends are:
 | **TDRObj** (direct) | `TDRObj` | `TDRObj` |
 | **Seurat** | `Seurat` | `Seurat` (TDRObj in `Misc` slot) |
 | **SingleCellExperiment** | `SingleCellExperiment` | `SingleCellExperiment` (TDRObj in `metadata`) |
-| **HDF5AnnData** | `HDF5AnnData` (via `anndataR`) | `TDRObj` (bare) |
+| **H5AD file path** | `character` (path to `.h5ad`) | `TDRObj` (bare) |
+| **HDF5AnnData** | `HDF5AnnData` (via `anndataR`, modern files only) | `TDRObj` (bare) |
 | **Sparse matrix** | `dgCMatrix` | `TDRObj` (bare) |
 | **On-disk matrix** | `IterableMatrix` (BPCells) | `TDRObj` (bare) |
 | **Delayed matrix** | `DelayedMatrix` | `TDRObj` (bare) |
@@ -85,19 +86,36 @@ sce_result <- RunTDR(sce_obj,
 The returned object is the same SCE with the `TDRObj` stored in
 `S4Vectors::metadata(sce_result)$tdr.obj`.
 
-### HDF5AnnData
+### H5AD File Path (recommended)
+
+The simplest way to work with `.h5ad` files is to pass the file path
+directly. This supports **all** H5AD format versions, including
+pre-0.8.0 files, using `rhdf5` for metadata and `BPCells` for the
+expression matrix.
+
+```{r runtdr-h5ad-path}
+tdr <- RunTDR("data.h5ad",
+              .sample.var = "sample_id",
+              .assay.type = "RNA")
+```
+
+### HDF5AnnData (modern files only)
+
+Alternatively, if you already have an `HDF5AnnData` object from
+`anndataR`, you can pass it directly. Note that `anndataR` only supports
+H5AD files created with anndata >= 0.8.0.
 
 ```{r runtdr-h5ad}
 library(anndataR)
 
-adata <- read_h5ad("data.h5ad", backend = "HDF5AnnData")
+adata <- read_h5ad("data.h5ad", as = "HDF5AnnData")
 h5ad_result <- RunTDR(adata,
                       .sample.var = "sample_id",
                       .assay.type = "RNA")
 ```
 
-The expression matrix is converted to a BPCells on-disk format for efficient
-lazy access. The result is a bare `TDRObj`.
+Both H5AD entry points convert the expression matrix to a BPCells on-disk
+format for efficient lazy access. The result is a bare `TDRObj`.
 
 ### Sparse matrix (dgCMatrix)
 
@@ -128,7 +146,7 @@ the input class. S3 dispatch routes each function call through the
 appropriate wrapper automatically.
 
 ```{r downstream}
-# These work identically whether result is Seurat, SCE, or HDF5AnnData:
+# These work identically whether result is Seurat or SCE:
 result <- result |>
   get.lm(.design = design)
 
@@ -171,8 +189,10 @@ Where the `TDRObj` is stored depends on the container:
 |:----------|:----------------------|:---------------------|
 | Seurat | `Misc(x, slot = "tdr.obj")` | `Misc(x, slot = "tdr.obj")` |
 | SingleCellExperiment | `S4Vectors::metadata(x)$tdr.obj` | `S4Vectors::metadata(x)$tdr.obj` |
-| HDF5AnnData | `x$uns[["tdr.obj"]]` | `x$uns[["tdr.obj"]]` |
 | TDRObj | returns `x` directly | returns `tdr` directly |
+
+Note: H5AD and matrix-class inputs always produce a bare `TDRObj`,
+so `GetTDR`/`SetTDR` are not needed for those backends.
 
 ## Extracting the TDRObj
 

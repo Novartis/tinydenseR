@@ -33,9 +33,13 @@ patients. We use PBMC data from the COMBAT (COvid-19 Multi-omics Blood
 ATlas) consortium to show how differential density analysis combined with
 PLS-based decomposition (plsD) reveals:
 
-1. **Dysregulated monocyte states** in early critical COVID-19 relative to mild
-   disease — captured by plsD component 1 (plsD1) scores and loadings.
-2. **Expanded immature cell populations** and **depleted pDCs** in critical cases — captured by plsD component 2 (plsD2).
+1. **A monocyte-centered transcriptional axis** separating neutrophil
+   degranulation-related inflammatory features from interferon alpha/gamma
+   response programs in early critical vs. mild disease — captured by plsD
+   component 1 (plsD1).
+2. **A secondary severity-associated axis** separating proliferative
+   progenitor expansion (G2M checkpoint) from NK-mediated cytotoxicity and
+   pDC-associated programs — captured by plsD component 2 (plsD2).
 
 ### Analysis Overview
 
@@ -138,10 +142,12 @@ ondisk.data <-
     path = file_path,
     group = "/X")
 
-BPCells::write_matrix_dir(
-  mat = ondisk.data, 
-  dir = ondisk_path,
-  overwrite = TRUE)
+if(!file.exists(path = ondisk_path)){
+  # write this BPCells matrix to disk
+  BPCells::write_matrix_dir(
+    mat = ondisk.data, 
+    dir = ondisk_path)
+}
 
 # Re-open and subset
 ondisk.mat <-
@@ -181,6 +187,7 @@ neighborhood graph, computes sample-level density profiles, and maps cell type
 annotations — all in a single call.
 
 ```{r run-tdr}
+set.seed(seed = 123) # for reproducibility
 lm.cells <-
   tinydenseR::RunTDR(
     x = ondisk.mat,
@@ -197,20 +204,6 @@ lm.cells <-
 
 Before statistical testing, we inspect the landmark UMAP and sample PCA to
 confirm that the data exhibits the expected biological structure.
-
-### Landmark UMAP
-
-The UMAP of landmarks reveals major immune cell populations. Each point is a
-landmark colored by its unsupervised cluster assignment.
-
-```{r umap-clustering, fig.width=10, fig.height=4}
-tinydenseR::plotUMAP(
-  x = lm.cells,
-  .plot.title = "COMBAT landmarks"
-)
-```
-
-We can overlay reference-based cell type annotations to identify clusters:
 
 ```{r umap-celltype, fig.width=10, fig.height=4}
 tinydenseR::plotUMAP(
@@ -321,16 +314,6 @@ matrix defines the biologically interesting comparisons.
 # Contrast matrix
 .contrast.matrix <- 
   limma::makeContrasts(
-    # Average early COVID vs healthy
-    earlyInfectionVSuninfected =
-      ((MILD_early + SEV_early + CRIT_early) / 3) -
-      uninfected,
-    
-    # Average late COVID vs early COVID
-    lateInfectionVSearlyInfection =
-      ((MILD_late + SEV_late + CRIT_late) / 3) -
-      ((MILD_early + SEV_early + CRIT_early) / 3),
-    
     # Critical vs mild within early timepoint
     CRIT_earlyVSMILD_early =
       CRIT_early - MILD_early,
@@ -361,103 +344,42 @@ lm.cells <-
 ### Visualize Differential Density
 
 We can now overlay the q-values and fold-change directions onto the landmark
-UMAP. This highlights which cell states are significantly expanding or
-depleting. The key contrast for the main result is early CRIT vs MILD.
+UMAP. Density shifts span multiple immune compartments — including monocyte/DC,
+T/NK, and B/plasmablast-rich regions of the manifold — indicating broad cell-state
+remodeling in early critical relative to mild COVID-19.
 
 ```{r da-umap, fig.width=10, fig.height=4}
 # get coloring based on fold-change direction and significance for each contrast
-q.earlyVsHV.c <-
-  ifelse(
-    test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$coefficients[, "earlyInfectionVSuninfected"] < 0,
-    yes = "lower density",
-    no = "higher density") |>
-      ifelse(
-        test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$pca.weighted.q[, "earlyInfectionVSuninfected"] < 0.1,
-        no = "not sig.") |>
-          factor(
-            levels = c("lower density", "not sig.", "higher density"))
-
-q.lateVsEarly.c <-
-  ifelse(
-    test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$coefficients[, "lateInfectionVSearlyInfection"] < 0,
-    yes = "lower density",
-    no = "higher density") |>
-      ifelse(
-        test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$pca.weighted.q[, "lateInfectionVSearlyInfection"] < 0.1,
-        no = "not sig.") |>
-          factor(
-            levels = c("lower density", "not sig.", "higher density"))
-
-q.critVsMild.c <-
-  ifelse(
-    test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$coefficients[, "CRIT_earlyVSMILD_early"] < 0,
-    yes = "lower density",
-    no = "higher density") |>
-      ifelse(
-        test = lm.cells$results$lm$contrast.Source_TSO.binary$fit$pca.weighted.q[, "CRIT_earlyVSMILD_early"] < 0.1,
-        no = "not sig.") |>
-          factor(
-            levels = c("lower density", "not sig.", "higher density"))
-
-# Early COVID vs healthy
-q.earlyVsHV <-
-  tinydenseR::plotUMAP(
-    x = lm.cells,
-    .feature = q.earlyVsHV.c,
-    .plot.title = "early COVID vs healthy",
-    .cat.feature.color = unname(obj = Color.Palette[1, c(1, 6, 2)]),
-    .color.label = "q < 0.1"
-  ) +
-  ggplot2::theme(plot.subtitle = ggplot2::element_blank())
-
-# Late vs early COVID
-q.lateVsEarly <-
-  tinydenseR::plotUMAP(
-    x = lm.cells,
-    .feature = q.lateVsEarly.c,
-    .plot.title = "COVID: late vs early",
-    .cat.feature.color = unname(obj = Color.Palette[1, c(1, 6, 2)]),
-    .color.label = "q < 0.1"
-  ) +
-  ggplot2::theme(plot.subtitle = ggplot2::element_blank())
-
 # Early CRIT vs MILD — the key contrast
-q.critVsMild <-
-  tinydenseR::plotUMAP(
+tinydenseR::plotUMAP(
     x = lm.cells,
-    .feature = q.critVsMild.c,
+    .feature = lm.cells$results$lm$contrast.Source_TSO.binary$fit$coefficients[, "CRIT_earlyVSMILD_early"],
     .plot.title = "early: CRIT vs MILD",
     .cat.feature.color = unname(obj = Color.Palette[1, c(1, 6, 2)]),
     .color.label = "q < 0.1"
   ) +
   ggplot2::theme(plot.subtitle = ggplot2::element_blank())
-
-(q.earlyVsHV | q.lateVsEarly | q.critVsMild) +
-  patchwork::plot_layout(guides = "collect") &
-  ggplot2::theme(legend.position = "bottom",
-                 legend.justification = "center")
 ```
 
 ### Sample Embeddings by Contrast
 
-We can also compute supervised sample embeddings (partial-effect PCs) for
-each contrast, providing a low-dimensional score that summarizes how each
-sample deviates along a contrast direction.
+We compute a supervised sample embedding (partial-effect PC, pePC) for the
+early CRIT vs MILD contrast. pePC1 provides a single quantitative score that
+summarizes how each sample deviates along the contrast direction, with the
+fraction of total density variance it explains reported on the y-axis.
 
 ```{r sample-embed, fig.width=10, fig.height=4}
 # Compute sample embeddings for each contrast
-for (contrast in colnames(lm.cells$results$lm$contrast.Source_TSO.binary$fit$coefficients)) {
-  lm.cells <-
+lm.cells <-
     tinydenseR::get.embedding(
       x = lm.cells,
       .full.model = "contrast.Source_TSO.binary",
-      .contrast.of.interest = contrast,
+      .contrast.of.interest = "CRIT_earlyVSMILD_early",
       .verbose = TRUE
     )
-}
 
 # Visualize pePC1 for the early CRIT vs MILD contrast
-(tinydenseR::plotSampleEmbedding(
+tinydenseR::plotSampleEmbedding(
   x = lm.cells,
   .embedding = "pePC",
   .color.by = "Source",
@@ -467,87 +389,8 @@ for (contrast in colnames(lm.cells$results$lm$contrast.Source_TSO.binary$fit$coe
      ggplot2::theme(axis.text.x = ggplot2::element_text(vjust = 1,
                                                         hjust = 1,
                                                         angle = 30),
-                    axis.title.x = ggplot2::element_blank()))
+                    axis.title.x = ggplot2::element_blank())
 
-# Same plot, just highlighting the contrast groups
-lm.cells$metadata |>
-  cbind(lm.cells$sample.embed$pepc$CRIT_earlyVSMILD_early$coord) |>
-  (\(x)
-   ggplot2::ggplot(data = x,
-                   mapping = ggplot2::aes(x = Source_TSO.binary,
-                                          y = pePC1)) +
-     ggplot2::theme_bw() +
-     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                    axis.text.x = ggplot2::element_text(vjust = 1,
-                                                        hjust = 1,
-                                                        angle = 30),
-                    axis.title.x = ggplot2::element_blank(),
-                    legend.title = ggplot2::element_blank()) +
-     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5))) +
-     ggplot2::scale_color_manual(values = unname(obj = tinydenseR::Color.Palette[1,c(5,1:3)])) +
-     ggplot2::geom_boxplot(outliers = FALSE,
-                           color = 
-                             (levels(x = x$Source_TSO.binary)  %in% 
-                             c("CRIT_early",
-                               "MILD_early")) |>
-                             ifelse(yes = "black",
-                                          no = "grey90")) +
-     ggplot2::geom_point(mapping = ggplot2::aes(color = Source),
-                         size = I(x = 1),
-                         position = ggplot2::position_jitter(height = 0,
-                                                             width = 0.2,
-                                                             seed = 123),
-                         alpha = ifelse(test = x$Source_TSO.binary %in% 
-                                          c("CRIT_early",
-                                            "MILD_early"),
-                                        yes = 1,
-                                        no = 0.25)) +
-     ggplot2::labs(title = "early: CRIT vs MILD",
-                   y = paste0("pePC1 (",
-                              round(x = lm.cells$sample.embed$pepc$CRIT_earlyVSMILD_early$perc.tot.var.exp,
-                                    digits = 1),
-                              "%)")) +
-     ggh4x::force_panelsizes(rows = grid::unit(x = 2,
-                                               units = "in"),
-                             col = grid::unit(x = 2,
-                                              units = "in"))
-  )()
-
-```
-
-### Beeswarm Summary
-
-`plotBeeswarm()` provides a compact overview of which landmark clusters are
-significantly enriched or depleted across multiple contrasts simultaneously.
-
-```{r beeswarm, fig.width=10, fig.height=4}
-tinydenseR::plotBeeswarm(
-    x = lm.cells,
-    .model.name = "contrast.Source_TSO.binary",
-    .coefs = c("earlyInfectionVSuninfected",
-               "lateInfectionVSearlyInfection",
-               "CRIT_earlyVSMILD_early"),
-    .label.substr.rm = "group",
-    .split.by = "clustering",
-    .perc.plot = FALSE,
-    .q.from = "pca.weighted.q",
-    .swarm.title = "COMBAT landmarks") |> 
-  (\(x)
-   x +
-     ggplot2::facet_grid(cols = ggplot2::vars(facets), 
-                         scales = "fixed", 
-                         labeller = ggplot2::as_labeller(
-                           c(
-                             "earlyInfectionVSuninfected" = "early COVID vs healthy",
-                             "lateInfectionVSearlyInfection" = "COVID: late vs early",
-                             "CRIT_earlyVSMILD_early" = "early: CRIT vs MILD"
-                           ))) +
-     ggh4x::force_panelsizes(cols = ggplot2::unit(x = 1.5,
-                                                  units = "in"),
-                             rows = ggplot2::unit(x = (unique(x = x$data$split.by) |>
-                                                         length()) * 0.2,
-                                                  units = "in"))
-  )()
 ```
 
 ## Step 4: Decomposing the Density Contrast with `get.plsD()`
@@ -572,11 +415,11 @@ lm.cells <-
   )
 ```
 
-### plsD1: Dysregulated Monocyte States
+### plsD1: Inflammatory Myeloid Program vs. Interferon Response
 
 plsD1 captures the dominant signal distinguishing early critical from mild
-COVID-19. Examining its scores and loadings reveals that classical monocytes
-are at the center of this dysregulation.
+COVID-19. Landmarks in the monocyte region carry the strongest plsD1 scores,
+indicating that this component is driven by monocyte-state variation.
 
 ```{r plsD1-scores, fig.width=10, fig.height=4}
 tinydenseR::plotPlsD(
@@ -607,23 +450,100 @@ tinydenseR::plotPlsDHeatmap(
 )
 ```
 
+```{r plsD1-gsea, fig.width=10, fig.height=4}
+# enrichment analysis setup
+msigdb.H <-
+  msigdbr::msigdbr(species = "Homo sapiens")
+
+hypotheses.1 <-
+  c(
+    "REACTOME_NEUTROPHIL_DEGRANULATION",
+    "HALLMARK_INTERFERON_ALPHA_RESPONSE",
+    "HALLMARK_INTERFERON_GAMMA_RESPONSE"
+    
+  ) |> 
+  (\(x)
+   unique(x = x[x %in% msigdb.H$gs_name])
+   )()
+  
+msigdb.list.1 <-
+  msigdb.H[msigdb.H$gs_name %in% hypotheses.1,
+           c("gene_symbol",
+             "gs_name")] |>
+  (\(x)
+   split(x = x$gene_symbol,
+         f = x$gs_name)
+  )()  |>
+  lapply(FUN = unique)
+
+set.seed(seed = 123)
+fgseaRes.plsD1 <- 
+  fgsea::fgseaMultilevel(pathways = msigdb.list.1, 
+                         stats = lm.cells$results$pls$CRIT_earlyVSMILD_early$loadings[,"plsD1"],
+                         eps = 1e-50,
+                         minSize = 5,
+                         maxSize = 500,
+                         nPermSimple = 1e5)
+
+# add concordance score for leading edge genes (the higher the score, the higher the confidence in the results)
+fgseaRes.plsD1$concordance <-
+  lapply(X = fgseaRes.plsD1$leadingEdge,
+         FUN = function(lead.edge){
+           mean(x = lm.cells$results$pls$CRIT_earlyVSMILD_early$concordance.weights[lead.edge,"plsD1"])
+         }) |>
+  unlist()
+
+fgseaRes.plsD1[order(-log10(x = padj)*sign(NES)),]
+
+(p <-
+  names(x = msigdb.list.1) |>
+  lapply(FUN = function(pw) {
+    
+    fgsea::plotEnrichment(pathway = msigdb.list.1[[pw]],
+                          stats =  lm.cells$results$pls$CRIT_earlyVSMILD_early$loadings[,"plsD1"]) +
+      ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5,
+                                                        size = I(x = 12)),
+                     plot.subtitle = ggplot2::element_text(hjust = 0.5,
+                                                           size = I(x = 10)),
+      ) +
+      ggplot2::labs(
+        title = gsub(pattern = "_",
+                                 replacement = " ",
+                                 x = pw,
+                                 fixed = TRUE) |>
+            gsub(pattern = "^HALLMARK |^REACTOME ",
+                    replacement = "",
+                  fixed = FALSE) |>
+                      tolower(),
+                    subtitle = paste0("p = ",
+                                      formatC(x = fgseaRes.plsD1[pathway == pw, padj],
+                                              digits = 0,
+                                              format = "e"))) +
+      ggh4x::force_panelsizes(rows = grid::unit(x = 1,
+                                                units = "in"),
+                              col = grid::unit(x = 1.5,
+                                               units = "in"))
+  }) |>
+  c(nrow = 1) |>
+    do.call(what = gridExtra::grid.arrange))
+```
 #### Interpretation
 
-plsD1 loadings highlight pro-inflammatory and innate immune genes
-being upregulated in critical cases — consistent with the hyperinflammatory
-monocyte phenotype that has been reported in critical COVID-19. Negative
-loadings correspond to genes involved in antigen presentation and
-classical monocyte identity (e.g., HLA class II genes), reflecting the
-loss of antigen-presenting capacity previously documented in critical
-patients.
+Positive plsD1 loadings are enriched for **neutrophil degranulation**, with
+key contributing genes including S100A12, CLU, VCAN, and CTSD. Negative
+loadings are enriched for **interferon gamma response** and **interferon
+alpha response** programs, driven by genes such as IFIT3, IFIT1, IFITM1,
+HLA-DPA1, and HLA-DPB1. This axis is consistent with a shift from
+interferon-responsive classical monocytes in early mild disease toward a
+more inflammatory, dysregulated myeloid program in early critical disease,
+in line with previous reports of myeloid dysregulation in severe COVID-19.
 
-### plsD2: Expanded Immature Cells and Depleted pDCs
+### plsD2: Proliferative Progenitor Expansion vs. NK/pDC Depletion
 
-plsD2 captures a secondary axis of variation. Inspecting the positive scores
-reveals that this component is driven by landmarks in regions annotated as
-progenitor or immature cell populations — consistent with emergency
-hematopoiesis and the well-documented expansion of immature myeloid cells
-in critical COVID-19 PBMC. The most negative scores correspond to landmarks in the plasmacytoid dendritic cell (pDC) region, which are known to be depleted in critical COVID-19.
+plsD2 captures a secondary axis of variation within the same contrast.
+Positive scores correspond to landmarks in proliferative progenitor regions
+of the manifold, while the most negative scores map to plasmacytoid dendritic
+cell (pDC) and NK cell regions.
 
 ```{r plsD2-scores, fig.width=10, fig.height=4}
 tinydenseR::plotPlsD(
@@ -644,10 +564,90 @@ tinydenseR::plotPlsDHeatmap(
 )
 ```
 
+```{r plsD2-gsea, fig.width=10, fig.height=4}
+hypotheses.2 <-
+     c(
+      "HE_LIM_SUN_FETAL_LUNG_C2_PDC_CELL",
+      "KEGG_NATURAL_KILLER_CELL_MEDIATED_CYTOTOXICITY",
+      "HALLMARK_G2M_CHECKPOINT"
+      ) |> 
+  (\(x)
+   unique(x = x[x %in% msigdb.H$gs_name])
+   )()
+  
+msigdb.list.2 <-
+  msigdb.H[msigdb.H$gs_name %in% hypotheses.2,
+           c("gene_symbol",
+             "gs_name")] |>
+  (\(x)
+   split(x = x$gene_symbol,
+         f = x$gs_name)
+  )()  |>
+  lapply(FUN = unique)
+
+set.seed(seed = 123)
+fgseaRes.plsD2 <- 
+  fgsea::fgseaMultilevel(pathways = msigdb.list.2, 
+                         stats = lm.cells$results$pls$CRIT_earlyVSMILD_early$loadings[,"plsD2"],
+                         eps = 1e-50,
+                         minSize = 5,
+                         maxSize = 500,
+                         nPermSimple = 1e5)
+
+# add concordance score for leading edge genes (the higher the score, the higher the confidence in the results)
+fgseaRes.plsD2$concordance <-
+  lapply(X = fgseaRes.plsD2$leadingEdge,
+         FUN = function(lead.edge){
+           mean(x = lm.cells$results$pls$CRIT_earlyVSMILD_early$concordance.weights[lead.edge,"plsD2"])
+         }) |>
+  unlist()
+
+fgseaRes.plsD2[order(-log10(x = padj)*sign(NES)),]
+
+(p <-
+  names(x = msigdb.list.2) |>
+  lapply(FUN = function(pw) {
+    
+    fgsea::plotEnrichment(pathway = msigdb.list.2[[pw]],
+                          stats =  lm.cells$results$pls$CRIT_earlyVSMILD_early$loadings[,"plsD2"]) +
+      ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5,
+                                                        size = I(x = 12)),
+                     plot.subtitle = ggplot2::element_text(hjust = 0.5,
+                                                           size = I(x = 10)),
+      ) +
+      ggplot2::labs(
+        title = gsub(pattern = "_",
+                                 replacement = " ",
+                                 x = pw,
+                                 fixed = TRUE) |>
+            gsub(pattern = "^HALLMARK |^REACTOME ",
+                    replacement = "",
+                  fixed = FALSE) |>
+                      tolower(),
+                    subtitle = paste0("p = ",
+                                      formatC(x = fgseaRes.plsD2[pathway == pw, padj],
+                                              digits = 0,
+                                              format = "e"))) +
+      ggh4x::force_panelsizes(rows = grid::unit(x = 1,
+                                                units = "in"),
+                              col = grid::unit(x = 1.5,
+                                               units = "in"))
+  }) |>
+  c(nrow = 1) |>
+    do.call(what = gridExtra::grid.arrange))
+```
+
 #### Interpretation
 
-plsD2 positive loadings highlight genes associated with immature or progenitor cell states (e.g., stem cell markers, cell-cycle genes) being positively loaded,
-reflecting the expansion of these populations in critical COVID-19. Negative loading on the other hand are markers of plasmacytoid dendritic cells (pDCs) and, to a lesser extent, effector memory T cells, highlighting their depletion early in critical COVID-19. These findings aligns with reports of the role pDCs in most severe COVID-19 cases, and, more importantly, emergency myelopoiesis producing immature, dysfunctional cells that enter circulation during critical infection.
+Positive plsD2 loadings are enriched for the **G2M checkpoint** pathway
+with top positive loaded genes include CD34, SPINK2 and PRSS57,
+reflecting expansion of proliferative progenitor/myeloid states. Negative
+loadings are enriched for **NK-mediated cytotoxicity** and a **pDC-associated
+signature**, driven by genes such as NKG7/KLRD1/PRF1 (NK) and LILRA4/CLEC4C/TPM2 (pDC).
+This component seems to capture a secondary severity-associated axis: emergency
+myelopoiesis producing proliferative, immature cells that enter circulation
+during critical infection, alongside depletion of pDC and NK cell programs
+implicated in antiviral innate immunity.
 
 ## Summary
 
@@ -663,15 +663,17 @@ dataset:
 
 The key biological findings are:
 
-- plsD1 identifies dysregulated monocyte states in early critical
-  COVID-19, with loadings pointing to pro-inflammatory activation and loss of
-  antigen-presenting function in classical monocytes.
-- plsD2 reveals expanded immature cell populations, consistent with emergency hematopoiesis, and depleted pDCs in critical cases.
+- **plsD1** identifies a monocyte-centered transcriptional axis separating
+  neutrophil degranulation-related inflammatory features from interferon
+  alpha/gamma response programs in early critical vs. mild COVID-19.
+- **plsD2** resolves a secondary axis separating proliferative progenitor
+  expansion (G2M checkpoint) from NK-mediated cytotoxicity and
+  pDC-associated programs, consistent with emergency myelopoiesis and
+  impaired antiviral innate immunity in critical cases.
 
-These results are obtained from a single unified framework that handles
-differential density analysis while controlling for covariates through the
-contrast design in `get.lm()`, followed by molecular decomposition via
-`get.plsD()`.
+Together, these results illustrate how `tinydenseR` combines sample-level
+modeling with exploratory decomposition to resolve multiple layers of
+biological heterogeneity within a single clinically relevant contrast.
 
 ## Session Info
 
