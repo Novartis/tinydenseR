@@ -19,10 +19,7 @@ release](https://img.shields.io/github/v/release/Novartis/tinydenseR?include_pre
 - [Overview](#overview)
 - [Key Features](#key-features)
 - [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Background](#background)
-- [How it Works](#how-it-works)
-- [Detailed Example](#detailed-example)
+- [Example](#example)
 - [Getting Help](#getting-help)
 - [Contributing](#contributing)
 - [Citation](#citation)
@@ -44,6 +41,10 @@ biological complexity while maintaining statistical rigor.
 
 For details, check out our [preprint on
 bioRxiv](https://doi.org/10.1101/2025.11.26.690752)!
+
+### Method Schematics
+
+<a href="man/figures/README1.png"><img src="man/figures/README1.png" align="center" width="100%" /></a>
 
 ## Key Features
 
@@ -132,488 +133,250 @@ unlink(temp_file)
 
 ### Example Data
 
-Examples in this README use simulated trajectory data that is
-automatically fetched from the [miloR package
-repository](https://github.com/MarioniLab/miloR). This data is sourced
-from:
+The example below uses a bundled synthetic scRNA-seq trajectory dataset
+(`sim_trajectory_tdr`).
 
-> Dann, E., Henderson, N.C., Teichmann, S.A. et al. Differential
-> abundance testing on single-cell data using k-nearest neighbor graphs.
-> *Nat Biotechnol* (2021). <https://doi.org/10.1038/s41587-021-01033-z>
+## Example
 
-## Quick Start
-
-Here’s a minimal example to get you started:
-
-``` r
-
-# Note: This example downloads data from miloR (GPL v3 licensed)
-# for demonstration purposes only
-
-library(tinydenseR)
-
-# Try to fetch trajectory data from miloR repository
-# If no internet connection, use miloR package directly
-if (curl::has_internet()) {
-    # Fetch example data from miloR repository
-    sim_trajectory <- fetch_trajectory_data()
-    
-} else {
-    # Fall back to using miloR package directly
-    message("No internet connection detected. Using miloR package data directly.")
-    library(miloR)
-    data(sim_trajectory)
-    
-    SummarizedExperiment::colData(x = sim_trajectory$SCE) <-
-        as.list(x = sim_trajectory$meta) |>
-      S4Vectors::DataFrame()
-    
-    colnames(x = sim_trajectory$SCE) <- 
-        sim_trajectory$meta$cell_id
-}
-
-# Extract components 
-sim_trajectory.meta <- 
-    sim_trajectory$meta
-sim_trajectory <-
-    sim_trajectory$SCE
-
-# Create .min.meta for 2-sample example  
-.min.meta <-
-    tinydenseR::get.meta(.obj = sim_trajectory,
-                         .sample.var = "Sample",
-                         .verbose = FALSE)[c("A_R1", "B_R1"),]
-
-# Create .cells object using SCE method
-.min.cells <-
-    tinydenseR::get.cells(.exprs = sim_trajectory,
-                          .meta = .min.meta,
-                          .sample.var = "Sample")[rownames(x = .min.meta)]
-
-# Set up the landmark object
-lm.cells <-
-    tinydenseR::setup.tdr.obj(
-        .cells = .min.cells,
-        .meta = .min.meta, 
-        .assay.type = "RNA",
-        .prop.landmarks = 0.05
-    ) |>
-    tinydenseR::get.landmarks(.nHVG = 500,
-                              .nPC = 3) |>
-    tinydenseR::get.graph(.k = 5) |>
-    tinydenseR::get.map()
-
-# Visualize results
-tinydenseR::plotPCA(x = lm.cells,
-                    .point.size = 1,
-                    .panel.size = 1.5)
-```
-
-## Background
-
-Single-cell technologies have revolutionized our understanding of
-cellular biology, but current analysis methods face significant
-challenges:
-
-### The Problem with Current Methods
-
-**Clustering limitations**: Most single-cell analysis tools rely heavily
-on clustering algorithms, which can be:
-
-- Oversimplistic for complex biological systems
-
-- Sensitive to parameter choices and method selection
-
-- Poor at capturing cell states at cluster boundaries
-
-- Subjective and labor-intensive to optimize
-
-**Statistical modeling issues**: Traditional approaches treat each cell
-as an independent biological replicate, which:
-
-- Ignores the hierarchical structure of biological systems (cells within
-  samples)
-
-- Exaggerates differences between cell populations
-
-- Can lead to misleading statistical conclusions
-
-### The `tinydenseR` Solution
-
-`tinydenseR` addresses these challenges by:
-
-1.  **Using samples as biological replicates**: This respects the true
-    experimental design and enables proper statistical inference
-2.  **Providing clustering-independent analysis**: Reduces subjectivity
-    and captures biological complexity more accurately  
-3.  **Linking cellular variation to outcomes**: Connects cell-level
-    changes to clinical, experimental, or treatment variables
-4.  **Scaling to large datasets**: Efficient algorithms handle
-    atlas-scale data with minimal memory requirements
-
-This approach enables researchers to answer the key question: **“How
-does cellular variation relate to sample-level outcomes?”**
-
-## How it Works
-
-`tinydenseR` uses a straightforward three-step process to analyze
-single-cell data:
-
-<a href="man/figures/README1.png"><img src="man/figures/README1.png" align="center" height="600" /></a>
-
-### Step 1: Identify Landmarks 🗺️
-
-- Select representative cells that capture the diversity of your entire
-  dataset
-- These “landmark” cells serve as reference points for all subsequent
-  analysis
-
-### Step 2: Map Cells to Landmarks 📍
-
-For each sample:
-
-- **Map**: Determine how similar each cell is to each landmark
-
-- **Calculate probabilities**: Estimate the likelihood that each cell
-  belongs to each landmark’s neighborhood
-
-- **Sum probabilities**: Add up all the probabilities for each landmark
-  (this gives you the “density” estimate)
-
-*Higher density = many cells are similar to that landmark*
-
-### Step 3: Link to Outcomes 🔗
-
-- Use the density estimates as features in statistical models
-
-- Connect cellular variation patterns to your experimental variables,
-  treatments, or clinical outcomes
-
-- Generate insights about which cell states are associated with your
-  conditions of interest
-
-<a href="man/figures/README2.png"><img src="man/figures/README2.png" align="center" height="600" /></a>
-
-- Use cell states associated with outcomes to identify key genes or
-  markers
-
-- `tinydenseR` automatically generates pseudo-bulks of cells mapped to
-  landmarks of interest
-
-<a href="man/figures/README3.png"><img src="man/figures/README3.png" align="center" height="250" /></a>
-
-This approach captures the complexity of cell-to-cell variation while
-maintaining statistical rigor by treating samples (not individual cells)
-as the unit of biological replication.
-
-## Detailed Example
-
-This example demonstrates a complete `tinydenseR` analysis workflow
-using simulated trajectory data with two conditions (A and B) across
-three replicates each.
+This example demonstrates the `tinydenseR` workflow on a synthetic
+scRNA-seq trajectory dataset with two conditions (A and B) and three
+replicates per condition (5,000 cells, 500 genes). Condition effects are
+introduced by systematically varying the proportion of cells assigned to
+each condition at each trajectory milestone, creating differential
+cell-state abundance along the trajectory.
 
 ### Load Libraries and Data
 
 ``` r
-
-# Note: This example downloads data from miloR (GPL v3 licensed)
-# for demonstration purposes only
-
 library(tinydenseR)
 #> Loading required package: Matrix
-library(tidyverse)
-#> ── Attaching core tidyverse packages ───────── tidyverse 2.0.0 ──
-#> ✔ dplyr     1.2.0     ✔ readr     2.2.0
-#> ✔ forcats   1.0.1     ✔ stringr   1.6.0
-#> ✔ ggplot2   4.0.2     ✔ tibble    3.3.1
-#> ✔ lubridate 1.9.5     ✔ tidyr     1.3.2
-#> ✔ purrr     1.2.1
-#> ── Conflicts ─────────────────────────── tidyverse_conflicts() ──
-#> ✖ tidyr::expand() masks Matrix::expand()
-#> ✖ dplyr::filter() masks stats::filter()
-#> ✖ dplyr::lag()    masks stats::lag()
-#> ✖ tidyr::pack()   masks Matrix::pack()
-#> ✖ tidyr::unpack() masks Matrix::unpack()
-#> ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+library(ggplot2)
+library(patchwork)
+library(ggh4x)
 
-# Check package version
-if(utils::packageVersion(pkg = "tinydenseR") < "0.0.2.0001") {
-  stop("please update the installation of tinydenseR")
-}
+set.seed(seed = 42)
 
-# Try to fetch trajectory data from miloR repository
-# If no internet connection, use miloR package directly
-if (curl::has_internet()) {
-  # Fetch trajectory data from miloR repository
-  sim_trajectory <- fetch_trajectory_data()
-  
-  # Extract components
-  sim_trajectory.meta <- sim_trajectory$meta
-  sim_trajectory <- sim_trajectory$SCE
-} else {
-  # Fall back to using miloR package directly
-  message("No internet connection detected. Using miloR package data directly.")
-  library(miloR)
-  data(sim_trajectory)
-  
-  # Extract components (miloR format is already the expected structure)
-  sim_trajectory.meta <- sim_trajectory$meta
-  sim_trajectory <- sim_trajectory$SCE
-  
-  SummarizedExperiment::colData(x = sim_trajectory) <-
-    as.list(x = sim_trajectory.meta) |>
-    S4Vectors::DataFrame()
-  
-  colnames(x = sim_trajectory) <- 
-    SummarizedExperiment::colData(x = sim_trajectory)$cell_id
+# Load bundled simulation data
+data(sim_trajectory_tdr, package = "tinydenseR")
+sim <- sim_trajectory_tdr
+rm(sim_trajectory_tdr)
 
-}
-#> Downloading trajectory data from miloR repository...
-#> Loading required namespace: SingleCellExperiment
-#> Successfully fetched trajectory data with 500 cells and 500 features
+sim_trajectory.meta <- sim$meta
+sim_trajectory <- sim$sce
 ```
 
-### Prepare Data for Analysis
+### Build Landmarks with `RunTDR()`
 
-``` r
-# Create .meta object containing sample-level data
-.meta <- get.meta(.obj = sim_trajectory,
-                  .sample.var = "Sample",
-                  .verbose = FALSE)
-
-# Create .cells object using SCE method
-.cells <- get.cells(.exprs = sim_trajectory,
-                    .meta = .meta,
-                    .sample.var = "Sample")[rownames(.meta)]
-#> Detected SingleCellExperiment object, using get.cells.SCE...
-#> Extracting data from SingleCellExperiment object with 500 cells and 500 features
-#> Found 6 total samples, 6 with >= 10 cells
-#> Processing sample A_R1 ( 16.67 %)
-#> Processing sample A_R2 ( 33.33 %)
-#> Processing sample A_R3 ( 50 %)
-#> Processing sample B_R1 ( 66.67 %)
-#> Processing sample B_R2 ( 83.33 %)
-#> Processing sample B_R3 ( 100 %)
-#> Successfully created .cells object with 6 samples
-```
-
-### Set Up Landmark Object
+`RunTDR()` selects landmark cells, builds a nearest-neighbor graph,
+clusters landmarks, maps all cells to their nearest landmarks to
+generate the landmark-by-sample matrix in a single call. Unsupervised
+sample embedding is also returned automatically.
 
 ``` r
 set.seed(seed = 123)
-
-# Create the main tinydenseR object
-lm.cells <- tinydenseR::setup.tdr.obj(
-    .cells = .cells,                    # Expression data
-    .meta = .meta,                      # Sample metadata  ,       
-    .assay.type = "RNA",              # Data type
-    .prop.landmarks = 0.15,           # Proportion of cells to use as landmarks
+sim_trajectory <-
+  tinydenseR::RunTDR(
+    x = sim_trajectory,
+    .sample.var = "Sample",
+    .assay.type = "RNA",
+    .nHVG = 500,
+    .cl.resolution.parameter = 10, # USE A VALUE CLOSER TO THE DEFAULT (0.8) FOR REAL-WORLD DATASETS
     .verbose = FALSE
-) |>
-    # Find highly variable genes and create landmarks
-    tinydenseR::get.landmarks(.nHVG = 500, 
-                              .nPC = 3,
-                              .verbose = FALSE) |>
-    
-    # Build neighborhood graph
-    tinydenseR::get.graph(
-        .cl.resolution.parameter = 2e2, 
-        .k = 10,
-        .small.size = 3,
-        .verbose = FALSE
-    )
-
-# Map all cells to landmarks
-lm.cells <- tinydenseR::get.map(x = lm.cells,
-                               .verbose = FALSE)
-```
-
-### Access fuzzy landmark-by-sample density matrix
-
-``` r
-# View first 10 landmarks and their density estimates across samples
-lm.cells$map$fdens |> 
-  (\(x)
-   x[, order(colnames(x = x))]
-   )() |> 
-  round(digits = 2) |>
-  head(n = 10) |>
-  knitr::kable()
-```
-
-|           | A_R1 |  A_R2 | A_R3 |  B_R1 |  B_R2 |  B_R3 |
-|:----------|-----:|------:|-----:|------:|------:|------:|
-| B_R1_C81  | 5.36 |  2.87 | 1.57 |  7.19 |  6.92 |  5.64 |
-| B_R1_C6   | 7.56 | 10.61 | 7.53 |  3.90 |  2.18 |  2.21 |
-| B_R1_C31  | 0.73 |  0.68 | 0.49 |  7.05 |  2.47 |  3.54 |
-| B_R1_C95  | 6.67 |  7.35 | 6.11 | 11.38 | 15.21 | 15.61 |
-| B_R1_C55  | 7.36 |  8.32 | 7.22 | 10.19 | 14.31 | 13.82 |
-| B_R1_C15  | 0.00 |  0.00 | 0.00 |  0.81 |  0.00 |  0.00 |
-| B_R1_C103 | 0.70 |  1.50 | 1.61 |  5.94 |  1.53 |  4.74 |
-| B_R1_C2   | 6.54 |  7.59 | 6.09 | 10.88 | 16.07 | 15.44 |
-| B_R1_C97  | 1.15 |  0.70 | 0.48 |  5.64 |  2.71 |  3.41 |
-| B_R1_C94  | 2.54 |  0.89 | 1.23 |  8.39 |  4.32 |  5.85 |
-
-### Statistical Analysis
-
-``` r
-# Set up design matrix for statistical testing
-.design <- model.matrix(object = ~ Condition + Replicate,
-                       data = lm.cells$metadata)
-
-# Test for differential density between conditions
-# Results stored in lm.cells$map$lm[["default"]]
-lm.cells <- tinydenseR::get.lm(
-    x = lm.cells,
-    .design = .design,
-    .verbose = FALSE
-)
-#> Warning in get.lm.TDRObj(x = lm.cells, .design = .design, .verbose = FALSE):
-#> q-value estimation is not recommended for fewer than 100 tests. Using BH
-#> instead.
-
-# Perform differential expression analysis
-lm.cells <- tinydenseR::get.pbDE(
-    x = lm.cells,
-    .design = .design, 
-    .verbose = FALSE
-)
-```
-
-### Visualizations
-
-Landmarks with differential density:
-
-``` r
-# Show density fold changes between conditions
-tinydenseR::plotPCA(
-    x = lm.cells,
-    .feature = lm.cells$results$lm[["default"]]$fit$coefficients[,"ConditionB"],
-    .panel.size = 1.5,
-    .point.size = 1,
-    .color.label = "estimated density\nlog2 fold change",
-    .midpoint = 0
-)
-
-# Highlight significantly different regions
-tinydenseR::plotPCA(
-    x = lm.cells,
-    .feature = ifelse(
-        test = lm.cells$results$lm[["default"]]$fit$coefficients[,"ConditionB"] < 0,
-        yes = "less abundant",
-        no = "more abundant") |>
-        ifelse(
-            test = lm.cells$results$lm[["default"]]$fit$pca.weighted.q[,"ConditionB"] < 0.1,
-            no = "not sig.") |>
-        factor(levels = c("less abundant", "not sig.", "more abundant")),
-    .cat.feature.color = Color.Palette[1,c(1,6,2)],
-    .color.label = "q < 0.1",
-    .point.size = 1,
-    .panel.size = 1.5
-)
-```
-
-<a href="man/figures/README-unnamed-chunk-8-1.png"><img src="man/figures/README-unnamed-chunk-8-1.png" align="center" height="300" /></a>
-
-<a href="man/figures/README-unnamed-chunk-8-2.png"><img src="man/figures/README-unnamed-chunk-8-2.png" align="center" height="300" /></a>
-
-Samples quantitatively embedded along the Condition axis:
-
-``` r
-# Create reduced model to embed samples quantitatively along the Condition axis
-red.design <- model.matrix(object = ~ Replicate,
-                       data = lm.cells$metadata)
-
-# Fit reduced model (stored in lm.cells$map$lm[["reduced"]])
-lm.cells <- tinydenseR::get.lm(
-    x = lm.cells,
-    .design = red.design,
-    .model.name = "reduced",
-    .verbose = FALSE 
-)
-#> Warning in get.lm.TDRObj(x = lm.cells, .design = red.design, .model.name =
-#> "reduced", : q-value estimation is not recommended for fewer than 100 tests.
-#> Using BH instead.
-
-# Compute sample embedding using full vs reduced model comparison
-# Embedding stored in lm.cells$map$embedding$pePC[["Condition"]]
-lm.cells <-
-  tinydenseR::get.embedding(
-    x = lm.cells,
-    .full.model = "default",
-    .term.of.interest = "Condition",
-    .red.model = "reduced",
-    .verbose = FALSE 
-)
+  )
+#> Loading required namespace: SingleCellExperiment
 #> Warning in (function (A, nv = 5, nu = nv, maxit = 1000, work = nv + 7, reorth =
 #> TRUE, : You're computing too large a percentage of total singular values, use a
 #> standard svd instead.
 ```
 
+### Differential Density Analysis with `get.lm()`
+
+We set up a design matrix and test which landmarks show differential
+density between conditions.
+
 ``` r
-# Embed samples based on differences along Condition
-tinydenseR::plotSampleEmbedding(
-    x = lm.cells,
+.design <-
+  model.matrix(~ Condition,
+               data = tinydenseR::GetTDR(sim_trajectory)@metadata)
+
+sim_trajectory <-
+  tinydenseR::get.lm(
+    x = sim_trajectory,
+    .design = .design,
+    .verbose = FALSE
+  )
+#> Warning in get.lm.TDRObj(tdr, ...): PCA-weighted q-value estimation is not
+#> recommended for fewer than 1000 tests. Using standard q-value estimation
+#> instead.
+```
+
+### Sample Embedding
+
+We fit a reduced (intercept-only) model and compute partial-effect PCs
+to produce a quantitative per-sample score along the Condition axis.
+
+``` r
+# Reduced model (no Condition term)
+noCondition.design <-
+  model.matrix(~ 1,
+               data = tinydenseR::GetTDR(sim_trajectory)@metadata)
+
+sim_trajectory <-
+  tinydenseR::get.lm(
+    x = sim_trajectory,
+    .design = noCondition.design,
+    .model.name = "noCondition",
+    .verbose = FALSE
+  )
+#> Warning in get.lm.TDRObj(tdr, ...): PCA-weighted q-value estimation is not
+#> recommended for fewer than 1000 tests. Using standard q-value estimation
+#> instead.
+
+# Compute partial-effect PCs
+sim_trajectory <-
+  tinydenseR::get.embedding(
+    x = sim_trajectory,
+    .full.model = "default",
+    .red.model = "noCondition",
+    .term.of.interest = "Condition",
+    .verbose = FALSE
+  )
+```
+
+``` r
+# Unsupervised sample PCA
+smpl.pca <-
+  tinydenseR::plotSampleEmbedding(
+    x = sim_trajectory,
+    .embedding = "pca",
+    .color.by = "Condition",
+    .cat.feature.color = tinydenseR::Color.Palette[1, c(1, 2)],
+    .panel.size = 1.5,
+    .point.size = 3
+  ) +
+  ggplot2::labs(title = "PCA") +
+  ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                 legend.position = "bottom")
+
+# Supervised partial-effect PC
+smpl.pePC <-
+  tinydenseR::plotSampleEmbedding(
+    x = sim_trajectory,
     .embedding = "pePC",
     .sup.embed.slot = "Condition",
     .color.by = "Condition",
-    .cat.feature.color = tinydenseR::Color.Palette[1,c(1,2)],
+    .cat.feature.color = tinydenseR::Color.Palette[1, c(1, 2)],
     .panel.size = 1.5,
-    .point.size = 2
-) +
-  ggplot2::labs(title = "Quantitative Sample Embedding",
-                subtitle = "in relation to Condition") +
+    .point.size = 3
+  ) +
+  ggplot2::labs(title = "partial-effect PC") +
   ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                 plot.subtitle = ggplot2::element_text(hjust = 0.5))
+                 legend.position = "bottom")
+
+(smpl.pca | smpl.pePC) +
+  patchwork::plot_layout(guides = "collect") &
+  ggplot2::theme(legend.position = "bottom",
+                 legend.justification = "center")
 ```
 
-<a href="man/figures/README-unnamed-chunk-10-1.png"><img src="man/figures/README-unnamed-chunk-10-1.png" align="center" height="300" /></a>
+<img src="man/figures/README-sample-embedding-plot-1.png" alt="" width="100%" />
 
-### Explore Individual Genes
+The unsupervised PCA shows inter-sample variation based on density
+profiles across landmarks. The supervised partial-effect PC isolates
+variation along the Condition axis, clearly separating the two groups.
+
+### Density Contrast and plsD
+
+We decompose the density contrast into interpretable gene-expression
+programs using `get.plsD()`, and visualize the result as a patchwork of
+the density fold-change and plsD1 scores on the landmark PCA.
 
 ``` r
-# Find most downregulated gene in condition B
-most_down_gene <- sort(lm.cells$results$pb$default$all$coefficients[,"ConditionB"])[1] |> names()
-
-tinydenseR::plotPCA(
-    x = lm.cells,
-    .feature = lm.cells$assay$expr[,most_down_gene],
-    .panel.size = 1.5,
-    .point.size = 1,
-    .color.label = most_down_gene
-)
-
-# Find most upregulated gene in condition B  
-most_up_gene <- sort(lm.cells$results$pb$default$all$coefficients[,"ConditionB"], decreasing = TRUE)[1] |> names()
-
-tinydenseR::plotPCA(
-    x = lm.cells,
-    .feature = lm.cells$assay$expr[,most_up_gene],
-    .panel.size = 1.5,
-    .point.size = 1,
-    .color.label = most_up_gene
-)
+sim_trajectory <-
+  tinydenseR::get.plsD(
+    x = sim_trajectory,
+    .coef.col = "ConditionB",
+    .model.name = "default",
+    .verbose = FALSE
+  )
 ```
-
-<a href="man/figures/README-unnamed-chunk-9-1.png"><img src="man/figures/README-unnamed-chunk-9-1.png" align="center" height="300" /></a>
-
-<a href="man/figures/README-unnamed-chunk-9-2.png"><img src="man/figures/README-unnamed-chunk-9-2.png" align="center" height="300" /></a>
-
-### Interactive Exploration
 
 ``` r
-# Add feature statistics for interactive exploration
-lm.cells <- 
-  tinydenseR::get.features(x = lm.cells)
-
-# Create interactive plot with hover information
-tinydenseR::plotPCA(
-    x = lm.cells,
-    .hover.stats = "marker",
+# Density fold-change on landmark PCA
+dens.p <-
+  tinydenseR::plotPCA(
+    x = sim_trajectory,
+    .feature = tinydenseR::GetTDR(sim_trajectory)@results$lm$default$fit$coefficients[, "ConditionB"],
     .panel.size = 1.5,
-    .point.size = 1
+    .point.size = 1,
+    .color.label = "density\nlog2(+0.5)FC",
+    .midpoint = 0,
+    .legend.position = "bottom"
+  ) +
+  ggplot2::guides(color = ggplot2::guide_colorbar(title.position = "top",
+                                                  title.hjust = 0.5)) +
+  ggplot2::theme(plot.subtitle = ggplot2::element_blank(),
+                 legend.margin = ggplot2::margin(t = -0.1, unit = "in"))
+
+# plsD1 scores on landmark PCA
+plsD1.p <-
+  tinydenseR::plotPlsD(
+    x = sim_trajectory,
+    .coef.col = "ConditionB",
+    .plsD.dim = 1,
+    .embed = "pca",
+    .panel.size = 1.5
+  )[[1]]
+
+# Patchwork: density contrast | plsD1
+((dens.p +
+    ggplot2::labs(title = "") +
+    ggplot2::theme(legend.margin = ggplot2::margin(t = -0.1,
+                                                   unit = "in"))) |
+   (plsD1.p +
+      ggplot2::labs(title = "") +
+      ggplot2::theme(legend.margin = ggplot2::margin(t = 0.1,
+                                                     unit = "in")))) +
+  patchwork::plot_annotation(title = "Density contrast: Condition B vs A") &
+  ggplot2::theme(
+    plot.title =
+      ggplot2::element_text(hjust = 0.5,
+                            margin = ggplot2::margin(t = -0.1,
+                                                     unit = "in")))
+```
+
+<img src="man/figures/README-density-plsD-patchwork-1.png" alt="" width="100%" />
+
+The left panel shows density log2 fold-change at each landmark:
+landmarks enriched in Condition B are red, those enriched in A are blue.
+The right panel shows plsD1 scores, which capture the leading
+gene-expression program aligned with the density contrast.
+
+### plsD Heatmap
+
+The plsD heatmap shows landmark expression profiles ordered by plsD1
+scores, with gene loadings on the right. Rows display centered
+expression of the top 25 features associated with each direction of
+plsD1.
+
+``` r
+tinydenseR::plotPlsDHeatmap(
+  x = sim_trajectory,
+  .coef.col = "ConditionB",
+  .plsD.dim = 1,
+  .order.by = "plsD.dim",
+  .panel.height = 3,
+  .feature.font.size = 4
 )
 ```
+
+<img src="man/figures/README-plsD-heatmap-1.png" alt="" width="100%" />
+
+tinydenseR recovered trajectory-associated cell-state changes, embedded
+samples along the variable of interest, and uncovered gene-expression
+programs associated with changes in cell density, illustrating its
+ability to model continuous cellular and molecular variation without
+relying on hard cluster boundaries.
 
 ## Getting Help
 
