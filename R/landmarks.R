@@ -921,10 +921,9 @@ get.landmarks.TDRObj <-
                        Class = "dgCMatrix") |>
             Matrix::t() |>
             (\(x)
-             # size factor normalization, taking into consideration size factor of landmarks
-             (x / (Matrix::rowSums(x = x) /
-                     mean(x = Matrix::rowSums(x = x)))) * 
-               (mean(x = Matrix::rowSums(x = x)) / mean(x = Matrix::rowSums(x = .tdr.obj@assay$raw)))
+             # size factor normalization to landmark library-size scale
+             x / (Matrix::rowSums(x = x) /
+                    mean(x = Matrix::rowSums(x = .tdr.obj@assay$raw)))
             )()
           
           mat@x <-
