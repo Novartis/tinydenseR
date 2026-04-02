@@ -208,6 +208,7 @@ sim_trajectory <-
 #> Warning in get.lm.TDRObj(tdr, ...): PCA-weighted q-value estimation is not
 #> recommended for fewer than 1000 tests. Using standard q-value estimation
 #> instead.
+#> Warning in value[[3L]](cond): q-value estimation failed. Using BH instead.
 ```
 
 ### Sample Embedding
