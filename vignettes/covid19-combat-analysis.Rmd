@@ -37,9 +37,10 @@ PLS-based decomposition (plsD) reveals:
    degranulation-related inflammatory features from interferon alpha/gamma
    response programs in early critical vs. mild disease — captured by plsD
    component 1 (plsD1).
-2. **A secondary severity-associated axis** separating proliferative
-   progenitor expansion (G2M checkpoint) from NK-mediated cytotoxicity and
-   pDC-associated programs — captured by plsD component 2 (plsD2).
+2. **A secondary severity-associated axis of hematopoietic stress** beyond
+   the dominant monocyte program, with progenitor-like cell-associated genes
+   at one extreme and pDC- and NK cell-associated genes at the other —
+   captured by plsD component 2 (plsD2).
 
 ### Analysis Overview
 
@@ -411,7 +412,8 @@ lm.cells <-
     x = lm.cells,
     .coef.col = "CRIT_earlyVSMILD_early",
     .model.name = "contrast.Source_TSO.binary",
-    .verbose = TRUE
+    .verbose = TRUE,
+    .min.prop = 0.001 # default is 0.005 but we lower it here to capture more subtle signals in this complex contrast
   )
 ```
 
@@ -425,8 +427,7 @@ indicating that this component is driven by monocyte-state variation.
 tinydenseR::plotPlsD(
   x = lm.cells,
   .coef.col = "CRIT_earlyVSMILD_early",
-  .plsD.dim = 1,
-  .point.size = 0.1
+  .plsD.dim = 1
 )
 ```
 
@@ -459,8 +460,7 @@ hypotheses.1 <-
   c(
     "REACTOME_NEUTROPHIL_DEGRANULATION",
     "HALLMARK_INTERFERON_ALPHA_RESPONSE",
-    "HALLMARK_INTERFERON_GAMMA_RESPONSE"
-    
+    "HALLMARK_INTERFERON_GAMMA_RESPONSE"  
   ) |> 
   (\(x)
    unique(x = x[x %in% msigdb.H$gs_name])
@@ -538,19 +538,18 @@ interferon-responsive classical monocytes in early mild disease toward a
 more inflammatory, dysregulated myeloid program in early critical disease,
 in line with previous reports of myeloid dysregulation in severe COVID-19.
 
-### plsD2: Proliferative Progenitor Expansion vs. NK/pDC Depletion
+### plsD2: Progenitor-like vs. pDC/NK Programs
 
 plsD2 captures a secondary axis of variation within the same contrast.
-Positive scores correspond to landmarks in proliferative progenitor regions
-of the manifold, while the most negative scores map to plasmacytoid dendritic
-cell (pDC) and NK cell regions.
+plsD2 scores are most extreme within two very small subsets of landmarks,
+with positive scores mapping to progenitor-like regions and the most negative
+scores mapping to plasmacytoid dendritic cell (pDC) and NK cell regions.
 
 ```{r plsD2-scores, fig.width=10, fig.height=4}
 tinydenseR::plotPlsD(
   x = lm.cells,
   .coef.col = "CRIT_earlyVSMILD_early",
-  .plsD.dim = 2,
-  .point.size = 0.1
+  .plsD.dim = 2
 )
 ```
 
@@ -567,9 +566,9 @@ tinydenseR::plotPlsDHeatmap(
 ```{r plsD2-gsea, fig.width=10, fig.height=4}
 hypotheses.2 <-
      c(
-      "HE_LIM_SUN_FETAL_LUNG_C2_PDC_CELL",
+      "HE_LIM_SUN_FETAL_LUNG_C2_HSC_ELP_CELL",
       "KEGG_NATURAL_KILLER_CELL_MEDIATED_CYTOTOXICITY",
-      "HALLMARK_G2M_CHECKPOINT"
+      "HE_LIM_SUN_FETAL_LUNG_C2_PDC_CELL"
       ) |> 
   (\(x)
    unique(x = x[x %in% msigdb.H$gs_name])
@@ -620,7 +619,7 @@ fgseaRes.plsD2[order(-log10(x = padj)*sign(NES)),]
                                  replacement = " ",
                                  x = pw,
                                  fixed = TRUE) |>
-            gsub(pattern = "^HALLMARK |^REACTOME ",
+            gsub(pattern = "^KEGG |^HE LIM SUN FETAL LUNG C2 ",
                     replacement = "",
                   fixed = FALSE) |>
                       tolower(),
@@ -635,19 +634,25 @@ fgseaRes.plsD2[order(-log10(x = padj)*sign(NES)),]
   }) |>
   c(nrow = 1) |>
     do.call(what = gridExtra::grid.arrange))
+
+rank(x = lm.cells$results$pls$CRIT_earlyVSMILD_early$loadings[,"plsD2"])[c("NKG7", "PRF1", "CST7", "GZMB", "CCL5", "GZMH", "GZMA")]
+
 ```
 
 #### Interpretation
 
-Positive plsD2 loadings are enriched for the **G2M checkpoint** pathway
-with top positive loaded genes include CD34, SPINK2 and PRSS57,
-reflecting expansion of proliferative progenitor/myeloid states. Negative
-loadings are enriched for **NK-mediated cytotoxicity** and a **pDC-associated
-signature**, driven by genes such as NKG7/KLRD1/PRF1 (NK) and LILRA4/CLEC4C/TPM2 (pDC).
-This component seems to capture a secondary severity-associated axis: emergency
-myelopoiesis producing proliferative, immature cells that enter circulation
-during critical infection, alongside depletion of pDC and NK cell programs
-implicated in antiviral innate immunity.
+Analysis of plsD2 loadings reveals the progenitor-like cell-associated genes
+CD34, CYTL1 and PRSS57 to be highly expressed in landmarks with the highest
+plsD2 scores, while the pDC-associated genes CLEC4C, LILRA4 and TPM2 are
+highly expressed in landmarks with low plsD2 scores. Furthermore, the NK
+cell-associated genes NKG7, PRF1, CST7, GZMB, CCL5, GZMH and GZMA are among
+the 100 genes with the most negative loadings. These findings are consistent
+with reports that severe COVID-19 is accompanied by emergency myelopoiesis
+and impaired antiviral innate immunity, including expansion of proliferative
+progenitor/myeloid states and reduced or dysfunctional pDC and NK cell
+programs, suggesting that plsD2 captures a secondary severity-associated axis
+of hematopoietic stress beyond the dominant dysregulated monocyte program
+highlighted by plsD1.
 
 ## Summary
 
@@ -666,10 +671,11 @@ The key biological findings are:
 - **plsD1** identifies a monocyte-centered transcriptional axis separating
   neutrophil degranulation-related inflammatory features from interferon
   alpha/gamma response programs in early critical vs. mild COVID-19.
-- **plsD2** resolves a secondary axis separating proliferative progenitor
-  expansion (G2M checkpoint) from NK-mediated cytotoxicity and
-  pDC-associated programs, consistent with emergency myelopoiesis and
-  impaired antiviral innate immunity in critical cases.
+- **plsD2** resolves a secondary severity-associated axis of hematopoietic
+  stress, with progenitor-like cell-associated genes (CD34, CYTL1, PRSS57)
+  at one extreme and pDC- (CLEC4C, LILRA4, TPM2) and NK cell-associated
+  programs at the other, consistent with emergency myelopoiesis and impaired
+  antiviral innate immunity in critical cases.
 
 Together, these results illustrate how `tinydenseR` combines sample-level
 modeling with exploratory decomposition to resolve multiple layers of
