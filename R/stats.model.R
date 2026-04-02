@@ -568,7 +568,7 @@ get.lm.TDRObj <-
     }
     
     stats$trad$clustering$fit <-
-      limma::eBayes(fit = stats$trad$clustering$fit)
+      limma::eBayes(fit = stats$trad$clustering$fit, robust = TRUE)
     
     stats$trad$clustering$fit$adj.p <-
       apply(X = stats$trad$clustering$fit$p.value,
@@ -619,7 +619,7 @@ get.lm.TDRObj <-
       }
       
       stats$trad$celltyping$fit <-
-        limma::eBayes(fit = stats$trad$celltyping$fit)
+        limma::eBayes(fit = stats$trad$celltyping$fit, robust = TRUE)
       
       stats$trad$celltyping$fit$adj.p <-
         apply(X = stats$trad$celltyping$fit$p.value,
