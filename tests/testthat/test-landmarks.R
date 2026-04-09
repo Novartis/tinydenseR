@@ -118,3 +118,86 @@ test_that("get.landmarks validates input properly", {
   expect_error(get.landmarks(incomplete_obj),
                "no applicable method")  # S3 dispatch error for non-TDRObj
 })
+
+# Test for HVG exclusion pattern
+
+test_that("HVG exclusion pattern excludes VDJ variable-region genes", {
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+
+  # TCR alpha/beta V/D/J segments
+  tcr_ab <- c("TRAV1-1", "TRAV12-1", "TRAV38-2DV8", "TRBV2", "TRBV28",
+              "TRAJ1", "TRAJ61", "TRBD1", "TRBD2", "TRBJ1-1", "TRBJ2-7")
+  expect_true(all(grepl(pattern, tcr_ab, ignore.case = TRUE)))
+
+
+  # TCR gamma/delta V/D/J segments
+  tcr_gd <- c("TRDV1", "TRDV2", "TRDV3", "TRDD1", "TRDD2", "TRDJ1",
+              "TRGV1", "TRGV2", "TRGV9", "TRGV10", "TRGJ1", "TRGJ2")
+  expect_true(all(grepl(pattern, tcr_gd, ignore.case = TRUE)))
+
+  # Ig V/D/J segments
+  ig_vdj <- c("IGHV1-2", "IGHV3-23", "IGHV4-34", "IGHD1-1", "IGHD3-10",
+              "IGHJ1", "IGHJ6", "IGKV1-5", "IGKV3-20", "IGKJ1", "IGKJ5",
+              "IGLV1-40", "IGLV2-14", "IGLJ1", "IGLJ7")
+  expect_true(all(grepl(pattern, ig_vdj, ignore.case = TRUE)))
+})
+
+test_that("HVG exclusion pattern retains constant-region genes", {
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+
+  # TCR constant regions
+  tcr_const <- c("TRAC", "TRBC1", "TRBC2", "TRDC", "TRGC1", "TRGC2")
+  expect_false(any(grepl(pattern, tcr_const, ignore.case = TRUE)))
+
+  # Ig constant regions and isotype genes
+  ig_const <- c("IGHG1", "IGHG2", "IGHG3", "IGHG4", "IGHA1", "IGHA2",
+                "IGHM", "IGHD", "IGHE", "IGKC",
+                "IGLC1", "IGLC2", "IGLC3", "IGLC7",
+                "IGLL1", "IGLL5", "JCHAIN")
+  expect_false(any(grepl(pattern, ig_const, ignore.case = TRUE)))
+})
+
+test_that("HVG exclusion pattern excludes mitochondrial genes", {
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+  mito <- c("MT-CO1", "MT-CO2", "MT-CO3", "MT-ND1", "MT-ND4L",
+            "MT-ATP6", "MT-ATP8", "MT-CYB", "MT-RNR1", "MT-RNR2", "MT-TA")
+  expect_true(all(grepl(pattern, mito, ignore.case = TRUE)))
+
+  # Nuclear-encoded MT pseudogenes should NOT match
+  expect_false(any(grepl(pattern, c("MTRNR2L1", "MTRNR2L8", "MTRNR2L12"), ignore.case = TRUE)))
+})
+
+test_that("HVG exclusion pattern excludes ribosomal protein genes", {
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+
+  rps <- c("RPS2", "RPS3", "RPS3A", "RPS4X", "RPS4Y1", "RPS6",
+           "RPS15A", "RPS27A", "RPS28", "RPS29")
+  expect_true(all(grepl(pattern, rps, ignore.case = TRUE)))
+
+  rpl <- c("RPL3", "RPL7A", "RPL7L1", "RPL10A", "RPL22L1", "RPL26L1",
+           "RPL35A", "RPL36A", "RPL36AL", "RPL39L", "RPL41")
+  expect_true(all(grepl(pattern, rpl, ignore.case = TRUE)))
+
+  rplp_rpsa <- c("RPLP0", "RPLP1", "RPLP2", "RPSA")
+  expect_true(all(grepl(pattern, rplp_rpsa, ignore.case = TRUE)))
+})
+
+test_that("HVG exclusion pattern does not match non-ribosomal RP-prefixed genes", {
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+
+  non_ribo <- c("RPA1", "RPA2", "RPA3", "RPE", "RPE65",
+                "RPGR", "RPGRIP1", "RPH3A", "RPAIN", "RPF1",
+                "RPP14", "RPP25", "RPP30", "RPP40",
+                "RPRM", "RPRD1A", "RPRD2", "RPTOR",
+                "RPUSD1", "RPUSD2", "RPN1", "RPN2",
+                "RPS6KA1", "RPS6KB1", "RPS6KC1")
+  expect_false(any(grepl(pattern, non_ribo, ignore.case = TRUE)))
+})
+
+test_that("HVG exclusion pattern does not match housekeeping/marker genes", {
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+  safe <- c("GAPDH", "ACTB", "B2M", "CD3D", "CD4", "CD8A", "FOXP3",
+            "HLA-A", "HLA-B", "NKG7", "GZMB", "PTPRC",
+            "TRAP1", "TRAF1", "TRAM1", "IGF1", "IGFBP1", "IGFBP3")
+  expect_false(any(grepl(pattern, safe, ignore.case = TRUE)))
+})
