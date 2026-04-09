@@ -41,9 +41,11 @@ but increase computation time.}
 Default 30. Must be less than the number of cells in smallest sample.}
 
 \item{.exc.vdj.mito.ribo.genes.from.hvg}{Logical, whether to exclude V(D)J
-recombination genes, mitochondrial genes (MT-), and ribosomal genes (RP)
-from HVG selection (RNA only). Default TRUE. Recommended to avoid
-technical/biological noise dominating variation.}
+variable-region genes (TR[ABDG][VDJ], IG[KHL][VDJ]), mitochondrial genes
+(MT-), and ribosomal protein genes (RPS/RPL/RPLP/RPSA) from HVG selection
+(RNA only). Default TRUE. Constant-region genes (e.g. TRAC, IGHG, IGKC)
+are intentionally retained as they carry cell-identity signal. Recommended
+to avoid technical/biological noise dominating variation.}
 
 \item{.force.in}{Character vector of gene names to force into the feature set
 regardless of variance (RNA only). Useful for known markers. Default NULL.}
