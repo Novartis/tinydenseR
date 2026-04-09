@@ -339,8 +339,9 @@ fast.jaccard.r <-
 #' @param .k Integer number of nearest neighbors for graph construction (default 20). Higher values 
 #'   create more connected graphs and smoother UMAP embeddings. Used for k-NN graph construction 
 #'   and passed to \code{uwot::umap} as \code{n_neighbors}.
-#' @param .scale Logical indicating whether to scale features before UMAP. Defaults to FALSE for 
-#'   RNA assays (PCA already scaled) and TRUE for cytometry.
+#' @param .scale Logical indicating whether to scale features before UMAP. Defaults to FALSE
+#'   when Harmony batch correction is active (any assay type) or for RNA assays (PCA already
+#'   scaled). Defaults to TRUE for cytometry without Harmony (raw marker input to UMAP).
 #' @param .verbose Logical for progress messages (default TRUE).
 #' @param .seed Integer seed for reproducibility of UMAP and clustering (default 123).
 #' @param .cl.method Character specifying clustering method: "snn" (shared nearest neighbors via 
@@ -432,7 +433,7 @@ get.graph <- function(x, ...) UseMethod("get.graph")
 get.graph.TDRObj <-
   function(x,
            .k = 20,
-           .scale = if(x@config$assay.type == "RNA") FALSE else TRUE,
+           .scale = if(!is.null(x@integration$harmony.obj) || x@config$assay.type == "RNA") FALSE else TRUE,
            .verbose = TRUE,
            .seed = 123,
            .cl.method = "snn",

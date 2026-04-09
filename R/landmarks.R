@@ -87,7 +87,9 @@
 #'   Only applicable for \code{.assay.type = "cyto"}. If NULL, uses all markers from
 #'   the first sample. Ignored for RNA data (uses HVG selection instead).
 #' @param .harmony.var Character vector of column names from \code{.meta} to use for
-#'   Harmony batch correction. If NULL, no batch correction is performed.
+#'   Harmony batch correction. Supported for both \code{"RNA"} and \code{"cyto"} assay
+#'   types. For cytometry, Harmony operates on the SVD embedding of the (centered, scaled)
+#'   marker matrix. If NULL, no batch correction is performed.
 #' @param .assay.type Character string: "cyto" for cytometry (default) or "RNA" for
 #'   scRNA-seq. Determines normalization strategy and feature selection approach.
 #' @param .celltype.vec Optional named character vector mapping cell IDs to cell type labels.
@@ -433,8 +435,12 @@ setup.lm.obj <- function(...) {
 #' 
 #' **Optional Harmony integration:**
 #' If \code{.harmony.var} was specified in \code{setup.tdr.obj}, performs
-#' batch correction on landmark PC embeddings. This creates a reference
-#' object for mapping query cells in a batch-corrected space.
+#' batch correction on landmark PC/SVD embeddings. This creates a Symphony
+#' reference object for mapping query cells in a batch-corrected space.
+#' Supported for both RNA and cytometry assay types. For cytometry, Harmony
+#' corrects batch effects in the full SVD embedding of the marker matrix
+#' (one dimension per marker). Cytometry data should be pre-transformed
+#' (e.g., arcsinh, logicle) before entering the tinydenseR pipeline.
 #' 
 #' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
 #'   (anndataR) object initialized with \code{setup.tdr.obj}.
@@ -449,9 +455,11 @@ setup.lm.obj <- function(...) {
 #' @param .nPC Integer, number of principal components for dimensionality reduction.
 #'   Default 30. Must be less than the number of cells in smallest sample.
 #' @param .exc.vdj.mito.ribo.genes.from.hvg Logical, whether to exclude V(D)J
-#'   recombination genes, mitochondrial genes (MT-), and ribosomal genes (RP)
-#'   from HVG selection (RNA only). Default TRUE. Recommended to avoid
-#'   technical/biological noise dominating variation.
+#'   variable-region genes (TR[ABDG][VDJ], IG[KHL][VDJ]), mitochondrial genes
+#'   (MT-), and ribosomal protein genes (RPS/RPL/RPLP/RPSA) from HVG selection
+#'   (RNA only). Default TRUE. Constant-region genes (e.g. TRAC, IGHG, IGKC)
+#'   are intentionally retained as they carry cell-identity signal. Recommended
+#'   to avoid technical/biological noise dominating variation.
 #' @param .force.in Character vector of gene names to force into the feature set
 #'   regardless of variance (RNA only). Useful for known markers. Default NULL.
 #' 
@@ -569,10 +577,11 @@ get.landmarks.TDRObj <-
           if(isTRUE(x = .exc.vdj.mito.ribo.genes.from.hvg)) {
             
             vdj.mito.ribo <-
-              grep(pattern = "^TR[AB][VDJ]\\d+|^IG[KHL][VDJ]\\d+|^RP|^MT-",
+              grep(pattern = "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$",
                    x = colnames(x = mat),
                    fixed = FALSE,
-                   value = TRUE)
+                   value = TRUE,
+                   ignore.case = TRUE)
             
           } else {
             
@@ -706,7 +715,7 @@ get.landmarks.TDRObj <-
       if(isTRUE(x = .exc.vdj.mito.ribo.genes.from.hvg)) {
         
         vdj.mito.ribo <-
-          grep(pattern = "^TR[AB][VDJ]\\d+|^IG[KHL][VDJ]\\d+|^RP|^MT-",
+          grep(pattern = "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$",
                x = colnames(x = .tdr.obj@assay$raw),
                fixed = FALSE,
                value = TRUE,
@@ -852,6 +861,11 @@ get.landmarks.TDRObj <-
     
     # Optional: Perform Harmony batch correction on landmark embeddings
     if(!is.null(x = .tdr.obj@integration$harmony.var)){
+      
+      if(isTRUE(x = .verbose) && .tdr.obj@config$assay.type == "cyto"){
+        message("Applying Harmony batch correction to cytometry SVD embedding (",
+                ncol(x = .tdr.obj@assay$expr), " marker dimensions).")
+      }
       
       set.seed(seed = .seed)
       # Run Harmony to correct for batch effects in PC space
