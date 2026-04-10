@@ -40,7 +40,7 @@
 #' @slot cellmap list. Per-cell, per-sample cached lists: cluster.ids, celltype.ids,
 #'   nearest.lm, fuzzy.graph.
 #' @slot results list. All statistical outputs: lm, pb, marker, spec, nmf, pls,
-#'   clustering, celltyping, features.
+#'   features.
 #'
 #' @param x A TDRObj object.
 #' @param name A character string naming the slot to access.

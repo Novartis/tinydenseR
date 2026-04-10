@@ -65,6 +65,6 @@ Contains pca, traj, and pepc sub-lists.}
 nearest.lm, fuzzy.graph.}
 
 \item{\code{results}}{list. All statistical outputs: lm, pb, marker, spec, nmf, pls,
-clustering, celltyping, features.}
+features.}
 }}
 
