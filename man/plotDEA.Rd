@@ -12,7 +12,7 @@ plotDEA(x, ...)
   .dea.obj,
   .coefs = colnames(x = .dea.obj$coefficients),
   .order.by = "clustering",
-  .markers = colnames(x = .tdr.obj@results[[.order.by]]$median.exprs),
+  .markers = NULL,
   .q = 0.1,
   .row.space.scaler = 0.2,
   .col.space.scaler = 0.065,

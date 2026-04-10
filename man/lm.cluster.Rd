@@ -14,6 +14,7 @@ lm.cluster(x, ...)
   .seed = 123,
   .verbose = TRUE,
   .small.size = 3,
+  .column.name = NULL,
   ...
 )
 }
