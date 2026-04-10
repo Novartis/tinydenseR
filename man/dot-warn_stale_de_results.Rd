@@ -4,17 +4,20 @@
 \alias{.warn_stale_de_results}
 \title{Warn about potentially stale pseudobulk / marker DE results}
 \usage{
-.warn_stale_de_results(.tdr.obj)
+.warn_stale_de_results(.tdr.obj, .annot.type = "celltyping")
 }
 \arguments{
 \item{.tdr.obj}{A TDRObj.}
+
+\item{.annot.type}{Character: \code{"celltyping"} (default) or
+\code{"clustering"}.}
 }
 \value{
 The (unmodified) \code{.tdr.obj}, invisibly.
 }
 \description{
 Checks whether any \code{get.pbDE()} results (design or marker mode)
-were computed with \code{.id.from = "celltyping"} and emits a warning
-if so, since those results now reflect the old celltype labels.
+were computed with \code{.id.from} matching \code{.annot.type} and
+emits a warning if so.
 }
 \keyword{internal}

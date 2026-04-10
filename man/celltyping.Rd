@@ -7,7 +7,7 @@
 \usage{
 celltyping(x, ...)
 
-\method{celltyping}{TDRObj}(x, .celltyping.map, .verbose = TRUE, ...)
+\method{celltyping}{TDRObj}(x, .celltyping.map, .verbose = TRUE, .name = NULL, ...)
 }
 \arguments{
 \item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
@@ -43,18 +43,6 @@ The \code{.tdr.obj} with the following updated fields:
 \describe{
 \item{\code{$landmark.annot$celltyping$ids}}{Factor vector of cell type labels
 for each landmark}
-\item{\code{$landmark.annot$celltyping$map}}{Mode A only: the
-\code{.celltyping.map} list (stored for provenance).
-\code{NULL} in Mode B.}
-\item{\code{$landmark.annot$celltyping$mode}}{\code{"cluster_map"}
-(Mode A) or \code{"cell_labels"} (Mode B)}
-\item{\code{$results$celltyping$median.exprs}}{Matrix of median expression
-values per cell type (rows) by features (columns). For RNA data,
-displays z-scored expression of top PC-loading genes. For cytometry
-data, shows z-scored marker intensities.}
-\item{\code{$results$celltyping$pheatmap}}{Heatmap object (from
-\code{pheatmap} package) visualizing median expression patterns across
-cell types}
 }
 If \code{get.map()} has already been run, the following slots are also
 refreshed (no re-mapping required):

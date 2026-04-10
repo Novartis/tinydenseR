@@ -2,23 +2,24 @@
 % Please edit documentation in R/celltype.R
 \name{.relabel_cellmap}
 \alias{.relabel_cellmap}
-\title{Re-derive cell-level celltype IDs from fuzzy graph + landmark labels}
+\title{Re-derive cell-level annotation IDs from fuzzy graph + landmark labels}
 \usage{
-.relabel_cellmap(.tdr.obj, .verbose = FALSE)
+.relabel_cellmap(.tdr.obj, .annot.type = "celltyping", .verbose = FALSE)
 }
 \arguments{
 \item{.tdr.obj}{A TDRObj where \code{get.map()} has already been run.}
 
+\item{.annot.type}{Character: \code{"celltyping"} (default) or
+\code{"clustering"}.}
+
 \item{.verbose}{Logical; print progress messages.}
 }
 \value{
-The modified \code{.tdr.obj} with updated
-\code{@cellmap$celltype.ids} (in-memory) or
-\code{@density$.cache$manifests$celltyping.ids} (on-disk).
+The modified \code{.tdr.obj}.
 }
 \description{
 Reads the cached (on-disk or in-memory) fuzzy graph for each sample and
-applies the current \code{@landmark.annot$celltyping$ids} via the same
+applies the current landmark-level annotation via the same
 weighted-voting logic used in \code{get.map()}.  No expression data is
 re-read and no UMAP transform is repeated.
 }
