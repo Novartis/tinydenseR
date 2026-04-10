@@ -40,7 +40,9 @@ Only applicable for \code{.assay.type = "cyto"}. If NULL, uses all markers from
 the first sample. Ignored for RNA data (uses HVG selection instead).}
 
 \item{.harmony.var}{Character vector of column names from \code{.meta} to use for
-Harmony batch correction. If NULL, no batch correction is performed.}
+Harmony batch correction. Supported for both \code{"RNA"} and \code{"cyto"} assay
+types. For cytometry, Harmony operates on the SVD embedding of the (centered, scaled)
+marker matrix. If NULL, no batch correction is performed.}
 
 \item{.assay.type}{Character string: "cyto" for cytometry (default) or "RNA" for
 scRNA-seq. Determines normalization strategy and feature selection approach.}

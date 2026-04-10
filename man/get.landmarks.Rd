@@ -41,8 +41,8 @@ but increase computation time.}
 Default 30. Must be less than the number of cells in smallest sample.}
 
 \item{.exc.vdj.mito.ribo.genes.from.hvg}{Logical, whether to exclude V(D)J
-variable-region genes (TR[ABDG][VDJ], IG[KHL][VDJ]), mitochondrial genes
-(MT-), and ribosomal protein genes (RPS/RPL/RPLP/RPSA) from HVG selection
+variable-region genes (\code{TR[ABDG][VDJ]}, \code{IG[KHL][VDJ]}), mitochondrial genes
+(\verb{MT-}), and ribosomal protein genes (\code{RPS/RPL/RPLP/RPSA}) from HVG selection
 (RNA only). Default TRUE. Constant-region genes (e.g. TRAC, IGHG, IGKC)
 are intentionally retained as they carry cell-identity signal. Recommended
 to avoid technical/biological noise dominating variation.}
@@ -107,8 +107,12 @@ prioritizes cells in high-variance regions while maintaining diversity.
 
 \strong{Optional Harmony integration:}
 If \code{.harmony.var} was specified in \code{setup.tdr.obj}, performs
-batch correction on landmark PC embeddings. This creates a reference
-object for mapping query cells in a batch-corrected space.
+batch correction on landmark PC/SVD embeddings. This creates a Symphony
+reference object for mapping query cells in a batch-corrected space.
+Supported for both RNA and cytometry assay types. For cytometry, Harmony
+corrects batch effects in the full SVD embedding of the marker matrix
+(one dimension per marker). Cytometry data should be pre-transformed
+(e.g., arcsinh, logicle) before entering the tinydenseR pipeline.
 }
 \examples{
 \dontrun{

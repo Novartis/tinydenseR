@@ -10,7 +10,8 @@ get.graph(x, ...)
 \method{get.graph}{TDRObj}(
   x,
   .k = 20,
-  .scale = if (x@config$assay.type == "RNA") FALSE else TRUE,
+  .scale = if (!is.null(x@integration$harmony.obj) || x@config$assay.type == "RNA") FALSE
+    else TRUE,
   .verbose = TRUE,
   .seed = 123,
   .cl.method = "snn",
@@ -29,8 +30,9 @@ get.graph(x, ...)
 create more connected graphs and smoother UMAP embeddings. Used for k-NN graph construction
 and passed to \code{uwot::umap} as \code{n_neighbors}.}
 
-\item{.scale}{Logical indicating whether to scale features before UMAP. Defaults to FALSE for
-RNA assays (PCA already scaled) and TRUE for cytometry.}
+\item{.scale}{Logical indicating whether to scale features before UMAP. Defaults to FALSE
+when Harmony batch correction is active (any assay type) or for RNA assays (PCA already
+scaled). Defaults to TRUE for cytometry without Harmony (raw marker input to UMAP).}
 
 \item{.verbose}{Logical for progress messages (default TRUE).}
 
