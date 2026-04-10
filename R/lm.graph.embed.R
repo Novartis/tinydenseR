@@ -1217,7 +1217,9 @@ get.map.TDRObj <-
         ] |>
         as.factor()
       
-      .tdr.obj <- .recompute_celltyping_summaries(.tdr.obj)
+      # Store as named solution
+      .tdr.obj@landmark.annot$celltyping[[.celltype.col.name]] <-
+        .tdr.obj@landmark.annot$celltyping$ids
       
     }
     
@@ -1416,11 +1418,20 @@ lm.cluster.TDRObj <-
            .seed = 123,
            .verbose = TRUE,
            .small.size = 3,
+           .column.name = NULL,
            ...){
     .tdr.obj <- x
     
     # R CMD check appeasement
     cell.pop <- NULL
+    
+    # Default column name from resolution parameter
+    if (is.null(.column.name)) {
+      .column.name <- paste0("leiden.res.", .cl.resolution.parameter)
+    }
+    if (.column.name == "ids") {
+      stop("'.column.name' cannot be 'ids' (reserved for the active solution).")
+    }
     
     set.seed(seed = .seed)
     
@@ -1432,9 +1443,6 @@ lm.cluster.TDRObj <-
     .cl.method <-
       match.arg(arg = .cl.method,
                 choices = c("fgraph","snn"))
-    
-    .tdr.obj@results$clustering <-
-      vector(mode = "list")
     
     # Run Leiden clustering on selected similarity matrix
     .tdr.obj@landmark.annot$clustering$ids <-
@@ -1450,68 +1458,142 @@ lm.cluster.TDRObj <-
         .small.size = .small.size,
         .verbose = .verbose)
     
-    if(isTRUE(x = .verbose)){
-      message("cluster heatmap")
+    # Store as named solution
+    .tdr.obj@landmark.annot$clustering[[.column.name]] <-
+      .tdr.obj@landmark.annot$clustering$ids
+    
+    return(.tdr.obj)
+  }
+
+#' Refresh all clustering-dependent downstream slots
+#'
+#' Mirrors \code{.refresh_celltyping} but for clustering annotations.
+#' Called after reclustering or switching the active clustering solution.
+#'
+#' @param .tdr.obj A TDRObj with \code{@landmark.annot$clustering$ids}
+#'   already set to the new values.
+#' @param .verbose Logical; print progress messages.
+#' @return The modified \code{.tdr.obj}.
+#' @keywords internal
+.refresh_clustering <- function(.tdr.obj, .verbose = FALSE) {
+  
+  # --- Cell-level IDs & composition (only if get.map() has run) ---
+  if (!is.null(.tdr.obj@density$fdens)) {
+    
+    if (isTRUE(.verbose)) {
+      message("-> get.map() results detected; refreshing cell-level cluster IDs and composition...")
     }
     
-    # For RNA: select top genes from PCA rotation (top 3 and bottom 3 per PC)
-    if(.tdr.obj@config$assay.type == "RNA"){
-      
-      top <-
-        apply(X = .tdr.obj@landmark.embed$pca$rotation,
-              MARGIN = 2,
-              FUN = function(PC.rot){
-                
-                order(PC.rot,
-                      decreasing = TRUE) |>
-                  (\(x)
-                   c(utils::head(x = x, 
-                                 n = 3),
-                     utils::tail(x = x,
-                                 n = 3))
-                  )()
-                
-              }) |>
-        as.vector() |> 
-        (\(x)
-         rownames(x = .tdr.obj@landmark.embed$pca$rotation)[x]
-        )() |>
-        unique()
-      
+    .tdr.obj <- .relabel_cellmap(.tdr.obj, .annot.type = "clustering", .verbose = .verbose)
+    .tdr.obj <- .recompute_composition(.tdr.obj, .annot.type = "clustering")
+    
+    if (isTRUE(.verbose)) {
+      message("-> Cell-level cluster IDs and composition matrices refreshed.")
+    }
+  }
+  
+  # --- trad clustering fit (only if get.lm() was run) ---
+  if (!is.null(.tdr.obj@results$lm)) {
+    .tdr.obj <- .invalidate_trad(.tdr.obj, .annot.type = "clustering")
+  }
+  
+  # --- Warn about potentially stale pbDE / markerDE results ---
+  .warn_stale_de_results(.tdr.obj, .annot.type = "clustering")
+  
+  # --- Warn if celltyping exists (may now be inconsistent) ---
+  if (!is.null(.tdr.obj@landmark.annot$celltyping$ids)) {
+    warning("Celltyping annotations exist and may be inconsistent with the new clustering. ",
+            "Consider re-running celltyping().", call. = FALSE)
+  }
+  
+  .tdr.obj
+}
+
+#' Recluster landmarks
+#'
+#' Re-runs Leiden community detection with new parameters and refreshes all
+#' clustering-dependent downstream slots (cell-level IDs, composition matrices,
+#' traditional fits). This is the recommended way to explore different
+#' resolutions after the initial \code{get.graph()} call.
+#'
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object with \code{get.graph()} already run.
+#' @param .cl.resolution.parameter Numeric resolution for Leiden CPM (default 0.8).
+#'   Internally scaled by 1e-3. Higher = finer clusters.
+#' @param .cl.method Character: \code{"snn"} or \code{"fgraph"} (default \code{"snn"}).
+#' @param .small.size Integer threshold for straggler absorption (default 3).
+#' @param .column.name Character name for storing the solution (default
+#'   \code{paste0("leiden.res.", .cl.resolution.parameter)}). Cannot be \code{"ids"}.
+#' @param .seed Integer for reproducibility (default 123).
+#' @param .verbose Logical (default TRUE).
+#' @param ... Additional arguments passed to methods.
+#' @return Updated object with new active clustering and refreshed downstream slots.
+#' @export
+recluster <- function(x, ...) UseMethod("recluster")
+
+#' @rdname recluster
+#' @export
+recluster.TDRObj <-
+  function(x,
+           .cl.resolution.parameter = 0.8,
+           .cl.method = "snn",
+           .small.size = 3,
+           .column.name = NULL,
+           .seed = 123,
+           .verbose = TRUE,
+           ...) {
+    
+    .tdr.obj <- lm.cluster.TDRObj(
+      x,
+      .cl.method = .cl.method,
+      .cl.resolution.parameter = .cl.resolution.parameter,
+      .seed = .seed,
+      .verbose = .verbose,
+      .small.size = .small.size,
+      .column.name = .column.name
+    )
+    
+    .tdr.obj <- .refresh_clustering(.tdr.obj, .verbose = .verbose)
+    
+    return(.tdr.obj)
+  }
+
+#' Set active clustering solution
+#'
+#' Switches the active clustering to a previously stored solution and
+#' refreshes all clustering-dependent downstream slots.
+#'
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
+#'   (anndataR) object.
+#' @param .column.name Character: name of the stored clustering solution to activate.
+#' @param .verbose Logical (default TRUE).
+#' @param ... Additional arguments passed to methods.
+#' @return Updated object with the selected clustering as active \code{$ids}.
+#' @export
+set_active_clustering <- function(x, ...) UseMethod("set_active_clustering")
+
+#' @rdname set_active_clustering
+#' @export
+set_active_clustering.TDRObj <-
+  function(x,
+           .column.name,
+           .verbose = TRUE,
+           ...) {
+    .tdr.obj <- x
+    
+    if (.column.name == "ids") {
+      stop("'.column.name' cannot be 'ids'. Specify a named solution.")
     }
     
-    # Compute median expression per cluster
-    .tdr.obj@results$clustering$median.exprs <-
-      (if(.tdr.obj@config$assay.type == "RNA") .tdr.obj@assay$scaled[,top] else .tdr.obj@assay$expr) |>
-      dplyr::as_tibble() |>
-      cbind(cell.pop = as.character(x = .tdr.obj@landmark.annot$clustering$ids)) |>
-      dplyr::group_by(cell.pop) |>
-      dplyr::summarize_all(.funs = stats::median) |>
-      as.data.frame() |>
-      (\(x)
-       `rownames<-`(x = x[,colnames(x = x) != "cell.pop"],
-                    value = x$cell.pop)
-      )() |>
-      as.matrix()
+    stored <- .tdr.obj@landmark.annot$clustering[[.column.name]]
+    if (is.null(stored)) {
+      avail <- setdiff(names(.tdr.obj@landmark.annot$clustering), "ids")
+      stop("Clustering solution '", .column.name, "' not found.\n",
+           "Available solutions: ", paste(avail, collapse = ", "))
+    }
     
-    # Generate heatmap of cluster profiles
-    .tdr.obj@results$clustering$pheatmap <-
-      pheatmap::pheatmap(mat = .tdr.obj@results$clustering$median.exprs,
-                         color = grDevices::colorRampPalette(
-                           unname(obj =
-                                    Color.Palette[1,c(1,6,2)]))(100),
-                         kmeans_k = NA,
-                         breaks = NA,
-                         border_color = NA,
-                         scale = "none",
-                         angle_col = 90,
-                         cluster_rows = if(nrow(x = .tdr.obj@results$clustering$median.exprs) > 1) TRUE else FALSE,
-                         cluster_cols = TRUE,
-                         cellwidth = 20,
-                         cellheight = 20,
-                         treeheight_row = 20,
-                         treeheight_col = 20,
-                         silent = TRUE)
+    .tdr.obj@landmark.annot$clustering$ids <- stored
+    .tdr.obj <- .refresh_clustering(.tdr.obj, .verbose = .verbose)
     
     return(.tdr.obj)
   }

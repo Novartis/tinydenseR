@@ -19,6 +19,75 @@
   requireNamespace("ggiraph", quietly = TRUE)
 }
 
+#' Compute annotation pheatmap on-the-fly
+#'
+#' Builds the median-expression matrix and pheatmap object for either
+#' clustering or celltyping annotations.  Called by \code{plotHeatmap},
+#' \code{plotBeeswarm}, and \code{plotTradStats} whenever a hierarchically
+#' ordered heatmap is needed.
+#'
+#' @param .tdr.obj A TDRObj with \code{@landmark.annot[[.id.from]]$ids}
+#'   already set.
+#' @param .id.from Character: \code{"clustering"} or \code{"celltyping"}.
+#' @return A \code{pheatmap} object (with \code{$gtable}, \code{$tree_row},
+#'   etc.).
+#' @keywords internal
+.compute_annot_pheatmap <- function(.tdr.obj, .id.from = "clustering") {
+  
+  cell.pop <- NULL
+  
+  ids <- .tdr.obj@landmark.annot[[.id.from]]$ids
+  if (is.null(ids)) {
+    stop("No '", .id.from, "' annotations found. ",
+         if (.id.from == "clustering") "Run get.graph() first."
+         else "Run celltyping() first.")
+  }
+  
+  # For RNA: select top PC-loading genes for heatmap visualisation
+  if (.tdr.obj@config$assay.type == "RNA") {
+    top <-
+      apply(X = .tdr.obj@landmark.embed$pca$rotation,
+            MARGIN = 2,
+            FUN = function(PC.rot) {
+              order(PC.rot, decreasing = TRUE) |>
+                (\(x) c(utils::head(x = x, n = 3),
+                         utils::tail(x = x, n = 3)))()
+            }) |>
+      as.vector() |>
+      (\(x) rownames(x = .tdr.obj@landmark.embed$pca$rotation)[x])() |>
+      unique()
+  }
+  
+  median.exprs <-
+    (if (.tdr.obj@config$assay.type == "RNA") .tdr.obj@assay$scaled[, top] else .tdr.obj@assay$expr) |>
+    dplyr::as_tibble() |>
+    cbind(cell.pop = as.character(x = ids)) |>
+    dplyr::group_by(cell.pop) |>
+    dplyr::summarize_all(.funs = stats::median) |>
+    as.data.frame() |>
+    (\(x) `rownames<-`(x = x[, colnames(x = x) != "cell.pop"],
+                        value = x$cell.pop))() |>
+    as.matrix()
+  
+  pheatmap::pheatmap(
+    mat            = median.exprs,
+    color          = grDevices::colorRampPalette(
+      unname(obj = Color.Palette[1, c(1, 6, 2)]))(100),
+    kmeans_k       = NA,
+    breaks         = NA,
+    border_color   = NA,
+    scale          = "none",
+    angle_col      = 90,
+    cluster_rows   = nrow(median.exprs) > 1,
+    cluster_cols   = ncol(median.exprs) > 1,
+    cellwidth      = 20,
+    cellheight     = 20,
+    treeheight_row = 20,
+    treeheight_col = 20,
+    silent         = TRUE
+  )
+}
+
 #' Plot PCA
 #'
 #' Visualizes landmarks in PCA space with flexible coloring by features, clusters, or statistical 
@@ -558,6 +627,12 @@ plotBeeswarm.TDRObj <-
     }
     .stats.obj <- .tdr.obj@results$lm[[.model.name]]
     
+    # Precompute annotation heatmap tree for ordering (only when needed)
+    .annot_tree_row <- NULL
+    if (isTRUE(.order.ids) && .split.by != "none") {
+      .annot_tree_row <- .compute_annot_pheatmap(.tdr.obj, .id.from = .split.by)$tree_row
+    }
+    
     .split.by <-
       match.arg(arg = .split.by,
                 choices = c("none",
@@ -586,8 +661,8 @@ plotBeeswarm.TDRObj <-
         dplyr::mutate(pop = factor(x = pop,
                                    levels = if(isTRUE(x = .order.ids)){
                                      
-                                     .tdr.obj@results[[.split.by]]$pheatmap$tree_row$labels[
-                                       .tdr.obj@results[[.split.by]]$pheatmap$tree_row$order
+                                     .annot_tree_row$labels[
+                                       .annot_tree_row$order
                                      ]
                                      
                                    } else {
@@ -679,8 +754,8 @@ plotBeeswarm.TDRObj <-
                                        times = length(x = .coefs))  |> 
                           factor(levels = if(isTRUE(x = .order.ids)){
                             
-                            .tdr.obj@results[[.split.by]]$pheatmap$tree_row$labels[
-                              .tdr.obj@results[[.split.by]]$pheatmap$tree_row$order
+                            .annot_tree_row$labels[
+                              .annot_tree_row$order
                             ]
                             
                           } else {
@@ -718,8 +793,8 @@ plotBeeswarm.TDRObj <-
             as.character(x = .tdr.obj@landmark.annot[[.split.by]]$ids) |> 
             factor(levels = if(isTRUE(x = .order.ids)){
               
-              .tdr.obj@results[[.split.by]]$pheatmap$tree_row$labels[
-                .tdr.obj@results[[.split.by]]$pheatmap$tree_row$order
+              .annot_tree_row$labels[
+                .annot_tree_row$order
               ]
               
             } else {
@@ -1546,6 +1621,12 @@ plotTradStats.TDRObj <-
                 choices = c("clustering",
                             "celltyping"))
     
+    # Precompute annotation heatmap tree for ordering (only when needed)
+    .annot_tree_row <- NULL
+    if (isTRUE(.order.ids)) {
+      .annot_tree_row <- .compute_annot_pheatmap(.tdr.obj, .id.from = .split.by)$tree_row
+    }
+    
     # Default .coefs to all coefficients if not provided
     if(is.null(x = .coefs)){
       .coefs <- colnames(x = .stats.obj$trad[[.split.by]]$fit$coefficients)
@@ -1558,8 +1639,8 @@ plotTradStats.TDRObj <-
       dplyr::mutate(pop = factor(x = pop,
                                  levels = if(isTRUE(x = .order.ids)){
                                    
-                                   .tdr.obj@results[[.split.by]]$pheatmap$tree_row$labels[
-                                     .tdr.obj@results[[.split.by]]$pheatmap$tree_row$order
+                                   .annot_tree_row$labels[
+                                     .annot_tree_row$order
                                    ]
                                    
                                  } else {
@@ -1642,8 +1723,8 @@ plotTradStats.TDRObj <-
       dplyr::mutate(pop = factor(x = pop,
                                  levels = if(isTRUE(x = .order.ids)){
                                    
-                                   .tdr.obj@results[[.split.by]]$pheatmap$tree_row$labels[
-                                     .tdr.obj@results[[.split.by]]$pheatmap$tree_row$order
+                                   .annot_tree_row$labels[
+                                     .annot_tree_row$order
                                    ]
                                    
                                  } else {
@@ -1912,10 +1993,11 @@ plotTradPerc.TDRObj <-
     
     if(isTRUE(x = .order.pop)){
       
+      .annot_tree_row_tp <- .compute_annot_pheatmap(.tdr.obj, .id.from = .pop.from)$tree_row
       dat.df$name <-
         as.character(x = dat.df$name) |>
-        factor(levels = .tdr.obj@results[[.pop.from]]$pheatmap$tree_row$labels[
-          .tdr.obj@results[[.pop.from]]$pheatmap$tree_row$order
+        factor(levels = .annot_tree_row_tp$labels[
+          .annot_tree_row_tp$order
         ])
       
     }
@@ -2348,8 +2430,9 @@ plotPbDE.TDRObj <-
                       factor(
                         x = marker,
                         levels = if(.order.by == "none") .tdr.obj@config$markers else {
-                          rev(x = .tdr.obj@results[[.order.by]]$pheatmap$tree_col$labels[
-                          .tdr.obj@results[[.order.by]]$pheatmap$tree_col$order]) |>
+                          .annot_ph_tree <- .compute_annot_pheatmap(.tdr.obj, .id.from = .order.by)
+                          rev(x = .annot_ph_tree$tree_col$labels[
+                          .annot_ph_tree$tree_col$order]) |>
                           (\(x)
                            x[x %in% marker]
                           )()
@@ -2496,7 +2579,7 @@ plotDEA.TDRObj <- function(
     .dea.obj,
     .coefs = colnames(x = .dea.obj$coefficients),
     .order.by = "clustering",
-    .markers = colnames(x = .tdr.obj@results[[.order.by]]$median.exprs),
+    .markers = NULL,
     .q = 0.1,
     .row.space.scaler = 0.2,
     .col.space.scaler = 0.065,
@@ -2504,6 +2587,10 @@ plotDEA.TDRObj <- function(
     ...
 ) {
   .tdr.obj <- x
+  
+  if (is.null(.markers)) {
+    .markers <- .tdr.obj@config$markers
+  }
   
   .Deprecated("plotPbDE",
               msg = "plotDEA() is deprecated. Use plotPbDE() instead.")
@@ -2851,11 +2938,6 @@ plotHeatmap.TDRObj <-
     
     .tdr.obj <- x
     
-    # Verify graph component exists
-    if(is.null(x = .tdr.obj@results[[.id.from]])){
-      stop(paste0("Please run get.graph first."))
-    }
-    
     # Validate id.from parameter
     .id.from <- 
       match.arg(
@@ -2864,8 +2946,15 @@ plotHeatmap.TDRObj <-
                     "celltyping")
       )
     
-    # Display cached pheatmap generated during get.graph()
-    return(gridExtra::grid.arrange(.tdr.obj@results[[.id.from]]$pheatmap$gtable))
+    # Verify annotation exists
+    if(is.null(x = .tdr.obj@landmark.annot[[.id.from]]$ids)){
+      stop(if (.id.from == "clustering") "Please run get.graph first."
+           else "Please run celltyping first.")
+    }
+    
+    # Compute and display pheatmap on-the-fly
+    ph <- .compute_annot_pheatmap(.tdr.obj, .id.from = .id.from)
+    return(gridExtra::grid.arrange(ph$gtable))
     
   }
 

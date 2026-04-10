@@ -104,6 +104,60 @@ lm.cluster.SingleCellExperiment <- function(x, ...) {
 }
 
 # ======================================================================
+# recluster Seurat / SCE wrappers
+# ======================================================================
+
+#' @export
+recluster.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- recluster.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+recluster.SingleCellExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- recluster.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+# ======================================================================
+# set_active_clustering Seurat / SCE wrappers
+# ======================================================================
+
+#' @export
+set_active_clustering.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- set_active_clustering.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+set_active_clustering.SingleCellExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- set_active_clustering.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+# ======================================================================
+# set_active_celltyping Seurat / SCE wrappers
+# ======================================================================
+
+#' @export
+set_active_celltyping.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- set_active_celltyping.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+set_active_celltyping.SingleCellExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- set_active_celltyping.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+# ======================================================================
 # get.features Seurat / SCE wrappers
 # ======================================================================
 
