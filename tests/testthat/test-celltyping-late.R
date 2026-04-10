@@ -113,22 +113,21 @@ test_that("U2: celltyping IDs are correctly updated after late celltyping", {
 })
 
 # ──────────────────────────────────────────────────────────────────────
-# U3: median.exprs and pheatmap are recomputed
+# U3: on-the-fly pheatmap computation works after late celltyping
 # ──────────────────────────────────────────────────────────────────────
 
-test_that("U3: median.exprs and pheatmap are recomputed after late celltyping", {
+test_that("U3: plotHeatmap works on-the-fly after late celltyping", {
+  skip_if_not_installed("pheatmap")
+  skip_if_not_installed("gridExtra")
+  
   obj <- .build_mapped_obj()
   ct_map <- .make_ct_map(obj)
   
   obj2 <- celltyping(obj, ct_map, .verbose = FALSE)
   
-  expect_true(!is.null(obj2@results$celltyping$median.exprs))
-  expect_true(is.matrix(obj2@results$celltyping$median.exprs))
-  expect_equal(sort(rownames(obj2@results$celltyping$median.exprs)),
-               sort(c("TypeA", "TypeB")))
-  
-  expect_true(!is.null(obj2@results$celltyping$pheatmap))
-  expect_s3_class(obj2@results$celltyping$pheatmap, "pheatmap")
+  # median.exprs and pheatmap are no longer stored;
+  # verify plotHeatmap computes on-the-fly successfully
+  expect_no_error(plotHeatmap(obj2, .id.from = "celltyping"))
 })
 
 # ──────────────────────────────────────────────────────────────────────
@@ -168,7 +167,6 @@ test_that("U4: celltyping() before get.map() still works", {
   
   # But landmark-level celltyping should be set
   expect_true(!is.null(obj2@landmark.annot$celltyping$ids))
-  expect_true(!is.null(obj2@results$celltyping$median.exprs))
 })
 
 # ──────────────────────────────────────────────────────────────────────
@@ -298,14 +296,19 @@ test_that("N2: non-celltyping slots are unchanged after late celltyping", {
 # .celltyping.map is stored for provenance
 # ──────────────────────────────────────────────────────────────────────
 
-test_that("celltyping.map and mode are stored for provenance", {
+test_that("celltyping stores named solution and $map/$mode are removed", {
   obj <- .build_mapped_obj()
   ct_map <- .make_ct_map(obj)
   
   obj2 <- celltyping(obj, ct_map, .verbose = FALSE)
   
-  expect_identical(obj2@landmark.annot$celltyping$map, ct_map)
-  expect_identical(obj2@landmark.annot$celltyping$mode, "cluster_map")
+  # $map and $mode were intentionally removed in multi-solution redesign
+  expect_null(obj2@landmark.annot$celltyping$map)
+  expect_null(obj2@landmark.annot$celltyping$mode)
+  
+  # named solution is stored (auto-generated name starting with "manual.")
+  stored_names <- setdiff(names(obj2@landmark.annot$celltyping), "ids")
+  expect_true(length(stored_names) >= 1)
 })
 
 # ──────────────────────────────────────────────────────────────────────

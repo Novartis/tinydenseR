@@ -222,7 +222,7 @@ test_that("U7: unnamed character vector gives clear error", {
 # U9: $mode slot is correct for both modes
 # ──────────────────────────────────────────────────────────────────────
 
-test_that("U9: $mode slot is cluster_map for A, cell_labels for B", {
+test_that("U9: $map/$mode removed; both modes store named solutions", {
   fix <- .build_mode_b_fixture()
   obj <- fix$obj
 
@@ -235,13 +235,16 @@ test_that("U9: $mode slot is cluster_map for A, cell_labels for B", {
     "TypeB" = cls[(half + 1):n]
   )
   obj_a <- celltyping(obj, ct_map, .verbose = FALSE)
-  expect_identical(obj_a@landmark.annot$celltyping$mode, "cluster_map")
-  expect_true(!is.null(obj_a@landmark.annot$celltyping$map))
+  # $map and $mode removed in multi-solution redesign
+  expect_null(obj_a@landmark.annot$celltyping$map)
+  expect_null(obj_a@landmark.annot$celltyping$mode)
+  expect_true(!is.null(obj_a@landmark.annot$celltyping$ids))
 
   # Mode B
   obj_b <- celltyping(obj, fix$cell_labels, .verbose = FALSE)
-  expect_identical(obj_b@landmark.annot$celltyping$mode, "cell_labels")
   expect_null(obj_b@landmark.annot$celltyping$map)
+  expect_null(obj_b@landmark.annot$celltyping$mode)
+  expect_true(!is.null(obj_b@landmark.annot$celltyping$ids))
 })
 
 # ──────────────────────────────────────────────────────────────────────
@@ -266,10 +269,6 @@ test_that("I1: Mode B after get.map refreshes all downstream slots", {
   expect_true(is.matrix(cell_count))
   expect_true(is.matrix(cell_perc))
   expect_true(any(c("TypeA", "TypeB") %in% colnames(cell_count)))
-
-  # Median expression + pheatmap
-  expect_true(is.matrix(obj2@results$celltyping$median.exprs))
-  expect_s3_class(obj2@results$celltyping$pheatmap, "pheatmap")
 })
 
 # ──────────────────────────────────────────────────────────────────────
@@ -286,20 +285,14 @@ test_that("I4: switching Mode A → Mode B fully replaces slots", {
   half <- max(1, floor(n / 2))
   ct_map <- list("Alpha" = cls[seq_len(half)], "Beta" = cls[(half + 1):n])
   obj_a <- celltyping(obj, ct_map, .verbose = FALSE)
-  expect_identical(obj_a@landmark.annot$celltyping$mode, "cluster_map")
+  expect_null(obj_a@landmark.annot$celltyping$mode)
   expect_true(all(obj_a@landmark.annot$celltyping$ids %in% c("Alpha", "Beta")))
 
   # Switch to Mode B
   obj_b <- celltyping(obj_a, fix$cell_labels, .verbose = FALSE)
-  expect_identical(obj_b@landmark.annot$celltyping$mode, "cell_labels")
+  expect_null(obj_b@landmark.annot$celltyping$mode)
   expect_null(obj_b@landmark.annot$celltyping$map)
   expect_true(all(obj_b@landmark.annot$celltyping$ids %in% c("TypeA", "TypeB")))
-
-  # Median expression rownames should reflect Mode B labels
-  expect_true(all(
-    sort(rownames(obj_b@results$celltyping$median.exprs)) ==
-    sort(c("TypeA", "TypeB"))
-  ))
 })
 
 # ──────────────────────────────────────────────────────────────────────

@@ -37,15 +37,33 @@ test_that("plotHeatmap dispatches on TDRObj", {
   skip_if_not_installed("pheatmap")
   skip_if_not_installed("gridExtra")
 
-  tdr <- create_mock_graph_obj(n_points = 20, n_clusters = 3)
-
-  # Build a real pheatmap object so plotHeatmap can display its $gtable
-  med_exprs <- matrix(runif(6), nrow = 3, ncol = 2,
-                      dimnames = list(paste0("cluster_", 1:3),
-                                     c("marker1", "marker2")))
-  tdr@results$clustering <- list(
-    median.exprs = med_exprs,
-    pheatmap = pheatmap::pheatmap(med_exprs, silent = TRUE)
+  n_points <- 20
+  n_clusters <- 3
+  n_markers <- 4
+  
+  # Need full assay data for on-the-fly pheatmap computation
+  expr_mat <- matrix(runif(n_points * n_markers), nrow = n_points, ncol = n_markers,
+                     dimnames = list(paste0("lm", seq_len(n_points)),
+                                    paste0("marker", seq_len(n_markers))))
+  tdr <- TDRObj(
+    config = list(assay.type = "cyto", markers = colnames(expr_mat)),
+    landmark.embed = list(
+      pca  = list(coord = matrix(
+        runif(n_points * 2), ncol = 2,
+        dimnames = list(NULL, c("PC1", "PC2"))
+      )),
+      umap = list(coord = matrix(runif(n_points * 2), ncol = 2)),
+      le   = list()
+    ),
+    landmark.annot = list(
+      clustering = list(
+        ids = factor(sample(seq_len(n_clusters), n_points, replace = TRUE))
+      )
+    ),
+    assay = list(expr = expr_mat),
+    graphs = list(adj.matrix = NULL, snn = NULL, fgraph = NULL),
+    density = list(),
+    results = list()
   )
 
   p <- plotHeatmap(tdr)
