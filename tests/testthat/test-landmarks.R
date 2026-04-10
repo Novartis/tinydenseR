@@ -122,7 +122,7 @@ test_that("get.landmarks validates input properly", {
 # Test for HVG exclusion pattern
 
 test_that("HVG exclusion pattern excludes VDJ variable-region genes", {
-  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[AXYL]?L?\\d?$|^RPLP[012]$|^RPSA$"
 
   # TCR alpha/beta V/D/J segments
   tcr_ab <- c("TRAV1-1", "TRAV12-1", "TRAV38-2DV8", "TRBV2", "TRBV28",
@@ -143,7 +143,7 @@ test_that("HVG exclusion pattern excludes VDJ variable-region genes", {
 })
 
 test_that("HVG exclusion pattern retains constant-region genes", {
-  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[AXYL]?L?\\d?$|^RPLP[012]$|^RPSA$"
 
   # TCR constant regions
   tcr_const <- c("TRAC", "TRBC1", "TRBC2", "TRDC", "TRGC1", "TRGC2")
@@ -158,7 +158,7 @@ test_that("HVG exclusion pattern retains constant-region genes", {
 })
 
 test_that("HVG exclusion pattern excludes mitochondrial genes", {
-  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[AXYL]?L?\\d?$|^RPLP[012]$|^RPSA$"
   mito <- c("MT-CO1", "MT-CO2", "MT-CO3", "MT-ND1", "MT-ND4L",
             "MT-ATP6", "MT-ATP8", "MT-CYB", "MT-RNR1", "MT-RNR2", "MT-TA")
   expect_true(all(grepl(pattern, mito, ignore.case = TRUE)))
@@ -168,7 +168,7 @@ test_that("HVG exclusion pattern excludes mitochondrial genes", {
 })
 
 test_that("HVG exclusion pattern excludes ribosomal protein genes", {
-  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[AXYL]?L?\\d?$|^RPLP[012]$|^RPSA$"
 
   rps <- c("RPS2", "RPS3", "RPS3A", "RPS4X", "RPS4Y1", "RPS6",
            "RPS15A", "RPS27A", "RPS28", "RPS29")
@@ -183,7 +183,7 @@ test_that("HVG exclusion pattern excludes ribosomal protein genes", {
 })
 
 test_that("HVG exclusion pattern does not match non-ribosomal RP-prefixed genes", {
-  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[AXYL]?L?\\d?$|^RPLP[012]$|^RPSA$"
 
   non_ribo <- c("RPA1", "RPA2", "RPA3", "RPE", "RPE65",
                 "RPGR", "RPGRIP1", "RPH3A", "RPAIN", "RPF1",
@@ -195,9 +195,24 @@ test_that("HVG exclusion pattern does not match non-ribosomal RP-prefixed genes"
 })
 
 test_that("HVG exclusion pattern does not match housekeeping/marker genes", {
-  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$"
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[AXYL]?L?\\d?$|^RPLP[012]$|^RPSA$"
   safe <- c("GAPDH", "ACTB", "B2M", "CD3D", "CD4", "CD8A", "FOXP3",
             "HLA-A", "HLA-B", "NKG7", "GZMB", "PTPRC",
             "TRAP1", "TRAF1", "TRAM1", "IGF1", "IGFBP1", "IGFBP3")
   expect_false(any(grepl(pattern, safe, ignore.case = TRUE)))
+})
+
+test_that("HVG exclusion pattern rejects known false positives", {
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[AXYL]?L?\\d?$|^RPLP[012]$|^RPSA$"
+
+  # RPS6KL1 (kinase, not ribosomal protein), ribosomal pseudogenes
+  expect_false(any(grepl(pattern, c("RPS6KL1", "RPL3P4", "RPS10P2"), ignore.case = TRUE)))
+})
+
+test_that("HVG exclusion pattern covers HGNC edge-case ribosomal symbols", {
+  pattern <- "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[AXYL]?L?\\d?$|^RPLP[012]$|^RPSA$"
+
+  # "like" genes, sex-linked variants, and other HGNC-approved edge cases
+  hgnc_edge <- c("RPL3L", "RPL10L", "RPL36AL", "RPS4Y2", "RPS27L")
+  expect_true(all(grepl(pattern, hgnc_edge, ignore.case = TRUE)))
 })
