@@ -455,8 +455,8 @@ setup.lm.obj <- function(...) {
 #' @param .nPC Integer, number of principal components for dimensionality reduction.
 #'   Default 30. Must be less than the number of cells in smallest sample.
 #' @param .exc.vdj.mito.ribo.genes.from.hvg Logical, whether to exclude V(D)J
-#'   variable-region genes (TR[ABDG][VDJ], IG[KHL][VDJ]), mitochondrial genes
-#'   (MT-), and ribosomal protein genes (RPS/RPL/RPLP/RPSA) from HVG selection
+#'   variable-region genes (`TR[ABDG][VDJ]`, `IG[KHL][VDJ]`), mitochondrial genes
+#'   (`MT-`), and ribosomal protein genes (`RPS/RPL/RPLP/RPSA`) from HVG selection
 #'   (RNA only). Default TRUE. Constant-region genes (e.g. TRAC, IGHG, IGKC)
 #'   are intentionally retained as they carry cell-identity signal. Recommended
 #'   to avoid technical/biological noise dominating variation.
@@ -577,7 +577,7 @@ get.landmarks.TDRObj <-
           if(isTRUE(x = .exc.vdj.mito.ribo.genes.from.hvg)) {
             
             vdj.mito.ribo <-
-              grep(pattern = "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$",
+              grep(pattern = "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[AXYL]?L?\\d?$|^RPLP[012]$|^RPSA$",
                    x = colnames(x = mat),
                    fixed = FALSE,
                    value = TRUE,
@@ -715,7 +715,7 @@ get.landmarks.TDRObj <-
       if(isTRUE(x = .exc.vdj.mito.ribo.genes.from.hvg)) {
         
         vdj.mito.ribo <-
-          grep(pattern = "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[A-Z]?L?\\d?$|^RPLP[012]$|^RPSA$",
+          grep(pattern = "^TR[ABDG][VDJ]\\d|^IG[KHL][VDJ]\\d|^MT-|^RP[SL]\\d{1,2}[AXYL]?L?\\d?$|^RPLP[012]$|^RPSA$",
                x = colnames(x = .tdr.obj@assay$raw),
                fixed = FALSE,
                value = TRUE,
