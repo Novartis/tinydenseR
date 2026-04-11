@@ -119,5 +119,7 @@ lm.cells <- celltyping(lm.cells, cell_labels)
 }
 \seealso{
 \code{\link{get.map}} for automatic cell typing with symphony reference objects,
-\code{\link{lm.cluster}} for the clustering that produces cluster IDs used here
+\code{\link{lm.cluster}} for the clustering that produces cluster IDs used here,
+\code{\link{import_cell_annotations}} for automatic multi-column ingestion of
+cell-level annotations from metadata
 }
