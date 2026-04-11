@@ -1,5 +1,34 @@
 # tinydenseR 0.0.3.0001
 
+## Cellmap unification — schema v3
+
+The `@cellmap` slot now uses a unified structure with four top-level
+sub-slots: `clustering`, `celltyping`, `nearest.lm`, and `fuzzy.graphs`.
+Clustering and celltyping each contain a `$ids` named list (per-sample
+entries) plus optional named solutions.
+
+**Key changes:**
+
+- **Renamed cellmap sub-slots:** `cluster.ids` → `clustering$ids`,
+  `celltype.ids` → `celltyping$ids`, `fuzzy.graph` → `fuzzy.graphs`.
+  The old names are accepted transparently via backward-compat migration
+  in the constructor and legacy-name mapping in `.tdr_get_map_slot()`.
+
+- **Unified on-disk representation:** Each sample entry in `@cellmap` is
+  either an in-memory R object OR an attributed path string (character
+  scalar with `schema_v` and `bytes` attributes). Detection:
+  `is.character(val) && length(val) == 1 && file.exists(val)`.
+
+- **`@density$.cache` manifests removed:** The manifest system
+  (`@density$.cache$manifests`) is eliminated. Path strings are stored
+  directly in `@cellmap`. Cache root is in `@config$.cache.root`.
+
+- **`.cache.on.disk` works for all backends:** The silent disable of
+  on-disk caching for non-`files` backends has been removed.
+
+- **Cache schema bumped to v3.** Objects serialised with schema v2
+  are automatically migrated by the `TDRObj()` constructor.
+
 ## Removed: `.cl.ct.to.ign` argument from `get.map()`
 
 The `.cl.ct.to.ign` argument has been removed from `get.map()`. This argument

@@ -47,7 +47,7 @@ for each landmark}
 If \code{get.map()} has already been run, the following slots are also
 refreshed (no re-mapping required):
 \describe{
-\item{\code{$cellmap$celltype.ids}}{Per-sample list of cell-level celltype
+\item{\code{$cellmap$celltyping$ids}}{Per-sample list of cell-level celltype
 assignments, re-derived from the existing fuzzy graph}
 \item{\code{$density$composition$celltyping$cell.count}}{Samples x cell
 types count matrix}
