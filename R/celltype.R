@@ -114,7 +114,9 @@
 #'   \code{NULL}) with a warning.
 #' @seealso 
 #'   \code{\link{get.map}} for automatic cell typing with symphony reference objects,
-#'   \code{\link{lm.cluster}} for the clustering that produces cluster IDs used here
+#'   \code{\link{lm.cluster}} for the clustering that produces cluster IDs used here,
+#'   \code{\link{import_cell_annotations}} for automatic multi-column ingestion of
+#'     cell-level annotations from metadata
 #' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
 #'   (anndataR) object.
 #' @param ... Additional arguments passed to methods.
@@ -647,3 +649,231 @@ set_active_celltyping.TDRObj <-
     
     return(.tdr.obj)
   }
+
+
+# ──────────────────────────────────────────────────────────────────────
+# import_cell_annotations: multi-column cell-level annotation ingestion
+# ──────────────────────────────────────────────────────────────────────
+
+#' Import multiple cell-level annotation columns as landmark-level celltyping solutions
+#'
+#' Scans a cell-level metadata data.frame for categorical columns and
+#' imports each as a named landmark-level celltyping solution via
+#' \code{\link{celltyping}} Mode B.  After importing, users can switch
+#' between solutions with \code{\link{set_active_celltyping}}.
+#'
+#' This function is designed to be called after \code{\link{get.graph}}
+#' and \strong{before} \code{\link{get.map}} in the pipeline.  Because
+#' \code{get.map()} has not yet run, \code{.refresh_celltyping()} inside
+#' each \code{celltyping()} call is a no-op, making the loop efficient.
+#'
+#' @section Column selection criteria:
+#' A column in \code{.cell.meta} is imported if it is:
+#' \itemize{
+#'   \item \code{character} or \code{factor} type (not numeric, logical,
+#'     integer, etc.)
+#'   \item Not the \code{.sample.var} column
+#'   \item Has more than 1 unique non-NA value
+#'   \item Has fewer unique non-NA values than total cells (excludes
+#'     ID-like columns)
+#'   \item Column name is not \code{"ids"} (reserved by the multi-solution
+#'     system)
+#' }
+#'
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, or SingleCellExperiment
+#'   object.
+#' @param .cell.meta A \code{data.frame} with rownames set to cell IDs
+#'   (original IDs before the tinydenseR sample prefix).  Must contain
+#'   at least the \code{.sample.var} column.
+#' @param .sample.var Character(1).  Column name in \code{.cell.meta}
+#'   identifying sample membership.
+#' @param .celltype.vec Character(1) or \code{NULL}.  If non-NULL, the
+#'   name of a column in \code{.cell.meta} that should be set as the
+#'   active \code{$ids} after import.
+#' @param .verbose Logical (default \code{TRUE}).  If \code{TRUE}, prints
+#'   a message listing the imported columns.
+#' @param ... Additional arguments passed to methods.
+#'
+#' @return The updated object with imported celltyping solutions stored in
+#'   \code{@landmark.annot$celltyping$<column_name>}.
+#'
+#' @seealso \code{\link{celltyping}}, \code{\link{set_active_celltyping}},
+#'   \code{\link{list_celltyping_solutions}}
+#'
+#' @examples
+#' \dontrun{
+#' tdr.obj <- setup.tdr.obj(.cells, .meta) |>
+#'   get.landmarks() |>
+#'   get.graph()
+#'
+#' # Import all categorical cell-level columns
+#' tdr.obj <- import_cell_annotations(tdr.obj,
+#'   .cell.meta = cell_metadata,
+#'   .sample.var = "sample_id",
+#'   .celltype.vec = "cell_type_l1"
+#' )
+#'
+#' # Check what was imported
+#' list_celltyping_solutions(tdr.obj)
+#'
+#' # Switch to a different annotation
+#' tdr.obj <- set_active_celltyping(tdr.obj, "cell_type_l2")
+#' }
+#'
+#' @export
+import_cell_annotations <- function(x, ...) UseMethod("import_cell_annotations")
+
+#' @rdname import_cell_annotations
+#' @export
+import_cell_annotations.TDRObj <-
+  function(x,
+           .cell.meta,
+           .sample.var,
+           .celltype.vec = NULL,
+           .verbose = TRUE,
+           ...) {
+    .tdr.obj <- x
+
+    # --- Validate inputs ---
+    if (!inherits(.cell.meta, "data.frame")) {
+      stop(".cell.meta must be a data.frame.")
+    }
+    rn <- rownames(.cell.meta)
+    if (is.null(rn) ||
+        identical(rn, as.character(seq_len(nrow(.cell.meta))))) {
+      stop(".cell.meta must have meaningful rownames (cell IDs).")
+    }
+    if (!is.character(.sample.var) || length(.sample.var) != 1L) {
+      stop(".sample.var must be a single character string.")
+    }
+    if (!(.sample.var %in% colnames(.cell.meta))) {
+      stop(".sample.var '", .sample.var,
+           "' not found in .cell.meta.")
+    }
+
+    # --- Identify cell-level categorical columns ---
+    # Cell-level = NOT constant within every sample (inverse of get.meta logic)
+    sample_ids <- .cell.meta[[.sample.var]]
+    n_cells <- nrow(.cell.meta)
+    all_cols <- colnames(.cell.meta)
+
+    # Exclude .sample.var and reserved "ids"
+    candidate_cols <- setdiff(all_cols, c(.sample.var, "ids"))
+
+    # Filter to character / factor columns
+    candidate_cols <- candidate_cols[
+      vapply(candidate_cols, function(col) {
+        is.character(.cell.meta[[col]]) || is.factor(.cell.meta[[col]])
+      }, logical(1))
+    ]
+
+    if (length(candidate_cols) == 0L) {
+      if (isTRUE(.verbose)) {
+        message("import_cell_annotations: no categorical columns found; ",
+                "returning object unchanged.")
+      }
+      return(.tdr.obj)
+    }
+
+    # Filter: >1 unique non-NA value AND <n_cells unique values (not ID-like)
+    # AND varies within at least one sample (cell-level, not sample-level)
+    qualifying <- vapply(candidate_cols, function(col) {
+      vals <- .cell.meta[[col]]
+      uvals <- unique(vals[!is.na(vals)])
+      n_unique <- length(uvals)
+      if (n_unique <= 1L || n_unique >= n_cells) return(FALSE)
+      # Check if cell-level: varies within at least one sample
+      any(vapply(
+        split(vals, sample_ids),
+        function(chunk) length(unique(chunk[!is.na(chunk)])) > 1L,
+        logical(1)
+      ))
+    }, logical(1))
+
+    qualifying_cols <- candidate_cols[qualifying]
+
+    if (length(qualifying_cols) == 0L) {
+      if (isTRUE(.verbose)) {
+        message("import_cell_annotations: no qualifying cell-level ",
+                "categorical columns found; returning object unchanged.")
+      }
+      return(.tdr.obj)
+    }
+
+    if (isTRUE(.verbose)) {
+      message("import_cell_annotations: importing ",
+              length(qualifying_cols), " column(s): ",
+              paste(qualifying_cols, collapse = ", "))
+    }
+
+    # --- Save current $ids state to restore if .celltype.vec is NULL ---
+    ids_before <- .tdr.obj@landmark.annot$celltyping$ids
+
+    # --- Import each column via celltyping Mode B ---
+    for (col in qualifying_cols) {
+      vec <- stats::setNames(
+        as.character(.cell.meta[[col]]),
+        rownames(.cell.meta)
+      )
+      .tdr.obj <- celltyping.TDRObj(
+        .tdr.obj,
+        .celltyping.map = vec,
+        .name = col,
+        .verbose = FALSE
+      )
+    }
+
+    # --- Activate requested column or restore prior $ids ---
+    if (!is.null(.celltype.vec) && .celltype.vec %in% qualifying_cols) {
+      .tdr.obj <- set_active_celltyping.TDRObj(
+        .tdr.obj,
+        .column.name = .celltype.vec,
+        .verbose = .verbose
+      )
+    } else {
+      # Restore prior $ids state (even if NULL)
+      .tdr.obj@landmark.annot$celltyping$ids <- ids_before
+      if (!is.null(.celltype.vec) && isTRUE(.verbose)) {
+        message("import_cell_annotations: .celltype.vec '",
+                .celltype.vec,
+                "' was not among the imported columns; ",
+                "active $ids unchanged.")
+      }
+    }
+
+    return(.tdr.obj)
+  }
+
+
+# ──────────────────────────────────────────────────────────────────────
+# list_celltyping_solutions: utility to list stored solutions
+# ──────────────────────────────────────────────────────────────────────
+
+#' List stored celltyping solutions
+#'
+#' Returns the names of all stored celltyping solutions (excluding the
+#' active \code{$ids} slot).
+#'
+#' @param x A \code{\linkS4class{TDRObj}}, Seurat, or SingleCellExperiment
+#'   object.
+#' @param ... Additional arguments passed to methods.
+#' @return A character vector of solution names.
+#'
+#' @seealso \code{\link{set_active_celltyping}}, \code{\link{import_cell_annotations}}
+#'
+#' @examples
+#' \dontrun{
+#' list_celltyping_solutions(tdr.obj)
+#' # [1] "cell_type_l1" "cell_type_l2" "azimuth_pred"
+#' }
+#'
+#' @export
+list_celltyping_solutions <- function(x, ...) UseMethod("list_celltyping_solutions")
+
+#' @rdname list_celltyping_solutions
+#' @export
+list_celltyping_solutions.TDRObj <- function(x, ...) {
+  nms <- names(x@landmark.annot$celltyping)
+  if (is.null(nms)) return(character(0))
+  setdiff(nms, "ids")
+}
