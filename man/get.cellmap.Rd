@@ -9,8 +9,11 @@ get.cellmap(x, .slot, .sample)
 \arguments{
 \item{x}{A \code{\linkS4class{TDRObj}} processed through \code{get.map()}.}
 
-\item{.slot}{Character. One of \code{"celltyping.ids"},
-\code{"clustering.ids"}, \code{"nearest.landmarks"}, \code{"fuzzy.graph"}.}
+\item{.slot}{Character. One of \code{"clustering"},
+\code{"celltyping"}, \code{"nearest.lm"}, \code{"fuzzy.graphs"}.
+Legacy names (\code{"clustering.ids"}, \code{"celltyping.ids"},
+\code{"nearest.landmarks"}, \code{"fuzzy.graph"}) are accepted for
+backward compatibility.}
 
 \item{.sample}{Character. Sample identifier (must match a name in
 \code{names(x@cells)}).}
@@ -18,8 +21,8 @@ get.cellmap(x, .slot, .sample)
 \value{
 The per-cell object for that sample and slot: a named character
 vector (for \code{*ids}), an integer matrix (for
-\code{nearest.landmarks}), or a sparse matrix (for
-\code{fuzzy.graph}).
+\code{nearest.lm}), or a sparse matrix (for
+\code{fuzzy.graphs}).
 }
 \description{
 Retrieves per-cell data (cluster IDs, cell type IDs, nearest landmarks,
@@ -30,7 +33,7 @@ cache when caching is active or from in-memory slots otherwise.
 \dontrun{
 # Get cell type labels for the first sample
 ct <- get.cellmap(x = lm.obj,
-                  .slot = "celltyping.ids",
+                  .slot = "celltyping",
                   .sample = names(lm.obj$cells)[1])
 }
 }

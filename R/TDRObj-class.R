@@ -33,12 +33,14 @@
 #'   Contains clustering and celltyping sub-lists, each with an $ids factor.
 #' @slot graphs list. Landmark-landmark connectivity matrices: adj.matrix, snn, fgraph.
 #' @slot density list. fdens-centric sample-level analytics (L x N matrices):
-#'   fdens, Y, composition (clustering/celltyping cell counts/percentages),
-#'   .cache.
+#'   fdens, Y, composition (clustering/celltyping cell counts/percentages).
 #' @slot sample.embed list. Sample-level embeddings (N x k matrices), each with $coord.
 #'   Contains pca, traj, and pepc sub-lists.
-#' @slot cellmap list. Per-cell, per-sample cached lists: cluster.ids, celltype.ids,
-#'   nearest.lm, fuzzy.graph.
+#' @slot cellmap list. Per-cell, per-sample data in unified structure:
+#'   clustering$ids, celltyping$ids (named per-sample lists with optional
+#'   named solutions), nearest.lm, fuzzy.graphs.  Each sample entry is
+#'   either an in-memory R object or an attributed path string for on-disk
+#'   cache.
 #' @slot results list. All statistical outputs: lm, pb, marker, spec, nmf, pls,
 #'   features.
 #'
@@ -214,27 +216,22 @@ TDRObj <- function(...) {
 
     if (!is.null(m$fdens))   args$density$fdens   <- m$fdens
     if (!is.null(m$Y))       args$density$Y       <- m$Y
-    if (!is.null(m$.cache))  args$density$.cache  <- m$.cache
-
-    # Only store .cache=NULL explicitly if it was passed
-    if (is.element(".cache", names(m)) && is.null(m$.cache)) {
-      args$density$.cache <- NULL
-    }
 
     if (!is.null(m$clustering)) {
       cl <- m$clustering
-      if (!is.null(cl$ids))        args$cellmap$cluster.ids <- cl$ids
+      if (!is.null(cl$ids))        args$cellmap$clustering$ids <- cl$ids
       if (is.null(args$density$composition)) args$density$composition <- list()
       args$density$composition$clustering <- cl[setdiff(names(cl), "ids")]
     }
     if (!is.null(m$celltyping)) {
       ct <- m$celltyping
-      if (!is.null(ct$ids))        args$cellmap$celltype.ids <- ct$ids
+      if (!is.null(ct$ids))        args$cellmap$celltyping$ids <- ct$ids
       if (is.null(args$density$composition)) args$density$composition <- list()
       args$density$composition$celltyping <- ct[setdiff(names(ct), "ids")]
     }
-    if (!is.null(m$nearest.landmarks)) args$cellmap$nearest.lm  <- m$nearest.landmarks
-    if (!is.null(m$fuzzy.graph))       args$cellmap$fuzzy.graph <- m$fuzzy.graph
+    if (!is.null(m$nearest.landmarks)) args$cellmap$nearest.lm   <- m$nearest.landmarks
+    if (!is.null(m$fuzzy.graph))       args$cellmap$fuzzy.graphs <- m$fuzzy.graph
+    if (!is.null(m$.cache))  args$density$.cache  <- m$.cache
     if (!is.null(m$lm)) {
       if (is.null(args$results)) args$results <- list()
       args$results$lm <- m$lm
@@ -268,6 +265,66 @@ TDRObj <- function(...) {
 
   # Drop any remaining unrecognised slot names
   args <- args[names(args) %in% new_slots]
+
+  # ── Backward-compat migration: old @cellmap structure → new unified ──
+  if (!is.null(args$cellmap)) {
+    cm <- args$cellmap
+    # cluster.ids → clustering$ids
+    if (!is.null(cm$cluster.ids) && is.null(cm$clustering$ids)) {
+      cm$clustering$ids <- cm$cluster.ids
+      cm$cluster.ids <- NULL
+    }
+    # celltype.ids → celltyping$ids
+    if (!is.null(cm$celltype.ids) && is.null(cm$celltyping$ids)) {
+      cm$celltyping$ids <- cm$celltype.ids
+      cm$celltype.ids <- NULL
+    }
+    # fuzzy.graph → fuzzy.graphs
+    if (!is.null(cm$fuzzy.graph) && is.null(cm$fuzzy.graphs)) {
+      cm$fuzzy.graphs <- cm$fuzzy.graph
+      cm$fuzzy.graph <- NULL
+    }
+    args$cellmap <- cm
+  }
+
+  # ── Migrate old @density$.cache manifests → @cellmap path strings ──
+  if (!is.null(args$density$.cache) && isTRUE(args$density$.cache$on.disk)) {
+    old_cache <- args$density$.cache
+    if (is.null(args$cellmap)) args$cellmap <- list()
+    cm <- args$cellmap
+    # Map old manifest slot names to new cellmap sub-slots
+    manifest_map <- list(
+      "clustering.ids"    = "clustering",
+      "celltyping.ids"    = "celltyping",
+      "nearest.landmarks" = "nearest.lm",
+      "fuzzy.graph"       = "fuzzy.graphs"
+    )
+    for (old_slot in names(manifest_map)) {
+      new_slot <- manifest_map[[old_slot]]
+      entries <- old_cache$manifests[[old_slot]]
+      if (is.null(entries)) next
+      for (sn in names(entries)) {
+        meta <- entries[[sn]]
+        if (is.null(meta) || is.null(meta$path)) next
+        path <- meta$path
+        attr(path, "schema_v") <- if (!is.null(meta$schema_v)) meta$schema_v else old_cache$schema_v
+        attr(path, "bytes")    <- meta$bytes
+        if (new_slot %in% c("clustering", "celltyping")) {
+          cm[[new_slot]]$ids[[sn]] <- path
+        } else {
+          cm[[new_slot]][[sn]] <- path
+        }
+      }
+    }
+    args$cellmap <- cm
+    # Store cache root in config
+    if (!is.null(old_cache$root)) {
+      if (is.null(args$config)) args$config <- list()
+      args$config$.cache.root <- old_cache$root
+    }
+    # Remove old .cache from density
+    args$density$.cache <- NULL
+  }
 
   do.call(new, c("TDRObj", args))
 }
@@ -368,6 +425,21 @@ setMethod("show", "TDRObj", function(object) {
   cat("  Landmarks:", n_lm, "\n")
   cat("  Graph computed:", length(object@graphs) > 0, "\n")
   cat("  Density/map computed:", !is.null(object@density$fdens), "\n")
+  # On-disk / in-memory cellmap status
+  .is_path <- function(val) is.character(val) && length(val) == 1L && !is.null(attr(val, "schema_v"))
+  any_paths <- any(vapply(
+    c(object@cellmap$clustering$ids, object@cellmap$nearest.lm,
+      object@cellmap$fuzzy.graphs, object@cellmap$celltyping$ids),
+    .is_path, logical(1)
+  ))
+  if (!is.null(object@density$fdens)) {
+    cat("  Cellmap storage:", if (any_paths) "on-disk" else "in-memory", "\n")
+  }
+  # Multi-solution counts
+  n_cl <- length(setdiff(names(object@landmark.annot$clustering), "ids"))
+  n_ct <- length(setdiff(names(object@landmark.annot$celltyping), "ids"))
+  if (n_cl > 0) cat("  Clustering solutions:", n_cl, "\n")
+  if (n_ct > 0) cat("  Celltyping solutions:", n_ct, "\n")
 })
 
 # --- Coercion from list ---

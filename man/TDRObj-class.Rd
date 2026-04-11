@@ -55,14 +55,16 @@ Contains clustering and celltyping sub-lists, each with an $ids factor.}
 \item{\code{graphs}}{list. Landmark-landmark connectivity matrices: adj.matrix, snn, fgraph.}
 
 \item{\code{density}}{list. fdens-centric sample-level analytics (L x N matrices):
-fdens, Y, composition (clustering/celltyping cell counts/percentages),
-.cache.}
+fdens, Y, composition (clustering/celltyping cell counts/percentages).}
 
 \item{\code{sample.embed}}{list. Sample-level embeddings (N x k matrices), each with $coord.
 Contains pca, traj, and pepc sub-lists.}
 
-\item{\code{cellmap}}{list. Per-cell, per-sample cached lists: cluster.ids, celltype.ids,
-nearest.lm, fuzzy.graph.}
+\item{\code{cellmap}}{list. Per-cell, per-sample data in unified structure:
+clustering$ids, celltyping$ids (named per-sample lists with optional
+named solutions), nearest.lm, fuzzy.graphs.  Each sample entry is
+either an in-memory R object or an attributed path string for on-disk
+cache.}
 
 \item{\code{results}}{list. All statistical outputs: lm, pb, marker, spec, nmf, pls,
 features.}
