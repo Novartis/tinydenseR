@@ -7,7 +7,7 @@
 tdr_cache_validate(.tdr.obj, .verbose = TRUE)
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object with \code{$map$.cache} populated.}
+\item{.tdr.obj}{A tinydenseR object.}
 
 \item{.verbose}{Logical; if \code{TRUE}, print a summary.  Default
 \code{TRUE}.}
@@ -17,10 +17,10 @@ The (unmodified) \code{.tdr.obj}, invisibly.  Stops with an
 error if any cached file is missing.
 }
 \description{
-Checks every entry in the cache manifest for file existence.  This
-function is called automatically (in quiet mode) when entering
-\code{get.lm()}, \code{get.pbDE()}, and \code{get.plsD()} so that broken caches
-are caught early.
+Walks the \code{@cellmap} sub-slots for path strings and checks file
+existence.  This function is called automatically (in quiet mode) when
+entering \code{get.lm()}, \code{get.pbDE()}, and \code{get.plsD()} so
+that broken caches are caught early.
 }
 \details{
 Because the cache is ephemeral (stored under \code{tempdir()} and

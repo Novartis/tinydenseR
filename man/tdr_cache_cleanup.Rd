@@ -7,15 +7,14 @@
 tdr_cache_cleanup(.tdr.obj)
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object with \code{$map$.cache} populated.}
+\item{.tdr.obj}{A tinydenseR object.}
 }
 \value{
 Updated \code{.tdr.obj} with cache removed.
 }
 \description{
 Deletes the on-disk cache directory, deregisters it from the
-session-end cleanup finalizer, and strips cache metadata from the
-object.  After cleanup, the large slots (clustering$ids,
-celltyping$ids, nearest.landmarks, fuzzy.graph) will be \code{NULL}
-and must be regenerated via \code{get.map()}.
+session-end cleanup finalizer, and clears the path strings from
+\code{@cellmap}.  After cleanup, the cellmap entries will be
+\code{NULL} and must be regenerated via \code{get.map()}.
 }

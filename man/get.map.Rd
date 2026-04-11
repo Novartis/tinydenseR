@@ -44,11 +44,11 @@ Only compatible with RNA assays. Replaces any existing \code{$graph$celltyping}.
 to assign a cell to a landmark‑derived cluster/celltype label.}
 
 \item{.cache.on.disk}{Logical (default TRUE). When \code{TRUE}, four large per-sample
-slots (\code{clustering$ids}, \code{celltyping$ids}, \code{nearest.landmarks},
-\code{fuzzy.graph}) are serialized to disk as uncompressed RDS files and evicted
-from memory. Downstream accessors (e.g.\ in \code{get.pbDE}, \code{goi.summary})
-read them back lazily on a per-sample basis. Set to \code{FALSE} to keep everything
-in memory (original behaviour).
+slots (\code{clustering$ids}, \code{celltyping$ids}, \code{nearest.lm},
+\code{fuzzy.graphs}) are serialized to disk as uncompressed RDS files and stored
+in \code{@cellmap} as attributed path strings.  Downstream accessors
+(e.g.\ in \code{get.pbDE}, \code{goi.summary}) read them back lazily on a
+per-sample basis.  Set to \code{FALSE} to keep everything in memory.
 
 Cache files are stored under the system temporary directory
 (\code{tempdir()}) and are automatically removed when the R session
@@ -77,13 +77,14 @@ assignments (only if celltyping available or \code{.ref.obj} provided).
 per sample. Used for "traditional" compositional statistics.
 \item \code{celltyping$cell.perc}: Matrix (samples × cell types) of percentage of cells per
 cell type per sample. Used for "traditional" compositional statistics.
-\item \code{nearest.landmarks}: List of matrices (one per sample) with nearest landmark indices
+\item \code{nearest.lm}: List of matrices (one per sample) with nearest landmark indices
 for all cells from UMAP transform.
-\item \code{.cache}: (When \code{.cache.on.disk = TRUE}) List with \code{root} (cache
-directory path), \code{on.disk} flag, \code{schema_v}, and \code{manifests} holding
-per-sample file metadata for each cached slot. The four large slots above are set
-to \code{NULL} in memory. Use \code{tdr_cache_cleanup()} to remove cached files.
 }
+
+When \code{.cache.on.disk = TRUE}, the four cell-level slots above are stored as
+attributed path strings (with \code{schema_v} and \code{bytes} attributes) in
+\code{@cellmap} rather than in-memory objects.  The cache root is stored in
+\code{@config$.cache.root}.  Use \code{tdr_cache_cleanup()} to remove cached files.
 If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with list containing \code{$ids}
 (factor of cell type assignments for landmarks), \code{$median.exprs} (matrix of mean expression
 per cell type), and \code{$pheatmap} (heatmap object).

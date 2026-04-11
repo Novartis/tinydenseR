@@ -7,7 +7,7 @@
 tdr_cache_info(.tdr.obj)
 }
 \arguments{
-\item{.tdr.obj}{A tinydenseR object (with or without \code{$map$.cache}).}
+\item{.tdr.obj}{A tinydenseR object.}
 }
 \value{
 A list (invisible) with components \code{active}, \code{root},
@@ -25,8 +25,8 @@ Useful for interactive inspection and debugging.
 tdr_cache_info(lm.cells)
 # On-disk cache: ACTIVE
 # Directory:     /tmp/RtmpXXXXXX/tinydenseR_cache/run_20260302_143012_a7f3c1b2
-# Schema:        v2
-# Slots:         clustering.ids, celltyping.ids, nearest.landmarks, fuzzy.graph
+# Schema:        v3
+# Slots:         clustering, celltyping, nearest.lm, fuzzy.graphs
 # Samples:       6
 # Files:         24  (4 slots x 6 samples)
 # Total size:    142.3 MB

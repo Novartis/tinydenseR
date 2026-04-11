@@ -9,14 +9,15 @@
 \arguments{
 \item{.tdr.obj}{tinydenseR object.}
 
-\item{slot_name}{Character – one of "clustering.ids", "celltyping.ids",
-"nearest.landmarks", "fuzzy.graph".}
+\item{slot_name}{Character – one of \code{"clustering"},
+\code{"celltyping"}, \code{"nearest.lm"}, \code{"fuzzy.graphs"}.
+Legacy names are mapped automatically.}
 }
 \value{
 A named list of R objects (one per sample).
 }
 \description{
 Returns a named list over all samples for the given slot, loading each
-element from disk when caching is active.
+element from disk when the entry is an on-disk path string.
 }
 \keyword{internal}

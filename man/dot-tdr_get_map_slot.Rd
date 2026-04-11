@@ -9,8 +9,11 @@
 \arguments{
 \item{.tdr.obj}{tinydenseR object.}
 
-\item{slot_name}{Character – one of "clustering.ids", "celltyping.ids",
-"nearest.landmarks", "fuzzy.graph".}
+\item{slot_name}{Character – one of \code{"clustering"},
+\code{"celltyping"}, \code{"nearest.lm"}, \code{"fuzzy.graphs"}.
+Legacy names (\code{"clustering.ids"}, \code{"celltyping.ids"},
+\code{"nearest.landmarks"}, \code{"fuzzy.graph"}) are mapped
+automatically.}
 
 \item{sample_name}{Character – sample identifier.}
 }
@@ -19,8 +22,15 @@ The R object for that sample/slot.
 }
 \description{
 This is the single entry point downstream code should use to access
-\code{$map$clustering$ids[[sample]]}, \code{$map$celltyping$ids[[sample]]},
-\code{$map$nearest.landmarks[[sample]]}, and
-\code{$map$fuzzy.graph[[sample]]}.
+per-cell data from \code{@cellmap}.  Supports the unified cellmap
+structure with four top-level slots: \code{clustering},
+\code{celltyping}, \code{nearest.lm}, and \code{fuzzy.graphs}.
+Clustering and celltyping have an inner \code{$ids} sub-list;
+nearest.lm and fuzzy.graphs are flat named lists.
+}
+\details{
+Auto-detects on-disk path strings (\code{is.character(val) &&
+length(val) == 1 && file.exists(val)}) and loads them with
+\code{readRDS}.
 }
 \keyword{internal}
