@@ -198,26 +198,26 @@ test_that("U5: .refresh_celltyping skips map-dependent slots when fdens is NULL"
   ct_map <- .make_ct_map(obj)
   obj2 <- celltyping(obj, ct_map, .verbose = FALSE)
   
-  # cellmap$celltype.ids should be NULL (no get.map run)
-  expect_null(obj2@cellmap$celltype.ids)
+  # cellmap$celltyping$ids should be NULL (no get.map run)
+  expect_null(obj2@cellmap$celltyping$ids)
   
   # composition celltyping should not exist
   expect_null(obj2@density$composition$celltyping)
 })
 
 # ──────────────────────────────────────────────────────────────────────
-# I1: Full late-celltyping pipeline — verify cellmap$celltype.ids
+# I1: Full late-celltyping pipeline — verify cellmap$celltyping$ids
 #     reflects updated labels
 # ──────────────────────────────────────────────────────────────────────
 
-test_that("I1: cellmap$celltype.ids reflects updated labels after late celltyping", {
+test_that("I1: cellmap$celltyping$ids reflects updated labels after late celltyping", {
   obj <- .build_mapped_obj()
   ct_map <- .make_ct_map(obj)
   
   obj2 <- celltyping(obj, ct_map, .verbose = FALSE)
   
   # Cell-level IDs should now be populated with the new celltype labels
-  ct_ids <- .tdr_get_map_slot_all(obj2, "celltyping.ids")
+  ct_ids <- .tdr_get_map_slot_all(obj2, "celltyping")
   expect_true(!is.null(ct_ids))
   
   all_labels <- unique(unlist(lapply(ct_ids, unique)))
@@ -278,7 +278,7 @@ test_that("N2: non-celltyping slots are unchanged after late celltyping", {
   graphs_before      <- obj@graphs
   assay_before       <- obj@assay
   embed_before       <- obj@landmark.embed
-  cluster_ids_before <- .tdr_get_map_slot_all(obj, "clustering.ids")
+  cluster_ids_before <- .tdr_get_map_slot_all(obj, "clustering")
   
   ct_map <- .make_ct_map(obj)
   obj2 <- celltyping(obj, ct_map, .verbose = FALSE)
@@ -288,7 +288,7 @@ test_that("N2: non-celltyping slots are unchanged after late celltyping", {
   expect_identical(obj2@assay, assay_before)
   expect_identical(obj2@landmark.embed, embed_before)
   
-  cluster_ids_after <- .tdr_get_map_slot_all(obj2, "clustering.ids")
+  cluster_ids_after <- .tdr_get_map_slot_all(obj2, "clustering")
   expect_identical(cluster_ids_after, cluster_ids_before)
 })
 
@@ -318,20 +318,22 @@ test_that("celltyping stores named solution and $map/$mode are removed", {
 test_that("I4: on-disk cached celltyping IDs are rewritten after late celltyping", {
   obj <- .build_mapped_obj(cache_on_disk = TRUE)
   
-  cache <- obj@density$.cache
-  skip_if(is.null(cache) || !isTRUE(cache$on.disk),
-          "On-disk caching not active")
+  # Check for on-disk path strings in cellmap
+  .is_path <- function(val) is.character(val) && length(val) == 1L && !is.null(attr(val, "schema_v"))
+  has_paths <- !is.null(obj@cellmap$clustering$ids) &&
+    length(obj@cellmap$clustering$ids) > 0L &&
+    .is_path(obj@cellmap$clustering$ids[[1]])
+  skip_if(!has_paths, "On-disk caching not active")
   
   ct_map <- .make_ct_map(obj)
   obj2 <- celltyping(obj, ct_map, .verbose = FALSE)
   
-  # Verify cache manifests are updated
-  cache2 <- obj2@density$.cache
-  expect_true(!is.null(cache2$manifests$celltyping.ids))
+  # Verify celltyping path strings exist in @cellmap
+  expect_true(!is.null(obj2@cellmap$celltyping$ids))
   
   # Read back from disk and verify labels
   for (sn in names(obj2@cells)) {
-    ids <- .tdr_get_map_slot(obj2, "celltyping.ids", sn)
+    ids <- .tdr_get_map_slot(obj2, "celltyping", sn)
     expect_true(any(c("TypeA", "TypeB") %in% unique(ids)))
   }
 })

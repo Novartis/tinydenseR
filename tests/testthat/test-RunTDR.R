@@ -83,7 +83,8 @@ test_that("RunTDR.default with .celltype.vec runs celltyping", {
   result <- RunTDR(tdr, .celltype.vec = ct_vec, .verbose = FALSE, .seed = 42)
   expect_true(is.TDRObj(result))
   expect_true(!is.null(result@landmark.annot$celltyping$ids))
-  expect_equal(result@landmark.annot$celltyping$mode, "cell_labels")
+  # $mode no longer stored (removed in multi-solution redesign)
+  expect_null(result@landmark.annot$celltyping$mode)
 })
 
 test_that("RunTDR.default errors on .celltype.vec conflict", {

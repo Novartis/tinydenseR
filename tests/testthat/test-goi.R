@@ -74,9 +74,9 @@ test_that("goi.summary validates .id parameter", {
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
-    map = list(
+    cellmap = list(
       clustering = list(ids = list(sample1 = c("1", "2", "3"))),
-      nearest.landmarks = list(sample1 = matrix(data = 1:10, ncol = 2))
+      nearest.lm = list(sample1 = matrix(data = 1:10, ncol = 2))
     ),
     graph = list(
       clustering = list(ids = factor(x = c("1", "2", "3")))
@@ -96,9 +96,9 @@ test_that("goi.summary validates .id.from parameter", {
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
-    map = list(
+    cellmap = list(
       clustering = list(ids = list(sample1 = c("1", "2", "3"))),
-      nearest.landmarks = list(sample1 = matrix(data = 1:10, ncol = 2))
+      nearest.lm = list(sample1 = matrix(data = 1:10, ncol = 2))
     ),
     graph = list(
       clustering = list(ids = factor(x = c("1", "2", "3")))
@@ -177,9 +177,9 @@ test_that("goi.summary validates .id.idx parameter type", {
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
-    map = list(
+    cellmap = list(
       clustering = list(ids = list(sample1 = c("1", "2", "3"))),
-      nearest.landmarks = list(sample1 = matrix(data = 1:10, ncol = 2))
+      nearest.lm = list(sample1 = matrix(data = 1:10, ncol = 2))
     ),
     graph = list(
       clustering = list(ids = factor(x = c("1", "2", "3")))
@@ -196,14 +196,13 @@ test_that("goi.summary returns structure with clustering, celltyping, and all", 
   # This test would require a full mock structure with actual expression data
   # Testing the expected return structure components
   
-  # Create minimal mock that would pass validation
+  # Create minimal mock via legacy map= constructor (which computes composition)
   .tdr.obj <- TDRObj(
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
     map = list(
       clustering = list(ids = list(sample1 = c("1", "2", "3"))),
-      celltyping = NULL,
       nearest.landmarks = list(sample1 = matrix(data = 1:10, ncol = 2))
     ),
     graph = list(
@@ -274,10 +273,10 @@ test_that("goi.summary ID validation works for celltyping", {
     raw.landmarks = matrix(data = 0, nrow = 10, ncol = 3,
                     dimnames = list(NULL, c("Gene1", "Gene2", "Gene3"))),
     config = list(assay.type = "RNA"),
-    map = list(
+    cellmap = list(
       clustering = list(ids = list(sample1 = c("1", "2", "3"))),
       celltyping = list(ids = list(sample1 = c("Tcell", "Bcell", "Monocyte"))),
-      nearest.landmarks = list(sample1 = matrix(data = 1:10, ncol = 2))
+      nearest.lm = list(sample1 = matrix(data = 1:10, ncol = 2))
     ),
     graph = list(
       clustering = list(ids = factor(x = c("1", "2", "3"))),

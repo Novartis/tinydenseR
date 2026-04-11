@@ -812,12 +812,12 @@ test_that("C6.4: recluster rejects .column.name = 'ids'", {
 test_that("C6.5: recluster refreshes cell-level clustering IDs after get.map", {
   obj <- .build_mapped_obj()
   # Cell-level clustering ids exist (from get.map)
-  cl_ids_before <- tinydenseR:::.tdr_get_map_slot(obj, "clustering.ids",
+  cl_ids_before <- tinydenseR:::.tdr_get_map_slot(obj, "clustering",
                                                    names(obj@cells)[1])
 
   obj2 <- recluster(obj, .cl.resolution.parameter = 3.0,
                      .seed = 42, .verbose = FALSE)
-  cl_ids_after <- tinydenseR:::.tdr_get_map_slot(obj2, "clustering.ids",
+  cl_ids_after <- tinydenseR:::.tdr_get_map_slot(obj2, "clustering",
                                                   names(obj2@cells)[1])
 
   # The cell-level labels should come from the new clustering
@@ -930,15 +930,13 @@ test_that("C7.8: celltyping catches unnamed list elements", {
 
 test_that("C8.1: .annot_slot_map returns correct slots for clustering", {
   m <- .annot_slot_map("clustering")
-  expect_equal(m$cellmap_slot, "cluster.ids")
-  expect_equal(m$cache_slot, "clustering.ids")
+  expect_equal(m$slot, "clustering")
   expect_equal(m$comp_slot, "clustering")
 })
 
 test_that("C8.2: .annot_slot_map returns correct slots for celltyping", {
   m <- .annot_slot_map("celltyping")
-  expect_equal(m$cellmap_slot, "celltype.ids")
-  expect_equal(m$cache_slot, "celltyping.ids")
+  expect_equal(m$slot, "celltyping")
   expect_equal(m$comp_slot, "celltyping")
 })
 
@@ -1024,7 +1022,7 @@ test_that("C8.11: .relabel_cellmap updates cell-level ids for both types", {
 
   # Check cell-level celltype IDs exist for each sample
   for (sn in names(obj2@cells)) {
-    ct_ids <- tinydenseR:::.tdr_get_map_slot(obj2, "celltyping.ids", sn)
+    ct_ids <- tinydenseR:::.tdr_get_map_slot(obj2, "celltyping", sn)
     expect_true(!is.null(ct_ids))
     # All cell-level labels should be from celltype vocabulary
     expect_true(all(ct_ids %in% c(levels(obj2@landmark.annot$celltyping$ids), NA)))

@@ -258,7 +258,7 @@ test_that("I1: Mode B after get.map refreshes all downstream slots", {
   obj2 <- celltyping(obj, fix$cell_labels, .verbose = FALSE)
 
   # Cell-level IDs should be populated
-  ct_ids <- .tdr_get_map_slot_all(obj2, "celltyping.ids")
+  ct_ids <- .tdr_get_map_slot_all(obj2, "celltyping")
   expect_true(!is.null(ct_ids))
   all_labels <- unique(unlist(lapply(ct_ids, unique)))
   expect_true(any(c("TypeA", "TypeB") %in% all_labels))
