@@ -158,6 +158,40 @@ set_active_celltyping.SingleCellExperiment <- function(x, ...) {
 }
 
 # ======================================================================
+# import_cell_annotations Seurat / SCE wrappers
+# ======================================================================
+
+#' @export
+import_cell_annotations.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- import_cell_annotations.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+import_cell_annotations.SingleCellExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- import_cell_annotations.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+# ======================================================================
+# list_celltyping_solutions Seurat / SCE wrappers
+# ======================================================================
+
+#' @export
+list_celltyping_solutions.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  list_celltyping_solutions.TDRObj(tdr, ...)
+}
+
+#' @export
+list_celltyping_solutions.SingleCellExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  list_celltyping_solutions.TDRObj(tdr, ...)
+}
+
+# ======================================================================
 # get.features Seurat / SCE wrappers
 # ======================================================================
 
