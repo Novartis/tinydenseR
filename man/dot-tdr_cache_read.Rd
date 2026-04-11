@@ -7,12 +7,15 @@
 .tdr_cache_read(meta_record)
 }
 \arguments{
-\item{meta_record}{A metadata list produced by \code{.tdr_cache_write}.}
+\item{meta_record}{An attributed path string (character scalar with
+\code{attr(, "schema_v")} and \code{attr(, "bytes")}), OR a
+legacy metadata list with \code{$path} and \code{$schema_v}.}
 }
 \value{
 The deserialized R object.
 }
 \description{
-Read a cached slot from disk
+Accepts either a new-style attributed path string (schema v3+) or a
+legacy metadata list (schema v2) with a \code{$path} element.
 }
 \keyword{internal}

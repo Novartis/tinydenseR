@@ -11,16 +11,17 @@
 
 \item{cache_dir}{Root cache directory for the current run.}
 
-\item{slot_name}{Character – one of \code{"clustering.ids"},
-\code{"celltyping.ids"}, \code{"nearest.landmarks"},
-\code{"fuzzy.graph"}.}
+\item{slot_name}{Character – one of \code{"clustering"},
+\code{"celltyping"}, \code{"nearest.lm"},
+\code{"fuzzy.graphs"}.}
 
 \item{sample_name}{Character – sample identifier (used as file stem).}
 
 \item{compress}{Passed to \code{saveRDS}. Default \code{FALSE} for speed.}
 }
 \value{
-A metadata list with path, slot, sample, bytes, and schema_v.
+An attributed path string: a character scalar with
+\code{attr(, "schema_v")} and \code{attr(, "bytes")} set.
 }
 \description{
 Writes \code{object} to an RDS file inside \code{cache_dir/slot_name/}

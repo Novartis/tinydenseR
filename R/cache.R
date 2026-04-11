@@ -24,7 +24,7 @@
 # ──────────────────────────────────────────────────────────────────────
 
 # Current schema version — bump when cache format changes
-.TDR_CACHE_SCHEMA_VERSION <- 2L
+.TDR_CACHE_SCHEMA_VERSION <- 3L
 
 # ── Package-private environment for session-end cleanup ──────────────
 # A strong-referenced environment that lives for the duration of the R
@@ -121,12 +121,13 @@
 #'
 #' @param object R object to serialize.
 #' @param cache_dir Root cache directory for the current run.
-#' @param slot_name Character – one of \code{"clustering.ids"},
-#'   \code{"celltyping.ids"}, \code{"nearest.landmarks"},
-#'   \code{"fuzzy.graph"}.
+#' @param slot_name Character – one of \code{"clustering"},
+#'   \code{"celltyping"}, \code{"nearest.lm"},
+#'   \code{"fuzzy.graphs"}.
 #' @param sample_name Character – sample identifier (used as file stem).
 #' @param compress Passed to \code{saveRDS}. Default \code{FALSE} for speed.
-#' @return A metadata list with path, slot, sample, bytes, and schema_v.
+#' @return An attributed path string: a character scalar with
+#'   \code{attr(, "schema_v")} and \code{attr(, "bytes")} set.
 #' @keywords internal
 .tdr_cache_write <- function(object,
                              cache_dir,
@@ -157,35 +158,51 @@
   
   file.rename(from = tmp, to = target)
   
-  list(
-    path     = target,
-    slot     = slot_name,
-    sample   = sample_name,
-    bytes    = file.size(target),
-    schema_v = .TDR_CACHE_SCHEMA_VERSION
-  )
+  # Return attributed path string
+  path <- target
+  attr(path, "schema_v") <- .TDR_CACHE_SCHEMA_VERSION
+  attr(path, "bytes")    <- file.size(target)
+  path
 }
 
 #' Read a cached slot from disk
 #'
-#' @param meta_record A metadata list produced by \code{.tdr_cache_write}.
+#' Accepts either a new-style attributed path string (schema v3+) or a
+#' legacy metadata list (schema v2) with a \code{$path} element.
+#'
+#' @param meta_record An attributed path string (character scalar with
+#'   \code{attr(, "schema_v")} and \code{attr(, "bytes")}), OR a
+#'   legacy metadata list with \code{$path} and \code{$schema_v}.
 #' @return The deserialized R object.
 #' @keywords internal
 .tdr_cache_read <- function(meta_record) {
-  if (!file.exists(meta_record$path)) {
-    stop("Cache file missing: ", meta_record$path,
+  # Detect format: path string vs legacy metadata list
+  if (is.character(meta_record) && length(meta_record) == 1L) {
+    path     <- meta_record
+    schema_v <- attr(meta_record, "schema_v")
+  } else if (is.list(meta_record) && !is.null(meta_record$path)) {
+    # Legacy v2 metadata list
+    path     <- meta_record$path
+    schema_v <- meta_record$schema_v
+  } else {
+    stop("Invalid cache record: expected an attributed path string or a ",
+         "metadata list with $path.")
+  }
+  
+  if (!file.exists(path)) {
+    stop("Cache file missing: ", path,
          "\nRe-run get.map() to regenerate or set .cache.on.disk = FALSE.")
   }
   
   # Schema version gate
-  if (!is.null(meta_record$schema_v) &&
-      meta_record$schema_v != .TDR_CACHE_SCHEMA_VERSION) {
-    stop("Cache schema mismatch: file has v", meta_record$schema_v,
+  if (!is.null(schema_v) &&
+      schema_v != .TDR_CACHE_SCHEMA_VERSION) {
+    stop("Cache schema mismatch: file has v", schema_v,
          " but current code expects v", .TDR_CACHE_SCHEMA_VERSION,
          ".\nRe-run get.map() to regenerate.")
   }
   
-  readRDS(file = meta_record$path)
+  readRDS(file = path)
 }
 
 #' Remove orphaned .rds.tmp files left by interrupted writes
@@ -206,65 +223,107 @@
 #' Access a per-sample map slot, transparently reading from cache if on-disk
 #'
 #' This is the single entry point downstream code should use to access
-#' \code{$map$clustering$ids[[sample]]}, \code{$map$celltyping$ids[[sample]]},
-#' \code{$map$nearest.landmarks[[sample]]}, and
-#' \code{$map$fuzzy.graph[[sample]]}.
+#' per-cell data from \code{@cellmap}.  Supports the unified cellmap
+#' structure with four top-level slots: \code{clustering},
+#' \code{celltyping}, \code{nearest.lm}, and \code{fuzzy.graphs}.
+#' Clustering and celltyping have an inner \code{$ids} sub-list;
+#' nearest.lm and fuzzy.graphs are flat named lists.
+#'
+#' Auto-detects on-disk path strings (\code{is.character(val) &&
+#' length(val) == 1 && file.exists(val)}) and loads them with
+#' \code{readRDS}.
 #'
 #' @param .tdr.obj tinydenseR object.
-#' @param slot_name Character – one of "clustering.ids", "celltyping.ids",
-#'   "nearest.landmarks", "fuzzy.graph".
+#' @param slot_name Character – one of \code{"clustering"},
+#'   \code{"celltyping"}, \code{"nearest.lm"}, \code{"fuzzy.graphs"}.
+#'   Legacy names (\code{"clustering.ids"}, \code{"celltyping.ids"},
+#'   \code{"nearest.landmarks"}, \code{"fuzzy.graph"}) are mapped
+#'   automatically.
 #' @param sample_name Character – sample identifier.
 #' @return The R object for that sample/slot.
 #' @keywords internal
 .tdr_get_map_slot <- function(.tdr.obj, slot_name, sample_name) {
   
-  cache <- .tdr.obj@density$.cache
+  # Legacy name mapping
+  slot_name <- switch(slot_name,
+    "clustering.ids"    = "clustering",
+    "celltyping.ids"    = "celltyping",
+    "nearest.landmarks" = "nearest.lm",
+    "fuzzy.graph"       = "fuzzy.graphs",
+    slot_name
+  )
   
-  if (!is.null(cache) && isTRUE(cache$on.disk)) {
-    # Read from disk
-    meta <- cache$manifests[[slot_name]][[sample_name]]
-    if (is.null(meta)) {
-      stop("No cache entry for slot '", slot_name,
-           "', sample '", sample_name, "'.")
-    }
-    return(.tdr_cache_read(meta))
+  # Navigate to the correct sub-list
+  val <- switch(slot_name,
+    "clustering"   = .tdr.obj@cellmap$clustering$ids[[sample_name]],
+    "celltyping"   = .tdr.obj@cellmap$celltyping$ids[[sample_name]],
+    "nearest.lm"   = .tdr.obj@cellmap$nearest.lm[[sample_name]],
+    "fuzzy.graphs" = .tdr.obj@cellmap$fuzzy.graphs[[sample_name]],
+    stop("Unknown slot_name: ", slot_name)
+  )
+  
+  if (is.null(val)) {
+    stop("No entry for slot '", slot_name,
+         "', sample '", sample_name, "'.")
   }
   
-  # In-memory fallback
-  switch(slot_name,
-         "clustering.ids"    = .tdr.obj@cellmap$cluster.ids[[sample_name]],
-         "celltyping.ids"    = .tdr.obj@cellmap$celltype.ids[[sample_name]],
-         "nearest.landmarks" = .tdr.obj@cellmap$nearest.lm[[sample_name]],
-         "fuzzy.graph"       = .tdr.obj@cellmap$fuzzy.graph[[sample_name]],
-         stop("Unknown slot_name: ", slot_name))
+  # Auto-detect on-disk path string and lazy-load
+  if (is.character(val) && length(val) == 1L && !is.null(attr(val, "schema_v"))) {
+    if (!file.exists(val)) {
+      stop("Cache file missing: ", val)
+    }
+    return(.tdr_cache_read(val))
+  }
+  if (is.character(val) && length(val) == 1L && file.exists(val)) {
+    return(.tdr_cache_read(val))
+  }
+  
+  val
 }
 
 #' Access a full slot as a named list (all samples), reading from cache lazily
 #'
 #' Returns a named list over all samples for the given slot, loading each
-#' element from disk when caching is active.
+#' element from disk when the entry is an on-disk path string.
 #'
 #' @param .tdr.obj tinydenseR object.
-#' @param slot_name Character – one of "clustering.ids", "celltyping.ids",
-#'   "nearest.landmarks", "fuzzy.graph".
+#' @param slot_name Character – one of \code{"clustering"},
+#'   \code{"celltyping"}, \code{"nearest.lm"}, \code{"fuzzy.graphs"}.
+#'   Legacy names are mapped automatically.
 #' @return A named list of R objects (one per sample).
 #' @keywords internal
 .tdr_get_map_slot_all <- function(.tdr.obj, slot_name) {
   
-  cache <- .tdr.obj@density$.cache
+  # Legacy name mapping
+  slot_name <- switch(slot_name,
+    "clustering.ids"    = "clustering",
+    "celltyping.ids"    = "celltyping",
+    "nearest.landmarks" = "nearest.lm",
+    "fuzzy.graph"       = "fuzzy.graphs",
+    slot_name
+  )
   
-  if (!is.null(cache) && isTRUE(cache$on.disk)) {
-    manifests <- cache$manifests[[slot_name]]
-    if (is.null(manifests)) return(NULL)
-    lapply(X = manifests, FUN = .tdr_cache_read)
-  } else {
-    switch(slot_name,
-           "clustering.ids"    = .tdr.obj@cellmap$cluster.ids,
-           "celltyping.ids"    = .tdr.obj@cellmap$celltype.ids,
-           "nearest.landmarks" = .tdr.obj@cellmap$nearest.lm,
-           "fuzzy.graph"       = .tdr.obj@cellmap$fuzzy.graph,
-           stop("Unknown slot_name: ", slot_name))
-  }
+  entries <- switch(slot_name,
+    "clustering"   = .tdr.obj@cellmap$clustering$ids,
+    "celltyping"   = .tdr.obj@cellmap$celltyping$ids,
+    "nearest.lm"   = .tdr.obj@cellmap$nearest.lm,
+    "fuzzy.graphs" = .tdr.obj@cellmap$fuzzy.graphs,
+    stop("Unknown slot_name: ", slot_name)
+  )
+  
+  if (is.null(entries)) return(NULL)
+  
+  # Lazy-load any on-disk path strings
+  lapply(entries, function(val) {
+    if (is.character(val) && length(val) == 1L && !is.null(attr(val, "schema_v"))) {
+      if (!file.exists(val)) stop("Cache file missing: ", val)
+      .tdr_cache_read(val)
+    } else if (is.character(val) && length(val) == 1L && file.exists(val)) {
+      .tdr_cache_read(val)
+    } else {
+      val
+    }
+  })
 }
 
 #' Access per-cell map data for a single sample
@@ -274,14 +333,17 @@
 #' cache when caching is active or from in-memory slots otherwise.
 #'
 #' @param x A \code{\linkS4class{TDRObj}} processed through \code{get.map()}.
-#' @param .slot Character. One of \code{"celltyping.ids"},
-#'   \code{"clustering.ids"}, \code{"nearest.landmarks"}, \code{"fuzzy.graph"}.
+#' @param .slot Character. One of \code{"clustering"},
+#'   \code{"celltyping"}, \code{"nearest.lm"}, \code{"fuzzy.graphs"}.
+#'   Legacy names (\code{"clustering.ids"}, \code{"celltyping.ids"},
+#'   \code{"nearest.landmarks"}, \code{"fuzzy.graph"}) are accepted for
+#'   backward compatibility.
 #' @param .sample Character. Sample identifier (must match a name in
 #'   \code{names(x@@cells)}).
 #' @return The per-cell object for that sample and slot: a named character
 #'   vector (for \code{*ids}), an integer matrix (for
-#'   \code{nearest.landmarks}), or a sparse matrix (for
-#'   \code{fuzzy.graph}).
+#'   \code{nearest.lm}), or a sparse matrix (for
+#'   \code{fuzzy.graphs}).
 #'
 #' @seealso \code{\link{get.map}}, \code{\link{tdr_cache_validate}}
 #'
@@ -289,7 +351,7 @@
 #' \dontrun{
 #' # Get cell type labels for the first sample
 #' ct <- get.cellmap(x = lm.obj,
-#'                   .slot = "celltyping.ids",
+#'                   .slot = "celltyping",
 #'                   .sample = names(lm.obj$cells)[1])
 #' }
 #' @export
@@ -300,16 +362,16 @@ get.cellmap <- function(x, .slot, .sample) {
 
 #' Validate that all on-disk cache files are intact
 #'
-#' Checks every entry in the cache manifest for file existence.  This
-#' function is called automatically (in quiet mode) when entering
-#' \code{get.lm()}, \code{get.pbDE()}, and \code{get.plsD()} so that broken caches
-#' are caught early.
+#' Walks the \code{@cellmap} sub-slots for path strings and checks file
+#' existence.  This function is called automatically (in quiet mode) when
+#' entering \code{get.lm()}, \code{get.pbDE()}, and \code{get.plsD()} so
+#' that broken caches are caught early.
 #'
 #' Because the cache is ephemeral (stored under \code{tempdir()} and
 #' cleaned up at session end), heavyweight checksum verification is no
 #' longer performed.  Only file existence and schema version are checked.
 #'
-#' @param .tdr.obj A tinydenseR object with \code{$map$.cache} populated.
+#' @param .tdr.obj A tinydenseR object.
 #' @param .verbose Logical; if \code{TRUE}, print a summary.  Default
 #'   \code{TRUE}.
 #' @return The (unmodified) \code{.tdr.obj}, invisibly.  Stops with an
@@ -318,39 +380,56 @@ get.cellmap <- function(x, .slot, .sample) {
 tdr_cache_validate <- function(.tdr.obj,
                                .verbose = TRUE) {
   
-  cache <- .tdr.obj@density$.cache
-  
-  if (is.null(cache) || !isTRUE(cache$on.disk)) {
-    if (isTRUE(.verbose)) message("No on-disk cache active; nothing to validate.")
-    return(invisible(.tdr.obj))
+  # Collect all path strings from @cellmap sub-slots
+  .is_path_string <- function(val) {
+    is.character(val) && length(val) == 1L && !is.null(attr(val, "schema_v"))
   }
   
-  # Schema version check
-  if (!is.null(cache$schema_v) &&
-      cache$schema_v != .TDR_CACHE_SCHEMA_VERSION) {
-    stop("Cache schema mismatch: manifest has v", cache$schema_v,
-         " but current code expects v", .TDR_CACHE_SCHEMA_VERSION,
-         ".\nRe-run get.map() to regenerate.")
-  }
+  # Define which sub-structures to walk
+  slot_lists <- list(
+    clustering   = .tdr.obj@cellmap$clustering$ids,
+    celltyping   = .tdr.obj@cellmap$celltyping$ids,
+    nearest.lm   = .tdr.obj@cellmap$nearest.lm,
+    fuzzy.graphs = .tdr.obj@cellmap$fuzzy.graphs
+  )
   
   n_ok      <- 0L
   n_missing <- 0L
   problems  <- character(0)
+  has_paths <- FALSE
   
-  for (slot_name in names(cache$manifests)) {
-    for (sample_name in names(cache$manifests[[slot_name]])) {
-      meta <- cache$manifests[[slot_name]][[sample_name]]
-      if (is.null(meta)) next
+  for (slot_name in names(slot_lists)) {
+    entries <- slot_lists[[slot_name]]
+    if (is.null(entries)) next
+    for (sample_name in names(entries)) {
+      val <- entries[[sample_name]]
+      if (is.null(val)) next
+      if (!.is_path_string(val)) next
       
-      if (!file.exists(meta$path)) {
+      has_paths <- TRUE
+      
+      # Schema version check
+      sv <- attr(val, "schema_v")
+      if (!is.null(sv) && sv != .TDR_CACHE_SCHEMA_VERSION) {
+        stop("Cache schema mismatch: file has v", sv,
+             " but current code expects v", .TDR_CACHE_SCHEMA_VERSION,
+             ".\nRe-run get.map() to regenerate.")
+      }
+      
+      if (!file.exists(val)) {
         n_missing <- n_missing + 1L
         problems <- c(problems,
                       paste0("MISSING: ", slot_name, "/", sample_name,
-                             " -> ", meta$path))
+                             " -> ", val))
       } else {
         n_ok <- n_ok + 1L
       }
     }
+  }
+  
+  if (!has_paths) {
+    if (isTRUE(.verbose)) message("No on-disk cache active; nothing to validate.")
+    return(invisible(.tdr.obj))
   }
   
   if (length(problems) > 0L) {
@@ -378,8 +457,22 @@ tdr_cache_validate <- function(.tdr.obj,
 #' @return \code{NULL} invisibly.
 #' @keywords internal
 .tdr_cache_validate_quiet <- function(.tdr.obj) {
-  cache <- .tdr.obj@density$.cache
-  if (is.null(cache) || !isTRUE(cache$on.disk)) return(invisible(NULL))
+  # Quick check: any path strings at all?
+  has_cache <- !is.null(.tdr.obj@config$.cache.root) ||
+    any(vapply(
+      list(.tdr.obj@cellmap$clustering$ids,
+           .tdr.obj@cellmap$celltyping$ids,
+           .tdr.obj@cellmap$nearest.lm,
+           .tdr.obj@cellmap$fuzzy.graphs),
+      function(lst) {
+        if (is.null(lst)) return(FALSE)
+        any(vapply(lst, function(v) {
+          is.character(v) && length(v) == 1L && !is.null(attr(v, "schema_v"))
+        }, logical(1)))
+      },
+      logical(1)
+    ))
+  if (!has_cache) return(invisible(NULL))
   tdr_cache_validate(.tdr.obj, .verbose = FALSE)
   invisible(NULL)
 }
@@ -387,22 +480,45 @@ tdr_cache_validate <- function(.tdr.obj,
 #' Remove all cached files for a tinydenseR object
 #'
 #' Deletes the on-disk cache directory, deregisters it from the
-#' session-end cleanup finalizer, and strips cache metadata from the
-#' object.  After cleanup, the large slots (clustering$ids,
-#' celltyping$ids, nearest.landmarks, fuzzy.graph) will be \code{NULL}
-#' and must be regenerated via \code{get.map()}.
+#' session-end cleanup finalizer, and clears the path strings from
+#' \code{@cellmap}.  After cleanup, the cellmap entries will be
+#' \code{NULL} and must be regenerated via \code{get.map()}.
 #'
-#' @param .tdr.obj A tinydenseR object with \code{$map$.cache} populated.
+#' @param .tdr.obj A tinydenseR object.
 #' @return Updated \code{.tdr.obj} with cache removed.
 #' @export
 tdr_cache_cleanup <- function(.tdr.obj) {
-  cache_root <- .tdr.obj@density$.cache$root
+  # Derive cache root from @config$.cache.root or from path strings
+  cache_root <- .tdr.obj@config$.cache.root
+  if (is.null(cache_root)) {
+    # Fallback: derive from any path string (dirname/dirname → run dir)
+    for (lst in list(.tdr.obj@cellmap$clustering$ids,
+                     .tdr.obj@cellmap$nearest.lm,
+                     .tdr.obj@cellmap$fuzzy.graphs,
+                     .tdr.obj@cellmap$celltyping$ids)) {
+      if (is.null(lst)) next
+      for (val in lst) {
+        if (is.character(val) && length(val) == 1L && !is.null(attr(val, "schema_v"))) {
+          cache_root <- dirname(dirname(val))
+          break
+        }
+      }
+      if (!is.null(cache_root)) break
+    }
+  }
+  
   if (!is.null(cache_root) && dir.exists(cache_root)) {
     unlink(cache_root, recursive = TRUE)
     .tdr_cache_deregister(cache_root)
     message("Removed cache directory: ", cache_root)
   }
-  .tdr.obj@density$.cache <- NULL
+  
+  # Clear path strings from cellmap
+  .tdr.obj@cellmap$clustering$ids  <- NULL
+  .tdr.obj@cellmap$celltyping$ids  <- NULL
+  .tdr.obj@cellmap$nearest.lm      <- NULL
+  .tdr.obj@cellmap$fuzzy.graphs    <- NULL
+  .tdr.obj@config$.cache.root      <- NULL
   .tdr.obj
 }
 
@@ -413,7 +529,7 @@ tdr_cache_cleanup <- function(.tdr.obj) {
 #' version, number of cached slots and files, and total size on disk.
 #' Useful for interactive inspection and debugging.
 #'
-#' @param .tdr.obj A tinydenseR object (with or without \code{$map$.cache}).
+#' @param .tdr.obj A tinydenseR object.
 #' @return A list (invisible) with components \code{active}, \code{root},
 #'   \code{schema_v}, \code{slots} (character vector of cached slot names),
 #'   \code{n_samples}, \code{n_files}, and \code{total_bytes}.
@@ -423,8 +539,8 @@ tdr_cache_cleanup <- function(.tdr.obj) {
 #' tdr_cache_info(lm.cells)
 #' # On-disk cache: ACTIVE
 #' # Directory:     /tmp/RtmpXXXXXX/tinydenseR_cache/run_20260302_143012_a7f3c1b2
-#' # Schema:        v2
-#' # Slots:         clustering.ids, celltyping.ids, nearest.landmarks, fuzzy.graph
+#' # Schema:        v3
+#' # Slots:         clustering, celltyping, nearest.lm, fuzzy.graphs
 #' # Samples:       6
 #' # Files:         24  (4 slots x 6 samples)
 #' # Total size:    142.3 MB
@@ -434,36 +550,49 @@ tdr_cache_cleanup <- function(.tdr.obj) {
 #' @export
 tdr_cache_info <- function(.tdr.obj) {
   
-  cache <- .tdr.obj@density$.cache
+  .is_path_string <- function(val) {
+    is.character(val) && length(val) == 1L && !is.null(attr(val, "schema_v"))
+  }
   
-  if (is.null(cache) || !isTRUE(cache$on.disk)) {
+  slot_lists <- list(
+    clustering   = .tdr.obj@cellmap$clustering$ids,
+    celltyping   = .tdr.obj@cellmap$celltyping$ids,
+    nearest.lm   = .tdr.obj@cellmap$nearest.lm,
+    fuzzy.graphs = .tdr.obj@cellmap$fuzzy.graphs
+  )
+  
+  # Count files and accumulate bytes
+  n_files     <- 0L
+  total_bytes <- 0
+  sample_set  <- character(0)
+  active_slots <- character(0)
+  schema_v    <- NULL
+  
+  for (sn in names(slot_lists)) {
+    entries <- slot_lists[[sn]]
+    if (is.null(entries)) next
+    slot_has_paths <- FALSE
+    for (sm in names(entries)) {
+      val <- entries[[sm]]
+      if (is.null(val) || !.is_path_string(val)) next
+      slot_has_paths <- TRUE
+      n_files <- n_files + 1L
+      sample_set <- union(sample_set, sm)
+      b <- attr(val, "bytes")
+      if (!is.null(b)) total_bytes <- total_bytes + b
+      if (is.null(schema_v)) schema_v <- attr(val, "schema_v")
+    }
+    if (slot_has_paths) active_slots <- c(active_slots, sn)
+  }
+  
+  if (n_files == 0L) {
     message("On-disk cache: INACTIVE")
     message("(Re-run get.map(.cache.on.disk = TRUE) to enable.)")
     return(invisible(list(active = FALSE)))
   }
   
-  slot_names <- names(cache$manifests)
-  slot_names <- slot_names[!vapply(cache$manifests[slot_names], is.null, logical(1))]
-  
-  # Count files and accumulate bytes
-  n_files    <- 0L
-  total_bytes <- 0
-  sample_set <- character(0)
-  
-  for (sn in slot_names) {
-    entries <- cache$manifests[[sn]]
-    for (sm in names(entries)) {
-      meta <- entries[[sm]]
-      if (is.null(meta)) next
-      n_files <- n_files + 1L
-      sample_set <- union(sample_set, sm)
-      if (!is.null(meta$bytes)) {
-        total_bytes <- total_bytes + meta$bytes
-      }
-    }
-  }
-  
   n_samples <- length(sample_set)
+  cache_root <- .tdr.obj@config$.cache.root
   
   # Human-readable size
   fmt_size <- function(b) {
@@ -474,19 +603,19 @@ tdr_cache_info <- function(.tdr.obj) {
   }
   
   message("On-disk cache: ACTIVE")
-  message("Directory:     ", cache$root)
-  message("Schema:        v", cache$schema_v)
-  message("Slots:         ", paste(slot_names, collapse = ", "))
+  if (!is.null(cache_root)) message("Directory:     ", cache_root)
+  if (!is.null(schema_v))   message("Schema:        v", schema_v)
+  message("Slots:         ", paste(active_slots, collapse = ", "))
   message("Samples:       ", n_samples)
   message("Files:         ", n_files,
-          "  (", length(slot_names), " slot(s) x ", n_samples, " sample(s))")
+          "  (", length(active_slots), " slot(s) x ", n_samples, " sample(s))")
   message("Total size:    ", fmt_size(total_bytes))
   
   invisible(list(
     active      = TRUE,
-    root        = cache$root,
-    schema_v    = cache$schema_v,
-    slots       = slot_names,
+    root        = cache_root,
+    schema_v    = schema_v,
+    slots       = active_slots,
     n_samples   = n_samples,
     n_files     = n_files,
     total_bytes = total_bytes
