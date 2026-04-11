@@ -121,6 +121,11 @@ RunTDR.default <- function(x,
 #' the full pipeline. The finished TDRObj is stored in
 #' \code{SeuratObject::Misc(x, slot = "tdr.obj")}.
 #'
+#' All categorical cell-level columns in \code{x@@meta.data} are
+#' automatically imported as named celltyping solutions via
+#' \code{\link{import_cell_annotations}}.  The \code{.celltype.vec}
+#' column (if specified) is set as the active annotation.
+#'
 #' @param x A Seurat object.
 #' @param .sample.var Character(1). Column name in \code{x@@meta.data}
 #'   identifying sample membership.
@@ -267,11 +272,14 @@ RunTDR.Seurat <- function(x,
   tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), lm_args))
   tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
 
-  if (!is.null(tdr.obj@config$celltype.vec)) {
-    tdr.obj <- celltyping(tdr.obj,
-                          .celltyping.map = tdr.obj@config$celltype.vec,
-                          .verbose = .verbose)
-  }
+  # --- Import all categorical cell-level annotations ---
+  valid_cells <- unlist(.cells)
+  .cell.meta.full <- x@meta.data[valid_cells, , drop = FALSE]
+  tdr.obj <- import_cell_annotations(tdr.obj,
+                                     .cell.meta = .cell.meta.full,
+                                     .sample.var = .sample.var,
+                                     .celltype.vec = .celltype.vec,
+                                     .verbose = .verbose)
 
   tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
   tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .verbose = .verbose), emb_args))
@@ -656,11 +664,16 @@ RunTDR.SingleCellExperiment <- function(x,
     tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), lm_args))
     tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
 
-    if (!is.null(tdr.obj@config$celltype.vec)) {
-      tdr.obj <- celltyping(tdr.obj,
-                            .celltyping.map = tdr.obj@config$celltype.vec,
-                            .verbose = .verbose)
-    }
+    # --- Import all categorical cell-level annotations ---
+    valid_cells <- unlist(.cells)
+    .cell.meta.full <- as.data.frame(
+      SummarizedExperiment::colData(x)
+    )[valid_cells, , drop = FALSE]
+    tdr.obj <- import_cell_annotations(tdr.obj,
+                                       .cell.meta = .cell.meta.full,
+                                       .sample.var = .sample.var,
+                                       .celltype.vec = .celltype.vec,
+                                       .verbose = .verbose)
 
     tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
     tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .verbose = .verbose), emb_args))
@@ -2119,11 +2132,12 @@ RunTDR.IterableMatrix <- function(x, .cell.meta, ...) {
   tdr.obj <- do.call(get.landmarks.TDRObj, c(list(tdr.obj, .source = NULL, .seed = .seed, .verbose = .verbose), lm_args))
   tdr.obj <- do.call(get.graph.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), gr_args))
 
-  if (!is.null(tdr.obj@config$celltype.vec)) {
-    tdr.obj <- celltyping(tdr.obj,
-                          .celltyping.map = tdr.obj@config$celltype.vec,
-                          .verbose = .verbose)
-  }
+  # --- Import all categorical cell-level annotations ---
+  tdr.obj <- import_cell_annotations(tdr.obj,
+                                     .cell.meta = .cell.meta,
+                                     .sample.var = .sample.var,
+                                     .celltype.vec = .celltype.vec,
+                                     .verbose = .verbose)
 
   tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = NULL, .seed = .seed, .verbose = .verbose), map_args))
   tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .verbose = .verbose), emb_args))

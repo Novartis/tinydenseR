@@ -243,6 +243,11 @@ Builds a \code{\linkS4class{TDRObj}} from a Seurat object and executes
 the full pipeline. The finished TDRObj is stored in
 \code{SeuratObject::Misc(x, slot = "tdr.obj")}.
 
+All categorical cell-level columns in \code{x@meta.data} are
+automatically imported as named celltyping solutions via
+\code{\link{import_cell_annotations}}.  The \code{.celltype.vec}
+column (if specified) is set as the active annotation.
+
 \item \code{RunTDR(SingleCellExperiment)}: Run the pipeline directly on a SingleCellExperiment
 
 Builds a \code{\linkS4class{TDRObj}} from a \code{SingleCellExperiment}
