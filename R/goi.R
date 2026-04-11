@@ -147,9 +147,8 @@ goi.summary.TDRObj <-
         }
         
         # Filter to cells belonging to specified cluster/celltype IDs
-        .id.from.slot <- paste0(.id.from, ".ids")
         .id.idx <-
-          lapply(X = .tdr_get_map_slot_all(.tdr.obj, .id.from.slot),
+          lapply(X = .tdr_get_map_slot_all(.tdr.obj, .id.from),
                  FUN = function(smpl){
                    which(x = smpl %in% .id)
                  })
@@ -157,9 +156,8 @@ goi.summary.TDRObj <-
       } else {
         
         # Use all cells (default behavior)
-        .id.from.slot <- paste0(.id.from, ".ids")
         .id.idx <-
-          lapply(X = .tdr_get_map_slot_all(.tdr.obj, .id.from.slot),
+          lapply(X = .tdr_get_map_slot_all(.tdr.obj, .id.from),
                  FUN = seq_along)
         
       }
@@ -167,7 +165,7 @@ goi.summary.TDRObj <-
       
       # Filter to cells mapped to a specific landmark index
       .id.idx <-
-        lapply(X = .tdr_get_map_slot_all(.tdr.obj, "nearest.landmarks"),
+        lapply(X = .tdr_get_map_slot_all(.tdr.obj, "nearest.lm"),
                FUN = function(smpl.knn)
                  which(x = smpl.knn[,1] == .id.idx))
       
@@ -198,7 +196,7 @@ goi.summary.TDRObj <-
         
         # Create cluster ID matrix for all cells × genes combinations
         .smpl.name <- names(x = .tdr.obj@cells)[cells.elem]
-        .smpl.cl.ids <- .tdr_get_map_slot(.tdr.obj, "clustering.ids", .smpl.name)
+        .smpl.cl.ids <- .tdr_get_map_slot(.tdr.obj, "clustering", .smpl.name)
         ids <-
           .smpl.cl.ids[.id.idx[[cells.elem]]] |>
           rep(times = length(x = .goi)) |>
@@ -219,10 +217,10 @@ goi.summary.TDRObj <-
         
         # Repeat same process for cell type labels (if available)
         .has.celltyping <- !is.null(x = .tdr.obj@density$composition$celltyping$cell.count) ||
-          (!is.null(.tdr.obj@density$.cache) && !is.null(.tdr.obj@density$.cache$manifests$celltyping.ids))
+          !is.null(.tdr.obj@cellmap$celltyping$ids)
         if(isTRUE(x = .has.celltyping)){
           
-          .smpl.ct.ids <- .tdr_get_map_slot(.tdr.obj, "celltyping.ids", .smpl.name)
+          .smpl.ct.ids <- .tdr_get_map_slot(.tdr.obj, "celltyping", .smpl.name)
           ct.ids <-
             .smpl.ct.ids[.id.idx[[cells.elem]]] |>
             rep(times = length(x = .goi)) |>
@@ -345,7 +343,7 @@ goi.summary.TDRObj <-
                  Matrix::rowSums(x = goi.elem$clustering$cell.count)
                
                .has.ct <- !is.null(x = .tdr.obj@density$composition$celltyping$cell.count) ||
-                 (!is.null(.tdr.obj@density$.cache) && !is.null(.tdr.obj@density$.cache$manifests$celltyping.ids))
+                 !is.null(.tdr.obj@cellmap$celltyping$ids)
                if(isTRUE(x = .has.ct)){
                  
                  # Same process for cell type labels

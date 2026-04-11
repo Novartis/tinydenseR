@@ -685,7 +685,7 @@ get.lm.TDRObj <-
     tmp.lbl[.id.idx] <- "in"
 
     lapply(
-      X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graph"),
+      X = .tdr_get_map_slot_all(.tdr.obj, "fuzzy.graphs"),
       FUN = function(smpl) {
         in.and.out <-
           .tdr_transfer_labels(
@@ -713,7 +713,7 @@ get.lm.TDRObj <-
     }
 
     lapply(
-      X = .tdr_get_map_slot_all(.tdr.obj, paste0(.id.from, ".ids")),
+      X = .tdr_get_map_slot_all(.tdr.obj, .id.from),
       FUN = function(smpl) {
         which(x = smpl %in% .id)
       }
@@ -755,7 +755,7 @@ get.lm.TDRObj <-
       .agg_fn <- function() {
         cell.idx <- .cell.idx.list[[smpl]]
         wcl <-
-          .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx, , drop = FALSE]
+          .tdr_get_map_slot(.tdr.obj, "fuzzy.graphs", smpl)[cell.idx, , drop = FALSE]
         wsum <- exprs.mat[, cell.idx] %*% wcl
         (Matrix::rowSums(x = wsum) / sum(wcl)) *
           (sum(Matrix::rowSums(x = wcl) > 0))
@@ -803,7 +803,7 @@ get.lm.TDRObj <-
       .agg_fn <- function() {
         cell.idx <- .cell.idx.list[[smpl]]
         wcl <-
-          .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", smpl)[cell.idx, , drop = FALSE]
+          .tdr_get_map_slot(.tdr.obj, "fuzzy.graphs", smpl)[cell.idx, , drop = FALSE]
         wsum <- Matrix::t(x = exprs.mat[cell.idx, cols]) %*% wcl
         Matrix::rowSums(x = wsum) / sum(wcl)
       }
@@ -1395,7 +1395,7 @@ get.pbDE.TDRObj <-
 
         .lm2.idx <-
           lapply(
-            X = .tdr_get_map_slot_all(.tdr.obj, paste0(.id.from, ".ids")),
+            X = .tdr_get_map_slot_all(.tdr.obj, .id.from),
             FUN = function(smpl) which(x = smpl %in% .id2)
           )
       }

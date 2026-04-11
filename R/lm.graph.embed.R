@@ -636,11 +636,11 @@ get.graph.TDRObj <-
 #' @param .label.confidence Numeric scalar in \code{[0,1]} controlling the minimum posterior confidence required
 #'   to assign a cell to a landmark‑derived cluster/celltype label.
 #' @param .cache.on.disk Logical (default TRUE). When \code{TRUE}, four large per-sample
-#'   slots (\code{clustering$ids}, \code{celltyping$ids}, \code{nearest.landmarks},
-#'   \code{fuzzy.graph}) are serialized to disk as uncompressed RDS files and evicted
-#'   from memory. Downstream accessors (e.g.\ in \code{get.pbDE}, \code{goi.summary})
-#'   read them back lazily on a per-sample basis. Set to \code{FALSE} to keep everything
-#'   in memory (original behaviour).
+#'   slots (\code{clustering$ids}, \code{celltyping$ids}, \code{nearest.lm},
+#'   \code{fuzzy.graphs}) are serialized to disk as uncompressed RDS files and stored
+#'   in \code{@cellmap} as attributed path strings.  Downstream accessors
+#'   (e.g.\ in \code{get.pbDE}, \code{goi.summary}) read them back lazily on a
+#'   per-sample basis.  Set to \code{FALSE} to keep everything in memory.
 #'
 #'   Cache files are stored under the system temporary directory
 #'   (\code{tempdir()}) and are automatically removed when the R session
@@ -668,13 +668,14 @@ get.graph.TDRObj <-
 #'       per sample. Used for "traditional" compositional statistics.
 #'     \item \code{celltyping$cell.perc}: Matrix (samples × cell types) of percentage of cells per 
 #'       cell type per sample. Used for "traditional" compositional statistics.
-#'     \item \code{nearest.landmarks}: List of matrices (one per sample) with nearest landmark indices 
+#'     \item \code{nearest.lm}: List of matrices (one per sample) with nearest landmark indices 
 #'       for all cells from UMAP transform.
-#'     \item \code{.cache}: (When \code{.cache.on.disk = TRUE}) List with \code{root} (cache
-#'       directory path), \code{on.disk} flag, \code{schema_v}, and \code{manifests} holding
-#'       per-sample file metadata for each cached slot. The four large slots above are set
-#'       to \code{NULL} in memory. Use \code{tdr_cache_cleanup()} to remove cached files.
 #'   }
+#'
+#'   When \code{.cache.on.disk = TRUE}, the four cell-level slots above are stored as
+#'   attributed path strings (with \code{schema_v} and \code{bytes} attributes) in
+#'   \code{@cellmap} rather than in-memory objects.  The cache root is stored in
+#'   \code{@config$.cache.root}.  Use \code{tdr_cache_cleanup()} to remove cached files.
 #'   If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with list containing \code{$ids} 
 #'   (factor of cell type assignments for landmarks), \code{$median.exprs} (matrix of mean expression 
 #'   per cell type), and \code{$pheatmap} (heatmap object).
@@ -831,13 +832,8 @@ get.map.TDRObj <-
     set.seed(seed = .seed)
     
     # ── Set up on-disk cache directory ──
-    # Auto-disable disk cache for non-files backends (cells are indices,
-    # not file paths, so dirname() would fail).
     backend <- .tdr.obj@config$backend
     if (is.null(backend)) backend <- "files"
-    if (backend != "files" && isTRUE(.cache.on.disk)) {
-      .cache.on.disk <- FALSE
-    }
 
     .cache.meta <- NULL
     if (isTRUE(x = .cache.on.disk)) {
@@ -846,21 +842,6 @@ get.map.TDRObj <-
       dir.create(.run_cache_dir, recursive = TRUE, showWarnings = FALSE)
       .tdr_cache_sweep_orphans(.run_cache_dir)
       .tdr_cache_register_cleanup(.run_cache_dir)
-      .cache.meta <- list(
-        root    = .run_cache_dir,
-        on.disk = TRUE,
-        schema_v = .TDR_CACHE_SCHEMA_VERSION,
-        manifests = list(
-          clustering.ids      = vector("list", length(.tdr.obj@cells)),
-          celltyping.ids      = vector("list", length(.tdr.obj@cells)),
-          nearest.landmarks   = vector("list", length(.tdr.obj@cells)),
-          fuzzy.graph          = vector("list", length(.tdr.obj@cells))
-        )
-      )
-      names(.cache.meta$manifests$clustering.ids)    <- names(.tdr.obj@cells)
-      names(.cache.meta$manifests$celltyping.ids)    <- names(.tdr.obj@cells)
-      names(.cache.meta$manifests$nearest.landmarks) <- names(.tdr.obj@cells)
-      names(.cache.meta$manifests$fuzzy.graph)       <- names(.tdr.obj@cells)
       
       if (isTRUE(x = .verbose)) {
         message("-> On-disk caching enabled: ", .run_cache_dir)
@@ -1139,28 +1120,28 @@ get.map.TDRObj <-
         if (isTRUE(x = .cache.on.disk)) {
           
           smpl.cache.records <- list(
-            clustering.ids = .tdr_cache_write(
+            clustering = .tdr_cache_write(
               object = res2$cell.clustering,
               cache_dir = .run_cache_dir,
-              slot_name = "clustering.ids",
+              slot_name = "clustering",
               sample_name = smpl.name),
-            nearest.landmarks = .tdr_cache_write(
+            nearest.lm = .tdr_cache_write(
               object = res2$nn$euclidean$idx,
               cache_dir = .run_cache_dir,
-              slot_name = "nearest.landmarks",
+              slot_name = "nearest.lm",
               sample_name = smpl.name),
-            fuzzy.graph = .tdr_cache_write(
+            fuzzy.graphs = .tdr_cache_write(
               object = res2$fgraph,
               cache_dir = .run_cache_dir,
-              slot_name = "fuzzy.graph",
+              slot_name = "fuzzy.graphs",
               sample_name = smpl.name)
           )
           
           if(!is.null(x = res2$cell.celltyping)){
-            smpl.cache.records$celltyping.ids <- .tdr_cache_write(
+            smpl.cache.records$celltyping <- .tdr_cache_write(
               object = res2$cell.celltyping,
               cache_dir = .run_cache_dir,
-              slot_name = "celltyping.ids",
+              slot_name = "celltyping",
               sample_name = smpl.name)
           }
           
@@ -1242,32 +1223,37 @@ get.map.TDRObj <-
     Y <-
       log2(x = fdens + 0.5)
     
-    # ── Assemble $map: cache-aware ──
+    # ── Assemble @cellmap: cache-aware ──
     if (isTRUE(x = .cache.on.disk)) {
       
-      # Populate cache manifest from per-sample records
+      # Populate @cellmap with path strings from per-sample records
+      clustering_ids <- stats::setNames(
+        vector("list", length(res)), names(res))
+      nearest_lm     <- clustering_ids
+      fuzzy_graphs   <- clustering_ids
+      celltyping_ids <- clustering_ids
+      has_celltyping <- FALSE
+      
       for (sn in names(res)) {
         recs <- res[[sn]]$cache.records
-        .cache.meta$manifests$clustering.ids[[sn]]    <- recs$clustering.ids
-        .cache.meta$manifests$nearest.landmarks[[sn]] <- recs$nearest.landmarks
-        .cache.meta$manifests$fuzzy.graph[[sn]]       <- recs$fuzzy.graph
-        if (!is.null(recs$celltyping.ids)) {
-          .cache.meta$manifests$celltyping.ids[[sn]]  <- recs$celltyping.ids
+        clustering_ids[[sn]] <- recs$clustering
+        nearest_lm[[sn]]    <- recs$nearest.lm
+        fuzzy_graphs[[sn]]  <- recs$fuzzy.graphs
+        if (!is.null(recs$celltyping)) {
+          celltyping_ids[[sn]] <- recs$celltyping
+          has_celltyping <- TRUE
         }
-      }
-      
-      # Remove empty celltyping manifest entries if no celltyping was performed
-      if (all(vapply(.cache.meta$manifests$celltyping.ids, is.null, logical(1)))) {
-        .cache.meta$manifests$celltyping.ids <- NULL
       }
       
       .tdr.obj@density$fdens <- fdens
       .tdr.obj@density$Y <- Y
-      .tdr.obj@cellmap$cluster.ids <- NULL
-      .tdr.obj@cellmap$celltype.ids <- NULL
-      .tdr.obj@cellmap$nearest.lm <- NULL
-      .tdr.obj@cellmap$fuzzy.graph <- NULL
-      .tdr.obj@density$.cache <- .cache.meta
+      .tdr.obj@cellmap$clustering$ids  <- clustering_ids
+      .tdr.obj@cellmap$nearest.lm      <- nearest_lm
+      .tdr.obj@cellmap$fuzzy.graphs    <- fuzzy_graphs
+      if (has_celltyping) {
+        .tdr.obj@cellmap$celltyping$ids <- celltyping_ids
+      }
+      .tdr.obj@config$.cache.root <- .run_cache_dir
       
     } else {
       
@@ -1290,10 +1276,10 @@ get.map.TDRObj <-
       
       .tdr.obj@density$fdens <- fdens
       .tdr.obj@density$Y <- Y
-      .tdr.obj@cellmap$cluster.ids <- cell.clustering
-      .tdr.obj@cellmap$celltype.ids <- cell.celltyping
-      .tdr.obj@cellmap$nearest.lm <- cell.nlmn
-      .tdr.obj@cellmap$fuzzy.graph <- cell.fg
+      .tdr.obj@cellmap$clustering$ids  <- cell.clustering
+      .tdr.obj@cellmap$celltyping$ids  <- cell.celltyping
+      .tdr.obj@cellmap$nearest.lm      <- cell.nlmn
+      .tdr.obj@cellmap$fuzzy.graphs    <- cell.fg
     }
     
     # ── Compute cell.count / cell.perc from streaming counts ──

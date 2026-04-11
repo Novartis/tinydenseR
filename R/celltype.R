@@ -102,7 +102,7 @@
 #'   If \code{get.map()} has already been run, the following slots are also
 #'   refreshed (no re-mapping required):
 #'   \describe{
-#'     \item{\code{$cellmap$celltype.ids}}{Per-sample list of cell-level celltype
+#'     \item{\code{$cellmap$celltyping$ids}}{Per-sample list of cell-level celltype
 #'       assignments, re-derived from the existing fuzzy graph}
 #'     \item{\code{$density$composition$celltyping$cell.count}}{Samples x cell
 #'       types count matrix}
@@ -339,18 +339,16 @@ celltyping.TDRObj <-
 # Private helpers for annotation refresh (parameterised by .annot.type)
 # ──────────────────────────────────────────────────────────────────────
 
-# Mapping from annotation type to internal slot/cache names
+# Mapping from annotation type to internal slot names
 .annot_slot_map <- function(.annot.type) {
   switch(.annot.type,
     clustering = list(
-      cellmap_slot = "cluster.ids",
-      cache_slot   = "clustering.ids",
-      comp_slot    = "clustering"
+      slot      = "clustering",
+      comp_slot = "clustering"
     ),
     celltyping = list(
-      cellmap_slot = "celltype.ids",
-      cache_slot   = "celltyping.ids",
-      comp_slot    = "celltyping"
+      slot      = "celltyping",
+      comp_slot = "celltyping"
     ),
     stop("Unknown .annot.type: ", .annot.type)
   )
@@ -385,8 +383,19 @@ celltyping.TDRObj <-
 
   .tdr_validate_label_confidence(.label.confidence)
   
-  cache <- .tdr.obj@density$.cache
-  is_cached <- !is.null(cache) && isTRUE(cache$on.disk)
+  # Detect on-disk mode: check if any entry in the slot is a path string
+  .is_path_string <- function(val) {
+    is.character(val) && length(val) == 1L && !is.null(attr(val, "schema_v"))
+  }
+  existing_entries <- .tdr.obj@cellmap[[smap$slot]]$ids
+  if (is.null(existing_entries)) {
+    # Check fuzzy.graphs to determine on-disk status
+    existing_entries <- .tdr.obj@cellmap$fuzzy.graphs
+  }
+  is_cached <- !is.null(existing_entries) &&
+    length(existing_entries) > 0L &&
+    .is_path_string(existing_entries[[1]])
+  cache_root <- .tdr.obj@config$.cache.root
   
   sample_names <- names(.tdr.obj@cells)
   
@@ -402,7 +411,7 @@ celltyping.TDRObj <-
     }
     
     # Read fuzzy graph (from disk cache or in-memory)
-    fgraph <- .tdr_get_map_slot(.tdr.obj, "fuzzy.graph", sn)
+    fgraph <- .tdr_get_map_slot(.tdr.obj, "fuzzy.graphs", sn)
     
     n_cells <- nrow(fgraph)
     
@@ -411,26 +420,26 @@ celltyping.TDRObj <-
         .method = "fuzzy",
         .label.confidence = .label.confidence,
         .n.cells = n_cells,
-        .cell.names = names(.tdr_get_map_slot(.tdr.obj, "clustering.ids", sn)),
+        .cell.names = names(.tdr_get_map_slot(.tdr.obj, "clustering", sn)),
         .fgraph = fgraph,
         .landmark.labels = annot_ids
       )
     
     # Write to on-disk cache if active
-    if (is_cached) {
-      cache_record <- .tdr_cache_write(
+    if (is_cached && !is.null(cache_root)) {
+      path_str <- .tdr_cache_write(
         object = new_ids[[sn]],
-        cache_dir = cache$root,
-        slot_name = smap$cache_slot,
+        cache_dir = cache_root,
+        slot_name = smap$slot,
         sample_name = sn
       )
-      .tdr.obj@density$.cache$manifests[[smap$cache_slot]][[sn]] <- cache_record
+      .tdr.obj@cellmap[[smap$slot]]$ids[[sn]] <- path_str
     }
   }
   
-  # Store in-memory (NULL if on-disk caching, populated otherwise)
+  # Store in-memory (data directly) if not on-disk
   if (!is_cached) {
-    .tdr.obj@cellmap[[smap$cellmap_slot]] <- new_ids
+    .tdr.obj@cellmap[[smap$slot]]$ids <- new_ids
   }
   
   .tdr.obj
@@ -454,7 +463,7 @@ celltyping.TDRObj <-
   counts <- lapply(
     X = stats::setNames(sample_names, sample_names),
     FUN = function(sn) {
-      ids <- .tdr_get_map_slot(.tdr.obj, smap$cache_slot, sn)
+      ids <- .tdr_get_map_slot(.tdr.obj, smap$slot, sn)
       tbl <- table(ids)
       stats::setNames(as.vector(tbl), names(tbl))
     }
