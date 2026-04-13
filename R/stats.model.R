@@ -576,7 +576,7 @@ get.lm.TDRObj <-
             FUN = stats::p.adjust,
             method = "fdr")
     
-    if(!is.null(x = .tdr.obj@landmark.annot$celltyping)){
+    if(!is.null(x = .tdr.obj@landmark.annot$celltyping$ids)){
       
       if(!(is.null(x = .block))){
         

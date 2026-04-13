@@ -974,7 +974,7 @@ get.map.TDRObj <-
         
         if(is.null(x = .tdr.obj@integration$symphony.obj)){
           
-          if(!is.null(x = .tdr.obj@landmark.annot$celltyping)){
+          if(!is.null(x = .tdr.obj@landmark.annot$celltyping$ids)){
             
             if(isTRUE(x = .verbose)){
               
@@ -1267,7 +1267,7 @@ get.map.TDRObj <-
       cell.clustering <-
         lapply(X = res, FUN = `[[`, "cell.clustering")
       
-      if(!is.null(x = .tdr.obj@landmark.annot$celltyping)){
+      if(!is.null(x = .tdr.obj@landmark.annot$celltyping$ids)){
         cell.celltyping <-
           lapply(X = res, FUN = `[[`, "cell.celltyping")
       } else {
@@ -1305,7 +1305,7 @@ get.map.TDRObj <-
       (.tdr.obj@density$composition$clustering$cell.count * 100) /
       Matrix::rowSums(x = .tdr.obj@density$composition$clustering$cell.count)
     
-    if(!is.null(x = .tdr.obj@landmark.annot$celltyping)){
+    if(!is.null(x = .tdr.obj@landmark.annot$celltyping$ids)){
       
       .tdr.obj@density$composition$celltyping$cell.count <-
         lapply(X = res, FUN = `[[`, "ct.count") |>
