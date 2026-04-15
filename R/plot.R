@@ -3385,8 +3385,11 @@ plotHeatmap.TDRObj <-
                                  y = feature,
                                  fill = loading)) +
     ggplot2::geom_raster() +
-    ggplot2::scale_fill_viridis_c(
-      option = "plasma",
+    ggplot2::scale_fill_gradientn(
+      colours = grDevices::hcl.colors(256, palette = "Blue-Red 2"),
+      rescaler = function(x, to = c(0, 1), from = range(x, na.rm = TRUE)) {
+        scales::rescale_mid(x, to, from, mid = 0)
+      },
       name = .loading.label,
       guide = ggplot2::guide_colorbar(
         direction = "vertical",
