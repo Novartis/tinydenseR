@@ -313,6 +313,60 @@ The pePC separates Baseline from Activation samples along a single supervised
 axis, confirming that the expression-driven density redistribution is
 captured after controlling for batch.
 
+### Multi-level factors and per-level pePC embeddings
+
+When the term of interest is a factor with more than two levels, the nested
+model comparison (`full` vs `reduced`) drops multiple columns from the design
+matrix at once. The resulting partial fitted-value delta
+$\Delta\hat{Y} = \hat{Y}_{full} - \hat{Y}_{red}$ has rank > 1, and PCA on
+that matrix learns axes that maximize variance across the **entire** effect
+subspace. Those axes are rotations within the multi-dimensional effect space
+— they do **not** correspond to individual level-vs-baseline comparisons.
+
+This whole-term embedding is mathematically correct and
+parameterization-invariant (it does not depend on the choice of factor coding
+or reference level). It is useful for omnibus visualization: "does this
+factor matter at all?"
+
+**For per-level interpretability**, use explicit contrasts instead. Fit a
+cell-means model with `limma::makeContrasts`, then call `get.embedding()`
+once per contrast. Each call produces a rank-1 pePC that isolates a specific
+level-vs-baseline effect via the Frisch–Waugh–Lovell theorem.
+
+```{r per-level-pepc-example, eval=FALSE}
+# --- Example: three-level factor (Timepoint: Baseline, D1, D7) ---
+
+# 1. Cell-means model (no intercept) with contrasts
+cm.design <- model.matrix(~ 0 + Timepoint + Batch, data = lm.obj$metadata)
+tp.contrasts <- limma::makeContrasts(
+    D1vsBaseline = TimepointD1  - TimepointBaseline,
+    D7vsBaseline = TimepointD7  - TimepointBaseline,
+    levels = cm.design
+)
+lm.obj <- get.lm(lm.obj, .design = cm.design,
+                  .contrasts = tp.contrasts,
+                  .model.name = "tp_contrasts")
+
+# 2. One rank-1 pePC per comparison
+lm.obj <- get.embedding(lm.obj,
+    .full.model = "tp_contrasts",
+    .contrast.of.interest = "D1vsBaseline")
+lm.obj <- get.embedding(lm.obj,
+    .full.model = "tp_contrasts",
+    .contrast.of.interest = "D7vsBaseline")
+
+# 3. Each embedding has a clear biological meaning
+plotSampleEmbedding(lm.obj, .embedding = "pePC",
+    .sup.embed.slot = "D1vsBaseline", .color.by = "Timepoint")
+plotSampleEmbedding(lm.obj, .embedding = "pePC",
+    .sup.embed.slot = "D7vsBaseline", .color.by = "Timepoint")
+```
+
+| Approach | When to use |
+|---|---|
+| Nested models (`full` vs `reduced`) | Omnibus view of the whole term; factor coding–invariant |
+| Explicit contrasts (`.contrast.of.interest`) | Per-level view; each pePC axis has a clear biological interpretation |
+
 ### Density Contrast and plsD
 
 We visualize the density fold-change alongside the leading plsD component on

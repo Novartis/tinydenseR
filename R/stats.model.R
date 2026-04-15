@@ -2026,10 +2026,50 @@ get.marker <- function(
 #' subspace (often rank-1 for a single contrast) that maximizes variance in the 
 #' partial-effect matrix \eqn{\Delta\hat{Y}^\top}.
 #'
-#' Geometrically, this evaluates how the residualized samples align with the effect 
-#' direction. Scores increase when residuals align with the partial-effect axis.
-#' Scatter along PCs reflects residual alignment with the effect; scatter orthogonal 
-#' to PCs is residual-only noise.
+#' Geometrically, this evaluates how the residualized samples align with the effect
+#' direction(s). For rank-1 effects (single contrast or two-level factor), scores
+#' increase when residuals align with the unique partial-effect axis. For rank > 1
+#' effects, each pePC axis captures a variance-maximizing direction within the
+#' multi-dimensional effect subspace (see below).
+#'
+#' \subsection{Multi-level terms (rank > 1 effects)}{
+#'
+#' When the dropped term has rank > 1 (e.g., a factor with more than two levels),
+#' the nested model method (\code{.red.model}) produces \eqn{\Delta\hat{Y}} with
+#' rank \eqn{r = p_{full} - p_{red} > 1}. PCA then learns \eqn{r} orthogonal axes
+#' that maximize variance within this effect subspace.
+#'
+#' \strong{Key property:} these axes are rotations that maximize explained variance.
+#' They do \emph{not} correspond to individual level-vs-baseline comparisons. For
+#' example, with a three-level factor (Baseline, D1, D7), the nested model pePC
+#' produces two axes (pePC1, pePC2) that span the same subspace as the D1-vs-Baseline
+#' and D7-vs-Baseline effects, but pePC1 might capture "shared activation" while
+#' pePC2 captures the difference between D1 and D7.
+#'
+#' \strong{The whole-term embedding is correct and parameterization-invariant:}
+#' \eqn{\Delta\hat{Y}} depends only on the column spaces of the full and reduced
+#' design matrices, not on the choice of factor coding (treatment, sum, Helmert) or
+#' reference level. The pePC subspace faithfully represents the complete effect of the
+#' dropped term.
+#'
+#' \strong{For per-level interpretability, use explicit contrasts instead.}
+#' The FWL-based method (\code{.contrast.of.interest}) produces rank-1 embeddings
+#' that isolate specific comparisons (e.g., D1 vs Baseline, D7 vs Baseline). This
+#' requires fitting a cell-means model with \code{limma::makeContrasts}. See
+#' Example 3 below.
+#'
+#' \strong{Practical guidance:}
+#' \itemize{
+#'   \item Two-level factors or single contrasts: both methods are equivalent and
+#'     produce a single, interpretable pePC axis.
+#'   \item Multi-level factors, whole-term view: use nested models. Useful for
+#'     omnibus visualization ("does this factor matter at all?") and for downstream
+#'     analyses that operate on the full effect subspace.
+#'   \item Multi-level factors, per-level view: use explicit contrasts. Each call to
+#'     \code{get.embedding()} with a different \code{.contrast.of.interest} produces
+#'     a separate rank-1 embedding with a clear biological interpretation.
+#' }
+#' }
 #'
 #' @seealso \code{\link{get.lm}} for model fitting, \code{\link{plotSampleEmbedding}} for
 #'   visualizing the embedding
@@ -2109,6 +2149,53 @@ get.marker <- function(
 #' # Multiple embeddings stored together
 #' names(lm.obj$map$embedding)       # c("pca", "traj", "pePC")
 #' names(lm.obj$map$embedding$pePC)  # c("TrtVsCtrl", "KO_TrtVsCtrl")
+#'
+#' # ===========================================================================
+#' # Example 3: Multi-level factor — per-level embeddings via explicit contrasts
+#' # ===========================================================================
+#'
+#' # Suppose Timepoint has three levels: Baseline, D1, D7.
+#' #
+#' # Option A (nested models): whole-term embedding with rank 2.
+#' # pePC1 and pePC2 are variance-maximizing rotations within the
+#' # Timepoint effect subspace — they do NOT correspond to individual
+#' # level-vs-baseline comparisons.
+#'
+#' full.design  <- model.matrix(~ Timepoint + Batch, data = lm.obj$metadata)
+#' red.design   <- model.matrix(~ Batch, data = lm.obj$metadata)
+#' lm.obj <- get.lm(lm.obj, .design = full.design,  .model.name = "tp_full")
+#' lm.obj <- get.lm(lm.obj, .design = red.design,   .model.name = "tp_red")
+#'
+#' lm.obj <- get.embedding(lm.obj,
+#'     .full.model = "tp_full", .red.model = "tp_red",
+#'     .term.of.interest = "Timepoint")
+#' # -> produces pePC1, pePC2: omnibus Timepoint effect
+#'
+#' # Option B (explicit contrasts): one rank-1 embedding per comparison.
+#' # Each pePC axis directly captures a specific level-vs-baseline effect.
+#'
+#' cm.design <- model.matrix(~ 0 + Timepoint + Batch, data = lm.obj$metadata)
+#' tp.contrasts <- limma::makeContrasts(
+#'     D1vsBaseline = TimepointD1  - TimepointBaseline,
+#'     D7vsBaseline = TimepointD7  - TimepointBaseline,
+#'     levels = cm.design
+#' )
+#' lm.obj <- get.lm(lm.obj, .design = cm.design,
+#'                   .contrasts = tp.contrasts,
+#'                   .model.name = "tp_contrasts")
+#'
+#' lm.obj <- get.embedding(lm.obj,
+#'     .full.model = "tp_contrasts",
+#'     .contrast.of.interest = "D1vsBaseline")
+#' lm.obj <- get.embedding(lm.obj,
+#'     .full.model = "tp_contrasts",
+#'     .contrast.of.interest = "D7vsBaseline")
+#'
+#' # Each embedding is rank 1 with a clear biological meaning:
+#' plotSampleEmbedding(lm.obj, .embedding = "pePC",
+#'     .sup.embed.slot = "D1vsBaseline", .color.by = "Timepoint")
+#' plotSampleEmbedding(lm.obj, .embedding = "pePC",
+#'     .sup.embed.slot = "D7vsBaseline", .color.by = "Timepoint")
 #' }
 #'
 #' @param ... Additional arguments passed to methods.
@@ -2549,6 +2636,17 @@ get.embedding.TDRObj <-
     
     if(isTRUE(x = .verbose)){
       message("  Rank of delta.Yhat: ", embed.rank)
+    }
+    
+    if(embed.rank > 1L && method == "nested_models" && isTRUE(x = .verbose)){
+      message(
+        "\n  Note: Term '", slot.name, "' has rank ", embed.rank,
+        ". pePC axes are variance-maximizing\n",
+        "  rotations within the full effect subspace -- they do NOT correspond\n",
+        "  to individual level-vs-baseline comparisons. For per-level embeddings,\n",
+        "  use get.embedding() with .contrast.of.interest and explicit contrasts.\n",
+        "  See ?get.embedding section 'Multi-level terms' for details."
+      )
     }
     
     # Compute PCA
