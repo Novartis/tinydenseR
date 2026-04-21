@@ -19,6 +19,7 @@ get.plsD(x, ...)
   .lazy.alpha = 1,
   .YX.interaction = TRUE,
   .loading.method = c("pearson", "ols", "spearman"),
+  .residualize = FALSE,
   .verbose = TRUE,
   ...
 )
@@ -80,6 +81,16 @@ scale-dependent, so high-variance features rank higher). \code{"spearman"}
 computes Spearman rank correlation via a sparse-aware implementation
 (robust to outliers and nonlinearity; slower, O(nnz * log(m_g) * K)).}
 
+\item{.residualize}{Logical: if TRUE, project out nuisance covariates from
+the expression matrix before decomposition. Default FALSE. Nuisance columns
+are identified automatically: when contrasts are present, design columns
+that do not participate in any contrast are nuisance; when no contrasts are
+used, all design columns except \code{.coef.col} are nuisance. The design
+is expanded from sample level to landmark level via \code{@config$key}.
+Sparsity of the expression matrix is preserved via implicit operators (the
+residualized matrix is never materialized). Not supported with
+\code{.loading.method = "spearman"}.}
+
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 }
 \value{
@@ -123,7 +134,10 @@ Note: this differs from the raw coefficient by a constant shift. Use the raw
 coefficient from the model fit for scientific interpretation of absolute density changes.}
 \item{Y.mean}{Numeric: mean of the density contrast used (mean(Y))}
 \item{M.local}{Matrix (optional): the interaction matrix (if .store.M = TRUE)}
-\item{params}{List: parameters used}
+\item{params}{List: parameters used, including:
+\code{params$residualize} (logical: whether residualization was applied) and
+\code{params$nuisance.cols} (character: names of nuisance design columns,
+NULL if not residualized)}
 }
 }
 \description{
@@ -193,6 +207,21 @@ because the expression matrix Xc sits between: the product is large only when
 features exist whose Y-weighted, graph-smoothed expression genuinely covaries
 with Y. With permuted Y, Ak collapses. Setting \code{.YX.interaction = FALSE}
 removes Y from the data matrix entirely, providing a diagnostic comparator.
+
+\strong{Nuisance residualization (.residualize = TRUE):}
+When the experimental design includes nuisance covariates (e.g. batch, sex,
+age), the density contrast Y from \code{get.lm} is already adjusted for these.
+However, the expression matrix X is not. Setting \code{.residualize = TRUE}
+projects X onto the orthogonal complement of the nuisance design, so that
+both sides of the PLS objective are free of nuisance effects. This improves
+interpretational symmetry: loadings reflect features whose expression covaries
+with the \emph{adjusted} density contrast, with nuisance-driven expression
+variation removed. The residualization uses the Frisch-Waugh-Lovell (FWL)
+decomposition: X is replaced by (I - H_Z) X, where H_Z is the hat matrix of
+the nuisance design expanded to landmark level via \code{@config$key}. Sparsity
+is preserved via implicit operators. When no nuisance covariates exist (e.g.
+a simple two-group design), \code{.residualize = TRUE} is equivalent to
+\code{.residualize = FALSE}.
 
 \strong{Structural score constraints and the balancing effect:}
 The score vectors computed by plsD are structurally mean-zero across landmarks. This

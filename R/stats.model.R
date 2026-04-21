@@ -2848,6 +2848,131 @@ get.embedding.TDRObj <-
 
 
 # -----------------------------------------------------------------------------
+# .build.nuisance.Z
+# Extracts the nuisance portion of the design matrix, expanded to landmark
+# level via @config$key.  Returns NULL if no nuisance columns exist.
+# -----------------------------------------------------------------------------
+
+.build.nuisance.Z <-
+  function(.tdr.obj,
+           .model.name,
+           .coef.col) {
+
+    fit <-
+      .tdr.obj@results$lm[[.model.name]]$fit
+
+    design <-
+      fit$design                       # original design (unchanged by contrasts.fit)
+
+    if (!is.null(x = fit$contrasts)) {
+      # Contrasts present: group = columns participating in any contrast
+      contrast.participation <-
+        Matrix::rowSums(x = abs(x = fit$contrasts)) > 0
+      nuisance.cols <-
+        which(x = !contrast.participation)
+    } else {
+      # No contrasts: group = .coef.col column
+      coef.col.idx <-
+        which(x = colnames(x = design) == .coef.col)
+      if (length(x = coef.col.idx) == 0) {
+        stop("'.coef.col' not found in design columns: ",
+             paste(colnames(x = design), collapse = ", "))
+      }
+      nuisance.cols <-
+        setdiff(x = seq_len(length.out = ncol(x = design)),
+                y = coef.col.idx)
+    }
+
+    if (length(x = nuisance.cols) == 0) return(NULL)
+
+    Z.sample <-
+      design[, nuisance.cols, drop = FALSE]
+
+    # Expand to landmark level
+    Z <-
+      Z.sample[.tdr.obj@config$key, , drop = FALSE]
+
+    # Ensure intercept is present (needed for proper centering)
+    has.intercept <-
+      apply(X = Z,
+            MARGIN = 2,
+            FUN = function(col) all(col == 1)) |>
+      any()
+
+    if (!has.intercept) {
+      Z <- cbind("(Intercept)" = 1, Z)
+    }
+
+    return(Z)
+  }
+
+
+# -----------------------------------------------------------------------------
+# .build.resid.operators
+# Precomputes the implicit residualization operators:
+#   B = (Z'Z)^{-1} Z' X          (q_z x p, dense)
+#   muX.resid = muX - zbar' B    (length p)
+#   ZtZ = Z'Z                     (q_z x q_z, for loading SD correction)
+#
+# Uses pivoted QR if Z'Z is near-singular.
+# Returns a list; NULL Z input returns NULL.
+# -----------------------------------------------------------------------------
+
+.build.resid.operators <-
+  function(Z,
+           X.sparse,
+           muX,
+           .verbose = TRUE) {
+
+    if (is.null(x = Z)) return(NULL)
+
+    q.z <- ncol(x = Z)
+    n   <- nrow(x = Z)
+
+    ZtZ <-
+      crossprod(x = Z)                              # q_z x q_z
+
+    # Check conditioning
+    rc <- rcond(x = ZtZ)
+    if (rc < .Machine$double.eps * 100) {
+      # Rank-deficient: reduce Z via pivoted QR
+      qr.Z <- qr(x = Z)
+      keep  <- seq_len(length.out = qr.Z$rank)
+      Z     <- qr.Q(qr = qr.Z)[, keep, drop = FALSE]
+      ZtZ   <- crossprod(x = Z)
+      q.z   <- ncol(x = Z)
+      if (isTRUE(x = .verbose)) {
+        warning("Nuisance design is rank-deficient after landmark expansion. ",
+                "Reduced to rank ", q.z, ".")
+      }
+    }
+
+    ZtZ.inv <-
+      solve(a = ZtZ)                                # q_z x q_z
+
+    ZtX <-
+      as.matrix(
+        x = Matrix::crossprod(x = Z, y = X.sparse)  # q_z x p
+      )
+
+    B <-
+      ZtZ.inv %*% ZtX                               # q_z x p
+
+    z.bar <-
+      colMeans(x = Z)                                # length q_z
+
+    muX.resid <-
+      muX - as.numeric(x = crossprod(x = B, y = z.bar))  # length p
+
+    list(B         = B,
+         Z         = Z,
+         ZtZ       = ZtZ,
+         z.bar     = z.bar,
+         muX.resid = muX.resid)
+  }
+
+
+# -----------------------------------------------------------------------------
 # .prepare.X
 # Filters, normalizes (size-factor + log2 for RNA), and optionally centers the
 # expression matrix.  Returns a list with:
@@ -2985,12 +3110,18 @@ get.embedding.TDRObj <-
            .method = c("pearson", "ols", "spearman"),
            Y0.vec = NULL,
            post.sd.vec = NULL,
-           muX = NULL) {
+           muX = NULL,
+           resid.ops = NULL) {
     
     .method <-
       match.arg(arg = .method,
                 choices = c("pearson", "ols", "spearman"))
     
+    .do.resid <- !is.null(x = resid.ops)
+
+    muX.eff <-
+      if (.do.resid) resid.ops$muX.resid else muX
+
     n <- nrow(x = scores)
     n.genes <- ncol(x = X.sparse)
     comp.names <- colnames(x = scores)
@@ -3010,6 +3141,24 @@ get.embedding.TDRObj <-
       gene.sd <-
         sqrt(x = pmax(col.sum.sq - (col.sums^2) / n, 0) /
                (n - 1))
+
+      if (.do.resid) {
+        # Adjust sufficient statistics for Xtilde = X - Z B
+        # colSums(Xtilde) = colSums(X) - n * zbar' B
+        col.sums <- col.sums -
+          n * as.numeric(x = crossprod(x = resid.ops$B,
+                                       y = resid.ops$z.bar))
+
+        # colSumSq(Xtilde) = colSumSq(X) - diag(B' Z'Z B)
+        R <- Matrix::chol(x = resid.ops$ZtZ)
+        RB <- R %*% resid.ops$B                          # q_z x p
+        col.sum.sq <- col.sum.sq -
+          colSums(x = RB^2)
+
+        gene.sd <-
+          sqrt(x = pmax(col.sum.sq - (col.sums^2) / n, 0) /
+                 (n - 1))
+      }
       
       loadings <-
         seq_len(length.out = ncomp) |>
@@ -3030,6 +3179,15 @@ get.embedding.TDRObj <-
                                y = X.sparse) |>
                as.numeric()) / (n - 1)
           
+          # Residualization correction to numerator
+          if (.do.resid) {
+            Zt.score <-
+              as.numeric(x = crossprod(x = resid.ops$Z, y = score.k))
+            num <- num -
+              as.numeric(x = crossprod(x = resid.ops$B, y = Zt.score)) /
+              (n - 1)
+          }
+
           r <-
             num / (sd.score * gene.sd)
           
@@ -3070,11 +3228,19 @@ get.embedding.TDRObj <-
           
           if (denom < .Machine$double.eps) return(rep(x = NA_real_, times = n.genes))
           
-          beta <-
-            (Matrix::crossprod(x = score.k,
-                               y = X.sparse) |>
-               as.numeric()) /
-            denom
+          num.ols <-
+            Matrix::crossprod(x = score.k,
+                              y = X.sparse) |>
+            as.numeric()
+
+          if (.do.resid) {
+            Zt.score <-
+              as.numeric(x = crossprod(x = resid.ops$Z, y = score.k))
+            num.ols <- num.ols -
+              as.numeric(x = crossprod(x = resid.ops$B, y = Zt.score))
+          }
+
+          beta <- num.ols / denom
           
           return(beta)
           
@@ -3116,6 +3282,13 @@ get.embedding.TDRObj <-
             full.num <-
               as.numeric(x = Matrix::crossprod(x = X.sparse, y = score.k))
             
+            if (.do.resid) {
+              Zt.score <-
+                as.numeric(x = crossprod(x = resid.ops$Z, y = score.k))
+              full.num <- full.num -
+                as.numeric(x = crossprod(x = resid.ops$B, y = Zt.score))
+            }
+            
             # Soft concordance indicator: pnorm( Y0 * sign(t_kc) / post.sd )
             # When t_kc = 0: sign returns 0 -> argument = 0 -> pnorm(0) = 0.5 (neutral)
             # When post.sd.vec is NULL: use hard threshold (indicator of sign agreement)
@@ -3133,8 +3306,16 @@ get.embedding.TDRObj <-
             # Note: sum(s * t_kc) != 0 in general, so muX correction IS needed
             s.t <- s.vec * score.k
             conc.num <-
-              as.numeric(x = Matrix::crossprod(x = X.sparse, y = s.t)) -
-              muX * sum(s.t)
+              as.numeric(x = Matrix::crossprod(x = X.sparse, y = s.t))
+
+            if (.do.resid) {
+              Zt.st <-
+                as.numeric(x = crossprod(x = resid.ops$Z, y = s.t))
+              conc.num <- conc.num -
+                as.numeric(x = crossprod(x = resid.ops$B, y = Zt.st))
+            }
+
+            conc.num <- conc.num - muX.eff * sum(s.t)
             
             # Concordance fraction
             near.zero <-
@@ -3243,6 +3424,21 @@ get.embedding.TDRObj <-
 #' with Y. With permuted Y, Ak collapses. Setting \code{.YX.interaction = FALSE}
 #' removes Y from the data matrix entirely, providing a diagnostic comparator.
 #'
+#' \strong{Nuisance residualization (.residualize = TRUE):}
+#' When the experimental design includes nuisance covariates (e.g. batch, sex,
+#' age), the density contrast Y from \code{get.lm} is already adjusted for these.
+#' However, the expression matrix X is not. Setting \code{.residualize = TRUE}
+#' projects X onto the orthogonal complement of the nuisance design, so that
+#' both sides of the PLS objective are free of nuisance effects. This improves
+#' interpretational symmetry: loadings reflect features whose expression covaries
+#' with the \emph{adjusted} density contrast, with nuisance-driven expression
+#' variation removed. The residualization uses the Frisch-Waugh-Lovell (FWL)
+#' decomposition: X is replaced by (I - H_Z) X, where H_Z is the hat matrix of
+#' the nuisance design expanded to landmark level via \code{@config$key}. Sparsity
+#' is preserved via implicit operators. When no nuisance covariates exist (e.g.
+#' a simple two-group design), \code{.residualize = TRUE} is equivalent to
+#' \code{.residualize = FALSE}.
+#'
 #' \strong{Structural score constraints and the balancing effect:}
 #' The score vectors computed by plsD are structurally mean-zero across landmarks. This
 #' is a mathematical consequence of column-centering \code{M.local}: for any weight vector
@@ -3327,6 +3523,15 @@ get.embedding.TDRObj <-
 #'   scale-dependent, so high-variance features rank higher). \code{"spearman"}
 #'   computes Spearman rank correlation via a sparse-aware implementation
 #'   (robust to outliers and nonlinearity; slower, O(nnz * log(m_g) * K)).
+#' @param .residualize Logical: if TRUE, project out nuisance covariates from
+#'   the expression matrix before decomposition. Default FALSE. Nuisance columns
+#'   are identified automatically: when contrasts are present, design columns
+#'   that do not participate in any contrast are nuisance; when no contrasts are
+#'   used, all design columns except \code{.coef.col} are nuisance. The design
+#'   is expanded from sample level to landmark level via \code{@config$key}.
+#'   Sparsity of the expression matrix is preserved via implicit operators (the
+#'   residualized matrix is never materialized). Not supported with
+#'   \code{.loading.method = "spearman"}.
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #'
 #' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$plsD[[.coef.col]]}:
@@ -3369,7 +3574,10 @@ get.embedding.TDRObj <-
 #'       coefficient from the model fit for scientific interpretation of absolute density changes.}
 #'     \item{Y.mean}{Numeric: mean of the density contrast used (mean(Y))}
 #'     \item{M.local}{Matrix (optional): the interaction matrix (if .store.M = TRUE)}
-#'     \item{params}{List: parameters used}
+#'     \item{params}{List: parameters used, including:
+#'       \code{params$residualize} (logical: whether residualization was applied) and
+#'       \code{params$nuisance.cols} (character: names of nuisance design columns,
+#'       NULL if not residualized)}
 #'   }
 #'
 #' @seealso \code{\link{get.lm}} (required predecessor),
@@ -3415,6 +3623,7 @@ get.plsD.TDRObj <-
            .lazy.alpha = 1,
            .YX.interaction = TRUE,
            .loading.method = c("pearson", "ols", "spearman"),
+           .residualize = FALSE,
            .verbose = TRUE,
            ...) {
     .tdr.obj <- x
@@ -3427,11 +3636,23 @@ get.plsD.TDRObj <-
       stop(".YX.interaction must be TRUE or FALSE.")
     }
 
+    if (!is.logical(x = .residualize) || length(x = .residualize) != 1) {
+      stop(".residualize must be TRUE or FALSE.")
+    }
+
     .loading.method <-
       match.arg(arg = .loading.method,
                 choices = c("pearson",
                             "ols",
                             "spearman"))
+
+    if (isTRUE(x = .residualize) &&
+        .loading.method == "spearman") {
+      stop(".residualize = TRUE is not supported with .loading.method = 'spearman'.\n",
+           "Rank-based correlations cannot be computed via the implicit ",
+           "residualization operator.\n",
+           "Use .loading.method = 'pearson' or 'ols' instead.")
+    }
     
     coef.mat <-
       .validate.DE.inputs(.tdr.obj = .tdr.obj,
@@ -3492,6 +3713,52 @@ get.plsD.TDRObj <-
     gene.names <-
       colnames(x = X)
     
+    # -------------------------------------------------------------------------
+    # Nuisance residualization (optional)
+    # -------------------------------------------------------------------------
+
+    resid.ops <- NULL
+    .do.resid <- FALSE
+
+    if (isTRUE(x = .residualize)) {
+
+      if (is.null(x = .tdr.obj@config$key)) {
+        stop("@config$key not found. Cannot expand design to landmark level.")
+      }
+
+      Z.nuisance <-
+        .build.nuisance.Z(.tdr.obj = .tdr.obj,
+                          .model.name = .model.name,
+                          .coef.col = .coef.col)
+
+      if (!is.null(x = Z.nuisance)) {
+
+        if (isTRUE(x = .verbose)) {
+          message("Residualizing expression against ",
+                  ncol(x = Z.nuisance),
+                  " nuisance column(s): ",
+                  paste(colnames(x = Z.nuisance), collapse = ", "))
+        }
+
+        resid.ops <-
+          .build.resid.operators(Z = Z.nuisance,
+                                X.sparse = X,
+                                muX = muX,
+                                .verbose = .verbose)
+
+        .do.resid <- TRUE
+
+      } else {
+        if (isTRUE(x = .verbose)) {
+          message("No nuisance covariates found; skipping residualization.")
+        }
+      }
+    }
+
+    # Effective column means (residualized or original)
+    muX.eff <-
+      if (.do.resid) resid.ops$muX.resid else muX
+
     # -------------------------------------------------------------------------
     # Build random-walk normalized graph P
     # -------------------------------------------------------------------------
@@ -3556,6 +3823,16 @@ get.plsD.TDRObj <-
       (1 / n.landmarks) *
       (as.numeric(x = Matrix::crossprod(x = X, y = qw)) -
          sum(qw) * muX)
+
+    # Correct muM for residualization: X -> X - Z B
+    if (.do.resid) {
+      Zt.qw <-
+        as.numeric(x = crossprod(x = resid.ops$Z, y = qw))   # length q_z
+      muM <- muM -
+        (1 / n.landmarks) *
+        (as.numeric(x = crossprod(x = resid.ops$B, y = Zt.qw)) +
+           sum(qw) * (muX.eff - muX))
+    }
     
     # --- M_mv(w): M_local %*% w  (returns dense length n) ---
     #
@@ -3567,8 +3844,13 @@ get.plsD.TDRObj <-
       w <- as.numeric(x = w)
       # sparse X %*% dense w  ->  dense length n
       xw <- as.numeric(x = X %*% w)
-      # implicit centering: Xc w = X w - (muX'w) 1
-      xcw <- xw - sum(muX * w)
+      # residualization correction: (X - Z B) w = X w - Z(Bw)
+      if (.do.resid) {
+        xw <- xw -
+          as.numeric(x = resid.ops$Z %*% (resid.ops$B %*% w))
+      }
+      # implicit centering: Xc w = Xtilde w - (muX.eff'w) 1
+      xcw <- xw - sum(muX.eff * w)
       # density weighting (element-wise, length n)
       if (isTRUE(x = .YX.interaction)) xcw <- Y * xcw
       # graph smoothing (sparse P.graph %*% dense vec)
@@ -3596,8 +3878,14 @@ get.plsD.TDRObj <-
       xtv <- as.numeric(
         x = Matrix::crossprod(x = X, y = ptv)
       )
+      # residualization correction: (X - Z B)' v = X' v - B' (Z' v)
+      if (.do.resid) {
+        xtv <- xtv -
+          as.numeric(x = crossprod(x = resid.ops$B,
+                                   y = crossprod(x = resid.ops$Z, y = ptv)))
+      }
       # implicit centering of X (transpose side)
-      xctv <- xtv - muX * sum(ptv)
+      xctv <- xtv - muX.eff * sum(ptv)
       # center M.local (transpose side)
       xctv - muM * sum(v)
     }
@@ -3837,7 +4125,8 @@ get.plsD.TDRObj <-
         .method     = .loading.method,
         Y0.vec      = coef.mat[, .coef.col],
         post.sd.vec = post.sd.vec,
-        muX         = muX
+        muX         = muX,
+        resid.ops   = resid.ops
       )
 
     raw.loadings        <- .loadings.res$raw.loadings
@@ -3897,7 +4186,9 @@ get.plsD.TDRObj <-
           tau.mult = .tau.mult,
           lazy.alpha = .lazy.alpha,
           YX.interaction = .YX.interaction,
-          loading.method = .loading.method
+          loading.method = .loading.method,
+          residualize = .residualize,
+          nuisance.cols = if (.do.resid) colnames(x = resid.ops$Z) else NULL
         )
       )
     
@@ -3908,9 +4199,14 @@ get.plsD.TDRObj <-
       }
       Xc.tmp <-
         X |>
-        (\(x)
-         Matrix::t(x = x) - muX
-        )() |>
+        (\(x) {
+          # Apply residualization if active
+          if (.do.resid) {
+            # Materialize Xtilde = X - Z B (this WILL be dense)
+            x <- x - resid.ops$Z %*% resid.ops$B
+          }
+          Matrix::t(x = x) - muX.eff
+        })() |>
         Matrix::t()
       if (isTRUE(x = .YX.interaction)) {
         YX.term <-
