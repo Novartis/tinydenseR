@@ -58,6 +58,8 @@ simulate_DA_data <- function(groups = c("Baseline", "Depletion"),
          "Install it with: BiocManager::install('flowCore')", call. = FALSE)
   }
 
+  # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+  withr::local_preserve_seed()
   set.seed(seed)
 
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
@@ -216,6 +218,8 @@ simulate_DE_data <- function(groups = c("Baseline", "Activation"),
          "Install it with: BiocManager::install('flowCore')", call. = FALSE)
   }
 
+  # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+  withr::local_preserve_seed()
   set.seed(seed)
 
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)

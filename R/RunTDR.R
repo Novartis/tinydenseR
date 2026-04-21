@@ -110,7 +110,7 @@ RunTDR.default <- function(x,
   }
 
   x <- do.call(get.map, c(list(x, .source = NULL, .seed = .seed, .verbose = .verbose), map_args))
-  x <- do.call(get.embedding, c(list(x, .verbose = .verbose), emb_args))
+  x <- do.call(get.embedding, c(list(x, .seed = .seed, .verbose = .verbose), emb_args))
 
   return(x)
 }
@@ -282,7 +282,7 @@ RunTDR.Seurat <- function(x,
                                      .verbose = .verbose)
 
   tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
-  tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .verbose = .verbose), emb_args))
+  tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), emb_args))
 
   # --- Store TDRObj in Seurat Misc slot ---
   SeuratObject::Misc(x, slot = "tdr.obj") <- tdr.obj
@@ -676,7 +676,7 @@ RunTDR.SingleCellExperiment <- function(x,
                                        .verbose = .verbose)
 
     tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = x, .seed = .seed, .verbose = .verbose), map_args))
-    tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .verbose = .verbose), emb_args))
+    tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), emb_args))
 
     # --- Store TDRObj in SCE metadata ---
     S4Vectors::metadata(x)$tdr.obj <- tdr.obj
@@ -1566,7 +1566,7 @@ RunTDR.cytoset <- function(x,
   }
 
   tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = NULL, .seed = .seed, .verbose = .verbose), map_args))
-  tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .verbose = .verbose), emb_args))
+  tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), emb_args))
 
   return(tdr.obj)
 }
@@ -2140,7 +2140,7 @@ RunTDR.IterableMatrix <- function(x, .cell.meta, ...) {
                                      .verbose = .verbose)
 
   tdr.obj <- do.call(get.map.TDRObj, c(list(tdr.obj, .source = NULL, .seed = .seed, .verbose = .verbose), map_args))
-  tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .verbose = .verbose), emb_args))
+  tdr.obj <- do.call(get.embedding.TDRObj, c(list(tdr.obj, .seed = .seed, .verbose = .verbose), emb_args))
 
   return(tdr.obj)
 }

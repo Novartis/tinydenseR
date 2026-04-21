@@ -37,7 +37,6 @@
 #' @param .force.recalc Logical: if TRUE, overwrite existing results in the specified slot 
 #'   (default FALSE). If FALSE and slot already exists, an error is thrown.
 #' @param .verbose Logical: print progress messages? Default TRUE.
-#' @param .seed Integer: random seed for reproducibility in blocking correlation estimation. Default 123.
 #'   
 #' @return The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$map$lm[[.model.name]]}:
 #'   \describe{
@@ -155,7 +154,6 @@ get.lm.TDRObj <-
     .model.name = "default",
     .force.recalc = FALSE,
     .verbose = TRUE,
-    .seed = 123,
     ...){
     .tdr.obj <- x
     
@@ -1777,7 +1775,8 @@ get.marker <- function(
     .n.pcs = 20,
     .verbose = TRUE,
     .ret.trajectory = FALSE,
-    .traj.dist.metric = "cosine"
+    .traj.dist.metric = "cosine",
+    .seed = 123
   ){
     
     # Initialize embedding slot if not present
@@ -1796,6 +1795,7 @@ get.marker <- function(
       }
       
       # Compute PCA via irlba (samples as rows, using .tdr.obj@density$Y)
+      set.seed(seed = .seed)
       pca.res <-
         Matrix::t(x = .tdr.obj@density$Y) |>
         (\(x)
@@ -1859,6 +1859,7 @@ get.marker <- function(
         }
         
         # Compute diffusion map on transposed Y (samples as rows)
+        set.seed(seed = .seed)
         Matrix.warnDeprecatedCoerce <-
           # destiny relies on Deprecated Matrix package function: see https://github.com/theislab/destiny/issues/61
           getOption(x = "Matrix.warnDeprecatedCoerce")
@@ -1951,6 +1952,8 @@ get.marker <- function(
 #' @param .n.pcs Integer: number of PCs for unsupervised PCA and diffusion map (default 20).
 #' @param .ret.trajectory Logical: whether to compute diffusion map trajectory embedding (default FALSE).
 #' @param .traj.dist.metric Character: distance metric for diffusion map (default "cosine").
+#' @param .seed Integer: random seed for reproducibility of sample-level PCA
+#'   (via \code{irlba::prcomp_irlba}) and diffusion map computation. Default 123.
 #' @param .verbose Logical: print progress messages? Default TRUE.
 #'
 #' @return Modified \code{.tdr.obj} with embeddings stored in \code{.tdr.obj$map$embedding}:
@@ -2216,10 +2219,14 @@ get.embedding.TDRObj <-
     .n.pcs = 20,
     .ret.trajectory = FALSE,
     .traj.dist.metric = "cosine",
+    .seed = 123,
     .verbose = TRUE,
     ...
   ){
     .tdr.obj <- x
+    
+    # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+    withr::local_preserve_seed()
     
     # -------------------------------------------------------------------------
     # Input validation
@@ -2266,6 +2273,7 @@ get.embedding.TDRObj <-
         .n.pcs = .n.pcs,
         .ret.trajectory = .ret.trajectory,
         .traj.dist.metric = .traj.dist.metric,
+        .seed = .seed,
         .verbose = .verbose
       )
     

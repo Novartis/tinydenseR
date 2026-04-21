@@ -520,6 +520,8 @@ get.landmarks.TDRObj <-
            ...){
     .tdr.obj <- x
     
+    # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+    withr::local_preserve_seed()
     set.seed(seed = .seed)
     
     if(!inherits(x = .tdr.obj, what = "TDRObj")){

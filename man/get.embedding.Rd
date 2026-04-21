@@ -17,6 +17,7 @@ get.embedding(x, ...)
   .n.pcs = 20,
   .ret.trajectory = FALSE,
   .traj.dist.metric = "cosine",
+  .seed = 123,
   .verbose = TRUE,
   ...
 )
@@ -52,6 +53,9 @@ the Frisch-Waugh-Lovell (FWL) theorem to compute the true partial fitted compone
 \item{.ret.trajectory}{Logical: whether to compute diffusion map trajectory embedding (default FALSE).}
 
 \item{.traj.dist.metric}{Character: distance metric for diffusion map (default "cosine").}
+
+\item{.seed}{Integer: random seed for reproducibility of sample-level PCA
+(via \code{irlba::prcomp_irlba}) and diffusion map computation. Default 123.}
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
 }

@@ -15,7 +15,6 @@ get.lm(x, ...)
   .model.name = "default",
   .force.recalc = FALSE,
   .verbose = TRUE,
-  .seed = 123,
   ...
 )
 }
@@ -43,8 +42,6 @@ in \code{.tdr.obj$map$lm[[.model.name]]}. Use different names to store multiple 
 (default FALSE). If FALSE and slot already exists, an error is thrown.}
 
 \item{.verbose}{Logical: print progress messages? Default TRUE.}
-
-\item{.seed}{Integer: random seed for reproducibility in blocking correlation estimation. Default 123.}
 }
 \value{
 The modified \code{.tdr.obj} with results stored in \code{.tdr.obj$map$lm[[.model.name]]}:

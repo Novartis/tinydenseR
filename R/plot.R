@@ -207,6 +207,8 @@ plotPCA.TDRObj <-
     }
     
     # Build plotting data frame
+    # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+    withr::local_preserve_seed()
     set.seed(seed = .seed)
     dat.df <-
       as.data.frame(x = .tdr.obj@landmark.embed$pca$coord[,c(.PC.x,.PC.y)]) |>
@@ -420,6 +422,8 @@ plotUMAP.TDRObj <-
     }
     
     # Build plotting data frame
+    # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+    withr::local_preserve_seed()
     set.seed(seed = .seed)
     dat.df <-
       as.data.frame(x = .tdr.obj@landmark.embed$umap$coord) |>
@@ -435,11 +439,6 @@ plotUMAP.TDRObj <-
     }
     
     # Randomize row order to avoid plotting bias
-    old.seed2 <- .Random.seed
-    on.exit(expr = assign(x = ".Random.seed",
-                          value = old.seed2,
-                          envir = .GlobalEnv),
-            add = TRUE)
     set.seed(seed = 123)
     dat.df <-
       dat.df  |>
@@ -807,11 +806,8 @@ plotBeeswarm.TDRObj <-
       
     }
     
-    old.seed <- .Random.seed
-    on.exit(expr = assign(x = ".Random.seed",
-                          value = old.seed,
-                          envir = .GlobalEnv),
-            add = TRUE)
+    # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+    withr::local_preserve_seed()
     set.seed(seed = 123)
     other.plot <-
       dat.df |>
@@ -2817,11 +2813,8 @@ scatterPlot <-
       dat.df$.color.feature <- 1
     }
     
-    old.seed <- .Random.seed
-    on.exit(expr = assign(x = ".Random.seed",
-                          value = old.seed,
-                          envir = .GlobalEnv),
-            add = TRUE)
+    # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+    withr::local_preserve_seed()
     set.seed(seed = .seed)
     p <-
       dat.df  |>
@@ -4034,11 +4027,8 @@ plotPlsD.TDRObj <-
     }
 
     # Build data frames
-    old.seed <- .Random.seed
-    on.exit(expr = assign(x = ".Random.seed",
-                          value = old.seed,
-                          envir = .GlobalEnv),
-            add = TRUE)
+    # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+    withr::local_preserve_seed()
     set.seed(seed = .seed)
 
     embed.df <-

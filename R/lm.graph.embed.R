@@ -82,6 +82,9 @@ leiden.cluster <-
            .verbose = TRUE,
            .seed = 123) {
     
+    # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+    withr::local_preserve_seed()
+    
     # Determine initialization embedding: LE > PCA > computed from similarity
     .init.embed <- 
       if(!is.null(x = .tdr.obj)){
@@ -442,6 +445,9 @@ get.graph.TDRObj <-
            ...){
     .tdr.obj <- x
     
+    # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+    withr::local_preserve_seed()
+    
     # Validate clustering method
     .cl.method <-
       match.arg(arg = .cl.method,
@@ -748,6 +754,9 @@ get.map.TDRObj <-
            .cache.on.disk = TRUE,
            ...){
     .tdr.obj <- x
+
+    # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+    withr::local_preserve_seed()
 
     .tdr_validate_label_confidence(.label.confidence)
     
@@ -1115,6 +1124,34 @@ get.map.TDRObj <-
             NULL
           }
         
+        # store original cell names
+        rownames(x = res2$nn$euclidean$idx) <-
+          rownames(x = mat.exprs)
+
+        colnames(x = res2$nn$euclidean$idx) <-
+          paste0(
+            "NN",
+            ncol(x = res2$nn$euclidean$idx) |>
+              seq_len())
+
+        if(ncol(x = res2$fgraph) == nrow(x = .tdr.obj@assay$expr)){
+          
+          rownames(x = res2$fgraph) <-
+            rownames(x = mat.exprs)
+
+          colnames(x = res2$fgraph) <-
+            rownames(x = .tdr.obj@assay$expr)
+
+        } else {
+          
+          colnames(x = res2$fgraph) <-
+            rownames(x = mat.exprs)
+
+          rownames(x = res2$fgraph) <-
+            rownames(x = .tdr.obj@assay$expr)
+
+        }
+
         # ── Cache large slots to disk or keep in-memory ──
         smpl.cache.records <- NULL
         if (isTRUE(x = .cache.on.disk)) {
@@ -1419,6 +1456,8 @@ lm.cluster.TDRObj <-
       stop("'.column.name' cannot be 'ids' (reserved for the active solution).")
     }
     
+    # Protect caller's RNG state; restore on exit (safe in fresh sessions)
+    withr::local_preserve_seed()
     set.seed(seed = .seed)
     
     if(is.null(.tdr.obj@graphs$adj.matrix)){
