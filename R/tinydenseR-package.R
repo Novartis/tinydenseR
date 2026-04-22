@@ -14,6 +14,7 @@
 # limitations under the License.
 #####
 
+#' @import patchwork
 #' @keywords internal
 "_PACKAGE"
 
