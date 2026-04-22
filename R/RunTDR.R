@@ -1796,8 +1796,8 @@ RunTDR.flowSet <- function(x,
     .tdr.obj@integration$harmony.var <- .harmony.var
   }
 
-  # --- Cytoset backend: store locked env for .get_sample_matrix ---
-  .tdr.obj@config$backend <- "cytoset"
+  # --- Cytometry backend: store locked env for .get_sample_matrix ---
+  .tdr.obj@config$backend <- "cyto"
   .tdr.obj@config$source.env <- .source.env
 
   # --- Cell type vector ---

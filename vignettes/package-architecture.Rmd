@@ -54,7 +54,7 @@ All analysis results are stored in a single S4 class, `TDRObj`. It contains
 | `graphs` | Landmark-landmark connectivity: adj.matrix, snn, fgraph |
 | `density` | Sample-level analytics (L × N matrices): fdens, Y, composition |
 | `sample.embed` | Sample-level embeddings (N × k matrices): pca, traj, pepc |
-| `cellmap` | Per-cell, per-sample data: clustering$ids, celltyping$ids, nearest.lm, fuzzy.graphs. Each entry is in-memory or an on-disk path string |
+| `cellmap` | Per-cell, per-sample data: clustering and celltyping, each with an `$ids` factor, nearest.lm, fuzzy.graphs. Each entry is in-memory or an on-disk path string |
 | `results` | All statistical outputs: lm, pb, marker, spec, nmf, pls, clustering, celltyping, features |
 
 The `$` accessor is overloaded so you can use `tdr$results` instead of
@@ -205,7 +205,7 @@ appropriate source:
 | `"seurat"` | Live Seurat object | `SeuratObject::LayerData(.source, assay, layer)[, col_idx]` |
 | `"sce"` | Live SingleCellExperiment | `SummarizedExperiment::assay(.source, assay)[, col_idx]` |
 | `"matrix"` | In-memory or on-disk matrix | Direct column indexing on the stored matrix reference |
-| `"cytoset"` | flowCore flowSet or flowWorkspace cytoset | `flowCore::exprs(cs[[sample_name]])` |
+| `"cyto"` | flowCore flowSet or flowWorkspace cytoset | `flowCore::exprs(cs[[sample_name]])` |
 
 The `"matrix"` backend is used by `dgCMatrix`, `DelayedMatrix`,
 `IterableMatrix`, and H5AD inputs (both `RunTDR.character` and

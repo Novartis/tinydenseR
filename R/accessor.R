@@ -54,7 +54,7 @@
         src[col_idx, , drop = FALSE]
       }
     },
-    "cytoset" = {
+    "cyto" = {
       cs <- .tdr.obj@config$source.env$cs
       # Handle both integer index and character sample name
       if (is.numeric(sample_idx)) {

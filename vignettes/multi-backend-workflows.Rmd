@@ -247,4 +247,4 @@ The `flowSet` and `cytoset` backends (from `flowCore` and `flowWorkspace`,
 respectively) are designed for flow, mass, and spectral cytometry data and
 require `.assay.type = "cyto"` along with a `.markers` argument specifying
 the channels to use. Both formats use the same internal backend
-(`"cytoset"`), so downstream behaviour is identical.
+(`"cyto"`), so downstream behaviour is identical.
