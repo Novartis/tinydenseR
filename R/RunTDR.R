@@ -1395,7 +1395,7 @@ RunTDR.character <- function(x,
 
 
 # ======================================================================
-# RunTDR – cytoset method
+# RunTDR – flow cytometry methods (cytoset / flowSet)
 # ======================================================================
 
 #' @describeIn RunTDR Run the pipeline on a flowWorkspace cytoset
@@ -1404,7 +1404,7 @@ RunTDR.character <- function(x,
 #' (one FCS sample per \code{cytoframe}) and executes the full pipeline.
 #'
 #' @param x A \code{flowWorkspace::cytoset} object.
-#' @param .sample.var Character(1). Column name in \code{flowWorkspace::pData(x)}
+#' @param .sample.var Character(1). Column name in \code{pData(x)}
 #'   identifying sample membership.
 #' @param .assay.type Character. Must be \code{"cyto"} (only valid type for
 #'   flow cytometry data).
@@ -1443,40 +1443,145 @@ RunTDR.cytoset <- function(x,
                              parallel::detectCores(logical = TRUE)
                            },
                            ...) {
+  .RunTDR_flow_common(
+    x = x, .sample.var = .sample.var, .assay.type = .assay.type,
+    .harmony.var = .harmony.var, .markers = .markers,
+    .celltype.vec = .celltype.vec,
+    .min.cells.per.sample = .min.cells.per.sample,
+    .verbose = .verbose, .seed = .seed,
+    .prop.landmarks = .prop.landmarks, .n.threads = .n.threads, ...
+  )
+}
 
-  # --- Guard ---
-  if (!requireNamespace("flowWorkspace", quietly = TRUE)) {
-    stop("Package 'flowWorkspace' is required for RunTDR.cytoset(). ",
+#' @describeIn RunTDR Run the pipeline on a flowCore flowSet
+#'
+#' Builds a \code{\linkS4class{TDRObj}} from a \code{flowSet} object
+#' (one FCS sample per \code{flowFrame}) and executes the full pipeline.
+#' Requires only \pkg{flowCore} (not \pkg{flowWorkspace}).
+#'
+#' @param x A \code{flowCore::flowSet} object.
+#' @param .sample.var Character(1). Column name in \code{pData(x)}
+#'   identifying sample membership.
+#' @param .assay.type Character. Must be \code{"cyto"} (only valid type for
+#'   flow cytometry data).
+#' @param .harmony.var Character vector of batch variable column names
+#'   in pData, or \code{NULL}.
+#' @param .markers Character vector of marker/channel names. If \code{NULL},
+#'   defaults to all channels in the flowSet.
+#' @param .celltype.vec Named character vector of per-cell type labels
+#'   (names = cell IDs, values = labels), or \code{NULL}.
+#' @param .min.cells.per.sample Integer. Minimum cells for inclusion.
+#' @param .verbose Logical.
+#' @param .seed Integer.
+#' @param .prop.landmarks Numeric in (0, 1].
+#' @param .n.threads Integer.
+#' @param ... Additional arguments passed to pipeline functions.
+#'
+#' @return The updated \code{\linkS4class{TDRObj}}.
+#'
+#' @export
+RunTDR.flowSet <- function(x,
+                           .sample.var,
+                           .assay.type = "cyto",
+                           .harmony.var = NULL,
+                           .markers = NULL,
+                           .celltype.vec = NULL,
+                           .min.cells.per.sample = 10,
+                           .verbose = TRUE,
+                           .seed = 123,
+                           .prop.landmarks = 0.1,
+                           .n.threads = if (is.hpc()) {
+                             max(RhpcBLASctl::blas_get_num_procs(),
+                                 RhpcBLASctl::omp_get_num_procs(),
+                                 RhpcBLASctl::omp_get_max_threads(),
+                                 na.rm = TRUE)
+                           } else {
+                             parallel::detectCores(logical = TRUE)
+                           },
+                           ...) {
+  .RunTDR_flow_common(
+    x = x, .sample.var = .sample.var, .assay.type = .assay.type,
+    .harmony.var = .harmony.var, .markers = .markers,
+    .celltype.vec = .celltype.vec,
+    .min.cells.per.sample = .min.cells.per.sample,
+    .verbose = .verbose, .seed = .seed,
+    .prop.landmarks = .prop.landmarks, .n.threads = .n.threads, ...
+  )
+}
+
+
+# ──────────────────────────────────────────────────────────────────────
+# Internal helper: shared logic for RunTDR.cytoset / RunTDR.flowSet
+# ──────────────────────────────────────────────────────────────────────
+
+#' Shared pipeline for cytoset and flowSet inputs
+#'
+#' @keywords internal
+#' @noRd
+.RunTDR_flow_common <- function(x,
+                                .sample.var,
+                                .assay.type = "cyto",
+                                .harmony.var = NULL,
+                                .markers = NULL,
+                                .celltype.vec = NULL,
+                                .min.cells.per.sample = 10,
+                                .verbose = TRUE,
+                                .seed = 123,
+                                .prop.landmarks = 0.1,
+                                .n.threads = if (is.hpc()) {
+                                  max(RhpcBLASctl::blas_get_num_procs(),
+                                      RhpcBLASctl::omp_get_num_procs(),
+                                      RhpcBLASctl::omp_get_max_threads(),
+                                      na.rm = TRUE)
+                                } else {
+                                  parallel::detectCores(logical = TRUE)
+                                },
+                                ...) {
+
+  # --- Guard: flowCore always required ---
+  if (!requireNamespace("flowCore", quietly = TRUE)) {
+    stop("Package 'flowCore' is required for flow cytometry input. ",
+         "Install it with: BiocManager::install('flowCore')", call. = FALSE)
+  }
+
+  # --- Guard: flowWorkspace required only for cytoset ---
+  is_cytoset <- inherits(x, "cytoset")
+  if (is_cytoset && !requireNamespace("flowWorkspace", quietly = TRUE)) {
+    stop("Package 'flowWorkspace' is required for cytoset input. ",
          "Install it with: BiocManager::install('flowWorkspace')", call. = FALSE)
   }
 
   # --- Validate input ---
-  if (!inherits(x, "cytoset")) {
-    stop("x must be a flowWorkspace::cytoset object.")
+  if (!inherits(x, "flowSet")) {
+    stop("x must be a flowCore::flowSet or flowWorkspace::cytoset object.")
   }
 
   if (!identical(.assay.type, "cyto")) {
-    stop(".assay.type must be 'cyto' for cytoset input. ",
-         "RNA data is not supported with cytoset.")
+    stop(".assay.type must be 'cyto' for flow cytometry input. ",
+         "RNA data is not supported with flowSet/cytoset.")
   }
 
   if (!is.character(.sample.var) || length(.sample.var) != 1) {
     stop(".sample.var must be a single character string.")
   }
 
-  if (!(.sample.var %in% colnames(flowWorkspace::pData(x)))) {
+  # pData and sampleNames are Biobase generics re-exported by flowCore.
+  # flowCore registers the flowSet method; flowWorkspace registers the
+
+  # cytoset method (loaded above via requireNamespace when needed).
+  if (!(.sample.var %in% colnames(flowCore::pData(x)))) {
     stop(".sample.var '", .sample.var,
          "' not found in pData(x).")
   }
 
   # --- Extract sample metadata ---
-  sample_meta <- as.data.frame(flowWorkspace::pData(x))
+  sample_meta <- as.data.frame(flowCore::pData(x))
   rownames(sample_meta) <- sample_meta[[.sample.var]]
   sample_meta <- sample_meta[, !colnames(sample_meta) %in% .sample.var,
                              drop = FALSE]
 
   # --- Build .cells ---
-  snames <- flowWorkspace::sampleNames(x)
+  snames <- flowCore::sampleNames(x)
   .cells <- lapply(
     stats::setNames(snames, snames),
     function(s) seq_len(nrow(x[[s]]))
@@ -1494,14 +1599,14 @@ RunTDR.cytoset <- function(x,
 
   # --- Resolve markers ---
   all_channels <-
-    flowCore::parameters(object = x[[flowWorkspace::sampleNames(x)[1]]])$name |>
+    flowCore::parameters(object = x[[flowCore::sampleNames(x)[1]]])$name |>
     unname()
   if (is.null(.markers)) {
     .markers <- all_channels
   } else {
     bad <- setdiff(.markers, all_channels)
     if (length(bad) > 0) {
-      stop("Markers not found in cytoset channels: ",
+      stop("Markers not found in channels: ",
            paste(bad, collapse = ", "))
     }
   }
@@ -1573,10 +1678,10 @@ RunTDR.cytoset <- function(x,
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Internal helper: build TDRObj from cytoset-derived inputs
+# Internal helper: build TDRObj from flow-cytometry-derived inputs
 # ──────────────────────────────────────────────────────────────────────
 
-#' Build a TDRObj from cytoset-derived cell lists and metadata
+#' Build a TDRObj from cytoset/flowSet-derived cell lists and metadata
 #'
 #' @keywords internal
 #' @noRd

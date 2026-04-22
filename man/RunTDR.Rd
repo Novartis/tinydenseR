@@ -8,6 +8,7 @@
 \alias{RunTDR.HDF5AnnData}
 \alias{RunTDR.character}
 \alias{RunTDR.cytoset}
+\alias{RunTDR.flowSet}
 \alias{RunTDR.dgCMatrix}
 \alias{RunTDR.DelayedMatrix}
 \alias{RunTDR.IterableMatrix}
@@ -137,6 +138,27 @@ RunTDR(x, ...)
   ...
 )
 
+\method{RunTDR}{flowSet}(
+  x,
+  .sample.var,
+  .assay.type = "cyto",
+  .harmony.var = NULL,
+  .markers = NULL,
+  .celltype.vec = NULL,
+  .min.cells.per.sample = 10,
+  .verbose = TRUE,
+  .seed = 123,
+  .prop.landmarks = 0.1,
+  .n.threads = if (is.hpc()) {
+     max(RhpcBLASctl::blas_get_num_procs(),
+    RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
+
+    } else {
+     parallel::detectCores(logical = TRUE)
+ },
+  ...
+)
+
 \method{RunTDR}{dgCMatrix}(x, .cell.meta, ...)
 
 \method{RunTDR}{DelayedMatrix}(x, .cell.meta, .bpcells.dir = NULL, ...)
@@ -215,6 +237,8 @@ A \code{\linkS4class{TDRObj}}.
 
 The updated \code{\linkS4class{TDRObj}}.
 
+The updated \code{\linkS4class{TDRObj}}.
+
 A \code{\linkS4class{TDRObj}}.
 
 A \code{\linkS4class{TDRObj}}.
@@ -284,6 +308,12 @@ are not supported by the \code{anndataR} package.
 
 Builds a \code{\linkS4class{TDRObj}} from a \code{cytoset} object
 (one FCS sample per \code{cytoframe}) and executes the full pipeline.
+
+\item \code{RunTDR(flowSet)}: Run the pipeline on a flowCore flowSet
+
+Builds a \code{\linkS4class{TDRObj}} from a \code{flowSet} object
+(one FCS sample per \code{flowFrame}) and executes the full pipeline.
+Requires only \pkg{flowCore} (not \pkg{flowWorkspace}).
 
 \item \code{RunTDR(dgCMatrix)}: Run the pipeline on a sparse matrix (dgCMatrix)
 

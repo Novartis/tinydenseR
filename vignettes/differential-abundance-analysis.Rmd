@@ -118,7 +118,8 @@ ggplot2::ggplot(data = DA_res_DA,
 
 We load the FCS files into a `cytoset`, attach sample-level metadata, and
 call `RunTDR()` to build landmarks, compute PCA, construct the
-nearest-neighbor graph, and map all cells in one step.
+nearest-neighbor graph, and map all cells in one step. (A `flowSet` from
+`flowCore` can be used interchangeably here — see `?RunTDR.flowSet`.)
 
 ```{r prepare-cytoset}
 # Sample metadata for the 0.5% setting

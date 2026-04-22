@@ -44,7 +44,7 @@ The supported backends are:
 | **Sparse matrix** | `dgCMatrix` | `TDRObj` (bare) |
 | **On-disk matrix** | `IterableMatrix` (BPCells) | `TDRObj` (bare) |
 | **Delayed matrix** | `DelayedMatrix` | `TDRObj` (bare) |
-| **Cytometry** | `cytoset` (flowWorkspace) | `TDRObj` (bare) |
+| **Cytometry** | `flowSet` (flowCore) or `cytoset` (flowWorkspace) | `TDRObj` (bare) |
 
 This means you can adopt `tinydenseR` without converting your data into a
 specific format first.
@@ -218,9 +218,9 @@ The `$` accessor on a `TDRObj` maps to the underlying S4 slots, so
 
 ## Matrix-Class Backends
 
-The `dgCMatrix`, `DelayedMatrix`, `IterableMatrix`, and `cytoset` backends
-produce a bare `TDRObj` directly — they do not wrap the result back into a
-container object. After calling `RunTDR()`, you work with the `TDRObj`
+The `dgCMatrix`, `DelayedMatrix`, `IterableMatrix`, `flowSet`, and `cytoset`
+backends produce a bare `TDRObj` directly — they do not wrap the result back
+into a container object. After calling `RunTDR()`, you work with the `TDRObj`
 directly:
  
 ```{r matrix-backends}
@@ -243,6 +243,8 @@ assays), the data is automatically converted to a BPCells on-disk format
 for efficient lazy access before running the pipeline. You can control the
 conversion directory with the `.bpcells.dir` argument.
 
-The `cytoset` backend (from `flowWorkspace`) is designed for flow, mass,
-and spectral cytometry data and requires `.assay.type = "cyto"` along
-with a `.markers` argument specifying the channels to use.
+The `flowSet` and `cytoset` backends (from `flowCore` and `flowWorkspace`,
+respectively) are designed for flow, mass, and spectral cytometry data and
+require `.assay.type = "cyto"` along with a `.markers` argument specifying
+the channels to use. Both formats use the same internal backend
+(`"cytoset"`), so downstream behaviour is identical.

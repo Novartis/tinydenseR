@@ -205,7 +205,7 @@ appropriate source:
 | `"seurat"` | Live Seurat object | `SeuratObject::LayerData(.source, assay, layer)[, col_idx]` |
 | `"sce"` | Live SingleCellExperiment | `SummarizedExperiment::assay(.source, assay)[, col_idx]` |
 | `"matrix"` | In-memory or on-disk matrix | Direct column indexing on the stored matrix reference |
-| `"cytoset"` | flowWorkspace cytoset | `flowCore::exprs(cs[[sample_name]])` |
+| `"cytoset"` | flowCore flowSet or flowWorkspace cytoset | `flowCore::exprs(cs[[sample_name]])` |
 
 The `"matrix"` backend is used by `dgCMatrix`, `DelayedMatrix`,
 `IterableMatrix`, and H5AD inputs (both `RunTDR.character` and

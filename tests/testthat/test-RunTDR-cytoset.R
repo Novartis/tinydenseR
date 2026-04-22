@@ -76,7 +76,7 @@ test_that("RunTDR.cytoset errors when .markers not in channels", {
   td <- .make_cytoset_test_data()
   expect_error(
     RunTDR(td$cs, .sample.var = "Sample", .markers = c("FakeMarker")),
-    "not found in cytoset"
+    "not found in channels"
   )
 })
 
