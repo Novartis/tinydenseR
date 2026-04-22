@@ -1389,6 +1389,10 @@ get.map.TDRObj <-
 #' @param .verbose Logical for progress messages (default TRUE).
 #' @param .small.size Integer threshold for straggler absorption (default 3). Clusters smaller 
 #'   than this are merged into most connected neighbors.
+#' @param .column.name Character name for storing the clustering solution
+#'   (default \code{NULL}, which auto-generates
+#'   \code{paste0("leiden.res.", .cl.resolution.parameter)}).  Cannot be
+#'   \code{"ids"}, which is reserved for the active solution.
 #'   
 #' @return Updated \code{.tdr.obj} with \code{$graph$clustering} containing:
 #'   \itemize{

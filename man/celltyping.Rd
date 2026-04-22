@@ -37,6 +37,11 @@ automatically.  Duplicate names are not allowed.
 
 \item{.verbose}{Logical; if \code{TRUE}, print progress messages when
 refreshing downstream slots (default \code{TRUE}).}
+
+\item{.name}{Character name for storing the solution (default \code{NULL},
+which auto-generates \code{"cluster_map"} for Mode A or
+\code{"per_cell"} for Mode B).  Cannot be \code{"ids"}, which is
+reserved for the active solution.}
 }
 \value{
 The \code{.tdr.obj} with the following updated fields:
