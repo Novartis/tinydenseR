@@ -49,6 +49,10 @@
 #' @param value The value to assign to the slot.
 #' @param object A TDRObj object (used in show method).
 #'
+#' @seealso \code{\link{as.SummarizedExperiment.TDRObj}} for converting to
+#'   SummarizedExperiment; \code{\link{GetTDR}}, \code{\link{SetTDR}} for
+#'   container extraction/storage.
+#'
 #' @name TDRObj-class
 #' @rdname TDRObj-class
 #' @exportClass TDRObj

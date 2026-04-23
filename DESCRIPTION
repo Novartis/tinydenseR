@@ -17,6 +17,7 @@ Collate:
     'dispatch.R'
     'Color.Palette.R'
     'sim_trajectory_tdr.R'
+    'as-SummarizedExperiment.R'
     'cache.R'
     'label.transfer.R'
     'celltype.R'

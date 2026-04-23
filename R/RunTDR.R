@@ -2442,3 +2442,13 @@ GetTDR.SingleCellExperiment <- function(x, ...) {
          "Run RunTDR() first.")
   tdr
 }
+
+#' @describeIn GetTDR Extract TDRObj from a SummarizedExperiment's metadata
+#' @export
+GetTDR.SummarizedExperiment <- function(x, ...) {
+  tdr <- S4Vectors::metadata(x)$tdr.obj
+  if (is.null(tdr))
+    stop("No TDRObj found in SummarizedExperiment metadata slot 'tdr.obj'. ",
+         "Convert with as.SummarizedExperiment() first.")
+  tdr
+}

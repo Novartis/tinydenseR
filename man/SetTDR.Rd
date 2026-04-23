@@ -5,6 +5,7 @@
 \alias{SetTDR.default}
 \alias{SetTDR.Seurat}
 \alias{SetTDR.SingleCellExperiment}
+\alias{SetTDR.SummarizedExperiment}
 \title{Store a TDRObj inside a container object}
 \usage{
 SetTDR(x, tdr, ...)
@@ -14,6 +15,8 @@ SetTDR(x, tdr, ...)
 \method{SetTDR}{Seurat}(x, tdr, ...)
 
 \method{SetTDR}{SingleCellExperiment}(x, tdr, ...)
+
+\method{SetTDR}{SummarizedExperiment}(x, tdr, ...)
 }
 \arguments{
 \item{x}{The container (Seurat, SCE, or TDRObj).}
@@ -35,5 +38,7 @@ Store a TDRObj inside a container object
 \item \code{SetTDR(Seurat)}: Store TDRObj in Seurat Misc slot
 
 \item \code{SetTDR(SingleCellExperiment)}: Store TDRObj in SCE metadata
+
+\item \code{SetTDR(SummarizedExperiment)}: Store TDRObj in SummarizedExperiment metadata
 
 }}

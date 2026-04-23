@@ -5,6 +5,7 @@
 \alias{GetTDR.default}
 \alias{GetTDR.Seurat}
 \alias{GetTDR.SingleCellExperiment}
+\alias{GetTDR.SummarizedExperiment}
 \title{Extract a TDRObj from a container object}
 \usage{
 GetTDR(x, ...)
@@ -14,6 +15,8 @@ GetTDR(x, ...)
 \method{GetTDR}{Seurat}(x, ...)
 
 \method{GetTDR}{SingleCellExperiment}(x, ...)
+
+\method{GetTDR}{SummarizedExperiment}(x, ...)
 }
 \arguments{
 \item{x}{An object that may contain a TDRObj.}
@@ -34,5 +37,7 @@ object in which \code{\link{RunTDR}} stored it.
 \item \code{GetTDR(Seurat)}: Extract TDRObj from a Seurat object's Misc slot
 
 \item \code{GetTDR(SingleCellExperiment)}: Extract TDRObj from a SingleCellExperiment's metadata
+
+\item \code{GetTDR(SummarizedExperiment)}: Extract TDRObj from a SummarizedExperiment's metadata
 
 }}
