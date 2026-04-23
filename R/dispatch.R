@@ -450,3 +450,185 @@ plotPlsD.SingleCellExperiment <- function(x, ...) plotPlsD.TDRObj(GetTDR(x), ...
 
 #' @export
 plotPlsDHeatmap.SingleCellExperiment <- function(x, ...) plotPlsDHeatmap.TDRObj(GetTDR(x), ...)
+
+# ======================================================================
+# SetTDR SummarizedExperiment
+# ======================================================================
+
+#' @describeIn SetTDR Store TDRObj in SummarizedExperiment metadata
+#' @export
+SetTDR.SummarizedExperiment <- function(x, tdr, ...) {
+  S4Vectors::metadata(x)$tdr.obj <- tdr
+  x
+}
+
+# ======================================================================
+# Tier 1 SummarizedExperiment wrappers (extract → delegate → store back)
+# ======================================================================
+
+#' @export
+get.graph.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- get.graph.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+celltyping.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- celltyping.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+lm.cluster.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- lm.cluster.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+recluster.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- recluster.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+set_active_clustering.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- set_active_clustering.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+set_active_celltyping.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- set_active_celltyping.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+import_cell_annotations.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- import_cell_annotations.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+list_celltyping_solutions.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  list_celltyping_solutions.TDRObj(tdr, ...)
+}
+
+#' @method get.features SummarizedExperiment
+#' @export
+get.features.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- get.features.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+get.lm.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- get.lm.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+get.embedding.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- get.embedding.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+#' @export
+get.plsD.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- get.plsD.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+
+# ======================================================================
+# Tier 2 SummarizedExperiment wrappers (require cell-level data)
+# ======================================================================
+
+#' @export
+get.landmarks.SummarizedExperiment <- function(x, ...) {
+  stop("get.landmarks() requires cell-level data. ",
+       "Use the original Seurat/SCE/matrix object, not a SummarizedExperiment.")
+}
+
+#' @export
+get.map.SummarizedExperiment <- function(x, ...) {
+  stop("get.map() requires cell-level data. ",
+       "Use the original Seurat/SCE/matrix object, not a SummarizedExperiment.")
+}
+
+#' @export
+get.pbDE.SummarizedExperiment <- function(x, ...) {
+  stop("get.pbDE() requires cell-level data. ",
+       "Use the original Seurat/SCE/matrix object, not a SummarizedExperiment.")
+}
+
+#' @export
+get.markerDE.SummarizedExperiment <- function(x, ...) {
+  stop("get.markerDE() requires cell-level data. ",
+       "Use the original Seurat/SCE/matrix object, not a SummarizedExperiment.")
+}
+
+#' @export
+goi.summary.SummarizedExperiment <- function(x, ...) {
+  stop("goi.summary() requires cell-level data. ",
+       "Use the original Seurat/SCE/matrix object, not a SummarizedExperiment.")
+}
+
+# ======================================================================
+# Tier 3 SummarizedExperiment plot wrappers (read-only)
+# ======================================================================
+
+#' @export
+plotPCA.SummarizedExperiment <- function(x, ...) plotPCA.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotUMAP.SummarizedExperiment <- function(x, ...) plotUMAP.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotBeeswarm.SummarizedExperiment <- function(x, ...) plotBeeswarm.TDRObj(GetTDR(x), ...)
+
+#' @export
+plot2Markers.SummarizedExperiment <- function(x, ...) plot2Markers.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotSamplePCA.SummarizedExperiment <- function(x, ...) plotSamplePCA.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotSampleEmbedding.SummarizedExperiment <- function(x, ...) plotSampleEmbedding.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotTradStats.SummarizedExperiment <- function(x, ...) plotTradStats.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotTradPerc.SummarizedExperiment <- function(x, ...) plotTradPerc.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotDensity.SummarizedExperiment <- function(x, ...) plotDensity.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotPbDE.SummarizedExperiment <- function(x, ...) plotPbDE.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotDEA.SummarizedExperiment <- function(x, ...) plotDEA.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotMarkerDE.SummarizedExperiment <- function(x, ...) plotMarkerDE.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotHeatmap.SummarizedExperiment <- function(x, ...) plotHeatmap.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotPlsD.SummarizedExperiment <- function(x, ...) plotPlsD.TDRObj(GetTDR(x), ...)
+
+#' @export
+plotPlsDHeatmap.SummarizedExperiment <- function(x, ...) plotPlsDHeatmap.TDRObj(GetTDR(x), ...)

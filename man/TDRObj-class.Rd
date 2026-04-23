@@ -70,3 +70,8 @@ cache.}
 features.}
 }}
 
+\seealso{
+\code{\link{as.SummarizedExperiment.TDRObj}} for converting to
+SummarizedExperiment; \code{\link{GetTDR}}, \code{\link{SetTDR}} for
+container extraction/storage.
+}
