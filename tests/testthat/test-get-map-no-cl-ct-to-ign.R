@@ -320,3 +320,33 @@ test_that("Seurat dispatch rejects .cl.ct.to.ign with informative error", {
     regexp = "'.cl.ct.to.ign' argument has been removed"
   )
 })
+
+# =========================================================================
+# 9. .ct.to.keep legacy variable is fully removed
+# =========================================================================
+
+test_that("get.map.TDRObj body does not reference .ct.to.keep", {
+  fn_body <- deparse(body(get.map.TDRObj))
+  expect_false(
+    any(grepl(".ct.to.keep", fn_body, fixed = TRUE)),
+    info = "Legacy .ct.to.keep variable should not appear in get.map.TDRObj"
+  )
+})
+
+test_that("fdens uses all cells (no cell-type subsetting)", {
+  tdr <- local_pipeline()
+
+  # fdens should be non-NULL and have correct dimensions
+
+  expect_false(is.null(tdr@density$fdens))
+  n_landmarks <- nrow(tdr@assay$expr)
+  n_samples   <- length(tdr@cells)
+  expect_equal(nrow(tdr@density$fdens), n_landmarks)
+  expect_equal(ncol(tdr@density$fdens), n_samples)
+
+  # All fdens values should be non-negative (sums of non-negative weights)
+  expect_true(all(tdr@density$fdens >= 0))
+
+  # Every sample should contribute a non-zero fdens column
+  expect_true(all(colSums(tdr@density$fdens) > 0))
+})

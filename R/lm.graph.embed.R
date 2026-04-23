@@ -830,14 +830,6 @@ get.map.TDRObj <-
       
     }
     
-    # Determine cell type levels for fdens filtering (all populations kept)
-    .ct.to.keep <-
-      if(is.null(x = .ref.obj)){
-        levels(x = .tdr.obj@landmark.annot$celltyping$ids)
-      } else {
-        unique(x = .ref.obj$meta_data[[.celltype.col.name]])
-      }
-    
     set.seed(seed = .seed)
     
     # ── Set up on-disk cache directory ──
@@ -1094,19 +1086,9 @@ get.map.TDRObj <-
         
         smpl.fdens <-
           if(ncol(x = res2$fgraph) == nrow(x = .tdr.obj@assay$expr)){
-            Matrix::colSums(x = res2$fgraph[
-              if(!is.null(x = .ct.to.keep)){
-                (res2$cell.celltyping %in% .ct.to.keep)
-              } else {
-                1:nrow(x = res2$fgraph)
-              }, , drop = FALSE])
+            Matrix::colSums(x = res2$fgraph)
           } else {
-            Matrix::rowSums(x = res2$fgraph[,
-              if(!is.null(x = .ct.to.keep)){
-                (res2$cell.celltyping %in% .ct.to.keep)
-              } else {
-                1:nrow(x = res2$fgraph)
-              }, drop = FALSE])
+            Matrix::rowSums(x = res2$fgraph)
           }
         
         smpl.n.cells <- nrow(x = res2$embedding)
