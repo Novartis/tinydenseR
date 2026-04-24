@@ -28,9 +28,34 @@
   backend <- .tdr.obj@config$backend
   if (is.null(backend)) backend <- "files"
 
+  # For seurat/sce backends, fall back to stored source reference when
+
+  # .source is NULL (e.g., child TDRObj from get.subset)
+  if (is.null(.source) && backend %in% c("seurat", "sce")) {
+    .source <- .tdr.obj@config$source.env$source
+    if (is.null(.source)) {
+      stop("No .source object available for '", backend, "' backend. ",
+           "Pass the source object explicitly or ensure the child was ",
+           "created via the container dispatch (get.subset.Seurat / ",
+           "get.subset.SingleCellExperiment).",
+           call. = FALSE)
+    }
+  }
+
   result <- switch(backend,
     "files" = {
-      readRDS(file = .tdr.obj@cells[[sample_idx]])
+      entry <- .tdr.obj@cells[[sample_idx]]
+      if (is.list(entry)) {
+        # Subset TDRObj: entry is list(path = ..., idx = ...)
+        mat <- readRDS(file = entry$path)
+        if (.tdr.obj@config$assay.type == "RNA") {
+          mat[, entry$idx, drop = FALSE]
+        } else {
+          mat[entry$idx, , drop = FALSE]
+        }
+      } else {
+        readRDS(file = entry)
+      }
     },
     "seurat" = {
       col_idx <- .tdr.obj@cells[[sample_idx]]
@@ -67,6 +92,11 @@
       colnames(mat) <- unname(colnames(mat))
       if (is.null(rownames(mat))) {
         rownames(mat) <- paste0("event_", seq_len(nrow(mat)))
+      }
+      # Apply cell filter for subset TDRObjs
+      cell_idx <- .tdr.obj@cells[[sample_idx]]
+      if (length(cell_idx) < nrow(mat)) {
+        mat <- mat[cell_idx, , drop = FALSE]
       }
       mat
     },

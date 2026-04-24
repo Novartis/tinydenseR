@@ -266,6 +266,28 @@ get.pbDE.SingleCellExperiment <- function(x, ...) {
 }
 
 # ======================================================================
+# get.subset Seurat / SCE / SE wrappers (returns child TDRObj, no SetTDR)
+# ======================================================================
+
+#' @export
+get.subset.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  get.subset.TDRObj(tdr, .source = x, ...)
+}
+
+#' @export
+get.subset.SingleCellExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  get.subset.TDRObj(tdr, .source = x, ...)
+}
+
+#' @export
+get.subset.SummarizedExperiment <- function(x, ...) {
+  tdr <- GetTDR(x)
+  get.subset.TDRObj(tdr, ...)
+}
+
+# ======================================================================
 # get.markerDE Seurat / SCE wrappers (Tier 2)
 # ======================================================================
 

@@ -29,6 +29,7 @@ Collate:
     'preprocess.R'
     'process.sim.trajectory.R'
     'stats.model.R'
+    'subset.R'
     'tinydenseR-package.R'
 VignetteBuilder: knitr
 Depends: 
