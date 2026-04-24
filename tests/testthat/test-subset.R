@@ -244,8 +244,8 @@ test_that("get.subset — full pipeline runs on child", {
   expect_true(!is.null(child@landmark.embed$pca))
   expect_true(!is.null(child@landmark.embed$umap))
   expect_true(!is.null(child@landmark.annot$clustering$ids))
-  expect_true(!is.null(child@density$fdens))
-  expect_true(!is.null(child@density$Y))
+  expect_true(!is.null(child@density$norm))
+  expect_true(!is.null(child@density$log.norm))
   expect_true(!is.null(child@cellmap$clustering$ids))
 
   # Child landmarks should be fewer than parent
@@ -427,5 +427,5 @@ test_that("get.subset — matrix backend", {
     get.map(.verbose = FALSE, .seed = 123)
 
   expect_true(nrow(child2@assay$expr) > 0)
-  expect_true(!is.null(child2@density$fdens))
+  expect_true(!is.null(child2@density$norm))
 })

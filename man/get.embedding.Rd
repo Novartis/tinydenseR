@@ -25,8 +25,8 @@ get.embedding(x, ...)
 \arguments{
 \item{x}{A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
 (anndataR) object processed through \code{get.map()}. Contains
-\code{$map$Y} (log2-transformed densities) used for unsupervised embeddings. Statistical
-model fits should be stored in \code{$map$lm} via \code{get.lm()}.}
+\code{@density$log.norm} (log2-transformed densities) used for unsupervised embeddings. Statistical
+model fits should be stored in \code{@results$lm} via \code{get.lm()}.}
 
 \item{...}{Additional arguments passed to methods.}
 
@@ -91,7 +91,7 @@ Modified \code{.tdr.obj} with embeddings stored in \code{.tdr.obj$map$embedding}
 \description{
 Computes embeddings for sample-level visualization. When called without supervised
 arguments, computes unsupervised embeddings (PCA and diffusion map trajectory) on
-landmark densities stored in \code{.tdr.obj$map$Y}. When called with supervised arguments
+landmark densities stored in \code{.tdr.obj@density$log.norm}. When called with supervised arguments
 (\code{.contrast.of.interest} or \code{.red.model}), additionally computes a
 partial-effect PCA (pePC) that isolates variation attributable to a specific effect.
 Exact for OLS; if duplicateCorrelation/blocking is used, the decomposition is approximate.

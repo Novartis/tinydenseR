@@ -23,13 +23,12 @@ Converts a tinydenseR \code{\linkS4class{TDRObj}} into a
 Rows represent tinydenseR \strong{landmarks} (not genes/proteins).
 The assays stored are:
 \describe{
+\item{\code{counts}}{Raw fuzzy graph density sums before size-factor
+normalization, from \code{@density$raw}.}
 \item{\code{normcounts}}{Size-factor-normalized fuzzy density
-(landmarks × samples), from \code{@density$fdens}.}
+(landmarks × samples), from \code{@density$norm}.}
 \item{\code{logcounts}}{log2(normcounts + 0.5), used by
-\code{\link{get.lm}} for linear modeling, from \code{@density$Y}.}
-\item{\code{counts}}{(When available) Raw fuzzy graph density sums
-before size-factor normalization, reconstructed from
-\code{@cellmap$fuzzy.graphs}.}
+\code{\link{get.lm}} for linear modeling, from \code{@density$log.norm}.}
 }
 
 \code{rowData} contains all stored clustering and celltyping solutions.

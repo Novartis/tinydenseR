@@ -54,8 +54,19 @@ Contains clustering and celltyping sub-lists, each with an $ids factor.}
 
 \item{\code{graphs}}{list. Landmark-landmark connectivity matrices: adj.matrix, snn, fgraph.}
 
-\item{\code{density}}{list. fdens-centric sample-level analytics (L x N matrices):
-fdens, Y, composition (clustering/celltyping cell counts/percentages).}
+\item{\code{density}}{list. Fuzzy density analytics populated by
+\code{\link{get.map}}. Contains five sub-elements:
+\describe{
+\item{raw}{L × N matrix of pre-normalization fuzzy density sums.}
+\item{norm}{L × N matrix after size-factor normalization:
+\code{norm = t(t(raw) / size.factors)}.}
+\item{log.norm}{L × N matrix: \code{log2(norm + 0.5)}.}
+\item{size.factors}{Named numeric(N): \eqn{n_j / \bar{n}},
+guaranteed to have mean 1.}
+\item{composition}{List of clustering/celltyping cell count and
+percentage matrices (samples × clusters).}
+}
+Access via \code{\link{get.density}} or the \code{$} accessor.}
 
 \item{\code{sample.embed}}{list. Sample-level embeddings (N x k matrices), each with $coord.
 Contains pca, traj, and pepc sub-lists.}

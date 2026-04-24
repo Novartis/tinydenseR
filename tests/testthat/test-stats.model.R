@@ -23,7 +23,7 @@ test_that("get.lm validates input correctly", {
   # Test error when design matrix doesn't match cells
   .tdr.obj <- TDRObj(
     cells = list(sample1 = "path1", sample2 = "path2"),
-    map = list(fdens = matrix(runif(20), nrow = 10, ncol = 2)),
+    map = list(norm = matrix(runif(20), nrow = 10, ncol = 2)),
     config = list(assay.type = "cyto")
   )
   .design <- matrix(1, nrow = 3, ncol = 1)  # Wrong number of rows

@@ -191,7 +191,7 @@ test_that("get.map is reproducible with same .seed", {
 
   r1 <- get.map(tdr, .verbose = FALSE, .seed = 42)
   r2 <- get.map(tdr, .verbose = FALSE, .seed = 42)
-  expect_identical(r1@density$fdens, r2@density$fdens)
+  expect_identical(r1@density$norm, r2@density$norm)
 })
 
 
@@ -470,7 +470,7 @@ test_that("RunTDR.default and stepwise pipeline yield identical results", {
   expect_identical(step@assay$expr,               auto@assay$expr)
   expect_identical(step@landmark.embed$pca$coord,  auto@landmark.embed$pca$coord)
   expect_identical(step@landmark.embed$umap$coord, auto@landmark.embed$umap$coord)
-  expect_identical(step@density$fdens,             auto@density$fdens)
+  expect_identical(step@density$norm,             auto@density$norm)
   expect_identical(step@sample.embed$pca$coord,    auto@sample.embed$pca$coord)
 })
 
@@ -520,7 +520,7 @@ test_that("get.lm silently absorbs .seed via ... for backward compatibility", {
     get.map(.verbose = FALSE, .seed = 123)
 
   # Ensure Y exists and has rows
-  skip_if(is.null(tdr@density$Y) || nrow(tdr@density$Y) == 0,
+  skip_if(is.null(tdr@density$log.norm) || nrow(tdr@density$log.norm) == 0,
           message = "Pipeline produced empty density matrix")
 
   design <- model.matrix(~ group, data = tdr@metadata)

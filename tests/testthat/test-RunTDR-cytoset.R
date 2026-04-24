@@ -96,7 +96,7 @@ test_that("RunTDR.cytoset full pipeline returns TDRObj", {
 
   expect_true(is.TDRObj(tdr))
   expect_equal(tdr@config$backend, "cyto")
-  expect_true(length(tdr@density$fdens) > 0)
+  expect_true(length(tdr@density$norm) > 0)
   expect_equal(nrow(tdr@metadata), length(tdr@cells))
 })
 

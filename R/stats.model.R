@@ -201,7 +201,7 @@ get.lm.TDRObj <-
                        collapse = " ")))
     }
     
-    if(is.null(x = .tdr.obj@density$fdens)){
+    if(is.null(x = .tdr.obj@density$norm)){
       stop("First run get.map")
     }
     
@@ -210,9 +210,9 @@ get.lm.TDRObj <-
       vector(mode = "list",
              length = 0)
     
-    # Use pre-computed Y from get.map
+    # Use pre-computed log.norm from get.map
     Y <-
-      .tdr.obj@density$Y
+      .tdr.obj@density$log.norm
     
     #if(nrow(x = Y) !=
     #   nrow(x = .tdr.obj@assay$expr)){
@@ -294,7 +294,7 @@ get.lm.TDRObj <-
               }
               
               # use 1/sum of probabilities as the weighting for the weighted BH adjustment from Cydar
-              w <- 1 / log10(x = Matrix::rowSums(x = .tdr.obj@density$fdens) + 1)
+              w <- 1 / log10(x = Matrix::rowSums(x = .tdr.obj@density$norm) + 1)
               w[is.infinite(x = w)] <- 1
               
               # Computing a density-weighted q-value.
@@ -1794,10 +1794,10 @@ get.marker <- function(
         message("\nComputing sample-level PCA on landmark densities")
       }
       
-      # Compute PCA via irlba (samples as rows, using .tdr.obj@density$Y)
+      # Compute PCA via irlba (samples as rows, using .tdr.obj@density$log.norm)
       set.seed(seed = .seed)
       pca.res <-
-        Matrix::t(x = .tdr.obj@density$Y) |>
+        Matrix::t(x = .tdr.obj@density$log.norm) |>
         (\(x)
          irlba::prcomp_irlba(
            x = x,
@@ -1867,7 +1867,7 @@ get.marker <- function(
         options(Matrix.warnDeprecatedCoerce = 0)
         
         traj.res <- 
-          Matrix::t(x = .tdr.obj@density$Y) |>
+          Matrix::t(x = .tdr.obj@density$log.norm) |>
           (\(x)
            destiny::DiffusionMap(
              data = x,
@@ -1927,15 +1927,15 @@ get.marker <- function(
 #'
 #' Computes embeddings for sample-level visualization. When called without supervised
 #' arguments, computes unsupervised embeddings (PCA and diffusion map trajectory) on
-#' landmark densities stored in \code{.tdr.obj$map$Y}. When called with supervised arguments 
+#' landmark densities stored in \code{.tdr.obj@density$log.norm}. When called with supervised arguments 
 #' (\code{.contrast.of.interest} or \code{.red.model}), additionally computes a 
 #' partial-effect PCA (pePC) that isolates variation attributable to a specific effect. 
 #' Exact for OLS; if duplicateCorrelation/blocking is used, the decomposition is approximate.
 #'
 #' @param x A \code{\linkS4class{TDRObj}}, Seurat, SingleCellExperiment, or HDF5AnnData
 #'   (anndataR) object processed through \code{get.map()}. Contains
-#'   \code{$map$Y} (log2-transformed densities) used for unsupervised embeddings. Statistical
-#'   model fits should be stored in \code{$map$lm} via \code{get.lm()}.
+#'   \code{@density$log.norm} (log2-transformed densities) used for unsupervised embeddings. Statistical
+#'   model fits should be stored in \code{@results$lm} via \code{get.lm()}.
 #' @param .full.model Character string naming the full model in \code{.tdr.obj$map$lm}
 #'   (default "default"). Required only when computing supervised embeddings (pePC).
 #' @param .term.of.interest Character string: the covariate/term being isolated when using the 
@@ -1987,11 +1987,12 @@ get.marker <- function(
 #' @details
 #' \strong{Unsupervised Embeddings (always computed):}
 #
-# \code{pca}: Standard PCA on log2-transformed landmark densities (log2(fdens + 0.5)),
+# \code{pca}: Standard PCA on log2-transformed landmark densities (log2(norm + 0.5)),
 # centered and scaled.
 #
 # \code{traj}: Diffusion map trajectory computed via \code{destiny::DiffusionMap} on
-# the log2-transformed landmark density matrix. Useful for visualizing continuous trajectories.
+# the log2-transformed landmark density matrix (\code{@density$log.norm}). Useful for
+# visualizing continuous trajectories.
 #
 # \strong{Supervised Embedding (pePC, when .contrast.of.interest or .red.model provided):}
 #'
@@ -2232,9 +2233,9 @@ get.embedding.TDRObj <-
     # Input validation
     # -------------------------------------------------------------------------
     
-    # Check that .tdr.obj has map$Y
-    if(is.null(x = .tdr.obj@density$Y)){
-      stop("'.tdr.obj$map$Y' not found. Run get.map() first.")
+    # Check that .tdr.obj has @density$log.norm
+    if(is.null(x = .tdr.obj@density$log.norm)){
+      stop("'.tdr.obj@density$log.norm' not found. Run get.map() first.")
     }
     
     # Determine if this is unsupervised-only mode (no pePC args provided)
@@ -2381,9 +2382,9 @@ get.embedding.TDRObj <-
         }
       }
       
-      # Get the expression matrix Y (landmarks x samples) from .tdr.obj@density$Y
+      # Get the log-normalized density matrix (landmarks x samples)
       Y <- 
-        .tdr.obj@density$Y
+        .tdr.obj@density$log.norm
       
       G <- 
         nrow(x = Y)
@@ -2569,15 +2570,15 @@ get.embedding.TDRObj <-
         message("  Reduced model ('", .red.model, "') columns: ", paste(colnames(.red.stats.obj$fit$design), collapse = ", "))
       }
       
-      # Get Y from .tdr.obj@density$Y for dimension validation
-      Y <- .tdr.obj@density$Y
+      # Get log.norm from .tdr.obj@density$log.norm for dimension validation
+      Y <- .tdr.obj@density$log.norm
       
       # Validate dimensions against model fits
       if(nrow(x = .stats.obj$fit$coefficients) != nrow(x = Y)){
-        stop("Number of landmarks in full model does not match .tdr.obj$map$Y")
+        stop("Number of landmarks in full model does not match .tdr.obj@density$log.norm")
       }
       if(nrow(x = .red.stats.obj$fit$coefficients) != nrow(x = Y)){
-        stop("Number of landmarks in reduced model does not match .tdr.obj$map$Y")
+        stop("Number of landmarks in reduced model does not match .tdr.obj@density$log.norm")
       }
       if(ncol(x = .stats.obj$fit$design) != ncol(x = .red.stats.obj$fit$design) ||
          nrow(x = .stats.obj$fit$design) != nrow(x = .red.stats.obj$fit$design)){
@@ -2676,7 +2677,7 @@ get.embedding.TDRObj <-
     
     # project E.red.t using delta.Yhat.t's V
     pca$coord <-
-      Matrix::t(x = (.tdr.obj@density$Y - Yhat.red) - pca$center) %*%
+      Matrix::t(x = (.tdr.obj@density$log.norm - Yhat.red) - pca$center) %*%
       pca$rotation
     
     colnames(x = pca$coord) <- 
@@ -2686,7 +2687,7 @@ get.embedding.TDRObj <-
     # partial-effect principal component variance as a fraction of TOTAL variance
     perc.tot.var.exp <-
       (100 * ((pca$sdev[1:ncol(x = pca$coord)])^2) /
-         (matrixStats::rowVars(x = .tdr.obj@density$Y) |>
+         (matrixStats::rowVars(x = .tdr.obj@density$log.norm) |>
             sum())) |>
       stats::setNames(nm = colnames(x = pca$coord))
     

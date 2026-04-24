@@ -162,18 +162,18 @@ test_that("U4: celltyping() before get.map() still works", {
     obj2 <- celltyping(obj, ct_map, .verbose = FALSE)
   )
   
-  # fdens should still be NULL since get.map was not run
-  expect_null(obj2@density$fdens)
+  # norm should still be NULL since get.map was not run
+  expect_null(obj2@density$norm)
   
   # But landmark-level celltyping should be set
   expect_true(!is.null(obj2@landmark.annot$celltyping$ids))
 })
 
 # ──────────────────────────────────────────────────────────────────────
-# U5: .refresh_celltyping() skips get.map-dependent slots when fdens is NULL
+# U5: .refresh_celltyping() skips get.map-dependent slots when norm is NULL
 # ──────────────────────────────────────────────────────────────────────
 
-test_that("U5: .refresh_celltyping skips map-dependent slots when fdens is NULL", {
+test_that("U5: .refresh_celltyping skips map-dependent slots when norm is NULL", {
   set.seed(42)
   n <- 200; m <- 5
   blob1 <- matrix(rnorm(n * m, 0, 0.5), n, m)
@@ -251,20 +251,20 @@ test_that("I1b: composition matrices are refreshed after late celltyping", {
 })
 
 # ──────────────────────────────────────────────────────────────────────
-# N1: fdens and Y are unchanged after celltyping re-run
+# N1: norm and log.norm are unchanged after celltyping re-run
 # ──────────────────────────────────────────────────────────────────────
 
-test_that("N1: fdens and Y are not changed by late celltyping", {
+test_that("N1: norm and log.norm are not changed by late celltyping", {
   obj <- .build_mapped_obj()
   
-  fdens_before <- obj@density$fdens
-  Y_before     <- obj@density$Y
+  norm_before     <- obj@density$norm
+  log_norm_before <- obj@density$log.norm
   
   ct_map <- .make_ct_map(obj)
   obj2 <- celltyping(obj, ct_map, .verbose = FALSE)
   
-  expect_identical(obj2@density$fdens, fdens_before)
-  expect_identical(obj2@density$Y, Y_before)
+  expect_identical(obj2@density$norm, norm_before)
+  expect_identical(obj2@density$log.norm, log_norm_before)
 })
 
 # ──────────────────────────────────────────────────────────────────────

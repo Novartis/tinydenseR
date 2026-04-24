@@ -575,7 +575,7 @@ test_that("C3.11: refresh skips downstream when get.map has NOT run", {
   obj <- .build_graph_obj()
   obj <- .inject_fake_trad(obj, "clustering")
 
-  # No fdens → should NOT touch composition (which doesn't exist)
+  # No norm → should NOT touch composition (which doesn't exist)
   expect_warning(
     obj2 <- recluster(obj, .cl.resolution.parameter = 2.0,
                        .seed = 42, .verbose = FALSE),

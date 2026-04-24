@@ -154,27 +154,27 @@ test_that("get.map succeeds and populates density/cellmap slots", {
   tdr <- local_pipeline()
 
   expect_true(is.TDRObj(tdr))
-  expect_false(is.null(tdr@density$fdens))
-  expect_false(is.null(tdr@density$Y))
+  expect_false(is.null(tdr@density$norm))
+  expect_false(is.null(tdr@density$log.norm))
   expect_false(is.null(tdr@density$composition$clustering$cell.count))
   expect_false(is.null(tdr@density$composition$clustering$cell.perc))
 })
 
-test_that("fdens has correct dimensions (landmarks x samples)", {
+test_that("norm has correct dimensions (landmarks x samples)", {
 
   tdr <- local_pipeline()
 
   n_landmarks <- nrow(tdr@assay$expr)
   n_samples <- length(tdr@cells)
-  expect_equal(nrow(tdr@density$fdens), n_landmarks)
-  expect_equal(ncol(tdr@density$fdens), n_samples)
+  expect_equal(nrow(tdr@density$norm), n_landmarks)
+  expect_equal(ncol(tdr@density$norm), n_samples)
 })
 
-test_that("Y equals log2(fdens + 0.5)", {
+test_that("log.norm equals log2(norm + 0.5)", {
   tdr <- local_pipeline()
 
-  expected_Y <- log2(tdr@density$fdens + 0.5)
-  expect_equal(tdr@density$Y, expected_Y)
+  expected_Y <- log2(tdr@density$norm + 0.5)
+  expect_equal(tdr@density$log.norm, expected_Y)
 })
 
 test_that("cell.count rows match sample names", {
@@ -236,8 +236,8 @@ test_that("get.map is deterministic with same seed", {
   tdr1 <- local_pipeline(seed = 42)
   tdr2 <- local_pipeline(seed = 42)
 
-  expect_equal(tdr1@density$fdens, tdr2@density$fdens)
-  expect_equal(tdr1@density$Y, tdr2@density$Y)
+  expect_equal(tdr1@density$norm, tdr2@density$norm)
+  expect_equal(tdr1@density$log.norm, tdr2@density$log.norm)
   expect_equal(
     tdr1@density$composition$clustering$cell.count,
     tdr2@density$composition$clustering$cell.count
@@ -280,7 +280,7 @@ test_that("Seurat dispatch wrapper still works without .cl.ct.to.ign", {
   result <- get.map(seu, .verbose = FALSE, .seed = 42)
 
   tdr_out <- GetTDR(result)
-  expect_false(is.null(tdr_out@density$fdens))
+  expect_false(is.null(tdr_out@density$norm))
   expect_null(tdr_out@density$ignored)
 })
 
@@ -333,20 +333,20 @@ test_that("get.map.TDRObj body does not reference .ct.to.keep", {
   )
 })
 
-test_that("fdens uses all cells (no cell-type subsetting)", {
+test_that("norm uses all cells (no cell-type subsetting)", {
   tdr <- local_pipeline()
 
-  # fdens should be non-NULL and have correct dimensions
+  # norm should be non-NULL and have correct dimensions
 
-  expect_false(is.null(tdr@density$fdens))
+  expect_false(is.null(tdr@density$norm))
   n_landmarks <- nrow(tdr@assay$expr)
   n_samples   <- length(tdr@cells)
-  expect_equal(nrow(tdr@density$fdens), n_landmarks)
-  expect_equal(ncol(tdr@density$fdens), n_samples)
+  expect_equal(nrow(tdr@density$norm), n_landmarks)
+  expect_equal(ncol(tdr@density$norm), n_samples)
 
-  # All fdens values should be non-negative (sums of non-negative weights)
-  expect_true(all(tdr@density$fdens >= 0))
+  # All norm values should be non-negative (sums of non-negative weights)
+  expect_true(all(tdr@density$norm >= 0))
 
-  # Every sample should contribute a non-zero fdens column
-  expect_true(all(colSums(tdr@density$fdens) > 0))
+  # Every sample should contribute a non-zero norm column
+  expect_true(all(colSums(tdr@density$norm) > 0))
 })

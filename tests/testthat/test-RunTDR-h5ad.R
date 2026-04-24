@@ -218,7 +218,7 @@ test_that("RunTDR.HDF5AnnData full pipeline with /X", {
   expect_s4_class(result, "TDRObj")
   expect_equal(result@config$backend, "matrix")
   expect_equal(nrow(result@metadata), 4L)
-  expect_false(is.null(result@density$fdens))
+  expect_false(is.null(result@density$norm))
   expect_true(all(paste0("sample", 1:4) %in% rownames(result@metadata)))
 })
 
@@ -246,7 +246,7 @@ test_that("RunTDR.HDF5AnnData full pipeline with /layers/counts", {
   expect_s4_class(result, "TDRObj")
   expect_equal(result@config$backend, "matrix")
   expect_equal(nrow(result@metadata), 4L)
-  expect_false(is.null(result@density$fdens))
+  expect_false(is.null(result@density$norm))
 })
 
 test_that("RunTDR.HDF5AnnData BPCells cache hit", {
@@ -538,7 +538,7 @@ test_that("RunTDR.character full pipeline with /X", {
   expect_s4_class(result, "TDRObj")
   expect_equal(result@config$backend, "matrix")
   expect_equal(nrow(result@metadata), 4L)
-  expect_false(is.null(result@density$fdens))
+  expect_false(is.null(result@density$norm))
   expect_true(all(paste0("sample", 1:4) %in% rownames(result@metadata)))
 })
 

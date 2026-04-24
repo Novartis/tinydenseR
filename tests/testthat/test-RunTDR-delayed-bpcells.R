@@ -304,7 +304,7 @@ test_that("RunTDR.DelayedMatrix full pipeline", {
 
   expect_true(is.TDRObj(result))
   expect_equal(result@config$backend, "matrix")
-  expect_true(!is.null(result@density$fdens))
+  expect_true(!is.null(result@density$norm))
   expect_equal(nrow(result@metadata), n_samples)
   expect_true(all(sort(rownames(result@metadata)) == sort(sample_names)))
 })
@@ -422,7 +422,7 @@ test_that("RunTDR.SingleCellExperiment with DelayedMatrix assay - full pipeline"
   expect_true(is.TDRObj(tdr.obj))
   expect_equal(tdr.obj@config$backend, "matrix")
   expect_equal(nrow(tdr.obj@metadata), 4L)
-  expect_true(!is.null(tdr.obj@density$fdens))
+  expect_true(!is.null(tdr.obj@density$norm))
 })
 
 test_that("RunTDR.SingleCellExperiment with DelayedMatrix and .bpcells.dir", {
@@ -469,7 +469,7 @@ test_that("RunTDR.SingleCellExperiment with DelayedMatrix and .celltype.vec", {
   expect_true(!is.null(tdr.obj@config$celltype.vec))
 })
 
-test_that("RunTDR.SingleCellExperiment + celltype.vec produces valid fdens (drop=FALSE regression)", {
+test_that("RunTDR.SingleCellExperiment + celltype.vec produces valid norm (drop=FALSE regression)", {
   skip_on_cran()
   skip_if_not_installed("BPCells")
   skip_if_not_installed("DelayedArray")
@@ -496,12 +496,12 @@ test_that("RunTDR.SingleCellExperiment + celltype.vec produces valid fdens (drop
 
   tdr.obj <- S4Vectors::metadata(result)$tdr.obj
 
-  # fdens must be a numeric matrix with one column per sample
-  expect_true(!is.null(tdr.obj@density$fdens))
-  expect_true(is.numeric(tdr.obj@density$fdens))
-  expect_equal(ncol(tdr.obj@density$fdens), nrow(tdr.obj@metadata))
-  # fdens values must be non-negative (they are fuzzy membership sums)
-  expect_true(all(tdr.obj@density$fdens >= 0))
+  # norm must be a numeric matrix with one column per sample
+  expect_true(!is.null(tdr.obj@density$norm))
+  expect_true(is.numeric(tdr.obj@density$norm))
+  expect_equal(ncol(tdr.obj@density$norm), nrow(tdr.obj@metadata))
+  # norm values must be non-negative (they are fuzzy membership sums)
+  expect_true(all(tdr.obj@density$norm >= 0))
 })
 
 test_that("fgraph subsetting preserves matrix structure with drop = FALSE", {
@@ -509,7 +509,7 @@ test_that("fgraph subsetting preserves matrix structure with drop = FALSE", {
 
   # Directly validate that subsetting a sparse matrix by a logical vector
   # that selects only 1 row does NOT drop to a vector when drop = FALSE.
-  # This is the unit-level guard for the fdens computation fix.
+  # This is the unit-level guard for the norm computation fix.
   set.seed(42)
   fg <- Matrix::Matrix(
     matrix(rpois(20, 3), nrow = 5, ncol = 4,

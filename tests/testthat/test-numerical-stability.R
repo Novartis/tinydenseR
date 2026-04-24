@@ -55,7 +55,7 @@ test_that("full pipeline is reproducible with fixed seed", {
   expect_equal(result1$graph$uwot$embedding, result2$graph$uwot$embedding)  # Same UMAP
   expect_identical(as.character(result1$landmark.annot$clustering$ids), 
                    as.character(result2$landmark.annot$clustering$ids))  # Same clusters
-  expect_equal(result1$map$fdens, result2$map$fdens, tolerance = 1e-14)  # Same densities
+  expect_equal(result1$map$norm, result2$map$norm, tolerance = 1e-14)  # Same densities
   
   cleanup_test_files(test_data)
 })
@@ -113,8 +113,8 @@ test_that("pipeline is invariant to cell order permutation", {
   set.seed(456)
   result2 <- run_full_pipeline(test_data_perm, seed = 456, verbose = FALSE)
   
-  # fdens should be identical (cell order doesn't matter for aggregates)
-  expect_equal(result1$map$fdens, result2$map$fdens, tolerance = 1e-12)
+  # norm should be identical (cell order doesn't matter for aggregates)
+  expect_equal(result1$map$norm, result2$map$norm, tolerance = 1e-12)
   
   # Cleanup
   cleanup_test_files(test_data)
@@ -152,8 +152,8 @@ test_that("pipeline is robust to small perturbations", {
   # Should be highly stable (>85% overlap for landmarks)
   expect_gt(jaccard_lm, 0.85)
   
-  # fdens should be similar (not identical, but close)
-  expect_equal(result1$map$fdens, result2$map$fdens, tolerance = 1e-3)
+  # norm should be similar (not identical, but close)
+  expect_equal(result1$map$norm, result2$map$norm, tolerance = 1e-3)
   
   # Cleanup
   cleanup_test_files(test_data)
@@ -169,9 +169,9 @@ test_that("fuzzy graph weights are valid and normalized", {
   set.seed(111)
   result <- run_full_pipeline(test_data, seed = 111, verbose = FALSE)
   
-  # Check fdens matrix properties
-  expect_true(all(is.finite(result$map$fdens)))  # No NaN/Inf
-  expect_true(all(result$map$fdens >= 0))  # Non-negative
+  # Check norm matrix properties
+  expect_true(all(is.finite(result$map$norm)))  # No NaN/Inf
+  expect_true(all(result$map$norm >= 0))  # Non-negative
   
   # Check cell count matrices
   expect_true(all(result$map$clustering$cell.count >= 0))

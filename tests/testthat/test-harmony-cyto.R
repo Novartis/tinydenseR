@@ -185,13 +185,13 @@ test_that("get.map uses symphony::mapQuery path for cyto+Harmony", {
     get.graph(.k = 5, .verbose = FALSE, .seed = 123) |>
     get.map(.verbose = FALSE, .seed = 123)
 
-  # fdens should be populated
-  expect_true(!is.null(obj@density$fdens))
-  expect_equal(ncol(obj@density$fdens), length(td$cells))
-  expect_equal(nrow(obj@density$fdens), nrow(obj@assay$expr))
+  # norm should be populated
+  expect_true(!is.null(obj@density$norm))
+  expect_equal(ncol(obj@density$norm), length(td$cells))
+  expect_equal(nrow(obj@density$norm), nrow(obj@assay$expr))
 
   # Y (log-density) should be populated
-  expect_true(!is.null(obj@density$Y))
+  expect_true(!is.null(obj@density$log.norm))
 
   # Cluster assignments should exist for each sample
   cl_counts <- obj@density$composition$clustering$cell.count

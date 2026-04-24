@@ -586,7 +586,7 @@ test_that("pePC variance explained is fraction of total density variance", {
   pepc <- obj@sample.embed$pepc$Timepoint
 
   # Manual computation: total variance = sum of per-landmark variances of Y
-  total.var <- sum(matrixStats::rowVars(obj@density$Y))
+  total.var <- sum(matrixStats::rowVars(obj@density$log.norm))
   manual.pve <- 100 * (pepc$sdev[1:ncol(pepc$coord)])^2 / total.var
 
   expect_equal(as.numeric(pepc$perc.tot.var.exp), manual.pve,

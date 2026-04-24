@@ -52,7 +52,7 @@ All analysis results are stored in a single S4 class, `TDRObj`. It contains
 | `landmark.embed` | Landmark-space coordinate matrices (pca, le, umap), each with a `$coord` entry |
 | `landmark.annot` | Per-landmark categorical annotations: clustering and celltyping, each with an `$ids` factor |
 | `graphs` | Landmark-landmark connectivity: adj.matrix, snn, fgraph |
-| `density` | Sample-level analytics (L × N matrices): fdens, Y, composition |
+| `density` | Fuzzy density analytics (L × N matrices): raw, norm, log.norm, size.factors, composition |
 | `sample.embed` | Sample-level embeddings (N × k matrices): pca, traj, pepc |
 | `cellmap` | Per-cell, per-sample data: clustering and celltyping, each with an `$ids` factor, nearest.lm, fuzzy.graphs. Each entry is in-memory or an on-disk path string |
 | `results` | All statistical outputs: lm, pb, marker, spec, nmf, pls, clustering, celltyping, features |
@@ -83,7 +83,7 @@ get.graph()      --> graphs (adj.matrix, snn)
     |                 landmark.embed (umap)
     |                 landmark.annot (clustering)
     v
-get.map()        --> density (fdens, Y, composition)
+get.map()        --> density (raw, norm, log.norm, composition)
     |                 cellmap (nearest.lm, fuzzy.graphs)
     v
 get.lm()         --> results$lm (fit, trad)

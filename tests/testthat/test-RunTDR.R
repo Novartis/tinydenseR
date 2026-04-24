@@ -57,7 +57,7 @@ test_that("RunTDR.default runs full pipeline and returns TDRObj", {
 
   result <- RunTDR(tdr, .verbose = FALSE, .seed = 42)
   expect_true(is.TDRObj(result))
-  expect_true(!is.null(result@density$fdens))
+  expect_true(!is.null(result@density$norm))
 })
 
 test_that("RunTDR.default with .celltype.vec runs celltyping", {
@@ -167,7 +167,7 @@ test_that("RunTDR.Seurat stores TDRObj in Misc and returns Seurat", {
   expect_true(inherits(result, "Seurat"))
   tdr <- GetTDR(result)
   expect_true(is.TDRObj(tdr))
-  expect_true(!is.null(tdr@density$fdens))
+  expect_true(!is.null(tdr@density$norm))
 })
 
 # ======================================================================
@@ -187,7 +187,7 @@ test_that("RunTDR.SingleCellExperiment stores TDRObj and returns SCE", {
   expect_true(inherits(result, "SingleCellExperiment"))
   tdr <- GetTDR(result)
   expect_true(is.TDRObj(tdr))
-  expect_true(!is.null(tdr@density$fdens))
+  expect_true(!is.null(tdr@density$norm))
 })
 
 # ======================================================================
@@ -222,8 +222,8 @@ test_that("Seurat backend produces equivalent results to SCE", {
   tdr_seurat <- GetTDR(seurat_result)
 
   # Compare density matrices
-  expect_equal(as.matrix(tdr_sce@density$fdens),
-               as.matrix(tdr_seurat@density$fdens),
+  expect_equal(as.matrix(tdr_sce@density$norm),
+               as.matrix(tdr_seurat@density$norm),
                tolerance = 1e-10)
 })
 
@@ -380,7 +380,7 @@ test_that("RunTDR.character runs full pipeline from h5ad file path", {
                    .seed = 42)
 
   expect_true(is.TDRObj(result))
-  expect_true(!is.null(result@density$fdens))
+  expect_true(!is.null(result@density$norm))
   expect_equal(result@config$backend, "matrix")
   expect_equal(nrow(result@metadata), 4L)
 })
@@ -436,7 +436,7 @@ test_that("RunTDR.HDF5AnnData runs full pipeline via S3 dispatch", {
                    .seed = 42)
 
   expect_true(is.TDRObj(result))
-  expect_true(!is.null(result@density$fdens))
+  expect_true(!is.null(result@density$norm))
   expect_equal(result@config$backend, "matrix")
 })
 

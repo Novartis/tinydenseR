@@ -589,7 +589,7 @@ celltyping.TDRObj <-
 .refresh_celltyping <- function(.tdr.obj, .verbose = FALSE) {
   
   # --- Cell-level IDs & composition (only if get.map() has run) ---
-  if (!is.null(.tdr.obj@density$fdens)) {
+  if (!is.null(.tdr.obj@density$norm)) {
     
     if (isTRUE(.verbose)) {
       message("-> get.map() results detected; refreshing cell-level celltype IDs and composition...")

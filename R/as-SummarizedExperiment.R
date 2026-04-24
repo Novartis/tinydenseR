@@ -33,13 +33,12 @@ as.SummarizedExperiment <- function(x, ...) UseMethod("as.SummarizedExperiment")
 #' Rows represent tinydenseR **landmarks** (not genes/proteins).
 #' The assays stored are:
 #' \describe{
+#'   \item{\code{counts}}{Raw fuzzy graph density sums before size-factor
+#'     normalization, from \code{@density$raw}.}
 #'   \item{\code{normcounts}}{Size-factor-normalized fuzzy density
-#'     (landmarks × samples), from \code{@density$fdens}.}
+#'     (landmarks × samples), from \code{@density$norm}.}
 #'   \item{\code{logcounts}}{log2(normcounts + 0.5), used by
-#'     \code{\link{get.lm}} for linear modeling, from \code{@density$Y}.}
-#'   \item{\code{counts}}{(When available) Raw fuzzy graph density sums
-#'     before size-factor normalization, reconstructed from
-#'     \code{@cellmap$fuzzy.graphs}.}
+#'     \code{\link{get.lm}} for linear modeling, from \code{@density$log.norm}.}
 #' }
 #'
 #' \code{rowData} contains all stored clustering and celltyping solutions.
@@ -72,35 +71,39 @@ as.SummarizedExperiment.TDRObj <- function(x, ...) {
   # ── Fail-fast validation ──────────────────────────────────────────────
   stopifnot(is.TDRObj(x))
 
-  if (is.null(x@density$fdens)) {
+  if (is.null(x@density$norm)) {
     stop("get.map() must be run before converting to SummarizedExperiment.")
   }
-  if (is.null(x@density$Y)) {
+  if (is.null(x@density$log.norm)) {
     stop("get.map() must be run before converting to SummarizedExperiment.")
   }
   if (is.null(x@landmark.annot$clustering$ids)) {
     stop("get.map() must be run before converting to SummarizedExperiment.")
   }
-  if (nrow(x@metadata) != ncol(x@density$fdens)) {
+  if (nrow(x@metadata) != ncol(x@density$norm)) {
     stop("Mismatch: nrow(@metadata) [", nrow(x@metadata),
-         "] != ncol(@density$fdens) [", ncol(x@density$fdens), "].")
+         "] != ncol(@density$norm) [", ncol(x@density$norm), "].")
   }
 
   # ── Assays ────────────────────────────────────────────────────────────
-  normcounts <- as.matrix(x@density$fdens)
-  logcounts  <- as.matrix(x@density$Y)
+  normcounts <- as.matrix(x@density$norm)
+  logcounts  <- as.matrix(x@density$log.norm)
 
   assay_list <- list(normcounts = normcounts, logcounts = logcounts)
 
-  # Best-effort reconstruction of raw counts from fuzzy graphs
-  counts_mat <- .reconstruct_counts(x)
+  # Raw counts from stored @density$raw (preferred) or reconstructed from fuzzy graphs
+  counts_mat <- if (!is.null(x@density$raw)) {
+    as.matrix(x@density$raw)
+  } else {
+    .reconstruct_counts(x)
+  }
   if (!is.null(counts_mat)) {
     assay_list <- c(list(counts = counts_mat), assay_list)
   }
 
   # ── rowData ───────────────────────────────────────────────────────────
   row_data <- S4Vectors::DataFrame(
-    row.names = rownames(x@density$fdens)
+    row.names = rownames(x@density$norm)
   )
 
   # Clustering solutions
@@ -149,8 +152,8 @@ as.SummarizedExperiment.TDRObj <- function(x, ...) {
   fg_list <- x@cellmap$fuzzy.graphs
   if (is.null(fg_list) || length(fg_list) == 0L) return(NULL)
 
-  lm_names <- rownames(x@density$fdens)
-  n_lm     <- nrow(x@density$fdens)
+  lm_names <- rownames(x@density$norm)
+  n_lm     <- nrow(x@density$norm)
   smpl_names <- names(fg_list)
   cols <- vector("list", length(smpl_names))
   names(cols) <- smpl_names

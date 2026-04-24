@@ -91,7 +91,7 @@ test_that("RunTDR.dgCMatrix runs full pipeline (RNA)", {
 
   expect_true(is.TDRObj(result))
   expect_equal(result@config$backend, "matrix")
-  expect_true(!is.null(result@density$fdens))
+  expect_true(!is.null(result@density$norm))
   expect_equal(nrow(result@metadata), 4L)
 })
 
@@ -162,7 +162,7 @@ test_that("RunTDR.DelayedMatrix runs full pipeline", {
 
   expect_true(is.TDRObj(result))
   expect_equal(result@config$backend, "matrix")
-  expect_true(!is.null(result@density$fdens))
+  expect_true(!is.null(result@density$norm))
 })
 
 # ======================================================================
@@ -185,7 +185,7 @@ test_that("RunTDR.IterableMatrix runs full pipeline", {
 
   expect_true(is.TDRObj(result))
   expect_equal(result@config$backend, "matrix")
-  expect_true(!is.null(result@density$fdens))
+  expect_true(!is.null(result@density$norm))
 })
 
 # ======================================================================

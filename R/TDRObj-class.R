@@ -32,8 +32,19 @@
 #' @slot landmark.annot list. Per-landmark categorical annotations (factor, length L).
 #'   Contains clustering and celltyping sub-lists, each with an $ids factor.
 #' @slot graphs list. Landmark-landmark connectivity matrices: adj.matrix, snn, fgraph.
-#' @slot density list. fdens-centric sample-level analytics (L x N matrices):
-#'   fdens, Y, composition (clustering/celltyping cell counts/percentages).
+#' @slot density list. Fuzzy density analytics populated by
+#'   \code{\link{get.map}}. Contains five sub-elements:
+#'   \describe{
+#'     \item{raw}{L × N matrix of pre-normalization fuzzy density sums.}
+#'     \item{norm}{L × N matrix after size-factor normalization:
+#'       \code{norm = t(t(raw) / size.factors)}.}
+#'     \item{log.norm}{L × N matrix: \code{log2(norm + 0.5)}.}
+#'     \item{size.factors}{Named numeric(N): \eqn{n_j / \bar{n}},
+#'       guaranteed to have mean 1.}
+#'     \item{composition}{List of clustering/celltyping cell count and
+#'       percentage matrices (samples × clusters).}
+#'   }
+#'   Access via \code{\link{get.density}} or the \code{$} accessor.
 #' @slot sample.embed list. Sample-level embeddings (N x k matrices), each with $coord.
 #'   Contains pca, traj, and pepc sub-lists.
 #' @slot cellmap list. Per-cell, per-sample data in unified structure:
@@ -218,8 +229,12 @@ TDRObj <- function(...) {
     if (is.null(args$density)) args$density <- list()
     if (is.null(args$cellmap)) args$cellmap <- list()
 
-    if (!is.null(m$fdens))   args$density$fdens   <- m$fdens
-    if (!is.null(m$Y))       args$density$Y       <- m$Y
+    if (!is.null(m$fdens))   args$density$norm     <- m$fdens
+    if (!is.null(m$Y))       args$density$log.norm  <- m$Y
+    if (!is.null(m$norm))    args$density$norm      <- m$norm
+    if (!is.null(m$log.norm)) args$density$log.norm  <- m$log.norm
+    if (!is.null(m$raw))     args$density$raw       <- m$raw
+    if (!is.null(m$size.factors)) args$density$size.factors <- m$size.factors
 
     if (!is.null(m$clustering)) {
       cl <- m$clustering
@@ -269,6 +284,18 @@ TDRObj <- function(...) {
 
   # Drop any remaining unrecognised slot names
   args <- args[names(args) %in% new_slots]
+
+  # ── Backward-compat migration: old density$fdens/Y → norm/log.norm ──
+  if (!is.null(args$density)) {
+    d <- args$density
+    if (!is.null(d$fdens) && is.null(d$norm)) {
+      d$norm  <- d$fdens;  d$fdens <- NULL
+    }
+    if (!is.null(d$Y) && is.null(d$log.norm)) {
+      d$log.norm <- d$Y;  d$Y <- NULL
+    }
+    args$density <- d
+  }
 
   # ── Backward-compat migration: old @cellmap structure → new unified ──
   if (!is.null(args$cellmap)) {
@@ -356,7 +383,13 @@ is.TDRObj <- function(x) {
 #' @rdname TDRObj-class
 setMethod("$", "TDRObj", function(x, name) {
   if (name %in% .tdrobj_new_slots) {
-    return(slot(x, name))
+    d <- slot(x, name)
+    # Density slot: add backward-compat aliases for fdens/Y
+    if (name == "density" && is.list(d)) {
+      if (!is.null(d$norm) && is.null(d$fdens))      d$fdens <- d$norm
+      if (!is.null(d$log.norm) && is.null(d$Y))      d$Y     <- d$log.norm
+    }
+    return(d)
   }
   # Legacy name shims (old 17-slot names → new paths)
   switch(name,
@@ -367,6 +400,9 @@ setMethod("$", "TDRObj", function(x, name) {
     "graph"            = slot(x, "graphs"),
     "map"              = {
       d <- slot(x, "density")
+      # Add backward-compat aliases
+      if (!is.null(d$norm) && is.null(d$fdens))      d$fdens <- d$norm
+      if (!is.null(d$log.norm) && is.null(d$Y))      d$Y     <- d$log.norm
       comp <- d$composition
       d$composition <- NULL
       if (!is.null(comp)) c(d, comp) else d
@@ -428,7 +464,7 @@ setMethod("show", "TDRObj", function(object) {
   n_lm <- if (length(object@assay) > 0 && !is.null(object@assay$expr)) nrow(object@assay$expr) else 0L
   cat("  Landmarks:", n_lm, "\n")
   cat("  Graph computed:", length(object@graphs) > 0, "\n")
-  cat("  Density/map computed:", !is.null(object@density$fdens), "\n")
+  cat("  Density/map computed:", !is.null(object@density$norm), "\n")
   # On-disk / in-memory cellmap status
   .is_path <- function(val) is.character(val) && length(val) == 1L && !is.null(attr(val, "schema_v"))
   any_paths <- any(vapply(
@@ -436,7 +472,8 @@ setMethod("show", "TDRObj", function(object) {
       object@cellmap$fuzzy.graphs, object@cellmap$celltyping$ids),
     .is_path, logical(1)
   ))
-  if (!is.null(object@density$fdens)) {
+  if (!is.null(object@density$norm)) {
+    cat("  Raw density stored:", !is.null(object@density$raw), "\n")
     cat("  Cellmap storage:", if (any_paths) "on-disk" else "in-memory", "\n")
   }
   # Multi-solution counts

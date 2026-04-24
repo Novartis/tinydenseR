@@ -655,13 +655,19 @@ get.graph.TDRObj <-
 #'   no implications for reproducibility since the cache only stores
 #'   intermediate results that are recomputed deterministically.
 #'   
-#' @return Updated \code{.tdr.obj} with \code{$map} component containing:
+#' @return Updated \code{.tdr.obj} with \code{@density} containing:
 #'   \itemize{
-#'     \item \code{fdens}: Matrix of fuzzy graph densities (landmarks × samples). Each entry is 
-#'       the sum of cell-landmark edge weights for that sample, normalized by sample size.
-#'     \item \code{Y}: Matrix of log2-transformed densities (landmarks × samples): 
-#'       \code{log2(fdens + 0.5)}. Used by \code{get.lm()} for linear modeling and 
-#'       \code{get.embedding()} for unsupervised embeddings.
+#'     \item \code{raw}: Matrix of raw fuzzy graph density sums (landmarks × samples).
+#'       Each entry is the sum of cell-landmark fuzzy edge weights before size-factor
+#'       normalization.
+#'     \item \code{norm}: Matrix of size-factor-normalized fuzzy densities
+#'       (landmarks × samples). Each sample column is divided by
+#'       \eqn{n_j / \bar{n}} where \eqn{n_j} is the cell count for sample \eqn{j}.
+#'     \item \code{log.norm}: Matrix of log2-transformed normalized densities
+#'       (landmarks × samples): \code{log2(norm + 0.5)}. Used by \code{get.lm()}
+#'       for linear modeling and \code{get.embedding()} for unsupervised embeddings.
+#'     \item \code{size.factors}: Named numeric vector (length N) of per-sample
+#'       size factors used to normalize \code{raw} into \code{norm}.
 #'     \item \code{clustering$ids}: List of named character vectors (one per sample) with cluster 
 #'       assignments for all cells.
 #'     \item \code{clustering$cell.count}: Matrix (samples × clusters) of cell counts per cluster 
@@ -716,9 +722,11 @@ get.graph.TDRObj <-
 #' 
 #' \strong{Fuzzy Graph Densities:}
 #' 
-#' The \code{fdens} matrix quantifies how strongly each landmark is connected to cells in each 
-#' sample. High values indicate the landmark's neighborhood is enriched in that sample. This 
-#' forms the basis for differential density testing in \code{get.lm}.
+#' The \code{norm} density matrix quantifies how strongly each landmark is connected to cells
+#' in each sample, after size-factor normalization. High values indicate the landmark's
+#' neighborhood is enriched in that sample. The \code{raw} matrix stores the pre-normalization
+#' sums, enabling users to explore alternative normalizations. This forms the basis for
+#' differential density testing in \code{get.lm}.
 #' 
 #' @seealso \code{\link{get.graph}}, \code{\link{get.lm}}, \code{\link{celltyping}}
 #' 
@@ -1223,24 +1231,27 @@ get.map.TDRObj <-
       
     }
     
-    # ── Assemble fdens from pre-computed per-sample columns ──
-    fdens <-
+    # ── Assemble raw density from pre-computed per-sample columns ──
+    raw <-
       lapply(X = res, FUN = `[[`, "fdens.col") |>
       do.call(what = cbind) |>
       (\(x)
        `rownames<-`(x = x,
                     value = rownames(x = .tdr.obj@assay$expr))
-      )() |>
-      Matrix::t() |>
-      (\(x) {
-        n.cells <- vapply(res, `[[`, numeric(1), "n.cells")
-        x / (n.cells / mean(n.cells))
-      })() |>
-      Matrix::t()
-    
-    # Compute log2-transformed landmark densities for statistical modeling
-    Y <-
-      log2(x = fdens + 0.5)
+      )()
+
+    # Size-factor normalization (cells per sample / mean cells)
+    n.cells <- vapply(res, `[[`, numeric(1), "n.cells")
+    size.factors <- n.cells / mean(n.cells)
+    names(size.factors) <- names(res)
+    norm <-
+      Matrix::t(
+        Matrix::t(raw) / size.factors
+      )
+
+    # Log2-transformed normalized densities for statistical modeling
+    log.norm <-
+      log2(x = norm + 0.5)
     
     # ── Assemble @cellmap: cache-aware ──
     if (isTRUE(x = .cache.on.disk)) {
@@ -1264,8 +1275,10 @@ get.map.TDRObj <-
         }
       }
       
-      .tdr.obj@density$fdens <- fdens
-      .tdr.obj@density$Y <- Y
+      .tdr.obj@density$raw          <- raw
+      .tdr.obj@density$norm         <- norm
+      .tdr.obj@density$log.norm     <- log.norm
+      .tdr.obj@density$size.factors <- size.factors
       .tdr.obj@cellmap$clustering$ids  <- clustering_ids
       .tdr.obj@cellmap$nearest.lm      <- nearest_lm
       .tdr.obj@cellmap$fuzzy.graphs    <- fuzzy_graphs
@@ -1293,8 +1306,10 @@ get.map.TDRObj <-
         cell.celltyping <- NULL
       }
       
-      .tdr.obj@density$fdens <- fdens
-      .tdr.obj@density$Y <- Y
+      .tdr.obj@density$raw          <- raw
+      .tdr.obj@density$norm         <- norm
+      .tdr.obj@density$log.norm     <- log.norm
+      .tdr.obj@density$size.factors <- size.factors
       .tdr.obj@cellmap$clustering$ids  <- cell.clustering
       .tdr.obj@cellmap$celltyping$ids  <- cell.celltyping
       .tdr.obj@cellmap$nearest.lm      <- cell.nlmn
@@ -1489,7 +1504,7 @@ lm.cluster.TDRObj <-
 .refresh_clustering <- function(.tdr.obj, .verbose = FALSE) {
   
   # --- Cell-level IDs & composition (only if get.map() has run) ---
-  if (!is.null(.tdr.obj@density$fdens)) {
+  if (!is.null(.tdr.obj@density$norm)) {
     
     if (isTRUE(.verbose)) {
       message("-> get.map() results detected; refreshing cell-level cluster IDs and composition...")

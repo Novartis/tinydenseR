@@ -58,13 +58,19 @@ no implications for reproducibility since the cache only stores
 intermediate results that are recomputed deterministically.}
 }
 \value{
-Updated \code{.tdr.obj} with \code{$map} component containing:
+Updated \code{.tdr.obj} with \code{@density} containing:
 \itemize{
-\item \code{fdens}: Matrix of fuzzy graph densities (landmarks × samples). Each entry is
-the sum of cell-landmark edge weights for that sample, normalized by sample size.
-\item \code{Y}: Matrix of log2-transformed densities (landmarks × samples):
-\code{log2(fdens + 0.5)}. Used by \code{get.lm()} for linear modeling and
-\code{get.embedding()} for unsupervised embeddings.
+\item \code{raw}: Matrix of raw fuzzy graph density sums (landmarks × samples).
+Each entry is the sum of cell-landmark fuzzy edge weights before size-factor
+normalization.
+\item \code{norm}: Matrix of size-factor-normalized fuzzy densities
+(landmarks × samples). Each sample column is divided by
+\eqn{n_j / \bar{n}} where \eqn{n_j} is the cell count for sample \eqn{j}.
+\item \code{log.norm}: Matrix of log2-transformed normalized densities
+(landmarks × samples): \code{log2(norm + 0.5)}. Used by \code{get.lm()}
+for linear modeling and \code{get.embedding()} for unsupervised embeddings.
+\item \code{size.factors}: Named numeric vector (length N) of per-sample
+size factors used to normalize \code{raw} into \code{norm}.
 \item \code{clustering$ids}: List of named character vectors (one per sample) with cluster
 assignments for all cells.
 \item \code{clustering$cell.count}: Matrix (samples × clusters) of cell counts per cluster
@@ -129,9 +135,11 @@ When \code{.ref.obj} is provided:
 
 \strong{Fuzzy Graph Densities:}
 
-The \code{fdens} matrix quantifies how strongly each landmark is connected to cells in each
-sample. High values indicate the landmark's neighborhood is enriched in that sample. This
-forms the basis for differential density testing in \code{get.lm}.
+The \code{norm} density matrix quantifies how strongly each landmark is connected to cells
+in each sample, after size-factor normalization. High values indicate the landmark's
+neighborhood is enriched in that sample. The \code{raw} matrix stores the pre-normalization
+sums, enabling users to explore alternative normalizations. This forms the basis for
+differential density testing in \code{get.lm}.
 }
 \examples{
 \dontrun{

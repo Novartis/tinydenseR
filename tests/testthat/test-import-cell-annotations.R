@@ -523,7 +523,7 @@ test_that("ICA7.3: single-sample object works", {
 test_that("ICA7.4: works on object where get.map() hasn't run", {
   fix <- .build_graph_with_meta()
   # obj is at graph stage, no get.map yet
-  expect_null(fix$obj@density$fdens)
+  expect_null(fix$obj@density$norm)
 
   obj <- import_cell_annotations(fix$obj,
                                  .cell.meta = fix$cell_meta,
@@ -533,8 +533,8 @@ test_that("ICA7.4: works on object where get.map() hasn't run", {
 
   # Solutions stored correctly
   expect_true("cell_type_l1" %in% list_celltyping_solutions(obj))
-  # No crash — .refresh_celltyping is a no-op since fdens is NULL
-  expect_null(obj@density$fdens)
+  # No crash — .refresh_celltyping is a no-op since norm is NULL
+  expect_null(obj@density$norm)
 })
 
 test_that("ICA7.5: column name collision with existing named solution", {

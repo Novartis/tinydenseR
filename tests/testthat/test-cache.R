@@ -875,7 +875,7 @@ test_that("TDRObj constructor migrates old @density$.cache to @cellmap path stri
   obj <- TDRObj(
     config = list(assay.type = "RNA"),
     map = list(
-      fdens = matrix(1, 2, 2),
+      norm = matrix(1, 2, 2),
       .cache = list(
         root = cache_dir,
         on.disk = TRUE,

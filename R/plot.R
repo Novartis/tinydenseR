@@ -1329,7 +1329,7 @@ plotSampleEmbedding.TDRObj <-
       # PCA stores sdev, compute variance explained as proportion of TOTAL variance
       # (not sum of truncated sdev^2, since we use truncated PCA)
       if(!is.null(x = embed$sdev)){
-        total.var <- matrixStats::rowVars(x = .tdr.obj@density$Y) |> sum()
+        total.var <- matrixStats::rowVars(x = .tdr.obj@density$log.norm) |> sum()
         var.explained <- 100 * embed$sdev^2 / total.var
         names(x = var.explained) <- paste0("PC", seq_along(along.with = var.explained))
       }
@@ -2189,13 +2189,13 @@ plotDensity.TDRObj <-
       
       dat.df <-
         cbind(dat.df,
-              Matrix::t(x = log2(x = .tdr.obj@density$fdens + 0.5))) |>
+              Matrix::t(x = log2(x = .tdr.obj@density$norm + 0.5))) |>
         tidyr::pivot_longer(
-          cols = rownames(x = .tdr.obj@density$fdens),
+          cols = rownames(x = .tdr.obj@density$norm),
           cols_vary = "slowest"
         ) |>
         dplyr::mutate(name = as.character(x = .tdr.obj@landmark.annot[[.pop.from]]$ids) |>
-                        stats::setNames(nm = rownames(x = .tdr.obj@density$fdens)) |>
+                        stats::setNames(nm = rownames(x = .tdr.obj@density$norm)) |>
                         (\(x)
                          x[name]
                         )()) |>
@@ -2205,9 +2205,9 @@ plotDensity.TDRObj <-
       
       dat.df <-
         cbind(dat.df,
-              Matrix::t(x = log2(x = .tdr.obj@density$fdens[.tdr.obj@landmark.annot[[.pop.from]]$ids == .pop,] + 0.5))) |>
+              Matrix::t(x = log2(x = .tdr.obj@density$norm[.tdr.obj@landmark.annot[[.pop.from]]$ids == .pop,] + 0.5))) |>
         tidyr::pivot_longer(
-          cols = rownames(.tdr.obj@density$fdens),
+          cols = rownames(.tdr.obj@density$norm),
           cols_vary = "slowest"
         ) |>
         as.data.frame()

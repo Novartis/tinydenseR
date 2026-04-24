@@ -31,13 +31,13 @@ create_mapped_tdr <- function(n_lm = 10, n_samples = 4, n_markers = 5,
   expr_mat <- matrix(runif(n_lm * n_markers), nrow = n_lm, ncol = n_markers,
                      dimnames = list(lm_names, paste0("marker", seq_len(n_markers))))
 
-  # fdens: L x N
-  fdens <- matrix(runif(n_lm * n_samples, min = 0.1, max = 5),
+  # norm: L x N
+  norm_dens <- matrix(runif(n_lm * n_samples, min = 0.1, max = 5),
                   nrow = n_lm, ncol = n_samples,
                   dimnames = list(lm_names, smpl_names))
 
-  # Y: log2(fdens + 0.5)
-  Y <- log2(fdens + 0.5)
+  # log.norm: log2(norm + 0.5)
+  log_norm_dens <- log2(norm_dens + 0.5)
 
   # metadata
   meta <- data.frame(
@@ -107,7 +107,7 @@ create_mapped_tdr <- function(n_lm = 10, n_samples = 4, n_markers = 5,
     ),
     landmark.annot = list(clustering = clustering, celltyping = celltyping),
     graphs         = list(adj.matrix = NULL, snn = NULL, fgraph = NULL),
-    density        = list(fdens = fdens, Y = Y),
+    density        = list(norm = norm_dens, log.norm = log_norm_dens),
     cellmap        = list(fuzzy.graphs = fg_list),
     sample.embed   = list(),
     results        = list()
@@ -123,8 +123,8 @@ test_that("as.SummarizedExperiment produces valid SE with correct dimensions", {
   se  <- as.SummarizedExperiment(tdr)
 
   expect_true(methods::validObject(se))
-  expect_equal(nrow(se), nrow(tdr@density$fdens))
-  expect_equal(ncol(se), ncol(tdr@density$fdens))
+  expect_equal(nrow(se), nrow(tdr@density$norm))
+  expect_equal(ncol(se), ncol(tdr@density$norm))
   expect_true("normcounts" %in% SummarizedExperiment::assayNames(se))
   expect_true("logcounts"  %in% SummarizedExperiment::assayNames(se))
 })
@@ -139,21 +139,21 @@ test_that("counts assay present when fuzzy graphs available", {
 # ======================================================================
 # 2. Assay fidelity
 # ======================================================================
-test_that("normcounts matches fdens exactly", {
+test_that("normcounts matches norm exactly", {
   tdr <- create_mapped_tdr()
   se  <- as.SummarizedExperiment(tdr)
   expect_identical(
     SummarizedExperiment::assay(se, "normcounts"),
-    as.matrix(tdr@density$fdens)
+    as.matrix(tdr@density$norm)
   )
 })
 
-test_that("logcounts matches Y exactly", {
+test_that("logcounts matches log.norm exactly", {
   tdr <- create_mapped_tdr()
   se  <- as.SummarizedExperiment(tdr)
   expect_identical(
     SummarizedExperiment::assay(se, "logcounts"),
-    as.matrix(tdr@density$Y)
+    as.matrix(tdr@density$log.norm)
   )
 })
 
@@ -161,9 +161,9 @@ test_that("assay dimnames match density dimnames", {
   tdr <- create_mapped_tdr()
   se  <- as.SummarizedExperiment(tdr)
   expect_identical(rownames(SummarizedExperiment::assay(se, "normcounts")),
-                   rownames(tdr@density$fdens))
+                   rownames(tdr@density$norm))
   expect_identical(colnames(SummarizedExperiment::assay(se, "normcounts")),
-                   colnames(tdr@density$fdens))
+                   colnames(tdr@density$norm))
 })
 
 
@@ -175,7 +175,7 @@ test_that("counts equals per-sample rowSums of fuzzy graphs", {
   se  <- as.SummarizedExperiment(tdr)
 
   counts <- SummarizedExperiment::assay(se, "counts")
-  lm_names <- rownames(tdr@density$fdens)
+  lm_names <- rownames(tdr@density$norm)
 
   for (sn in names(tdr@cellmap$fuzzy.graphs)) {
     fg <- tdr@cellmap$fuzzy.graphs[[sn]]
@@ -198,7 +198,7 @@ test_that("rowData contains clustering and celltyping columns", {
   se  <- as.SummarizedExperiment(tdr)
   rd  <- SummarizedExperiment::rowData(se)
 
-  expect_equal(nrow(rd), nrow(tdr@density$fdens))
+  expect_equal(nrow(rd), nrow(tdr@density$norm))
 
   # Clustering
   cl_names <- setdiff(names(tdr@landmark.annot$clustering), "ids")
@@ -239,7 +239,7 @@ test_that("colData matches metadata", {
   cd  <- as.data.frame(SummarizedExperiment::colData(se))
   expect_equal(cd, tdr@metadata)
   expect_identical(rownames(SummarizedExperiment::colData(se)),
-                   colnames(tdr@density$fdens))
+                   colnames(tdr@density$norm))
 })
 
 
@@ -252,8 +252,8 @@ test_that("GetTDR round-trips the TDRObj", {
 
   tdr2 <- GetTDR(se)
   expect_true(is.TDRObj(tdr2))
-  expect_identical(tdr2@density$fdens, tdr@density$fdens)
-  expect_identical(tdr2@density$Y, tdr@density$Y)
+  expect_identical(tdr2@density$norm, tdr@density$norm)
+  expect_identical(tdr2@density$log.norm, tdr@density$log.norm)
 })
 
 test_that("metadata contains version and date", {
@@ -315,16 +315,16 @@ test_that("goi.summary errors on SummarizedExperiment", {
 # ======================================================================
 # 8. Fail-fast validation
 # ======================================================================
-test_that("conversion fails when fdens is NULL", {
+test_that("conversion fails when norm is NULL", {
   tdr <- create_mapped_tdr()
-  tdr@density$fdens <- NULL
+  tdr@density$norm <- NULL
   expect_error(as.SummarizedExperiment(tdr),
                "get.map\\(\\) must be run")
 })
 
-test_that("conversion fails when Y is NULL", {
+test_that("conversion fails when log.norm is NULL", {
   tdr <- create_mapped_tdr()
-  tdr@density$Y <- NULL
+  tdr@density$log.norm <- NULL
   expect_error(as.SummarizedExperiment(tdr),
                "get.map\\(\\) must be run")
 })
@@ -360,8 +360,8 @@ test_that("SE created without counts when fuzzy graph cache expired", {
   tdr <- create_mapped_tdr(with_fuzzy_graphs = FALSE)
   # Simulate cache paths that don't exist
   tdr@cellmap$fuzzy.graphs <- stats::setNames(
-    as.list(paste0("/nonexistent/path/", colnames(tdr@density$fdens), ".rds")),
-    colnames(tdr@density$fdens)
+    as.list(paste0("/nonexistent/path/", colnames(tdr@density$norm), ".rds")),
+    colnames(tdr@density$norm)
   )
   expect_message(
     se <- as.SummarizedExperiment(tdr),

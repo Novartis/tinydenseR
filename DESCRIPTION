@@ -19,6 +19,7 @@ Collate:
     'sim_trajectory_tdr.R'
     'as-SummarizedExperiment.R'
     'cache.R'
+    'density-accessor.R'
     'label.transfer.R'
     'celltype.R'
     'elbow.finder.R'

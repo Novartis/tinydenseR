@@ -172,10 +172,10 @@ test_that("RunTDR.SCE produces identical landmarks, PCA, graph, map,
     info = "SNN graph must be identical"
   )
 
-  # Density matrix (fdens)
+  # Density matrix (norm)
   expect_equal(
-    tdr_explicit@density$fdens,
-    tdr_wrapper@density$fdens,
+    tdr_explicit@density$norm,
+    tdr_wrapper@density$norm,
     tolerance = 0,
     info = "fuzzy density matrix must be identical"
   )
@@ -268,8 +268,8 @@ test_that("RunTDR.Seurat produces identical results as the explicit
   )
 
   expect_equal(
-    tdr_explicit@density$fdens,
-    tdr_wrapper@density$fdens,
+    tdr_explicit@density$norm,
+    tdr_wrapper@density$norm,
     tolerance = 0,
     info = "Seurat: fuzzy density matrix must be identical"
   )
@@ -368,8 +368,8 @@ test_that("RunTDR.dgCMatrix produces identical results as the explicit
   )
 
   expect_equal(
-    tdr_explicit@density$fdens,
-    tdr_wrapper@density$fdens,
+    tdr_explicit@density$norm,
+    tdr_wrapper@density$norm,
     tolerance = 0,
     info = "dgCMatrix: fuzzy density matrix must be identical"
   )
@@ -610,8 +610,8 @@ test_that("RunTDR on sim_trajectory_tdr SCE matches explicit workflow", {
   )
 
   expect_equal(
-    tdr_explicit@density$fdens,
-    tdr_wrapper@density$fdens,
+    tdr_explicit@density$norm,
+    tdr_wrapper@density$norm,
     tolerance = 0,
     info = "sim_trajectory: fuzzy density matrix must be identical"
   )

@@ -98,7 +98,7 @@ test_that("RunTDR.flowSet full pipeline returns TDRObj", {
 
   expect_true(is.TDRObj(tdr))
   expect_equal(tdr@config$backend, "cyto")
-  expect_true(length(tdr@density$fdens) > 0)
+  expect_true(length(tdr@density$norm) > 0)
   expect_equal(nrow(tdr@metadata), length(tdr@cells))
 })
 
@@ -333,5 +333,5 @@ test_that("flowSet and cytoset produce numerically equivalent TDRObj", {
                tdr_fs@landmark.embed$pca$embed, tolerance = 1e-10)
 
   # Density vectors should be numerically equivalent
-  expect_equal(tdr_cs@density$fdens, tdr_fs@density$fdens, tolerance = 1e-10)
+  expect_equal(tdr_cs@density$norm, tdr_fs@density$norm, tolerance = 1e-10)
 })

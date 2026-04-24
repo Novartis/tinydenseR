@@ -180,8 +180,8 @@ test_that("Stepwise dispatch matches RunTDR pipeline on TDRObj", {
 
   # Densities should match
   expect_equal(
-    as.matrix(result_mono@density$fdens),
-    as.matrix(result_step@density$fdens),
+    as.matrix(result_mono@density$norm),
+    as.matrix(result_step@density$norm),
     tolerance = 1e-10
   )
 })

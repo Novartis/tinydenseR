@@ -118,7 +118,7 @@ goi.summary.TDRObj <-
            "Current assay type: ", .tdr.obj@config$assay.type)
     }
     
-    if(is.null(x = .tdr.obj@cellmap$nearest.lm) && is.null(x = .tdr.obj@density$fdens)){
+    if(is.null(x = .tdr.obj@cellmap$nearest.lm) && is.null(x = .tdr.obj@density$norm)){
       stop("Cell mapping not found. Run get.graph() and get.map() before calling goi.summary().")
     }
     
