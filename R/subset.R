@@ -24,11 +24,11 @@
 #' Cell selection uses the same machinery as \code{\link{get.pbDE}}:
 #' \itemize{
 #'   \item \code{.id}: select cells whose per-cell label (from
-#'     \code{@cellmap$clustering$ids} or \code{@cellmap$celltyping$ids})
+#'     \code{@cellmap\$clustering\$ids} or \code{@cellmap\$celltyping\$ids})
 #'     matches the specified identifiers.
 #'   \item \code{.id.idx}: select cells via fuzzy confidence-thresholded
 #'     voting from the specified landmark indices (using the UMAP fuzzy
-#'     simplicial set stored in \code{@cellmap$fuzzy.graphs}).
+#'     simplicial set stored in \code{@cellmap\$fuzzy.graphs}).
 #' }
 #'
 #' Nested subsetting is supported: calling \code{get.subset()} on a child
@@ -60,10 +60,10 @@
 #' @param .label.confidence Numeric scalar in \code{[0,1]}.
 #'   Minimum confidence for fuzzy label assignment.
 #'   Defaults to the parent's stored threshold
-#'   (\code{@config$label.confidence}), or 0.5 if not set.
+#'   (\code{@config\$label.confidence}), or 0.5 if not set.
 #' @param .prop.landmarks Numeric between 0 and 1 specifying proportion of
 #'   cells to use as landmarks when the child pipeline runs
-#'   \code{get.landmarks()}.  Default 0.1 (10\%).
+#'   \code{get.landmarks()}.  Default 0.1 (10 percent).
 #' @param .min.cells.per.sample Integer.  Samples with fewer qualifying cells
 #'   than this threshold are excluded from the child (default 10).
 #' @param .verbose Logical: print progress? Default \code{TRUE}.
@@ -77,8 +77,8 @@
 #'     \code{n.cells}.}
 #'   \item{\code{@config}}{Inherited parameters (backend, assay.type,
 #'     markers, harmony.var) plus provenance in
-#'     \code{@config$.subset.provenance}.}
-#'   \item{All other slots}{Empty — ready for \code{get.landmarks()}.}
+#'     \code{@config\$.subset.provenance}.}
+#'   \item{All other slots}{Empty -- ready for \code{get.landmarks()}.}
 #' }
 #'
 #' @seealso \code{\link{get.map}} (required predecessor),
