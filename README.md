@@ -150,6 +150,7 @@ cell-state abundance along the trajectory.
 ``` r
 library(tinydenseR)
 #> Loading required package: Matrix
+#> Loading required package: patchwork
 library(ggplot2)
 library(patchwork)
 library(ggh4x)
@@ -180,7 +181,6 @@ sim_trajectory <-
     .sample.var = "Sample",
     .assay.type = "RNA",
     .nHVG = 500,
-    .cl.resolution.parameter = 10, # USE A VALUE CLOSER TO THE DEFAULT (0.8) FOR REAL-WORLD DATASETS
     .verbose = FALSE
   )
 #> Loading required namespace: SingleCellExperiment
@@ -209,6 +209,9 @@ sim_trajectory <-
 #> recommended for fewer than 1000 tests. Using standard q-value estimation
 #> instead.
 #> Warning in value[[3L]](cond): q-value estimation failed. Using BH instead.
+#> Warning in get.lm.TDRObj(tdr, ...): Only 1 cluster detected. Skipping limma fit
+#> on cluster composition (nothing to compare). Density-level analysis (get.plsD,
+#> get.dea, etc.) is unaffected.
 ```
 
 ### Sample Embedding
@@ -232,6 +235,9 @@ sim_trajectory <-
 #> Warning in get.lm.TDRObj(tdr, ...): PCA-weighted q-value estimation is not
 #> recommended for fewer than 1000 tests. Using standard q-value estimation
 #> instead.
+#> Warning in get.lm.TDRObj(tdr, ...): Only 1 cluster detected. Skipping limma fit
+#> on cluster composition (nothing to compare). Density-level analysis (get.plsD,
+#> get.dea, etc.) is unaffected.
 
 # Compute partial-effect PCs
 sim_trajectory <-

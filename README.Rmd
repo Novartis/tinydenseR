@@ -174,7 +174,6 @@ sim_trajectory <-
     .sample.var = "Sample",
     .assay.type = "RNA",
     .nHVG = 500,
-    .cl.resolution.parameter = 10, # USE A VALUE CLOSER TO THE DEFAULT (0.8) FOR REAL-WORLD DATASETS
     .verbose = FALSE
   )
 ```

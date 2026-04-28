@@ -85,7 +85,9 @@ computes Spearman rank correlation via a sparse-aware implementation
 the expression matrix before decomposition. Default FALSE. Nuisance columns
 are identified automatically: when contrasts are present, design columns
 that do not participate in any contrast are nuisance; when no contrasts are
-used, all design columns except \code{.coef.col} are nuisance. The design
+used, all design columns except \code{.coef.col} are nuisance. If
+\code{get.lm()} was called with \code{.block}, the blocking variable is
+additionally included in the nuisance design (dummy-coded). The design
 is expanded from sample level to landmark level via \code{@config$key}.
 Sparsity of the expression matrix is preserved via implicit operators (the
 residualized matrix is never materialized). Not supported with
@@ -150,7 +152,7 @@ graph-smoothed expression and Y.
 \details{
 plsD is an \strong{interpretive decomposition}, not a formal hypothesis test.
 It answers: "What features — through expression patterns, population identity,
-or both — explain the density contrast?" Loadings reflect this combined signal:
+or both — explain the density contrast?" Loadings reflect combined signal, like:
 markers of depleted populations carry negative loadings (high expression where
 density is low), DE genes carry signed loadings tracking their direction of
 change, and mixed DA/DE features appear alongside both.
@@ -168,8 +170,11 @@ centered expression without Y-weighting). Y appears only on the response
 side, so loadings reflect only features whose graph-smoothed expression
 independently covaries with Y. This mode is less comprehensive — it misses
 DA markers unless their expression happens to correlate with Y through
-smoothed space — but serves as a useful diagnostic comparator: features
-that rank high in both modes are robust.
+smoothed space. In the presence of strongly bimodal density contrasts and/or,
+datasets with a small number of extreme landmarks, setting
+\code{.YX.interaction = FALSE} can help distinguish features whose expression
+genuinely covaries with Y from those that are strong but purely geometric
+counterweights.
 
 The method:
 \enumerate{
@@ -181,6 +186,7 @@ regularization and lazy walk)
 \item Constructs M.local: if \code{.YX.interaction = TRUE},
 M.local = P \\%\emph{\\% diag(Y) \\%}\\% Xc (density-weighted); if FALSE,
 M.local = P \\%*\\% Xc (graph-smoothed only). Both are centered by columns.
+Optionally, residualize Xc against nuisance covariates before constructing M.local.
 \item Runs NIPALS PLS1: iteratively finds feature weights w maximizing
 cov(M.local w, Y), with deflation of both M.local and Y
 \item Applies sign convention: positive scores = aligned with Y
@@ -222,6 +228,17 @@ the nuisance design expanded to landmark level via \code{@config$key}. Sparsity
 is preserved via implicit operators. When no nuisance covariates exist (e.g.
 a simple two-group design), \code{.residualize = TRUE} is equivalent to
 \code{.residualize = FALSE}.
+
+\strong{Blocking variable handling:}
+When \code{get.lm()} was called with a \code{.block} argument (invoking
+\code{limma::duplicateCorrelation}), the blocking factor does NOT appear in
+the design matrix — it enters only through the GLS covariance structure for
+the density contrast Y. If \code{.residualize = TRUE}, the blocking variable
+is automatically detected from \code{fit$block} and appended to the nuisance
+design Z as dummy-coded columns. This ensures that block-level mean expression
+shifts (e.g. donor-specific expression baselines) are removed from X, preventing
+them from contaminating PLS directions via spurious covariance with the
+block-correlated residual structure in Y.
 
 \strong{Structural score constraints and the balancing effect:}
 The score vectors computed by plsD are structurally mean-zero across landmarks. This
