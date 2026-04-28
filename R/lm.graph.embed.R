@@ -1323,12 +1323,13 @@ get.map.TDRObj <-
       dplyr::bind_rows(.id = "sample") |>
       as.data.frame() |>
       (\(x)
-       `rownames<-`(x = as.matrix(x = x[,colnames(x = x) != "sample"]),
+       `rownames<-`(x = as.matrix(x = x[, colnames(x = x) != "sample",
+                                          drop = FALSE]),
                     value = x$sample)
       )() |>
       (\(x)
-       x[,colnames(x = x) |>
-           sort()]
+       x[, colnames(x = x) |>
+           sort(), drop = FALSE]
       )()
     
     .tdr.obj@density$composition$clustering$cell.count[
@@ -1347,12 +1348,13 @@ get.map.TDRObj <-
         dplyr::bind_rows(.id = "sample") |>
         as.data.frame() |>
         (\(x)
-         `rownames<-`(x = as.matrix(x = x[,colnames(x = x) != "sample"]),
+         `rownames<-`(x = as.matrix(x = x[, colnames(x = x) != "sample",
+                                            drop = FALSE]),
                       value = x$sample)
         )()  |>
         (\(x)
-         x[,colnames(x = x) |>
-             sort()]
+         x[, colnames(x = x) |>
+             sort(), drop = FALSE]
         )()
       
       .tdr.obj@density$composition$celltyping$cell.count[

@@ -480,12 +480,13 @@ celltyping.TDRObj <-
     dplyr::bind_rows(.id = "sample") |>
     as.data.frame() |>
     (\(x)
-     `rownames<-`(x = as.matrix(x = x[, colnames(x = x) != "sample"]),
+     `rownames<-`(x = as.matrix(x = x[, colnames(x = x) != "sample",
+                                        drop = FALSE]),
                   value = x$sample)
     )() |>
     (\(x)
      x[, colnames(x = x) |>
-         sort()]
+         sort(), drop = FALSE]
     )()
   
   .tdr.obj@density$composition[[smap$comp_slot]]$cell.count[

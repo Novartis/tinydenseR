@@ -525,6 +525,26 @@ get.lm.TDRObj <-
       stats::setNames(nm = c("clustering",
                              "celltyping"))
     
+    # Number of unique clusters/celltypes — skip composition limma fit when
+    # only 1 level exists (nothing to compare, and limma needs >= 2 rows)
+    n.clusters <-
+      length(x = unique(x = .tdr.obj@landmark.annot$clustering$ids))
+    
+    n.celltypes <-
+      if (!is.null(x = .tdr.obj@landmark.annot$celltyping$ids)) {
+        length(x = unique(x = .tdr.obj@landmark.annot$celltyping$ids))
+      } else {
+        0L
+      }
+
+    if (n.clusters <= 1L) {
+      warning("Only ", n.clusters, " cluster detected. ",
+              "Skipping limma fit on cluster composition (nothing to compare). ",
+              "Density-level analysis (get.plsD, get.dea, etc.) is unaffected.")
+    }
+
+    if (n.clusters > 1L) {
+
     if(!(is.null(x = .block))){
       
       if(length(x = .block) != 1){
@@ -574,7 +594,10 @@ get.lm.TDRObj <-
             FUN = stats::p.adjust,
             method = "fdr")
     
-    if(!is.null(x = .tdr.obj@landmark.annot$celltyping$ids)){
+    } # end if (n.clusters > 1L)
+
+    if(!is.null(x = .tdr.obj@landmark.annot$celltyping$ids) &&
+       n.celltypes > 1L){
       
       if(!(is.null(x = .block))){
         
@@ -625,6 +648,13 @@ get.lm.TDRObj <-
               FUN = stats::p.adjust,
               method = "fdr")
       
+    }
+
+    if (!is.null(x = .tdr.obj@landmark.annot$celltyping$ids) &&
+        n.celltypes <= 1L) {
+      warning("Only ", n.celltypes, " cell type detected. ",
+              "Skipping limma fit on celltype composition (nothing to compare). ",
+              "Density-level analysis (get.plsD, get.dea, etc.) is unaffected.")
     }
     
     # -------------------------------------------------------------------------
@@ -2858,14 +2888,34 @@ get.embedding.TDRObj <-
 
 # -----------------------------------------------------------------------------
 # .build.nuisance.Z
+#
 # Extracts the nuisance portion of the design matrix, expanded to landmark
-# level via @config$key.  Returns NULL if no nuisance columns exist.
+# level via @config$key.  Optionally augments Z with dummy-coded blocking
+# columns when fit$block is non-NULL (i.e. get.lm() was called with .block).
+#
+# Block-awareness rationale:
+#   When get.lm() uses limma::duplicateCorrelation with a blocking variable
+#   (e.g. donor/subject), the density contrast Y is estimated via GLS that
+#   accounts for within-block correlation.  However, the blocking factor does
+#   NOT appear in the design matrix — it enters only through the covariance
+#   structure.  Without explicit handling, the expression matrix X retains
+#   between-block mean shifts that can contaminate PLS directions.
+#
+#   The fix is to include the blocking factor as additional nuisance columns in
+#   Z so that the OLS projection (I - H_Z) X removes block-level expression
+#   means.  This preserves the implicit-operator architecture and does not
+#   require GLS on X (which would be both computationally infeasible at
+#   landmark scale and statistically inappropriate for observed data).
+#
+# Returns: expanded nuisance matrix Z (n_landmarks x q_z), or NULL if no
+#          nuisance columns exist after accounting for design + block.
 # -----------------------------------------------------------------------------
 
 .build.nuisance.Z <-
   function(.tdr.obj,
            .model.name,
-           .coef.col) {
+           .coef.col,
+           .verbose = TRUE) {
 
     fit <-
       .tdr.obj@results$lm[[.model.name]]$fit
@@ -2892,12 +2942,90 @@ get.embedding.TDRObj <-
                 y = coef.col.idx)
     }
 
-    if (length(x = nuisance.cols) == 0) return(NULL)
+    # -------------------------------------------------------------------------
+    # Build sample-level nuisance matrix from design columns
+    # -------------------------------------------------------------------------
 
-    Z.sample <-
-      design[, nuisance.cols, drop = FALSE]
+    if (length(x = nuisance.cols) > 0) {
+      Z.sample <-
+        design[, nuisance.cols, drop = FALSE]
+    } else {
+      Z.sample <- NULL
+    }
 
-    # Expand to landmark level
+    # -------------------------------------------------------------------------
+    # Detect and append blocking variable (if used in get.lm)
+    #
+    # fit$block is a character/factor vector of length n_samples stored by
+    # limma::lmFit when block= is supplied.  We reverse-lookup the metadata
+    # column that matches it (same approach as get.embedding's pePC path).
+    # The block factor is dummy-encoded with treatment contrasts; the intercept
+    # (already guaranteed in Z) absorbs the reference level.
+    # -------------------------------------------------------------------------
+
+    block.cols.sample <- NULL
+
+    if (!is.null(x = fit$block)) {
+
+      # Reverse-lookup: find the metadata column matching fit$block
+      block.name <-
+        lapply(X = .tdr.obj@metadata,
+               FUN = function(meta.col) {
+                 if (length(x = meta.col) != length(x = fit$block)) return(FALSE)
+                 all(as.character(x = meta.col) == as.character(x = fit$block))
+               }) |>
+        unlist(use.names = TRUE) |>
+        which() |>
+        names()
+
+      if (length(x = block.name) > 0) {
+        block.name <- block.name[1]
+
+        block.factor <-
+          factor(x = fit$block)
+
+        n.levels <- nlevels(x = block.factor)
+
+        if (n.levels > 1) {
+          # Treatment-coded dummies (drops reference = first level)
+          # With intercept in Z, this gives full-rank parameterization
+          block.dummies <-
+            stats::model.matrix(object = ~ block.factor)[, -1, drop = FALSE]
+
+          # Clean column names: "block.factorB" -> "block:B"
+          colnames(x = block.dummies) <-
+            gsub(pattern = "^block\\.factor",
+                 replacement = paste0("block:", block.name, ":"),
+                 x = colnames(x = block.dummies))
+
+          block.cols.sample <- block.dummies
+
+          if (isTRUE(x = .verbose)) {
+            message("  Including blocking variable '", block.name,
+                    "' (", n.levels, " levels) in nuisance design.")
+          }
+        }
+      }
+    }
+
+    # -------------------------------------------------------------------------
+    # Combine design-based nuisance + block dummies at sample level
+    # -------------------------------------------------------------------------
+
+    if (is.null(x = Z.sample) && is.null(x = block.cols.sample)) {
+      return(NULL)
+    }
+
+    if (!is.null(x = Z.sample) && !is.null(x = block.cols.sample)) {
+      Z.sample <- cbind(Z.sample, block.cols.sample)
+    } else if (is.null(x = Z.sample)) {
+      Z.sample <- block.cols.sample
+    }
+
+    # -------------------------------------------------------------------------
+    # Expand to landmark level via @config$key
+    # -------------------------------------------------------------------------
+
     Z <-
       Z.sample[.tdr.obj@config$key, , drop = FALSE]
 
@@ -3375,7 +3503,7 @@ get.embedding.TDRObj <-
 #' @details
 #' plsD is an \strong{interpretive decomposition}, not a formal hypothesis test.
 #' It answers: "What features — through expression patterns, population identity,
-#' or both — explain the density contrast?" Loadings reflect this combined signal:
+#' or both — explain the density contrast?" Loadings reflect combined signal, like:
 #' markers of depleted populations carry negative loadings (high expression where
 #' density is low), DE genes carry signed loadings tracking their direction of
 #' change, and mixed DA/DE features appear alongside both.
@@ -3393,8 +3521,11 @@ get.embedding.TDRObj <-
 #' side, so loadings reflect only features whose graph-smoothed expression
 #' independently covaries with Y. This mode is less comprehensive — it misses
 #' DA markers unless their expression happens to correlate with Y through
-#' smoothed space — but serves as a useful diagnostic comparator: features
-#' that rank high in both modes are robust.
+#' smoothed space. In the presence of strongly bimodal density contrasts and/or,
+#' datasets with a small number of extreme landmarks, setting 
+#' \code{.YX.interaction = FALSE} can help distinguish features whose expression 
+#' genuinely covaries with Y from those that are strong but purely geometric
+#' counterweights.
 #'
 #' The method:
 #' \enumerate{
@@ -3406,6 +3537,7 @@ get.embedding.TDRObj <-
 #'   \item Constructs M.local: if \code{.YX.interaction = TRUE},
 #'         M.local = P \%*\% diag(Y) \%*\% Xc (density-weighted); if FALSE,
 #'         M.local = P \%*\% Xc (graph-smoothed only). Both are centered by columns.
+#'         Optionally, residualize Xc against nuisance covariates before constructing M.local.
 #'   \item Runs NIPALS PLS1: iteratively finds feature weights w maximizing
 #'         cov(M.local w, Y), with deflation of both M.local and Y
 #'   \item Applies sign convention: positive scores = aligned with Y
@@ -3447,6 +3579,17 @@ get.embedding.TDRObj <-
 #' is preserved via implicit operators. When no nuisance covariates exist (e.g.
 #' a simple two-group design), \code{.residualize = TRUE} is equivalent to
 #' \code{.residualize = FALSE}.
+#'
+#' \strong{Blocking variable handling:}
+#' When \code{get.lm()} was called with a \code{.block} argument (invoking
+#' \code{limma::duplicateCorrelation}), the blocking factor does NOT appear in
+#' the design matrix — it enters only through the GLS covariance structure for
+#' the density contrast Y. If \code{.residualize = TRUE}, the blocking variable
+#' is automatically detected from \code{fit$block} and appended to the nuisance
+#' design Z as dummy-coded columns. This ensures that block-level mean expression
+#' shifts (e.g. donor-specific expression baselines) are removed from X, preventing
+#' them from contaminating PLS directions via spurious covariance with the
+#' block-correlated residual structure in Y.
 #'
 #' \strong{Structural score constraints and the balancing effect:}
 #' The score vectors computed by plsD are structurally mean-zero across landmarks. This
@@ -3536,7 +3679,9 @@ get.embedding.TDRObj <-
 #'   the expression matrix before decomposition. Default FALSE. Nuisance columns
 #'   are identified automatically: when contrasts are present, design columns
 #'   that do not participate in any contrast are nuisance; when no contrasts are
-#'   used, all design columns except \code{.coef.col} are nuisance. The design
+#'   used, all design columns except \code{.coef.col} are nuisance. If
+#'   \code{get.lm()} was called with \code{.block}, the blocking variable is
+#'   additionally included in the nuisance design (dummy-coded). The design
 #'   is expanded from sample level to landmark level via \code{@config$key}.
 #'   Sparsity of the expression matrix is preserved via implicit operators (the
 #'   residualized matrix is never materialized). Not supported with
@@ -3728,6 +3873,7 @@ get.plsD.TDRObj <-
 
     resid.ops <- NULL
     .do.resid <- FALSE
+    nuisance.col.names <- NULL
 
     if (isTRUE(x = .residualize)) {
 
@@ -3738,15 +3884,20 @@ get.plsD.TDRObj <-
       Z.nuisance <-
         .build.nuisance.Z(.tdr.obj = .tdr.obj,
                           .model.name = .model.name,
-                          .coef.col = .coef.col)
+                          .coef.col = .coef.col,
+                          .verbose = .verbose)
 
       if (!is.null(x = Z.nuisance)) {
+
+        # Preserve original column names before .build.resid.operators,
+        # which may QR-reduce Z and lose them
+        nuisance.col.names <- colnames(x = Z.nuisance)
 
         if (isTRUE(x = .verbose)) {
           message("Residualizing expression against ",
                   ncol(x = Z.nuisance),
                   " nuisance column(s): ",
-                  paste(colnames(x = Z.nuisance), collapse = ", "))
+                  paste(nuisance.col.names, collapse = ", "))
         }
 
         resid.ops <-
@@ -4197,7 +4348,7 @@ get.plsD.TDRObj <-
           YX.interaction = .YX.interaction,
           loading.method = .loading.method,
           residualize = .residualize,
-          nuisance.cols = if (.do.resid) colnames(x = resid.ops$Z) else NULL
+          nuisance.cols = nuisance.col.names
         )
       )
     
