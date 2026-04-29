@@ -14,21 +14,44 @@
 # limitations under the License.
 #####
 
+library(ggrepel)
+library(patchwork)
 library(tinydenseR)
 library(tidyverse)
 library(ggpubr)
 library(rstatix)
-library(patchwork)
 library(ggh4x)
 library(Matrix)
 library(flowCore)
 library(flowWorkspace)
 
+# set wd to local dir
+script.path <-
+  grep(pattern = "^--file=", 
+       x = commandArgs(), 
+       value = TRUE,
+       fixed = FALSE) |>
+  gsub(pattern = "^--file=",
+       replacement = "", 
+       fixed = FALSE) |>
+  (\(x)
+   if(length(x = x) == 0) rstudioapi::getSourceEditorContext()$path else x
+  )()
+
+script.path |>
+  dirname() |>
+  setwd()
+
+# create sub-folder for results
+rd <- file.path(dirname(script.path), "results", "sim_flow_DE")
+
+if(!dir.exists(paths = rd)) dir.create(path = rd, recursive = TRUE)
+
+set.seed(seed = 42)
+
 # Simulate DE data and write FCS files
-sim_data <- simulate_DE_data()
-final_data_DE <- sim_data$cell_meta |>
-  dplyr::mutate(Treatment = factor(x = Treatment,
-                                   levels = c("Baseline", "Activation")))
+sim_data <- tinydenseR::simulate_DE_data()
+final_data_DE <- sim_data$cell_meta
 
 DE_res_DE <-
   final_data_DE |>
@@ -44,9 +67,9 @@ DE_res_DE <-
              setNames(object = y,
                       nm = y)
             )(),
-          FUN = function(sd_shift) {
+          FUN = function(setting) {
             lm(formula = log2(x = prop) ~ Treatment + Batch,
-               data = x[x$SD_Shift == sd_shift,]) |> 
+               data = x[x$SD_Shift == setting,]) |> 
               (\(mod)
                c(coef = unname(obj = coef(object = mod)["TreatmentActivation"]),
                  confint(object = mod)["TreatmentActivation",])
@@ -78,101 +101,6 @@ DE_res_DE |>
                                                   units = "in"))
   )()
 
-final_data_DE |>
-  dplyr::group_by(Sample, Treatment, Batch, SD_Shift, CellType) |>
-  dplyr::summarize(Marker1 = mean(log(Marker1))) |> 
-  dplyr::ungroup() |>
-  dplyr::filter(CellType == "target") |>
-  as.data.frame() |>
-  (\(x)
-   lapply(X = unique(x = x$SD_Shift) |> 
-            (\(y)
-             setNames(object = y,
-                      nm = y)
-            )(),
-          FUN = function(sd_shift) {
-            lm(formula = Marker1 ~ Treatment + Batch,
-               data = x[x$SD_Shift == sd_shift,]) |>
-              summary()
-          })
-  )()
-
-final_data_DE |>
-  dplyr::group_by(Sample, Treatment, Batch, SD_Shift, CellType) |>
-  dplyr::summarize(Marker2 = mean(log(Marker2))) |> 
-  dplyr::ungroup() |>
-  dplyr::filter(CellType == "target") |>
-  as.data.frame() |>
-  (\(x)
-   lapply(X = unique(x = x$SD_Shift) |> 
-            (\(y)
-             setNames(object = y,
-                      nm = y)
-            )(),
-          FUN = function(sd_shift) {
-            lm(formula = Marker2 ~ Treatment + Batch,
-               data = x[x$SD_Shift == sd_shift,]) |>
-              summary()
-          })
-  )()
-
-final_data_DE |>
-  dplyr::group_by(Sample, Treatment, Batch, SD_Shift, CellType) |>
-  dplyr::summarize(Marker3 = mean(log(Marker3))) |> 
-  dplyr::ungroup() |>
-  dplyr::filter(CellType == "target") |>
-  as.data.frame() |>
-  (\(x)
-   lapply(X = unique(x = x$SD_Shift) |> 
-            (\(y)
-             setNames(object = y,
-                      nm = y)
-            )(),
-          FUN = function(sd_shift) {
-            lm(formula = Marker3 ~ Treatment + Batch,
-               data = x[x$SD_Shift == sd_shift,]) |>
-              summary()
-          })
-  )()
-
-final_data_DE |>
-  dplyr::group_by(Sample, Treatment, Batch, SD_Shift, CellType) |>
-  dplyr::summarize(Marker4 = mean(log(Marker4))) |> 
-  dplyr::ungroup() |>
-  dplyr::filter(CellType == "target") |>
-  as.data.frame() |>
-  (\(x)
-   lapply(X = unique(x = x$SD_Shift) |> 
-            (\(y)
-             setNames(object = y,
-                      nm = y)
-            )(),
-          FUN = function(sd_shift) {
-            lm(formula = Marker4 ~ Treatment + Batch,
-               data = x[x$SD_Shift == sd_shift,]) |>
-              summary()
-          })
-  )()
-
-final_data_DE |>
-  dplyr::group_by(Sample, Treatment, Batch, SD_Shift, CellType) |>
-  dplyr::summarize(Marker5 = mean(log(Marker5))) |> 
-  dplyr::ungroup() |>
-  dplyr::filter(CellType == "target") |>
-  as.data.frame() |>
-  (\(x)
-   lapply(X = unique(x = x$SD_Shift) |> 
-            (\(y)
-             setNames(object = y,
-                      nm = y)
-            )(),
-          FUN = function(sd_shift) {
-            lm(formula = Marker5 ~ Treatment + Batch,
-               data = x[x$SD_Shift == sd_shift,]) |>
-              summary()
-          })
-  )()
-
 # 0.5SD
 .setting.meta.0.5 <-
   sim_data$sample_meta |>
@@ -185,17 +113,21 @@ cs.DE.0.5 <-
 
 flowWorkspace::pData(cs.DE.0.5)$Sample <-
   flowWorkspace::sampleNames(cs.DE.0.5)
+
 flowWorkspace::pData(cs.DE.0.5)$Treatment <-
   .setting.meta.0.5$Treatment[match(flowWorkspace::sampleNames(cs.DE.0.5),
-                                    .setting.meta.0.5$Sample)]
+                                    paste0(.setting.meta.0.5$Sample,
+                                           ".fcs"))]
+
 flowWorkspace::pData(cs.DE.0.5)$Batch <-
   .setting.meta.0.5$Batch[match(flowWorkspace::sampleNames(cs.DE.0.5),
-                                .setting.meta.0.5$Sample)]
+                                paste0(.setting.meta.0.5$Sample,
+                                       ".fcs"))]
 
 set.seed(seed = 123)
 lm.cells.DE.0.5 <-
   tinydenseR::RunTDR(
-    cs.DE.0.5,
+    x = cs.DE.0.5,
     .sample.var = "Sample",
     .assay.type = "cyto",
     .markers = paste0("Marker", 1:5),
@@ -203,11 +135,41 @@ lm.cells.DE.0.5 <-
     .verbose = TRUE,
     .cl.resolution.parameter = 0.5)
 
-.meta.DE.0.5 <-
-  lm.cells.DE.0.5@metadata
+# Unsupervised sample embedding
+(smpl.pca.DE.0.5 <- 
+    tinydenseR::plotSampleEmbedding(
+      x = lm.cells.DE.0.5,
+      .embedding = "pca",
+      .color.by = "Treatment",
+      .cat.feature.color = tinydenseR::Color.Palette[1,c(2,1)],
+      .panel.size = 1.5,
+      .point.size = 3) +
+    ggplot2::labs(title = "PCA") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "bottom"))
 
-lm.cells.DE.0.5 <-
-  tinydenseR::get.map(.tdr.obj = lm.cells.DE.0.5)
+(p <- tinydenseR::plotSampleEmbedding(
+  x = lm.cells.DE.0.5,
+  .embedding = "pca",
+  .color.by = "Batch",
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(3,4)],
+  .panel.size = 1.5,
+  .point.size = 3
+) +
+    ggplot2::labs(title = "PCA") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "left")); ggplot2::ggsave(plot = p,
+                                                               filename = file.path(rd,
+                                                                                    "sample_pca_DE_0.5_Batch.png"),
+                                                               width = 3.5, 
+                                                               height = 2.5,
+                                                               dpi = 300,
+                                                               bg = "white"); rm(p)
+
+# supervised analysis
+.meta.DE.0.5 <-
+  lm.cells.DE.0.5@metadata |>
+  dplyr::mutate(Treatment = factor(x = Treatment, levels = c("Baseline", "Activation")))
 
 .design.0.5 <-
   model.matrix(object = ~ Treatment + Batch,
@@ -220,208 +182,255 @@ lm.cells.DE.0.5 <-
                        fixed = FALSE))
   )()
 
-# New API: get.lm() returns updated .tdr.obj with results in $map$lm[[.model.name]]
 lm.cells.DE.0.5 <-
   tinydenseR::get.lm(
-    .tdr.obj = lm.cells.DE.0.5,
+    x = lm.cells.DE.0.5,
     .design = .design.0.5)
 
-lapply(X = names(lm.cells.DE.0.5@cells),
-       FUN = function(s) flowCore::exprs(cs.DE.0.5[[s]])) |>
-  do.call(what = rbind) |>
-  (\(x)
-   (((Matrix::t(x = x[,lm.cells.DE.0.5$pca$HVG]) - lm.cells.DE.0.5$pca$center) /
-       lm.cells.DE.0.5$pca$scale) |>
-       Matrix::t()) %*%
-     lm.cells.DE.0.5$pca$rotation
-  )() |>
-  as.matrix() |>
-  as.data.frame() |>
-  (\(x)
-   dplyr::mutate(
-     .data = x,
-     Treatment = final_data_DE |>
-       dplyr::filter(Sample %in% names(x = lm.cells.DE.0.5@cells)) |>
-       dplyr::pull(Treatment))
-  )() |>
-  (\(x)
-   ggplot2::ggplot(data = x,
-                   mapping = ggplot2::aes(x = PC1,
-                                          y = PC2)) +
-     ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
-     ggplot2::theme_bw() +
-     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                    legend.position = "none") +
-     ggplot2::labs(title = "ground truth (no % diff. with activation)") +
-     ggplot2::stat_bin_hex(bins = 128) + 
-     ggplot2::scale_fill_viridis_c(trans = "log") +
-     ggh4x::force_panelsizes(cols = grid::unit(x = 2,
-                                               units = "in"),
-                             rows = grid::unit(x = 2,
-                                               units = "in"))
-  )()
+# Create reduced models to embed samples quantitatively along the variables of interest
+noTreatment.design.0.5 <- 
+  model.matrix(object = ~ Batch,
+               data = lm.cells.DE.0.5@metadata)
 
-final_data_DE |>
-  dplyr::filter(Sample %in% names(x = lm.cells.DE.0.5@cells)) |>
-  dplyr::mutate(CellType = factor(x = CellType,
-                                  levels = c("target",
-                                             "other"))) |>
-  tidyr::pivot_longer(
-    cols = c(Marker1, Marker2, Marker3, Marker4, Marker5),
-    names_to = "Marker",
-    values_to = "value"
+noBatch.design.0.5 <- 
+  model.matrix(object = ~ Treatment,
+               data = lm.cells.DE.0.5@metadata)
+
+lm.cells.DE.0.5 <- 
+  tinydenseR::get.lm(
+    x = lm.cells.DE.0.5,
+    .design = noTreatment.design.0.5,
+    .model.name = "noTreatment",
+    .verbose = TRUE
   ) |>
-  (\(x)
-   ggplot2::ggplot(data = x,
-                   mapping = ggplot2::aes(x = Marker,
-                                          y = value,
-                                          color = CellType,
-                                          fill = CellType)) +
-     ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
-     ggplot2::theme_bw() +
-     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                    legend.position = "right",
-                    axis.text.x = ggplot2::element_text(hjust = 1,
-                                                        vjust = 1,
-                                                        angle = 30)) +
-     ggplot2::labs(title = "ground truth",
-                   x = "",
-                   y = "expression level") +
-     ggplot2::scale_fill_manual(values = unname(obj = tinydenseR::Color.Palette[1,1:2])) + 
-     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5,
-                                                                       alpha = 1)),
-                     fill = "none") +
-     ggplot2::scale_color_manual(values = unname(obj = tinydenseR::Color.Palette[1,1:2])) + 
-     ggplot2::scale_y_log10(breaks = scales::trans_breaks(trans = "log10",
-                                                          inv =  function(x) 10^x),
-                            labels = scales::trans_format(trans = "log10", 
-                                                          format = scales::math_format(10^.x))) + 
-     ggplot2::annotation_logticks(sides = "l") +
-     scattermore::geom_scattermore(position = ggplot2::position_jitterdodge(jitter.width = 0.5,
-                                                                            jitter.height = 0,
-                                                                            dodge.width = 0.5,
-                                                                            seed = 123),
-                                   alpha = 0.1) + 
-     ggplot2::geom_violin(color = "black",
-                          alpha = 0,
-                          position = ggplot2::position_dodge(width = 0.5),
-                          quantiles = 0.5, 
-                          quantile.linetype = "solid") +
-     ggh4x::force_panelsizes(cols = grid::unit(x = 2,
-                                               units = "in"),
-                             rows = grid::unit(x = 2,
-                                               units = "in"))
-  )()
+  tinydenseR::get.lm(
+    .design = noBatch.design.0.5,
+    .model.name = "noBatch",
+    .verbose = TRUE 
+  )
 
-lapply(X = names(lm.cells.DE.0.5@cells),
-       FUN = function(s) flowCore::exprs(cs.DE.0.5[[s]])) |>
-  do.call(what = rbind) |>
-  (\(x)
-   (((Matrix::t(x = x[,lm.cells.DE.0.5$pca$HVG]) - lm.cells.DE.0.5$pca$center) /
-       lm.cells.DE.0.5$pca$scale) |>
-       Matrix::t()) %*%
-     lm.cells.DE.0.5$pca$rotation
-  )() |>
-  as.matrix() |>
+# update stats results to get sample embedding
+lm.cells.DE.0.5 <-
+  tinydenseR::get.embedding(
+    x = lm.cells.DE.0.5,
+    .full.model = "default",
+    .red.model = "noTreatment",
+    .term.of.interest = "Treatment",
+    .verbose = FALSE 
+  ) |>
+  tinydenseR::get.embedding(
+    .full.model = "default",
+    .red.model = "noBatch",
+    .term.of.interest = "Batch",
+    .verbose = FALSE 
+  )
+
+# Embed samples based on differences along the variable of interest
+(smpl.pePC.DE.0.5 <- 
+    tinydenseR::plotSampleEmbedding(
+      x = lm.cells.DE.0.5,
+      .embedding = "pePC",
+      .sup.embed.slot = "Treatment",
+      .color.by = "Treatment",
+      .cat.feature.color = tinydenseR::Color.Palette[1,c(2,1)],
+      .panel.size = 1.5,
+      .point.size = 3) +
+    ggplot2::labs(title = "pePC") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "bottom"))
+
+(p <-
+    ((smpl.pca.DE.0.5 | 
+        smpl.pePC.DE.0.5) +
+       patchwork::plot_layout(guides = "collect") &
+       ggplot2::theme(legend.position = "bottom",
+                      legend.justification = "center")));ggplot2::ggsave(
+                        plot = p,
+                        filename = file.path(rd,
+                                             "sample_embed_DE_0.5.png"),
+                        width = 4.5,
+                        height = 3,
+                        units = "in",
+                        dpi = 300,
+                        bg = "white"); rm(p)
+
+(p <- tinydenseR::plotSampleEmbedding(
+  x = lm.cells.DE.0.5,
+  .embedding = "pePC",
+  .sup.embed.slot = "Batch",
+  .color.by = "Batch",
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(3,4)],
+  .panel.size = 1.5,
+  .point.size = 2
+) +
+    ggplot2::labs(title = "pePC: Batch") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "none")); ggplot2::ggsave(plot = p,
+                                                               filename = file.path(rd,
+                                                                                    "sample_pePC_DE_0.5.Batch.png"),
+                                                               width = 2.5, 
+                                                               height = 2.5,
+                                                               dpi = 300,
+                                                               bg = "white"); rm(p)
+
+(p <- lapply(X = names(lm.cells.DE.0.5@cells),
+             FUN = function(s) flowCore::exprs(cs.DE.0.5[[s]])) |>
+    do.call(what = rbind) |>
+    (\(x)
+     (((Matrix::t(x = x[,lm.cells.DE.0.5@landmark.embed$pca$HVG]) - lm.cells.DE.0.5@landmark.embed$pca$center) /
+         lm.cells.DE.0.5@landmark.embed$pca$scale) |>
+         Matrix::t()) %*%
+       lm.cells.DE.0.5@landmark.embed$pca$rotation
+    )() |>
+    as.matrix() |>
+    as.data.frame() |>
+    (\(x)
+     dplyr::mutate(
+       .data = x,
+       Treatment = final_data_DE |>
+         dplyr::filter(Sample %in% gsub(pattern = "\\.fcs$", replacement = "", names(x = lm.cells.DE.0.5@cells))) |>
+         dplyr::pull(Treatment))
+    )() |>
+    (\(x)
+     ggplot2::ggplot(data = x,
+                     mapping = ggplot2::aes(x = PC1,
+                                            y = PC2)) +
+       ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
+       ggplot2::theme_bw() +
+       ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                      legend.position = "none") +
+       ggplot2::labs(title = "ground truth") +
+       ggplot2::stat_bin_hex(bins = 128) + 
+       ggplot2::scale_fill_viridis_c(trans = "log") +
+       ggh4x::force_panelsizes(cols = grid::unit(x = 2,
+                                                 units = "in"),
+                               rows = grid::unit(x = 2,
+                                                 units = "in"))
+    )()); ggplot2::ggsave(plot = p,
+                          filename = file.path(rd,
+                                               "ground_truth_DE_0.5.png"),
+                          width = 5, 
+                          height = 3,
+                          dpi = 300); rm(p)
+
+# similar to above, but now a simple heatmap of ground truth mean marker expression in target vs other
+(p <- 
+  flowCore::fsApply(
+  x = lm.cells.DE.0.5$config$source.env$cs,
+  FUN = flowCore::exprs) |>
   as.data.frame() |>
-  (\(x)
-   dplyr::mutate(
-     .data = x,
-     Treatment = final_data_DE |>
-       dplyr::filter(Sample %in% names(x = lm.cells.DE.0.5@cells)) |>
-       dplyr::pull(Treatment),
-     Batch = final_data_DE |>
-       dplyr::filter(Sample %in% names(x = lm.cells.DE.0.5@cells)) |>
-       dplyr::pull(Batch))
-  )() |>
-  (\(x)
-   ggplot2::ggplot(data = x,
-                   mapping = ggplot2::aes(x = PC1,
-                                          y = PC2)) +
-     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5))) +
-     ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
-     ggplot2::theme_bw() +
-     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                    legend.position = "right") +
-     ggplot2::labs(title = "ground truth",
-                   color = "") +
-     scattermore::geom_scattermore(mapping = ggplot2::aes(color = Batch),
-                                   pointsize = I(x = 3)) + 
-     ggplot2::scale_color_viridis_d() +
-     ggh4x::force_panelsizes(cols = grid::unit(x = 2,
-                                               units = "in"),
-                             rows = grid::unit(x = 2,
-                                               units = "in"))
-  )()
+  cbind(final_data_DE[(final_data_DE$SD_Shift == "0.5SD"),]) |>
+  dplyr::filter(CellType == "target") |>
+  dplyr::group_by(Sample, CellType) |>
+  dplyr::summarize(
+    dplyr::across(dplyr::starts_with(match = "Marker"), mean),
+    Treatment = unique(x = Treatment),
+    .groups = "drop") |>
+  tidyr::pivot_longer(cols = dplyr::starts_with("Marker"),
+                      names_to = "name",
+                      values_to = "mean\nexpr") |>
+  ggplot2::ggplot(mapping = ggplot2::aes(x = Treatment,
+                                         y = name,
+                                         fill = `mean\nexpr`)) +
+    ggplot2::theme_void() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90,
+                                                        hjust = 0.5,
+                                                        vjust = 1),
+                   axis.title = ggplot2::element_blank(),
+                   legend.position = "right",
+                  axis.text.y = ggplot2::element_text()) +
+    ggplot2::labs() +
+    ggplot2::scale_y_discrete(position = "right", limits = rev) +
+    ggplot2::scale_fill_viridis_c(option = "plasma") +
+    ggplot2::geom_raster() +
+    ggh4x::force_panelsizes(cols = grid::unit(x = 0.5,
+                                              units = "in"),
+                            rows = grid::unit(x = 1.5,
+                                              units = "in"))); ggplot2::ggsave(
+       filename = file.path(rd,
+                            "ground_truth_markers_DE_0.5.png"),
+       width = 2, 
+       height = 2.5,
+       dpi = 300); rm(p)
 
-tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.0.5,
-                    .feature = lm.cells.DE.0.5$metada$Treatment[lm.cells.DE.0.5$config$key],
+tinydenseR::plotPCA(x = lm.cells.DE.0.5,
+                    .feature = lm.cells.DE.0.5@metadata$Treatment[lm.cells.DE.0.5@config$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,
                     .color.label = "Treatment")
 
-(tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.0.5,
-                     .feature = lm.cells.DE.0.5$map$lm$default$fit$coefficients[,"Activation"],
-                     .plot.title = "Activation vs Baseline",
-                     .color.label = "density\nlog2(+0.5)FC",
-                     .panel.size = 2,
-                     .point.size = 1,
-                     .midpoint = 0) +
+(DE.0.5.dens <- tinydenseR::plotPCA(x = lm.cells.DE.0.5,
+                                    .feature = lm.cells.DE.0.5@results$lm$default$fit$coefficients[,"Activation"],
+                                    .plot.title = "Activation vs Baseline",
+                                    .color.label = "density\nlog2(+0.5)FC",
+                                    .panel.size = 1.5,
+                                    .point.size = 1,
+                                    .midpoint = 0) +
     ggplot2::theme(plot.subtitle = ggplot2::element_blank()))
 
-(tinydenseR::plotPCA(
-  .tdr.obj = lm.cells.DE.0.5,
+(DE.0.5.q <- tinydenseR::plotPCA(
+  x = lm.cells.DE.0.5,
   .feature =
     ifelse(
-      test = lm.cells.DE.0.5$map$lm$default$fit$coefficients[,"Activation"] < 0,
-      yes = "less abundant",
-      no = "more abundant") |>
+      test = lm.cells.DE.0.5@results$lm$default$fit$coefficients[,"Activation"] < 0,
+      yes = "lower density",
+      no = "higher density") |>
     ifelse(
-      test = lm.cells.DE.0.5$map$lm$default$fit$pca.weighted.q[,"Activation"] < 0.1,
+      test = lm.cells.DE.0.5@results$lm$default$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
-    factor(levels = c("less abundant",
-                      "not sig.",
-                      "more abundant")),
+    factor(levels = c("lower density",
+                      "higher density",
+                      "not sig.")),
   .plot.title = "Activation vs Baseline",
   .color.label = "q < 0.1",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,2,6)],
   .point.size = 1,
-  .panel.size = 2)   +
-    ggplot2::labs(subtitle = "hypothesis testing"))
+  .panel.size = 1.5,
+  .legend.position = "bottom")   +
+    ggplot2::theme(plot.subtitle = ggplot2::element_blank()))
 
-tinydenseR::plotPCA(
-  .tdr.obj = lm.cells.DE.0.5,
-  .feature = lm.cells.DE.0.5$landmark.annot$clustering$ids,
+(cl.DE.0.5 <- tinydenseR::plotPCA(
+  x = lm.cells.DE.0.5,
+  .feature = lm.cells.DE.0.5@landmark.annot$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
-  .panel.size = 2) |> 
-  (\(x)
-   x +
-     ggplot2::theme(plot.subtitle = ggplot2::element_blank()) +
-     ggplot2::geom_text(data = x$data |>
-                          dplyr::group_by(feature) |>
-                          dplyr::summarize(PC1 = mean(x = PC1),
-                                           PC2 = mean(x = PC2),
-                                           .groups = "drop"),
-                        mapping = ggplot2::aes(label = feature),
-                        size = I(x = 3),
-                        color = "black")
-  )()
+  .panel.size = 1.5,
+  .legend.position = "bottom") |> 
+    (\(x)
+     x +
+       ggplot2::guides(color = ggplot2::guide_legend(ncol = 2,
+                                                     override.aes = list(size = I(x = 5)))) +
+       ggplot2::theme(plot.subtitle = ggplot2::element_blank()) +
+       ggrepel::geom_text_repel(data = x$data |>
+                            dplyr::group_by(feature) |>
+                            dplyr::summarize(PC1 = mean(x = PC1),
+                                             PC2 = mean(x = PC2),
+                                             .groups = "drop"),
+                          mapping = ggplot2::aes(label = feature),
+                          size = I(x = 4),
+                          color = "black",
+                          seed = 123, min.segment.length = -Inf)
+    )())
 
-tinydenseR::plotTradStats(
-    .tdr.obj = lm.cells.DE.0.5,
-    .model.name = "default")
+(p <- tinydenseR::plotTradStats(
+  x = lm.cells.DE.0.5,
+  .model.name = "default")); ggplot2::ggsave(plot = p,
+                                             filename = file.path(rd, 
+                                                                  "TradStats_DE_0.5.png"),
+                                             width = 7, 
+                                             height = 5,
+                                             dpi = 300); rm(p)
 
 stat.test.percentages.DE.0.5 <-
-  lm.cells.DE.0.5$map$clustering$cell.perc |>
+  lm.cells.DE.0.5@density$composition$clustering$cell.perc |>
   dplyr::as_tibble() |>
-  dplyr::mutate(treatment = lm.cells.DE.0.5$metadata$Treatment) |>
+  dplyr::mutate(treatment = lm.cells.DE.0.5@metadata$Treatment) |>
   tidyr::pivot_longer(cols = dplyr::starts_with(match = "cluster.")) |>
   dplyr::group_by(name) |>
   rstatix::t_test(formula = value ~ treatment) |>
-  dplyr::mutate(p = lm.cells.DE.0.5$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"],
-                p.adj = lm.cells.DE.0.5$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"]) |>
+  dplyr::mutate(p = lm.cells.DE.0.5@results$lm$default$trad$clustering$fit$adj.p[name,"Activation"],
+                p.adj = lm.cells.DE.0.5@results$lm$default$trad$clustering$fit$adj.p[name,"Activation"]) |>
   rstatix::add_significance() |>
   dplyr::mutate(p.adj = ifelse(test = p.adj < 0.01,
                                yes = formatC(x = p.adj,
@@ -432,9 +441,8 @@ stat.test.percentages.DE.0.5 <-
                                             format = "f"))) |>
   rstatix::add_xy_position(x = "treatment")
 
-
-(tinydenseR::plotTradPerc(
-  .tdr.obj = lm.cells.DE.0.5,
+(p <- tinydenseR::plotTradPerc(
+  x = lm.cells.DE.0.5,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
@@ -442,67 +450,144 @@ stat.test.percentages.DE.0.5 <-
     ggpubr::stat_pvalue_manual(data = stat.test.percentages.DE.0.5, 
                                label = "p.adj",
                                label.size = I(x = 3)) +
-    ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.15)))) |>
-  gridExtra::grid.arrange()
+    ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.15)))); ggplot2::ggsave(plot = p,
+                                                                                            filename = file.path(rd, 
+                                                                                                                 "TradPerc_DE_0.5.png"),
+                                                                                            width = 3.5, 
+                                                                                            height = 3,
+                                                                                            dpi = 300); rm(p)
 
-(tinydenseR::plotDensity(
-  .tdr.obj = lm.cells.DE.0.5,
+(p <- tinydenseR::plotDensity(
+  x = lm.cells.DE.0.5,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
-    ggplot2::labs(title = "within-cluster density"))
+    ggplot2::labs(title = "within-cluster density")); ggplot2::ggsave(
+      plot = p,
+                                                                      filename = file.path(rd, 
+                                                                                           "density_DE_0.5.png"),
+                                                                      width = 3.5, 
+                                                                      height = 3,
+                                                                      dpi = 300); rm(p)
 
-tinydenseR::plotBeeswarm(
-  .tdr.obj = lm.cells.DE.0.5,
+(DE.0.5.bees <- tinydenseR::plotBeeswarm(
+  x = lm.cells.DE.0.5,
   .model.name = "default",
   .coefs = "Activation",
   .swarm.title = "Activation vs Baseline",
   .row.space.scaler = 0.5,
-  .perc.plot = FALSE)
+  .perc.plot = FALSE,
+  .q.from = "pca.weighted.q",
+  .legend.position = "bottom") +
+    ggplot2::geom_vline(xintercept = -1,
+                        color = "red",
+                        linetype = "dashed"))
 
-.dea.0.5 <-
-  tinydenseR::get.pbDE(
-    .tdr.obj = lm.cells.DE.0.5,
-    .design = .design.0.5,
-    .id = "cluster.4"
+lm.cells.DE.0.5 <-
+  tinydenseR::get.plsD(
+    x = lm.cells.DE.0.5, 
+    .coef.col = "Activation",
+    .model.name = "default",
+    .verbose = TRUE
   )
 
-(tinydenseR::plotPbDE(
-  .tdr.obj = lm.cells.DE.0.5,
-  .dea.obj = .dea.0.5, 
-  .coefs = c("Activation", "Batch2"),
-  .col.space.scaler = 0.15) +
-    ggplot2::coord_flip() +
-    ggplot2::labs(subtitle = "for cluster.4") +
-    ggplot2::scale_fill_gradientn(
-      colours = c(unname(obj = tinydenseR::Color.Palette[1,6]),
-                  unname(obj = tinydenseR::Color.Palette[1,2])),
-      limits  = c(0, 0.5),
-      breaks = c(0, 0.25, 0.5),
-      values  = scales::rescale(x = c(0, 0.5),
-                                from = c(0, 0.5))) +
-    ggplot2::guides(fill = ggplot2::guide_legend(override.aes = list(size = 5,
-                                                                     shape = 21))))
+(p <-
+    tinydenseR::plotPlsD(
+      x = lm.cells.DE.0.5,
+      .coef.col = "Activation",
+      .point.size = 2
+    )); rm(p)
 
-.dea.0.5$adj.p
-.dea.0.5$coefficients
+(DE.0.5.plsD1 <-
+    tinydenseR::plotPlsD(
+      x = lm.cells.DE.0.5,
+      .coef.col = "Activation",
+      .plsD.dim = 1,
+      .embed = "pca",
+      .panel.size = 1.5
+    )[[1]])
+
+(p <-
+    ((DE.0.5.dens +
+        ggplot2::guides(color = ggplot2::guide_colorbar(title.position = "top",
+                                                        title.hjust = 0.5)) +
+        ggplot2::labs(title = "") +
+        ggplot2::theme(legend.position = "bottom",
+                       legend.margin = ggplot2::margin(t = -0.1, 
+                                                       unit = "in"))) | 
+       (DE.0.5.plsD1 +
+          ggplot2::labs(title = "") +
+          ggplot2::theme(legend.margin = ggplot2::margin(t = 0.1, 
+                                                         unit = "in")))) +
+    patchwork::plot_annotation(title = "Density contrast: Activation") &
+    ggplot2::theme(
+      plot.title =
+        ggplot2::element_text(hjust = 0.5,
+                              margin = ggplot2::margin(t = -0.1, 
+                                                       unit = "in")))); ggplot2::ggsave(
+                                                         plot = p,
+                                                         filename = file.path(rd,
+                                                                              "q_DE_0.5.png"),
+                                                         width = 5.5,
+                                                         height = 3.5,
+                                                         units = "in",
+                                                         dpi = 300,
+                                                         bg = "white");rm(p)
+
+(p <-
+    tinydenseR::plotPlsDHeatmap(
+      x = lm.cells.DE.0.5,
+      .coef.col = "Activation",
+      .plsD.dim = 1,
+      .order.by = "plsD.dim",
+      .panel.height = 2,
+      .feature.font.size = I(x = 8)
+    )); ggplot2::ggsave(plot = p,
+                        filename = file.path(rd,
+                                             "sim.DE.0.5.plsD1.hm.png"),
+                        width = 6.5, 
+                        height = 4,
+                        dpi = 300,
+                        bg = "white"); rm(p) 
 
 lm.cells.DE.0.5 <-
   tinydenseR::get.pbDE(
     x = lm.cells.DE.0.5,
-    .mode = "marker",
-    .id = "cluster.4",
-    .result.name = "cluster4_vs_all"
+    .design = .design.0.5,
+    .id = "cluster.4"
   )
 
-tinydenseR::plotMarkerDE(
-  .tdr.obj = lm.cells.DE.0.5,
-  .comparison.name = "cluster4_vs_all",
-  .coefs = ".id1") |>
-  gridExtra::grid.arrange()
+(markerDE.DE.0.5 <- 
+    tinydenseR::plotPbDE(
+      x = lm.cells.DE.0.5,
+      .population.name = "cluster.4",
+      .coefs = "Activation",
+      .row.space.scaler = 0.065,
+      .col.space.scaler = 0.2,
+      .order.by = "none") +
+    ggplot2::labs(title = "cluster.4: Activation",
+                  subtitle = "pseudobulk") +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(hjust = 1,
+                                                       vjust = 1,
+                                                       angle = 30),
+                   axis.title = ggplot2::element_blank(),
+                   axis.text.y = ggplot2::element_blank()) +
+    ggplot2::guides(fill = guide_colorbar(position = "bottom", 
+                                          title.position = "top",
+                                          title.hjust = 0.5)) +
+    ggplot2::coord_flip())
 
-lm.cells.DE.0.5$markerDE$default$cluster4_vs_all$adj.p
-lm.cells.DE.0.5$markerDE$default$cluster4_vs_all$coefficients
+(p <-
+    (cl.DE.0.5 | 
+        markerDE.DE.0.5));ggplot2::ggsave(
+                        plot = p,
+                        filename = file.path(rd,
+                                             "DEA_DE_0.5.png"),
+                        width = 5,
+                        height = 3.75,
+                        units = "in",
+                        dpi = 300,
+                        bg = "white"); rm(p)
 
 # 1SD
 .setting.meta.1 <-
@@ -516,17 +601,21 @@ cs.DE.1 <-
 
 flowWorkspace::pData(cs.DE.1)$Sample <-
   flowWorkspace::sampleNames(cs.DE.1)
+
 flowWorkspace::pData(cs.DE.1)$Treatment <-
   .setting.meta.1$Treatment[match(flowWorkspace::sampleNames(cs.DE.1),
-                                    .setting.meta.1$Sample)]
+                                    paste0(.setting.meta.1$Sample,
+                                           ".fcs"))]
+
 flowWorkspace::pData(cs.DE.1)$Batch <-
   .setting.meta.1$Batch[match(flowWorkspace::sampleNames(cs.DE.1),
-                                .setting.meta.1$Sample)]
+                                paste0(.setting.meta.1$Sample,
+                                       ".fcs"))]
 
 set.seed(seed = 123)
 lm.cells.DE.1 <-
   tinydenseR::RunTDR(
-    cs.DE.1,
+    x = cs.DE.1,
     .sample.var = "Sample",
     .assay.type = "cyto",
     .markers = paste0("Marker", 1:5),
@@ -534,11 +623,41 @@ lm.cells.DE.1 <-
     .verbose = TRUE,
     .cl.resolution.parameter = 0.5)
 
-.meta.DE.1 <-
-  lm.cells.DE.1@metadata
+# Unsupervised sample embedding
+(smpl.pca.DE.1 <- 
+    tinydenseR::plotSampleEmbedding(
+      x = lm.cells.DE.1,
+      .embedding = "pca",
+      .color.by = "Treatment",
+      .cat.feature.color = tinydenseR::Color.Palette[1,c(2,1)],
+      .panel.size = 1.5,
+      .point.size = 3) +
+    ggplot2::labs(title = "PCA") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "bottom"))
 
-lm.cells.DE.1 <-
-  tinydenseR::get.map(.tdr.obj = lm.cells.DE.1)
+(p <- tinydenseR::plotSampleEmbedding(
+  x = lm.cells.DE.1,
+  .embedding = "pca",
+  .color.by = "Batch",
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(3,4)],
+  .panel.size = 1.5,
+  .point.size = 3
+) +
+    ggplot2::labs(title = "PCA") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "left")); ggplot2::ggsave(plot = p,
+                                                               filename = file.path(rd,
+                                                                                    "sample_pca_DE_1_Batch.png"),
+                                                               width = 3.5, 
+                                                               height = 2.5,
+                                                               dpi = 300,
+                                                               bg = "white"); rm(p)
+
+# supervised analysis
+.meta.DE.1 <-
+  lm.cells.DE.1@metadata |>
+  dplyr::mutate(Treatment = factor(x = Treatment, levels = c("Baseline", "Activation")))
 
 .design.1 <-
   model.matrix(object = ~ Treatment + Batch,
@@ -551,208 +670,256 @@ lm.cells.DE.1 <-
                        fixed = FALSE))
   )()
 
-# New API: get.lm() returns updated .tdr.obj with results in $map$lm[[.model.name]]
 lm.cells.DE.1 <-
   tinydenseR::get.lm(
-    .tdr.obj = lm.cells.DE.1,
+    x = lm.cells.DE.1,
     .design = .design.1)
 
-lapply(X = names(lm.cells.DE.1@cells),
-       FUN = function(s) flowCore::exprs(cs.DE.1[[s]])) |>
-  do.call(what = rbind) |>
-  (\(x)
-   (((Matrix::t(x = x[,lm.cells.DE.1$pca$HVG]) - lm.cells.DE.1$pca$center) /
-       lm.cells.DE.1$pca$scale) |>
-       Matrix::t()) %*%
-     lm.cells.DE.1$pca$rotation
-  )() |>
-  as.matrix() |>
-  as.data.frame() |>
-  (\(x)
-   dplyr::mutate(
-     .data = x,
-     Treatment = final_data_DE |>
-       dplyr::filter(Sample %in% names(x = lm.cells.DE.1@cells)) |>
-       dplyr::pull(Treatment))
-  )() |>
-  (\(x)
-   ggplot2::ggplot(data = x,
-                   mapping = ggplot2::aes(x = PC1,
-                                          y = PC2)) +
-     ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
-     ggplot2::theme_bw() +
-     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                    legend.position = "none") +
-     ggplot2::labs(title = "ground truth (no % diff. with activation)") +
-     ggplot2::stat_bin_hex(bins = 128) + 
-     ggplot2::scale_fill_viridis_c(trans = "log") +
-     ggh4x::force_panelsizes(cols = grid::unit(x = 2,
-                                               units = "in"),
-                             rows = grid::unit(x = 2,
-                                               units = "in"))
-  )()
+# Create reduced models to embed samples quantitatively along the variables of interest
+noTreatment.design.1 <- 
+  model.matrix(object = ~ Batch,
+               data = lm.cells.DE.1@metadata)
 
-final_data_DE |>
-  dplyr::filter(Sample %in% names(x = lm.cells.DE.1@cells)) |>
-  dplyr::mutate(CellType = factor(x = CellType,
-                                  levels = c("target",
-                                             "other"))) |>
-  tidyr::pivot_longer(
-    cols = c(Marker1, Marker2, Marker3, Marker4, Marker5),
-    names_to = "Marker",
-    values_to = "value"
+noBatch.design.1 <- 
+  model.matrix(object = ~ Treatment,
+               data = lm.cells.DE.1@metadata)
+
+lm.cells.DE.1 <- 
+  tinydenseR::get.lm(
+    x = lm.cells.DE.1,
+    .design = noTreatment.design.1,
+    .model.name = "noTreatment",
+    .verbose = TRUE
   ) |>
-  (\(x)
-   ggplot2::ggplot(data = x,
-                   mapping = ggplot2::aes(x = Marker,
-                                          y = value,
-                                          color = CellType,
-                                          fill = CellType)) +
-     ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
-     ggplot2::theme_bw() +
-     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                    legend.position = "right",
-                    axis.text.x = ggplot2::element_text(hjust = 1,
-                                                        vjust = 1,
-                                                        angle = 30)) +
-     ggplot2::labs(title = "ground truth",
-                   x = "",
-                   y = "expression level") +
-     ggplot2::scale_fill_manual(values = unname(obj = tinydenseR::Color.Palette[1,1:2])) + 
-     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5,
-                                                                       alpha = 1)),
-                     fill = "none") +
-     ggplot2::scale_color_manual(values = unname(obj = tinydenseR::Color.Palette[1,1:2])) + 
-     ggplot2::scale_y_log10(breaks = scales::trans_breaks(trans = "log10",
-                                                          inv =  function(x) 10^x),
-                            labels = scales::trans_format(trans = "log10", 
-                                                          format = scales::math_format(10^.x))) + 
-     ggplot2::annotation_logticks(sides = "l") +
-     scattermore::geom_scattermore(position = ggplot2::position_jitterdodge(jitter.width = 0.5,
-                                                                            jitter.height = 0,
-                                                                            dodge.width = 0.5,
-                                                                            seed = 123),
-                                   alpha = 0.1) + 
-     ggplot2::geom_violin(color = "black",
-                          alpha = 0,
-                          position = ggplot2::position_dodge(width = 0.5),
-                          quantiles = 0.5, 
-                          quantile.linetype = "solid") +
-     ggh4x::force_panelsizes(cols = grid::unit(x = 2,
-                                               units = "in"),
-                             rows = grid::unit(x = 2,
-                                               units = "in"))
-  )()
+  tinydenseR::get.lm(
+    .design = noBatch.design.1,
+    .model.name = "noBatch",
+    .verbose = TRUE 
+  )
 
-lapply(X = names(lm.cells.DE.1@cells),
-       FUN = function(s) flowCore::exprs(cs.DE.1[[s]])) |>
-  do.call(what = rbind) |>
-  (\(x)
-   (((Matrix::t(x = x[,lm.cells.DE.1$pca$HVG]) - lm.cells.DE.1$pca$center) /
-       lm.cells.DE.1$pca$scale) |>
-       Matrix::t()) %*%
-     lm.cells.DE.1$pca$rotation
-  )() |>
-  as.matrix() |>
+# update stats results to get sample embedding
+lm.cells.DE.1 <-
+  tinydenseR::get.embedding(
+    x = lm.cells.DE.1,
+    .full.model = "default",
+    .red.model = "noTreatment",
+    .term.of.interest = "Treatment",
+    .verbose = FALSE 
+  ) |>
+  tinydenseR::get.embedding(
+    .full.model = "default",
+    .red.model = "noBatch",
+    .term.of.interest = "Batch",
+    .verbose = FALSE 
+  )
+
+# Embed samples based on differences along the variable of interest
+(smpl.pePC.DE.1 <- 
+    tinydenseR::plotSampleEmbedding(
+      x = lm.cells.DE.1,
+      .embedding = "pePC",
+      .sup.embed.slot = "Treatment",
+      .color.by = "Treatment",
+      .cat.feature.color = tinydenseR::Color.Palette[1,c(2,1)],
+      .panel.size = 1.5,
+      .point.size = 3) +
+    ggplot2::labs(title = "pePC") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "bottom"))
+
+(p <-
+    ((smpl.pca.DE.1 | 
+        smpl.pePC.DE.1) +
+       patchwork::plot_layout(guides = "collect") &
+       ggplot2::theme(legend.position = "bottom",
+                      legend.justification = "center")));ggplot2::ggsave(
+                        plot = p,
+                        filename = file.path(rd,
+                                             "sample_embed_DE_1.png"),
+                        width = 4.5,
+                        height = 3,
+                        units = "in",
+                        dpi = 300,
+                        bg = "white"); rm(p)
+
+(p <- tinydenseR::plotSampleEmbedding(
+  x = lm.cells.DE.1,
+  .embedding = "pePC",
+  .sup.embed.slot = "Batch",
+  .color.by = "Batch",
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(3,4)],
+  .panel.size = 1.5,
+  .point.size = 2
+) +
+    ggplot2::labs(title = "pePC: Batch") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "none")); ggplot2::ggsave(plot = p,
+                                                               filename = file.path(rd,
+                                                                                    "sample_pePC_DE_1.Batch.png"),
+                                                               width = 2.5, 
+                                                               height = 2.5,
+                                                               dpi = 300,
+                                                               bg = "white"); rm(p)
+
+(p <- lapply(X = names(lm.cells.DE.1@cells),
+             FUN = function(s) flowCore::exprs(cs.DE.1[[s]])) |>
+    do.call(what = rbind) |>
+    (\(x)
+     (((Matrix::t(x = x[,lm.cells.DE.1@landmark.embed$pca$HVG]) - lm.cells.DE.1@landmark.embed$pca$center) /
+         lm.cells.DE.1@landmark.embed$pca$scale) |>
+         Matrix::t()) %*%
+       lm.cells.DE.1@landmark.embed$pca$rotation
+    )() |>
+    as.matrix() |>
+    as.data.frame() |>
+    (\(x)
+     dplyr::mutate(
+       .data = x,
+       Treatment = final_data_DE |>
+         dplyr::filter(Sample %in% gsub(pattern = "\\.fcs$", replacement = "", names(x = lm.cells.DE.1@cells))) |>
+         dplyr::pull(Treatment))
+    )() |>
+    (\(x)
+     ggplot2::ggplot(data = x,
+                     mapping = ggplot2::aes(x = PC1,
+                                            y = PC2)) +
+       ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
+       ggplot2::theme_bw() +
+       ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                      legend.position = "none") +
+       ggplot2::labs(title = "ground truth") +
+       ggplot2::stat_bin_hex(bins = 128) + 
+       ggplot2::scale_fill_viridis_c(trans = "log") +
+       ggh4x::force_panelsizes(cols = grid::unit(x = 2,
+                                                 units = "in"),
+                               rows = grid::unit(x = 2,
+                                                 units = "in"))
+    )()); ggplot2::ggsave(plot = p,
+                          filename = file.path(rd,
+                                               "ground_truth_DE_1.png"),
+                          width = 5, 
+                          height = 3,
+                          dpi = 300); rm(p)
+
+# similar to above, but now a simple heatmap of ground truth mean marker expression in target vs other
+(p <- 
+  flowCore::fsApply(
+  x = lm.cells.DE.1$config$source.env$cs,
+  FUN = flowCore::exprs) |>
   as.data.frame() |>
-  (\(x)
-   dplyr::mutate(
-     .data = x,
-     Treatment = final_data_DE |>
-       dplyr::filter(Sample %in% names(x = lm.cells.DE.1@cells)) |>
-       dplyr::pull(Treatment),
-     Batch = final_data_DE |>
-       dplyr::filter(Sample %in% names(x = lm.cells.DE.1@cells)) |>
-       dplyr::pull(Batch))
-  )() |>
-  (\(x)
-   ggplot2::ggplot(data = x,
-                   mapping = ggplot2::aes(x = PC1,
-                                          y = PC2)) +
-     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5))) +
-     ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
-     ggplot2::theme_bw() +
-     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 1),
-                    legend.position = "right") +
-     ggplot2::labs(title = "ground truth",
-                   color = "") +
-     scattermore::geom_scattermore(mapping = ggplot2::aes(color = Batch),
-                                   pointsize = I(x = 3)) + 
-     ggplot2::scale_color_viridis_d() +
-     ggh4x::force_panelsizes(cols = grid::unit(x = 2,
-                                               units = "in"),
-                             rows = grid::unit(x = 2,
-                                               units = "in"))
-  )()
+  cbind(final_data_DE[(final_data_DE$SD_Shift == "1SD"),]) |>
+  dplyr::filter(CellType == "target") |>
+  dplyr::group_by(Sample, CellType) |>
+  dplyr::summarize(
+    dplyr::across(dplyr::starts_with(match = "Marker"), mean),
+    Treatment = unique(x = Treatment),
+    .groups = "drop") |>
+  tidyr::pivot_longer(cols = dplyr::starts_with("Marker"),
+                      names_to = "name",
+                      values_to = "mean\nexpr") |>
+  ggplot2::ggplot(mapping = ggplot2::aes(x = Treatment,
+                                         y = name,
+                                         fill = `mean\nexpr`)) +
+    ggplot2::theme_void() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90,
+                                                        hjust = 0.5,
+                                                        vjust = 1),
+                   axis.title = ggplot2::element_blank(),
+                   legend.position = "right",
+                  axis.text.y = ggplot2::element_text()) +
+    ggplot2::labs() +
+    ggplot2::scale_y_discrete(position = "right", limits = rev) +
+    ggplot2::scale_fill_viridis_c(option = "plasma") +
+    ggplot2::geom_raster() +
+    ggh4x::force_panelsizes(cols = grid::unit(x = 0.5,
+                                              units = "in"),
+                            rows = grid::unit(x = 1.5,
+                                              units = "in"))); ggplot2::ggsave(
+       filename = file.path(rd,
+                            "ground_truth_markers_DE_1.png"),
+       width = 2, 
+       height = 2.5,
+       dpi = 300); rm(p)
 
-tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.1,
-                    .feature = lm.cells.DE.1$metada$Treatment[lm.cells.DE.1$config$key],
+
+tinydenseR::plotPCA(x = lm.cells.DE.1,
+                    .feature = lm.cells.DE.1@metadata$Treatment[lm.cells.DE.1@config$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,
                     .color.label = "Treatment")
 
-(tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.1,
-                     .feature = lm.cells.DE.1$map$lm$default$fit$coefficients[,"Activation"],
-                     .plot.title = "Activation vs Baseline",
-                     .color.label = "density\nlog2(+0.5)FC",
-                     .panel.size = 2,
-                     .point.size = 1,
-                     .midpoint = 0) +
+(DE.1.dens <- tinydenseR::plotPCA(x = lm.cells.DE.1,
+                                    .feature = lm.cells.DE.1@results$lm$default$fit$coefficients[,"Activation"],
+                                    .plot.title = "Activation vs Baseline",
+                                    .color.label = "density\nlog2(+0.5)FC",
+                                    .panel.size = 1.5,
+                                    .point.size = 1,
+                                    .midpoint = 0) +
     ggplot2::theme(plot.subtitle = ggplot2::element_blank()))
 
-(tinydenseR::plotPCA(
-  .tdr.obj = lm.cells.DE.1,
+(DE.1.q <- tinydenseR::plotPCA(
+  x = lm.cells.DE.1,
   .feature =
     ifelse(
-      test = lm.cells.DE.1$map$lm$default$fit$coefficients[,"Activation"] < 0,
-      yes = "less abundant",
-      no = "more abundant") |>
+      test = lm.cells.DE.1@results$lm$default$fit$coefficients[,"Activation"] < 0,
+      yes = "lower density",
+      no = "higher density") |>
     ifelse(
-      test = lm.cells.DE.1$map$lm$default$fit$pca.weighted.q[,"Activation"] < 0.1,
+      test = lm.cells.DE.1@results$lm$default$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
-    factor(levels = c("less abundant",
-                      "not sig.",
-                      "more abundant")),
+    factor(levels = c("lower density",
+                      "higher density",
+                      "not sig.")),
   .plot.title = "Activation vs Baseline",
   .color.label = "q < 0.1",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,2,6)],
   .point.size = 1,
-  .panel.size = 2)   +
-    ggplot2::labs(subtitle = "hypothesis testing"))
+  .panel.size = 1.5,
+  .legend.position = "bottom")   +
+    ggplot2::theme(plot.subtitle = ggplot2::element_blank()))
 
-tinydenseR::plotPCA(
-  .tdr.obj = lm.cells.DE.1,
-  .feature = lm.cells.DE.1$landmark.annot$clustering$ids,
+(cl.DE.1 <- tinydenseR::plotPCA(
+  x = lm.cells.DE.1,
+  .feature = lm.cells.DE.1@landmark.annot$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
-  .panel.size = 2) |> 
-  (\(x)
-   x +
-     ggplot2::theme(plot.subtitle = ggplot2::element_blank()) +
-     ggplot2::geom_text(data = x$data |>
-                          dplyr::group_by(feature) |>
-                          dplyr::summarize(PC1 = mean(x = PC1),
-                                           PC2 = mean(x = PC2),
-                                           .groups = "drop"),
-                        mapping = ggplot2::aes(label = feature),
-                        size = I(x = 3),
-                        color = "black")
-  )()
+  .panel.size = 1.5,
+  .legend.position = "bottom") |> 
+    (\(x)
+     x +
+       ggplot2::guides(color = ggplot2::guide_legend(ncol = 2,
+                                                     override.aes = list(size = I(x = 5)))) +
+       ggplot2::theme(plot.subtitle = ggplot2::element_blank()) +
+       ggrepel::geom_text_repel(data = x$data |>
+                            dplyr::group_by(feature) |>
+                            dplyr::summarize(PC1 = mean(x = PC1),
+                                             PC2 = mean(x = PC2),
+                                             .groups = "drop"),
+                          mapping = ggplot2::aes(label = feature),
+                          size = I(x = 4),
+                          color = "black",
+                          seed = 123)
+    )())
 
-tinydenseR::plotTradStats(
-    .tdr.obj = lm.cells.DE.1,
-    .model.name = "default")
+(p <- tinydenseR::plotTradStats(
+  x = lm.cells.DE.1,
+  .model.name = "default")); ggplot2::ggsave(plot = p,
+                                             filename = file.path(rd, 
+                                                                  "TradStats_DE_1.png"),
+                                             width = 7, 
+                                             height = 5,
+                                             dpi = 300); rm(p)
 
 stat.test.percentages.DE.1 <-
-  lm.cells.DE.1$map$clustering$cell.perc |>
+  lm.cells.DE.1@density$composition$clustering$cell.perc |>
   dplyr::as_tibble() |>
-  dplyr::mutate(treatment = lm.cells.DE.1$metadata$Treatment) |>
+  dplyr::mutate(treatment = lm.cells.DE.1@metadata$Treatment) |>
   tidyr::pivot_longer(cols = dplyr::starts_with(match = "cluster.")) |>
   dplyr::group_by(name) |>
   rstatix::t_test(formula = value ~ treatment) |>
-  dplyr::mutate(p = lm.cells.DE.1$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"],
-                p.adj = lm.cells.DE.1$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"]) |>
+  dplyr::mutate(p = lm.cells.DE.1@results$lm$default$trad$clustering$fit$adj.p[name,"Activation"],
+                p.adj = lm.cells.DE.1@results$lm$default$trad$clustering$fit$adj.p[name,"Activation"]) |>
   rstatix::add_significance() |>
   dplyr::mutate(p.adj = ifelse(test = p.adj < 0.01,
                                yes = formatC(x = p.adj,
@@ -763,9 +930,8 @@ stat.test.percentages.DE.1 <-
                                             format = "f"))) |>
   rstatix::add_xy_position(x = "treatment")
 
-
-(tinydenseR::plotTradPerc(
-  .tdr.obj = lm.cells.DE.1,
+(p <- tinydenseR::plotTradPerc(
+  x = lm.cells.DE.1,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
@@ -773,65 +939,144 @@ stat.test.percentages.DE.1 <-
     ggpubr::stat_pvalue_manual(data = stat.test.percentages.DE.1, 
                                label = "p.adj",
                                label.size = I(x = 3)) +
-    ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))))
+    ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.15)))); ggplot2::ggsave(plot = p,
+                                                                                            filename = file.path(rd, 
+                                                                                                                 "TradPerc_DE_1.png"),
+                                                                                            width = 3.5, 
+                                                                                            height = 3,
+                                                                                            dpi = 300); rm(p)
 
-(tinydenseR::plotDensity(
-  .tdr.obj = lm.cells.DE.1,
+(p <- tinydenseR::plotDensity(
+  x = lm.cells.DE.1,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
-    ggplot2::labs(title = "within-cluster density"))
+    ggplot2::labs(title = "within-cluster density")); ggplot2::ggsave(
+      plot = p,
+                                                                      filename = file.path(rd, 
+                                                                                           "density_DE_1.png"),
+                                                                      width = 3.5, 
+                                                                      height = 3,
+                                                                      dpi = 300); rm(p)
 
-tinydenseR::plotBeeswarm(
-  .tdr.obj = lm.cells.DE.1,
+(DE.1.bees <- tinydenseR::plotBeeswarm(
+  x = lm.cells.DE.1,
   .model.name = "default",
   .coefs = "Activation",
   .swarm.title = "Activation vs Baseline",
   .row.space.scaler = 0.5,
-  .perc.plot = FALSE)
+  .perc.plot = FALSE,
+  .q.from = "pca.weighted.q",
+  .legend.position = "bottom") +
+    ggplot2::geom_vline(xintercept = -1,
+                        color = "red",
+                        linetype = "dashed"))
 
-.dea.1 <-
-  tinydenseR::get.pbDE(
-    .tdr.obj = lm.cells.DE.1,
-    .design = .design.1,
-    .id = "cluster.3"
+lm.cells.DE.1 <-
+  tinydenseR::get.plsD(
+    x = lm.cells.DE.1, 
+    .coef.col = "Activation",
+    .model.name = "default",
+    .verbose = TRUE
   )
 
-(tinydenseR::plotPbDE(
-  .tdr.obj = lm.cells.DE.1,
-  .dea.obj = .dea.1, 
-  .coefs = c("Activation", "Batch2"),
-  .col.space.scaler = 0.15) +
-    ggplot2::coord_flip() +
-    ggplot2::labs(subtitle = "for cluster.3") +
-    ggplot2::scale_fill_gradientn(
-      colours = c(unname(obj = tinydenseR::Color.Palette[1,6]),
-                  unname(obj = tinydenseR::Color.Palette[1,2])),
-      limits  = c(0, 1),
-      breaks = c(0, 0.5, 1),
-      values  = scales::rescale(x = c(0, 1),
-                                from = c(0, 1))) +
-    ggplot2::guides(fill = ggplot2::guide_legend(override.aes = list(size = 5,
-                                                                     shape = 21))))
+(p <-
+    tinydenseR::plotPlsD(
+      x = lm.cells.DE.1,
+      .coef.col = "Activation",
+      .point.size = 2
+    )); rm(p)
 
-.dea.1$adj.p
-.dea.1$coefficients
+(DE.1.plsD1 <-
+    tinydenseR::plotPlsD(
+      x = lm.cells.DE.1,
+      .coef.col = "Activation",
+      .plsD.dim = 1,
+      .embed = "pca",
+      .panel.size = 1.5
+    )[[1]])
+
+(p <-
+    ((DE.1.dens +
+        ggplot2::guides(color = ggplot2::guide_colorbar(title.position = "top",
+                                                        title.hjust = 0.5)) +
+        ggplot2::labs(title = "") +
+        ggplot2::theme(legend.position = "bottom",
+                       legend.margin = ggplot2::margin(t = -0.1, 
+                                                       unit = "in"))) | 
+       (DE.1.plsD1 +
+          ggplot2::labs(title = "") +
+          ggplot2::theme(legend.margin = ggplot2::margin(t = 0.1, 
+                                                         unit = "in")))) +
+    patchwork::plot_annotation(title = "Density contrast: Activation") &
+    ggplot2::theme(
+      plot.title =
+        ggplot2::element_text(hjust = 0.5,
+                              margin = ggplot2::margin(t = -0.1, 
+                                                       unit = "in")))); ggplot2::ggsave(
+                                                         plot = p,
+                                                         filename = file.path(rd,
+                                                                              "q_DE_1.png"),
+                                                         width = 5.5,
+                                                         height = 3.5,
+                                                         units = "in",
+                                                         dpi = 300,
+                                                         bg = "white");rm(p)
+
+(p <-
+    tinydenseR::plotPlsDHeatmap(
+      x = lm.cells.DE.1,
+      .coef.col = "Activation",
+      .plsD.dim = 1,
+      .order.by = "plsD.dim",
+      .panel.height = 2,
+      .feature.font.size = I(x = 8)
+    )); ggplot2::ggsave(plot = p,
+                        filename = file.path(rd,
+                                             "sim.DE.1.plsD1.hm.png"),
+                        width = 6.5, 
+                        height = 4,
+                        dpi = 300,
+                        bg = "white"); rm(p) 
 
 lm.cells.DE.1 <-
   tinydenseR::get.pbDE(
     x = lm.cells.DE.1,
-    .mode = "marker",
-    .id = "cluster.3",
-    .result.name = "cluster3_vs_all"
+    .design = .design.1,
+    .id = "cluster.3"
   )
 
-tinydenseR::plotMarkerDE(
-  .tdr.obj = lm.cells.DE.1,
-  .comparison.name = "cluster3_vs_all",
-  .coefs = ".id1")
+(markerDE.DE.1 <- 
+    tinydenseR::plotPbDE(
+      x = lm.cells.DE.1,
+      .population.name = "cluster.3",
+      .coefs = "Activation",
+      .row.space.scaler = 0.065,
+      .col.space.scaler = 0.2,
+      .order.by = "none") +
+    ggplot2::labs(title = "cluster.3: Activation",
+                  subtitle = "pseudobulk") +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(hjust = 1,
+                                                       vjust = 1,
+                                                       angle = 30),
+                   axis.title = ggplot2::element_blank(),
+                   axis.text.y = ggplot2::element_blank()) +
+    ggplot2::guides(fill = guide_colorbar(position = "bottom", 
+                                          title.position = "top",
+                                          title.hjust = 0.5)) +
+    ggplot2::coord_flip())
 
-lm.cells.DE.1$markerDE$default$cluster3_vs_all$adj.p
-lm.cells.DE.1$markerDE$default$cluster3_vs_all$coefficients
+(p <-
+    (cl.DE.1 | 
+        markerDE.DE.1));ggplot2::ggsave(
+                        plot = p,
+                        filename = file.path(rd,
+                                             "DEA_DE_1.png"),
+                        width = 5,
+                        height = 3.75,
+                        units = "in",
+                        dpi = 300,
+                        bg = "white"); rm(p)
 
 # 2SD
 .setting.meta.2 <-
@@ -845,17 +1090,21 @@ cs.DE.2 <-
 
 flowWorkspace::pData(cs.DE.2)$Sample <-
   flowWorkspace::sampleNames(cs.DE.2)
+
 flowWorkspace::pData(cs.DE.2)$Treatment <-
   .setting.meta.2$Treatment[match(flowWorkspace::sampleNames(cs.DE.2),
-                                    .setting.meta.2$Sample)]
+                                    paste0(.setting.meta.2$Sample,
+                                           ".fcs"))]
+
 flowWorkspace::pData(cs.DE.2)$Batch <-
   .setting.meta.2$Batch[match(flowWorkspace::sampleNames(cs.DE.2),
-                                .setting.meta.2$Sample)]
+                                paste0(.setting.meta.2$Sample,
+                                       ".fcs"))]
 
 set.seed(seed = 123)
 lm.cells.DE.2 <-
   tinydenseR::RunTDR(
-    cs.DE.2,
+    x = cs.DE.2,
     .sample.var = "Sample",
     .assay.type = "cyto",
     .markers = paste0("Marker", 1:5),
@@ -863,11 +1112,41 @@ lm.cells.DE.2 <-
     .verbose = TRUE,
     .cl.resolution.parameter = 0.5)
 
-.meta.DE.2 <-
-  lm.cells.DE.2@metadata
+# Unsupervised sample embedding
+(smpl.pca.DE.2 <- 
+    tinydenseR::plotSampleEmbedding(
+      x = lm.cells.DE.2,
+      .embedding = "pca",
+      .color.by = "Treatment",
+      .cat.feature.color = tinydenseR::Color.Palette[1,c(2,1)],
+      .panel.size = 1.5,
+      .point.size = 3) +
+    ggplot2::labs(title = "PCA") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "bottom"))
 
-lm.cells.DE.2 <-
-  tinydenseR::get.map(.tdr.obj = lm.cells.DE.2)
+(p <- tinydenseR::plotSampleEmbedding(
+  x = lm.cells.DE.2,
+  .embedding = "pca",
+  .color.by = "Batch",
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(3,4)],
+  .panel.size = 1.5,
+  .point.size = 3
+) +
+    ggplot2::labs(title = "PCA") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "left")); ggplot2::ggsave(plot = p,
+                                                               filename = file.path(rd,
+                                                                                    "sample_pca_DE_2_Batch.png"),
+                                                               width = 3.5, 
+                                                               height = 2.5,
+                                                               dpi = 300,
+                                                               bg = "white"); rm(p)
+
+# supervised analysis
+.meta.DE.2 <-
+  lm.cells.DE.2@metadata |>
+  dplyr::mutate(Treatment = factor(x = Treatment, levels = c("Baseline", "Activation")))
 
 .design.2 <-
   model.matrix(object = ~ Treatment + Batch,
@@ -880,208 +1159,255 @@ lm.cells.DE.2 <-
                        fixed = FALSE))
   )()
 
-# New API: get.lm() returns updated .tdr.obj with results in $map$lm[[.model.name]]
 lm.cells.DE.2 <-
   tinydenseR::get.lm(
-    .tdr.obj = lm.cells.DE.2,
+    x = lm.cells.DE.2,
     .design = .design.2)
 
-lapply(X = names(lm.cells.DE.2@cells),
-       FUN = function(s) flowCore::exprs(cs.DE.2[[s]])) |>
-  do.call(what = rbind) |>
-  (\(x)
-   (((Matrix::t(x = x[,lm.cells.DE.2$pca$HVG]) - lm.cells.DE.2$pca$center) /
-       lm.cells.DE.2$pca$scale) |>
-       Matrix::t()) %*%
-     lm.cells.DE.2$pca$rotation
-  )() |>
-  as.matrix() |>
-  as.data.frame() |>
-  (\(x)
-   dplyr::mutate(
-     .data = x,
-     Treatment = final_data_DE |>
-       dplyr::filter(Sample %in% names(x = lm.cells.DE.2@cells)) |>
-       dplyr::pull(Treatment))
-  )() |>
-  (\(x)
-   ggplot2::ggplot(data = x,
-                   mapping = ggplot2::aes(x = PC1,
-                                          y = PC2)) +
-     ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
-     ggplot2::theme_bw() +
-     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                    legend.position = "none") +
-     ggplot2::labs(title = "ground truth (no % diff. with activation)") +
-     ggplot2::stat_bin_hex(bins = 128) + 
-     ggplot2::scale_fill_viridis_c(trans = "log") +
-     ggh4x::force_panelsizes(cols = grid::unit(x = 2,
-                                               units = "in"),
-                             rows = grid::unit(x = 2,
-                                               units = "in"))
-  )()
+# Create reduced models to embed samples quantitatively along the variables of interest
+noTreatment.design.2 <- 
+  model.matrix(object = ~ Batch,
+               data = lm.cells.DE.2@metadata)
 
-final_data_DE |>
-  dplyr::filter(Sample %in% names(x = lm.cells.DE.2@cells)) |>
-  dplyr::mutate(CellType = factor(x = CellType,
-                                  levels = c("target",
-                                             "other"))) |>
-  tidyr::pivot_longer(
-    cols = c(Marker1, Marker2, Marker3, Marker4, Marker5),
-    names_to = "Marker",
-    values_to = "value"
+noBatch.design.2 <- 
+  model.matrix(object = ~ Treatment,
+               data = lm.cells.DE.2@metadata)
+
+lm.cells.DE.2 <- 
+  tinydenseR::get.lm(
+    x = lm.cells.DE.2,
+    .design = noTreatment.design.2,
+    .model.name = "noTreatment",
+    .verbose = TRUE
   ) |>
-  (\(x)
-   ggplot2::ggplot(data = x,
-                   mapping = ggplot2::aes(x = Marker,
-                                          y = value,
-                                          color = CellType,
-                                          fill = CellType)) +
-     ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
-     ggplot2::theme_bw() +
-     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                    legend.position = "right",
-                    axis.text.x = ggplot2::element_text(hjust = 1,
-                                                        vjust = 1,
-                                                        angle = 30)) +
-     ggplot2::labs(title = "ground truth",
-                   x = "",
-                   y = "expression level") +
-     ggplot2::scale_fill_manual(values = unname(obj = tinydenseR::Color.Palette[1,1:2])) + 
-     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5,
-                                                                       alpha = 1)),
-                     fill = "none") +
-     ggplot2::scale_color_manual(values = unname(obj = tinydenseR::Color.Palette[1,1:2])) + 
-     ggplot2::scale_y_log10(breaks = scales::trans_breaks(trans = "log10",
-                                                          inv =  function(x) 10^x),
-                            labels = scales::trans_format(trans = "log10", 
-                                                          format = scales::math_format(10^.x))) + 
-     ggplot2::annotation_logticks(sides = "l") +
-     scattermore::geom_scattermore(position = ggplot2::position_jitterdodge(jitter.width = 0.5,
-                                                                            jitter.height = 0,
-                                                                            dodge.width = 0.5,
-                                                                            seed = 123),
-                                   alpha = 0.1) + 
-     ggplot2::geom_violin(color = "black",
-                          alpha = 0,
-                          position = ggplot2::position_dodge(width = 0.5),
-                          quantiles = 0.5,
-                          quantile.linetype = "solid") +
-     ggh4x::force_panelsizes(cols = grid::unit(x = 2,
-                                               units = "in"),
-                             rows = grid::unit(x = 2,
-                                               units = "in"))
-  )()
+  tinydenseR::get.lm(
+    .design = noBatch.design.2,
+    .model.name = "noBatch",
+    .verbose = TRUE 
+  )
 
-lapply(X = names(lm.cells.DE.2@cells),
-       FUN = function(s) flowCore::exprs(cs.DE.2[[s]])) |>
-  do.call(what = rbind) |>
-  (\(x)
-   (((Matrix::t(x = x[,lm.cells.DE.2$pca$HVG]) - lm.cells.DE.2$pca$center) /
-       lm.cells.DE.2$pca$scale) |>
-       Matrix::t()) %*%
-     lm.cells.DE.2$pca$rotation
-  )() |>
-  as.matrix() |>
+# update stats results to get sample embedding
+lm.cells.DE.2 <-
+  tinydenseR::get.embedding(
+    x = lm.cells.DE.2,
+    .full.model = "default",
+    .red.model = "noTreatment",
+    .term.of.interest = "Treatment",
+    .verbose = FALSE 
+  ) |>
+  tinydenseR::get.embedding(
+    .full.model = "default",
+    .red.model = "noBatch",
+    .term.of.interest = "Batch",
+    .verbose = FALSE 
+  )
+
+# Embed samples based on differences along the variable of interest
+(smpl.pePC.DE.2 <- 
+    tinydenseR::plotSampleEmbedding(
+      x = lm.cells.DE.2,
+      .embedding = "pePC",
+      .sup.embed.slot = "Treatment",
+      .color.by = "Treatment",
+      .cat.feature.color = tinydenseR::Color.Palette[1,c(2,1)],
+      .panel.size = 1.5,
+      .point.size = 3) +
+    ggplot2::labs(title = "pePC") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "bottom"))
+
+(p <-
+    ((smpl.pca.DE.2 | 
+        smpl.pePC.DE.2) +
+       patchwork::plot_layout(guides = "collect") &
+       ggplot2::theme(legend.position = "bottom",
+                      legend.justification = "center")));ggplot2::ggsave(
+                        plot = p,
+                        filename = file.path(rd,
+                                             "sample_embed_DE_2.png"),
+                        width = 4.5,
+                        height = 3,
+                        units = "in",
+                        dpi = 300,
+                        bg = "white"); rm(p)
+
+(p <- tinydenseR::plotSampleEmbedding(
+  x = lm.cells.DE.2,
+  .embedding = "pePC",
+  .sup.embed.slot = "Batch",
+  .color.by = "Batch",
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(3,4)],
+  .panel.size = 1.5,
+  .point.size = 2
+) +
+    ggplot2::labs(title = "pePC: Batch") +
+    ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                   legend.position = "none")); ggplot2::ggsave(plot = p,
+                                                               filename = file.path(rd,
+                                                                                    "sample_pePC_DE_2.Batch.png"),
+                                                               width = 2.5, 
+                                                               height = 2.5,
+                                                               dpi = 300,
+                                                               bg = "white"); rm(p)
+
+(p <- lapply(X = names(lm.cells.DE.2@cells),
+             FUN = function(s) flowCore::exprs(cs.DE.2[[s]])) |>
+    do.call(what = rbind) |>
+    (\(x)
+     (((Matrix::t(x = x[,lm.cells.DE.2@landmark.embed$pca$HVG]) - lm.cells.DE.2@landmark.embed$pca$center) /
+         lm.cells.DE.2@landmark.embed$pca$scale) |>
+         Matrix::t()) %*%
+       lm.cells.DE.2@landmark.embed$pca$rotation
+    )() |>
+    as.matrix() |>
+    as.data.frame() |>
+    (\(x)
+     dplyr::mutate(
+       .data = x,
+       Treatment = final_data_DE |>
+         dplyr::filter(Sample %in% gsub(pattern = "\\.fcs$", replacement = "", names(x = lm.cells.DE.2@cells))) |>
+         dplyr::pull(Treatment))
+    )() |>
+    (\(x)
+     ggplot2::ggplot(data = x,
+                     mapping = ggplot2::aes(x = PC1,
+                                            y = PC2)) +
+       ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
+       ggplot2::theme_bw() +
+       ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
+                      legend.position = "none") +
+       ggplot2::labs(title = "ground truth") +
+       ggplot2::stat_bin_hex(bins = 128) + 
+       ggplot2::scale_fill_viridis_c(trans = "log") +
+       ggh4x::force_panelsizes(cols = grid::unit(x = 2,
+                                                 units = "in"),
+                               rows = grid::unit(x = 2,
+                                                 units = "in"))
+    )()); ggplot2::ggsave(plot = p,
+                          filename = file.path(rd,
+                                               "ground_truth_DE_2.png"),
+                          width = 5, 
+                          height = 3,
+                          dpi = 300); rm(p)
+
+# similar to above, but now a simple heatmap of ground truth mean marker expression in target vs other
+(p <- 
+  flowCore::fsApply(
+  x = lm.cells.DE.2$config$source.env$cs,
+  FUN = flowCore::exprs) |>
   as.data.frame() |>
-  (\(x)
-   dplyr::mutate(
-     .data = x,
-     Treatment = final_data_DE |>
-       dplyr::filter(Sample %in% names(x = lm.cells.DE.2@cells)) |>
-       dplyr::pull(Treatment),
-     Batch = final_data_DE |>
-       dplyr::filter(Sample %in% names(x = lm.cells.DE.2@cells)) |>
-       dplyr::pull(Batch))
-  )() |>
-  (\(x)
-   ggplot2::ggplot(data = x,
-                   mapping = ggplot2::aes(x = PC1,
-                                          y = PC2)) +
-     ggplot2::guides(color = ggplot2::guide_legend(override.aes = list(size = 5))) +
-     ggplot2::facet_grid(cols = ggplot2::vars(Treatment)) +
-     ggplot2::theme_bw() +
-     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 1),
-                    legend.position = "right") +
-     ggplot2::labs(title = "ground truth",
-                   color = "") +
-     scattermore::geom_scattermore(mapping = ggplot2::aes(color = Batch),
-                                   pointsize = I(x = 3)) + 
-     ggplot2::scale_color_viridis_d() +
-     ggh4x::force_panelsizes(cols = grid::unit(x = 2,
-                                               units = "in"),
-                             rows = grid::unit(x = 2,
-                                               units = "in"))
-  )()
+  cbind(final_data_DE[(final_data_DE$SD_Shift == "2SD"),]) |>
+  dplyr::filter(CellType == "target") |>
+  dplyr::group_by(Sample, CellType) |>
+  dplyr::summarize(
+    dplyr::across(dplyr::starts_with(match = "Marker"), mean),
+    Treatment = unique(x = Treatment),
+    .groups = "drop") |>
+  tidyr::pivot_longer(cols = dplyr::starts_with("Marker"),
+                      names_to = "name",
+                      values_to = "mean\nexpr") |>
+  ggplot2::ggplot(mapping = ggplot2::aes(x = Treatment,
+                                         y = name,
+                                         fill = `mean\nexpr`)) +
+    ggplot2::theme_void() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 90,
+                                                        hjust = 0.5,
+                                                        vjust = 1),
+                   axis.title = ggplot2::element_blank(),
+                   legend.position = "right",
+                  axis.text.y = ggplot2::element_text()) +
+    ggplot2::labs() +
+    ggplot2::scale_y_discrete(position = "right", limits = rev) +
+    ggplot2::scale_fill_viridis_c(option = "plasma") +
+    ggplot2::geom_raster() +
+    ggh4x::force_panelsizes(cols = grid::unit(x = 0.5,
+                                              units = "in"),
+                            rows = grid::unit(x = 1.5,
+                                              units = "in"))); ggplot2::ggsave(
+       filename = file.path(rd,
+                            "ground_truth_markers_DE_2.png"),
+       width = 2, 
+       height = 2.5,
+       dpi = 300); rm(p)
 
-tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.2,
-                    .feature = lm.cells.DE.2$metada$Treatment[lm.cells.DE.2$config$key],
+tinydenseR::plotPCA(x = lm.cells.DE.2,
+                    .feature = lm.cells.DE.2@metadata$Treatment[lm.cells.DE.2@config$key],
                     .cat.feature.color = tinydenseR::Color.Palette[1,1:2],
                     .panel.size = 1.5,
                     .point.size = 1,
                     .color.label = "Treatment")
 
-(tinydenseR::plotPCA(.tdr.obj = lm.cells.DE.2,
-                     .feature = lm.cells.DE.2$map$lm$default$fit$coefficients[,"Activation"],
-                     .plot.title = "Activation vs Baseline",
-                     .color.label = "density\nlog2(+0.5)FC",
-                     .panel.size = 2,
-                     .point.size = 1,
-                     .midpoint = 0) +
+(DE.2.dens <- tinydenseR::plotPCA(x = lm.cells.DE.2,
+                                    .feature = lm.cells.DE.2@results$lm$default$fit$coefficients[,"Activation"],
+                                    .plot.title = "Activation vs Baseline",
+                                    .color.label = "density\nlog2(+0.5)FC",
+                                    .panel.size = 1.5,
+                                    .point.size = 1,
+                                    .midpoint = 0) +
     ggplot2::theme(plot.subtitle = ggplot2::element_blank()))
 
-(tinydenseR::plotPCA(
-  .tdr.obj = lm.cells.DE.2,
+(DE.2.q <- tinydenseR::plotPCA(
+  x = lm.cells.DE.2,
   .feature =
     ifelse(
-      test = lm.cells.DE.2$map$lm$default$fit$coefficients[,"Activation"] < 0,
-      yes = "less abundant",
-      no = "more abundant") |>
+      test = lm.cells.DE.2@results$lm$default$fit$coefficients[,"Activation"] < 0,
+      yes = "lower density",
+      no = "higher density") |>
     ifelse(
-      test = lm.cells.DE.2$map$lm$default$fit$pca.weighted.q[,"Activation"] < 0.1,
+      test = lm.cells.DE.2@results$lm$default$fit$pca.weighted.q[,"Activation"] < 0.1,
       no = "not sig.")  |>
-    factor(levels = c("less abundant",
-                      "not sig.",
-                      "more abundant")),
+    factor(levels = c("lower density",
+                      "higher density",
+                      "not sig.")),
   .plot.title = "Activation vs Baseline",
   .color.label = "q < 0.1",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,6,2)],
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,2,6)],
   .point.size = 1,
-  .panel.size = 2)   +
-    ggplot2::labs(subtitle = "hypothesis testing"))
+  .panel.size = 1.5,
+  .legend.position = "bottom")   +
+    ggplot2::theme(plot.subtitle = ggplot2::element_blank()))
 
-tinydenseR::plotPCA(
-  .tdr.obj = lm.cells.DE.2,
-  .feature = lm.cells.DE.2$landmark.annot$clustering$ids,
+(cl.DE.2 <- tinydenseR::plotPCA(
+  x = lm.cells.DE.2,
+  .feature = lm.cells.DE.2@landmark.annot$clustering$ids,
   .plot.title = "clustering",
   .point.size = 1,
-  .panel.size = 2) |> 
-  (\(x)
-   x +
-     ggplot2::theme(plot.subtitle = ggplot2::element_blank()) +
-     ggplot2::geom_text(data = x$data |>
-                          dplyr::group_by(feature) |>
-                          dplyr::summarize(PC1 = mean(x = PC1),
-                                           PC2 = mean(x = PC2),
-                                           .groups = "drop"),
-                        mapping = ggplot2::aes(label = feature),
-                        size = I(x = 3),
-                        color = "black")
-  )()
+  .panel.size = 1.5,
+  .legend.position = "bottom") |> 
+    (\(x)
+     x +
+       ggplot2::guides(color = ggplot2::guide_legend(ncol = 2,
+                                                     override.aes = list(size = I(x = 5)))) +
+       ggplot2::theme(plot.subtitle = ggplot2::element_blank()) +
+       ggrepel::geom_text_repel(data = x$data |>
+                            dplyr::group_by(feature) |>
+                            dplyr::summarize(PC1 = mean(x = PC1),
+                                             PC2 = mean(x = PC2),
+                                             .groups = "drop"),
+                          mapping = ggplot2::aes(label = feature),
+                          size = I(x = 4),
+                          color = "black",
+                          seed = 123)
+    )())
 
-tinydenseR::plotTradStats(
-    .tdr.obj = lm.cells.DE.2,
-    .model.name = "default")
+(p <- tinydenseR::plotTradStats(
+  x = lm.cells.DE.2,
+  .model.name = "default")); ggplot2::ggsave(plot = p,
+                                             filename = file.path(rd, 
+                                                                  "TradStats_DE_2.png"),
+                                             width = 7, 
+                                             height = 5,
+                                             dpi = 300); rm(p)
 
 stat.test.percentages.DE.2 <-
-  lm.cells.DE.2$map$clustering$cell.perc |>
+  lm.cells.DE.2@density$composition$clustering$cell.perc |>
   dplyr::as_tibble() |>
-  dplyr::mutate(treatment = lm.cells.DE.2$metadata$Treatment) |>
+  dplyr::mutate(treatment = lm.cells.DE.2@metadata$Treatment) |>
   tidyr::pivot_longer(cols = dplyr::starts_with(match = "cluster.")) |>
   dplyr::group_by(name) |>
   rstatix::t_test(formula = value ~ treatment) |>
-  dplyr::mutate(p = lm.cells.DE.2$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"],
-                p.adj = lm.cells.DE.2$map$lm$default$trad$clustering$fit$adj.p[name,"Activation"]) |>
+  dplyr::mutate(p = lm.cells.DE.2@results$lm$default$trad$clustering$fit$adj.p[name,"Activation"],
+                p.adj = lm.cells.DE.2@results$lm$default$trad$clustering$fit$adj.p[name,"Activation"]) |>
   rstatix::add_significance() |>
   dplyr::mutate(p.adj = ifelse(test = p.adj < 0.01,
                                yes = formatC(x = p.adj,
@@ -1092,9 +1418,8 @@ stat.test.percentages.DE.2 <-
                                             format = "f"))) |>
   rstatix::add_xy_position(x = "treatment")
 
-
-(tinydenseR::plotTradPerc(
-  .tdr.obj = lm.cells.DE.2,
+(p <- tinydenseR::plotTradPerc(
+  x = lm.cells.DE.2,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
@@ -1102,68 +1427,150 @@ stat.test.percentages.DE.2 <-
     ggpubr::stat_pvalue_manual(data = stat.test.percentages.DE.2, 
                                label = "p.adj",
                                label.size = I(x = 3)) +
-    ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.25))))
+    ggplot2::scale_y_continuous(expand = expansion(mult = c(0.05, 0.15)))); ggplot2::ggsave(plot = p,
+                                                                                            filename = file.path(rd, 
+                                                                                                                 "TradPerc_DE_2.png"),
+                                                                                            width = 3.5, 
+                                                                                            height = 3,
+                                                                                            dpi = 300); rm(p)
 
-(tinydenseR::plotDensity(
-  .tdr.obj = lm.cells.DE.2,
+(p <- tinydenseR::plotDensity(
+  x = lm.cells.DE.2,
   .x.split = "Treatment",
   .x.space.scaler = 0.3
 ) + 
-    ggplot2::labs(title = "within-cluster density"))
+    ggplot2::labs(title = "within-cluster density")); ggplot2::ggsave(
+      plot = p,
+                                                                      filename = file.path(rd, 
+                                                                                           "density_DE_2.png"),
+                                                                      width = 3.5, 
+                                                                      height = 3,
+                                                                      dpi = 300); rm(p)
 
-tinydenseR::plotBeeswarm(
-    .tdr.obj = lm.cells.DE.2,
+(DE.2.bees <- tinydenseR::plotBeeswarm(
+  x = lm.cells.DE.2,
+  .model.name = "default",
+  .coefs = "Activation",
+  .swarm.title = "Activation vs Baseline",
+  .row.space.scaler = 0.5,
+  .perc.plot = FALSE,
+  .q.from = "pca.weighted.q",
+  .legend.position = "bottom") +
+    ggplot2::geom_vline(xintercept = -1,
+                        color = "red",
+                        linetype = "dashed"))
+
+lm.cells.DE.2 <-
+  tinydenseR::get.plsD(
+    x = lm.cells.DE.2, 
+    .coef.col = "Activation",
     .model.name = "default",
-    .coefs = "Activation",
-    .swarm.title = "Activation vs Baseline",
-    .row.space.scaler = 0.5,
-    .perc.plot = FALSE)
-
-.dea.2 <-
-  tinydenseR::get.pbDE(
-    .tdr.obj = lm.cells.DE.2,
-    .design = .design.2,
-    .id = "cluster.4"
+    .verbose = TRUE
   )
 
-(tinydenseR::plotPbDE(
-  .tdr.obj = lm.cells.DE.2,
-  .dea.obj = .dea.2, 
-  .coefs = c("Activation", "Batch2"),
-  .col.space.scaler = 0.15) +
-    ggplot2::coord_flip() +
-    ggplot2::labs(subtitle = "for cluster.4") +
-    ggplot2::scale_fill_gradientn(
-      colours = c(unname(obj = tinydenseR::Color.Palette[1,6]),
-                  unname(obj = tinydenseR::Color.Palette[1,2])),
-      limits  = c(0, 2),
-      breaks = c(0, 1, 2),
-      values  = scales::rescale(x = c(0, 2),
-                                from = c(0, 2))) +
-    ggplot2::guides(fill = ggplot2::guide_legend(override.aes = list(size = 5,
-                                                                     shape = 21))))
+(p <-
+    tinydenseR::plotPlsD(
+      x = lm.cells.DE.2,
+      .coef.col = "Activation",
+      .point.size = 2
+    )); rm(p)
 
-.dea.2$adj.p
-.dea.2$coefficients
+(DE.2.plsD1 <-
+    tinydenseR::plotPlsD(
+      x = lm.cells.DE.2,
+      .coef.col = "Activation",
+      .plsD.dim = 1,
+      .embed = "pca",
+      .panel.size = 1.5
+    )[[1]])
+
+(p <-
+    ((DE.2.dens +
+        ggplot2::guides(color = ggplot2::guide_colorbar(title.position = "top",
+                                                        title.hjust = 0.5)) +
+        ggplot2::labs(title = "") +
+        ggplot2::theme(legend.position = "bottom",
+                       legend.margin = ggplot2::margin(t = -0.1, 
+                                                       unit = "in"))) | 
+       (DE.2.plsD1 +
+          ggplot2::labs(title = "") +
+          ggplot2::theme(legend.margin = ggplot2::margin(t = 0.1, 
+                                                         unit = "in")))) +
+    patchwork::plot_annotation(title = "Density contrast: Activation") &
+    ggplot2::theme(
+      plot.title =
+        ggplot2::element_text(hjust = 0.5,
+                              margin = ggplot2::margin(t = -0.1, 
+                                                       unit = "in")))); ggplot2::ggsave(
+                                                         plot = p,
+                                                         filename = file.path(rd,
+                                                                              "q_DE_2.png"),
+                                                         width = 5.5,
+                                                         height = 3.5,
+                                                         units = "in",
+                                                         dpi = 300,
+                                                         bg = "white");rm(p)
+
+(p <-
+    tinydenseR::plotPlsDHeatmap(
+      x = lm.cells.DE.2,
+      .coef.col = "Activation",
+      .plsD.dim = 1,
+      .order.by = "plsD.dim",
+      .panel.height = 2,
+      .feature.font.size = I(x = 8)
+    )); ggplot2::ggsave(plot = p,
+                        filename = file.path(rd,
+                                             "sim.DE.2.plsD1.hm.png"),
+                        width = 6.5, 
+                        height = 4,
+                        dpi = 300,
+                        bg = "white"); rm(p) 
 
 lm.cells.DE.2 <-
   tinydenseR::get.pbDE(
     x = lm.cells.DE.2,
-    .mode = "marker",
-    .id = "cluster.4",
-    .result.name = "cluster4_vs_all"
+    .design = .design.2,
+    .id = "cluster.4"
   )
 
-tinydenseR::plotMarkerDE(
-  .tdr.obj = lm.cells.DE.2,
-  .comparison.name = "cluster4_vs_all",
-  .coefs = ".id1")
+(markerDE.DE.2 <- 
+    tinydenseR::plotPbDE(
+      x = lm.cells.DE.2,
+      .population.name = "cluster.4",
+      .coefs = "Activation",
+      .row.space.scaler = 0.065,
+      .col.space.scaler = 0.2,
+      .order.by = "none") +
+    ggplot2::labs(title = "cluster.4: Activation",
+                  subtitle = "pseudobulk") +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(hjust = 1,
+                                                       vjust = 1,
+                                                       angle = 30),
+                   axis.title = ggplot2::element_blank(),
+                   axis.text.y = ggplot2::element_blank()) +
+    ggplot2::guides(fill = guide_colorbar(position = "bottom", 
+                                          title.position = "top",
+                                          title.hjust = 0.5)) +
+    ggplot2::coord_flip())
 
-lm.cells.DE.2$markerDE$default$cluster4_vs_all$adj.p
-lm.cells.DE.2$markerDE$default$cluster4_vs_all$coefficients
+(p <-
+    (cl.DE.2 | 
+        markerDE.DE.2));ggplot2::ggsave(
+                        plot = p,
+                        filename = file.path(rd,
+                                             "DEA_DE_2.png"),
+                        width = 5,
+                        height = 3.75,
+                        units = "in",
+                        dpi = 300,
+                        bg = "white"); rm(p)
 
 # permutation tests
-source(file = "https://raw.githubusercontent.com/Novartis/tinydenseR/inst/scripts/perm_utils.R")
+file.path(script.path |>
+  dirname(),
+"perm_utils.R") |>
+  source()
 
 # For each condition (0.5SD, 1SD, 2SD), run exact permutation test
 conditions <- list(
@@ -1222,5 +1629,25 @@ results |>
             .groups = "drop")
 
 # Plot results
-plot_n_sig(results = results)
-plot_min_q(results = results)
+# Plot results
+(p <- 
+  plot_n_sig(results = results)); ggplot2::ggsave(plot = p,
+                        filename = file.path(rd,
+                                             "perm_test_n_sig.png"),
+                        width = 9, 
+                        height = 4,
+                        dpi = 300); rm(p)
+(p <-
+  plot_min_q(results = results)); ggplot2::ggsave(plot = p,
+                        filename = file.path(rd,
+                                             "perm_test_min_q.png"),
+                        width = 9, 
+                        height = 4,
+                        dpi = 300); rm(p)
+
+results[results$mcc == 0,] |>
+  dplyr::group_by(condition, type) |>
+  dplyr::summarize(mean_min_q = mean(min_q < 0.1),
+                   .groups = "drop")
+
+sessionInfo()

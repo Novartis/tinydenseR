@@ -23,29 +23,49 @@ library(ggpubr)
 library(ggh4x)
 library(rstatix)
 library(scales)
+library(symphony)
 
-# Compare Seurat reference mapping vs tinydenseR on COVID PBMC datasets
-wd <- 
-  "path/to/your/working/directory/" # change to your working directory
-rd <-
-  file.path(wd,
-            "res")
+# set wd to local dir
+script.path <-
+  grep(pattern = "^--file=", 
+       x = commandArgs(), 
+       value = TRUE,
+       fixed = FALSE) |>
+  gsub(pattern = "^--file=",
+       replacement = "", 
+       fixed = FALSE) |>
+  (\(x)
+   if(length(x = x) == 0) rstudioapi::getSourceEditorContext()$path else x
+  )()
 
-setwd(dir = wd)
+script.path |>
+  dirname() |>
+  setwd()
 
-if(!(file.path(wd,
-               "Seurat.data") |>
-     dir.exists())){
-  file.path(wd,
-            "Seurat.data") |>
-    dir.create(recursive = TRUE,
-               showWarnings = TRUE)
-}
+# create sub-folder for results
+rd <- file.path(dirname(script.path), "results", "head_to_head_Seu")
 
-# Follow instructions to create Seurat object from h5ad files here
-# https://github.com/satijalab/seurat/blob/e35abd442520808a20025e589f861620ddc315af/vignettes/seurat5_bpcells_interaction_vignette.Rmd
-# and just to line 83 here: 
-# https://github.com/satijalab/seurat/blob/30f82df52159ac5f0feb80b149698abbd876b779/vignettes/COVID_SCTMapping.Rmd
+if(!dir.exists(paths = rd)) dir.create(path = rd, recursive = TRUE)
+
+# create sub-folder to store data
+dd <- file.path(dirname(script.path), "derived_data")
+
+if(!dir.exists(paths = dd)) dir.create(path = dd, recursive = TRUE)
+
+# ── Required external data ──
+# This script requires a merged Seurat v5 object with BPCells backend,
+# saved as "derived_data/seurat_object.RDS" relative to this script.
+#
+# To create this object, follow:
+#   1. https://github.com/satijalab/seurat/blob/e35abd442520808a20025e589f861620ddc315af/vignettes/seurat5_bpcells_interaction_vignette.Rmd
+#   2. https://github.com/satijalab/seurat/blob/30f82df52159ac5f0feb80b149698abbd876b779/vignettes/COVID_SCTMapping.Rmd
+#      (up to line 83)
+# Then save the resulting object:
+#   saveRDS(object, file.path("derived_data", "seurat_object.RDS"))
+
+# load merged Seurat objects
+object <-
+  readRDS(file = file.path(dd, "seurat_object.RDS"))
 
 # make sure to have the ref.umap reduction
 Seurat::DimPlot(object = object, 
@@ -160,7 +180,8 @@ COVID.PBMC.Seurat.perc.data <-
                        fixed = TRUE))
 
 # plot relative abundances
-COVID.PBMC.Seurat.perc.data |>
+(p <-
+    COVID.PBMC.Seurat.perc.data |>
   (\(x)
    ggplot2::ggplot(data = x,
                    mapping = ggplot2::aes(x = disease, 
@@ -192,15 +213,21 @@ COVID.PBMC.Seurat.perc.data |>
                                                   units = "in"),
                              rows = ggplot2::unit(x = 0.75,
                                                   units = "in"))
-  )()
+  )()); ggplot2::ggsave(
+    plot = p,
+    filename = file.path(rd,
+                         "COVID.PBMC.Seurat.perc.png"),
+    width = 7,
+    height = 7,
+    dpi = 300); rm(p)
 
 # Build symphony reference to use with tinydenseR
-reference.symphony <-
+reference <-
   symphony::buildReference(
     exp_ref = reference[["SCT"]]$counts, # ONLY SCT FOUND IN THIS DATASET!
-    metadata_ref = reference@meta.data,
+    metadata_ref = object@meta.data,
     verbose = TRUE,
-    save_uwot_path = file.path(wd ,"Seurat.data/symphony_ref_uwot_model"), # file path to save uwot UMAP model
+    save_uwot_path = file.path(dd, "symphony_ref_uwot_model"), # file path to save uwot UMAP model
     seed = 123
   )
 
@@ -217,28 +244,6 @@ reference.symphony <-
     .verbose = TRUE
   )
 
-# Add additional metadata columns that we need for downstream analysis
-.meta.extra <-
-  object@meta.data[, c("publication", "sex", "donor_id", "disease", "donor_id_disease")] |>
-  dplyr::distinct() |>
-  (\(x)
-   `rownames<-`(x = x, 
-                value = x$donor_id_disease)
-  )()
-
-.meta <- 
-  dplyr::left_join(
-    x = .meta |> 
-      dplyr::mutate(donor_id_disease = rownames(x = .meta)),
-    y = .meta.extra,
-    by = "donor_id_disease"
-  ) |>
-  (\(x)
-   `rownames<-`(x = x, 
-                value = x$donor_id_disease)
-  )() |>
-  dplyr::select(-donor_id_disease)
-
 # Create .cells object using new API
 # This automatically handles:
 # - Multiple BPCells layers matching "counts" pattern
@@ -251,13 +256,16 @@ reference.symphony <-
     .sample.var = "donor_id_disease",
     .assay = "RNA",
     .layer.pattern = "counts",
+    .layer.name.source = "publication",  # Use publication to name layers
     .min.cells.per.sample = 1000,  # Filter to samples with > 1000 cells
     .compress = FALSE,
-    .verbose = TRUE
+    .verbose = TRUE,
+    .dest.path = dd
   )
 
 # Subset .meta to match .cells (samples that passed filtering)
-.meta <- .meta[names(x = .cells), ] |>
+.meta <- 
+  .meta[names(x = .cells), ] |>
   droplevels()
 
 covid.lm.cells <-
@@ -273,67 +281,64 @@ covid.lm.cells <-
 
 covid.lm.cells <-
   tinydenseR::get.graph(
-    .tdr.obj = covid.lm.cells,
+    x = covid.lm.cells,
     .cl.resolution.parameter = 2,
     .verbose = TRUE)
 
 tinydenseR::plotUMAP(
-  .tdr.obj = covid.lm.cells,
-  .panel.size = 2
-)
-
-tinydenseR::plotPCA(
-  .tdr.obj = covid.lm.cells,
-  .feature = covid.lm.cells$metadata$publication[covid.lm.cells$config$key],
+  x = covid.lm.cells,
   .panel.size = 2
 )
 
 tinydenseR::plotUMAP(
-  .tdr.obj = covid.lm.cells,
+  x = covid.lm.cells,
+  .feature = covid.lm.cells$metadata$publication[covid.lm.cells$config$key],
+  .panel.size = 2
+)
+
+tinydenseR::plotPCA(
+  x = covid.lm.cells,
   .feature = covid.lm.cells$metadata$publication[covid.lm.cells$config$key],
   .panel.size = 2
 )
 
 covid.lm.cells <-
   tinydenseR::get.map(
-    .tdr.obj = covid.lm.cells,
-    .ref.obj = reference.symphony,
-    .integrate.vars = "LibraryId",
+    x = covid.lm.cells,
+    .ref.obj = reference,
     .celltype.col.name = "celltype.l2",
-    .verbose = TRUE)
+    .verbose = TRUE) |>
+  get.embedding()
 
 tinydenseR::plotUMAP(
-  .tdr.obj = covid.lm.cells,
+  x = covid.lm.cells,
   .feature = covid.lm.cells$landmark.annot$celltyping$ids,
   .panel.size = 2
 )
 
-tinydenseR::plotSamplePCA(
-  .tdr.obj = covid.lm.cells,
-  .labels.from = "disease",
+tinydenseR::plotSampleEmbedding(
+  x = covid.lm.cells,
+  .embedding = "pca",
+  .color.by = "disease",
   .point.size = 1
 )
 
-tinydenseR::plotSamplePCA(
-  .tdr.obj = covid.lm.cells,
-  .labels.from = "publication",
+tinydenseR::plotSampleEmbedding(
+  x = covid.lm.cells,
+  .embedding = "pca",
+  .color.by = "publication",
   .point.size = 1
 )
 
-tinydenseR::plotSamplePCA(
-  .tdr.obj = covid.lm.cells,
-  .labels.from = "sex",
-  .point.size = 1
-)
-
-tinydenseR::plotSamplePCA(
-  .tdr.obj = covid.lm.cells,
-  .labels.from = "log10.n.cells",
+tinydenseR::plotSampleEmbedding(
+  x = covid.lm.cells,
+  .embedding = "pca",
+  .color.by = "sex",
   .point.size = 1
 )
 
 COVID.tdr.stat.percentages <-
-  as.data.frame(x = covid.lm.cells$map$celltyping$cell.perc) |>
+  as.data.frame(x = covid.lm.cells$map$celltyping$cell.perc[,colnames(x = covid.lm.cells$map$celltyping$cell.perc) != "..low.confidence.."]) |>
   cbind(disease = covid.lm.cells$metadata$disease) |>
   dplyr::filter(disease %in% c("normal",
                                "COVID-19")) |>
@@ -370,7 +375,7 @@ COVID.tdr.stat.percentages <-
   rstatix::add_xy_position(x = "disease")
 
 COVID.PBMC.perc.data <- 
-  as.data.frame(x = covid.lm.cells$map$celltyping$cell.perc) |>
+  as.data.frame(x = covid.lm.cells$map$celltyping$cell.perc[,colnames(x = covid.lm.cells$map$celltyping$cell.perc) != "..low.confidence.."]) |>
   cbind(disease = covid.lm.cells$metadata$disease,
         donor_id_disease = rownames(x = covid.lm.cells$map$celltyping$cell.perc)) |>
   dplyr::filter(disease %in% c("normal",
@@ -397,7 +402,8 @@ COVID.PBMC.perc.data <-
                        replacement = "++",
                        fixed = TRUE))
 
-COVID.PBMC.perc.data |>
+COVID.PBMC.perc <-
+  COVID.PBMC.perc.data |>
   (\(x)
    ggplot2::ggplot(data = x,
                    mapping = ggplot2::aes(x = disease, 
@@ -431,7 +437,17 @@ COVID.PBMC.perc.data |>
                                                   units = "in"))
   )()
 
-list(tinydenseR = COVID.PBMC.perc.data,
+COVID.PBMC.perc
+
+ggplot2::ggsave(plot = COVID.PBMC.perc,
+                filename = file.path(rd,
+                                     "COVID.PBMC.perc.png"),
+                width = 7,
+                height = 7,
+                dpi = 300)
+
+(p <-
+  list(tinydenseR = COVID.PBMC.perc.data,
      Seurat = dplyr::mutate(.data = COVID.PBMC.Seurat.perc.data,
                             relative_abundance = relative_abundance*100)) |>
   dplyr::bind_rows(.id = "method") |>
@@ -465,87 +481,12 @@ list(tinydenseR = COVID.PBMC.perc.data,
                                                   units = "in"),
                              rows = ggplot2::unit(x = 0.75,
                                                   units = "in"))
-  )()
+  )()); ggplot2::ggsave(
+    plot = p,
+    filename = file.path(rd,
+                                             "COVID.PBMC.1to1.perc.png"),
+                        width = 7,
+                        height = 8,
+                        dpi = 300); rm(p)
 
-disease.covid.design <-
-  stats::model.matrix(object = ~ 0 + disease + publication + sex,
-                      data = covid.lm.cells$metadata)
-
-# check group names
-colnames(x = disease.covid.design) <-
-  colnames(x = disease.covid.design) |>
-  gsub(pattern = "^disease|^publication|^sex",
-       replacement = "",
-       fixed = FALSE) |>
-  make.names()
-
-# set contrasts
-disease.covid.contrasts <- 
-  limma::makeContrasts(
-    COVID.19 - normal,
-    levels = colnames(x = disease.covid.design)
-  )
-
-# get stats - new API stores results in .tdr.obj$map$lm[[.model.name]]
-covid.lm.cells <-
-  tinydenseR::get.lm(
-    .tdr.obj = covid.lm.cells,
-    .design = disease.covid.design,
-    .contrasts = disease.covid.contrasts
-  )
-
-# plotBeeswarm now uses .model.name to access results from .tdr.obj$map$lm
-tinydenseR::plotBeeswarm(
-    .tdr.obj = covid.lm.cells,
-    .model.name = "default",
-    .coefs = "COVID.19 - normal",
-    .split.by = "clustering",
-    .swarm.title = "PBMC",
-    .legend.position = "left",
-    .q = 0.1,
-    .perc.plot = FALSE) +
-  ggplot2::theme(plot.subtitle = ggplot2::element_text(hjust = 0.5)) +
-  ggplot2::labs(subtitle = "COVID.19 vs normal")
-
-
-table(covid.lm.cells$landmark.annot$clustering$ids,
-      covid.lm.cells$landmark.annot$celltyping$ids) |>
-  as.data.frame.matrix() |> 
-  (\(x)
-   dplyr::mutate(.data = x,
-                 cluster = rownames(x = x))
-  )() |>
-  tidyr::pivot_longer(cols = -cluster,
-                      names_to = "celltype",
-                      values_to = "n_cells") |>
-  dplyr::group_by(celltype, cluster) |>
-  dplyr::summarize(n_cells = sum(n_cells),
-                   .groups = "drop") |>
-  dplyr::group_by(cluster) |>
-  dplyr::mutate(perc_cluster = n_cells / sum(n_cells) * 100) |>
-  (\(x)
-   ggplot2::ggplot(data = x,
-                   mapping = ggplot2::aes(x = celltype,
-                                          y = cluster,
-                                          label = round(x = perc_cluster,
-                                                        digits = 0))) +
-     ggplot2::theme_bw(base_size = 10) +
-     ggplot2::theme(axis.text.x = ggplot2::element_text(hjust = 1,
-                                                        vjust = 1,
-                                                        angle = 30)) +
-     ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5),
-                    axis.title.x = ggplot2::element_blank(),
-                    axis.title.y = ggplot2::element_blank()) +
-     ggplot2::labs(title = "cell typing via ref. mapping",
-                   fill = "% of cluster\n(row sums = 100)") +
-     ggplot2::scale_y_discrete(limits = rev) +
-     ggplot2::scale_fill_viridis_c() +
-     ggplot2::geom_tile(mapping = ggplot2::aes(fill = perc_cluster)) +
-     ggplot2::geom_text(size = I(x = 3))+
-     ggh4x::force_panelsizes(cols = ggplot2::unit(x = (unique(x = x$celltype) |>
-                                                         length()) * 0.2,
-                                                  units = "in"),
-                             rows = ggplot2::unit(x = 3,
-                                                  units = "in"))
-   
-  )()
+sessionInfo()

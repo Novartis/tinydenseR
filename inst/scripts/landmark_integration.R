@@ -21,6 +21,7 @@
 set.seed(42L)
 
 library(tinydenseR)
+library(sparseMatrixStats)
 library(BPCells)
 library(rhdf5)          # h5ad reading (used by tinydenseR internals)
 library(harmony)
@@ -36,13 +37,40 @@ library(ggplot2)
 library(ggh4x)
 library(patchwork)
 
-# ── Paths (explicit, no hidden state) ─────────────────────────────────────────
+# set wd to local dir
+script.path <-
+  grep(pattern = "^--file=", 
+       x = commandArgs(), 
+       value = TRUE,
+       fixed = FALSE) |>
+  gsub(pattern = "^--file=",
+       replacement = "", 
+       fixed = FALSE) |>
+  (\(x)
+   if(length(x = x) == 0) rstudioapi::getSourceEditorContext()$path else x
+  )()
 
-H5AD_PATH    <- "~/sandbox/landmark_integration/derived_data/Immune_ALL_human.h5ad"
-DERIVED_DIR  <- "~/sandbox/landmark_integration/derived_data"
-RESULTS_DIR  <- "~/sandbox/landmark_integration/results"
+script.path |>
+  dirname() |>
+  setwd()
+
+# ── Paths (explicit, no hidden state) ─────────────────────────────────────────
+# Required data: Immune_ALL_human.h5ad (33,506 cells × 12,303 genes)
+# Download from: https://figshare.com/ndownloader/files/25717328
+# Place in:      derived_data/Immune_ALL_human.h5ad
+#
+# Example download command (R):
+#   dir.create("derived_data", showWarnings = FALSE)
+#   curl::curl_download(
+#     "https://figshare.com/ndownloader/files/25717328",
+#     file.path("derived_data", "Immune_ALL_human.h5ad"))
+
+H5AD_PATH    <- file.path("derived_data", "Immune_ALL_human.h5ad")
+DERIVED_DIR  <- "derived_data"
+RESULTS_DIR  <- "results"
 BPCELLS_DIR  <- file.path(DERIVED_DIR, "Immune_ALL_human_bpcells")
 
+if (!dir.exists(DERIVED_DIR)) dir.create(DERIVED_DIR, recursive = TRUE)
 if (!dir.exists(RESULTS_DIR)) dir.create(RESULTS_DIR, recursive = TRUE)
 
 # ── Global settings ───────────────────────────────────────────────────────────
@@ -55,7 +83,7 @@ CELLTYPE_VAR        <- "final_annotation"
 PSEUDO_SAMPLE_VAR   <- "pseudo_sample"  # synthetic sample grouping (see §1)
 N_PSEUDO_PER_BATCH  <- 3L          # random sub-samples per batch
 PROP_LANDMARKS      <- 0.1         # 10% landmark sampling rate
-N_THREADS           <- parallel::detectCores(logical = TRUE)
+N_THREADS           <- 1L
 
 ###############################################################################
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -90,6 +118,8 @@ N_THREADS           <- parallel::detectCores(logical = TRUE)
 #     - Uses a fixed seed for reproducibility
 #     - Does NOT affect Branch B (cell-level Harmony ignores sample structure)
 ###############################################################################
+
+# Download: curl::curl_download("https://figshare.com/ndownloader/files/25717328", H5AD_PATH)
 
 cat("\n── Preparing shared data ──\n")
 

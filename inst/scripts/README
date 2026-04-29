@@ -1,18 +1,62 @@
-List of reproducible scripts
+Reproducible analysis scripts for tinydenseR
+=============================================
+
+These scripts reproduce the analyses presented in the tinydenseR manuscript.
+All scripts are self-contained in terms of working directory detection and
+output folder creation.  Run via `Rscript --file=<script>` or source from
+RStudio.
+
+Requirements: R >= 4.1, tinydenseR (this package), plus script-specific
+packages listed at the top of each file.
 
 
-benchmark_Seu_miloR.R:  benchmark tinydenseR, Seurat and miloR on COVID dataset
+## Self-contained simulation scripts (no external data needed)
 
-head_to_head_Seu.R:     head to head comparison bewteen Seurat and tinydenseR on COVID dataset
+sim_flow_DA.R               Simulated differential abundance (flow cytometry)
+                            with tinydenseR. Three effect sizes (0.5%, 5%, 50%).
+                            Includes exact stratified permutation testing.
 
-peak_mem_profvis.R:     utility used in benchmark
+sim_flow_DE.R               Simulated differential expression (flow cytometry)
+                            with tinydenseR. Three effect sizes (0.5SD, 1SD, 2SD).
+                            Includes exact stratified permutation testing.
 
-sim_flow_DA_diffcyt.R:  simulated differential abundance dataset and analysis with diffcyt
+sim_flow_DA_diffcyt.R       Same simulated DA data analysed with diffcyt
+                            (FlowSOM + edgeR). Comparator method.
 
-sim_flow_DA.R:          simulated differential abundance dataset and analysis with tinydenseR
+sim_flow_DE_diffcyt.R       Same simulated DE data analysed with diffcyt
+                            (FlowSOM + limma). Comparator method.
 
-sim_flow_DE_diffcyt.R:  simulated differential expression dataset and analysis with diffcyt
+sim_scRNAseq_trajectory_tdr.R
+                            Simulated scRNA-seq trajectory analysis with
+                            tinydenseR.  Uses package-shipped data
+                            (sim_trajectory_tdr). Includes permutation testing.
 
-sim_flow_DE.R:          simulated differential expression dataset and analysis with tinydenseR
 
-sim_scRNAseq_traj.R:    simulated trajectory dataset and analysis with tinydenseR
+## Scripts requiring external data (user must supply input files)
+
+benchmark_methods_comparison.R
+                            Benchmark tinydenseR, Seurat, and miloR on the
+                            COVID PBMC dataset. Measures time and memory at
+                            multiple cell-count levels. Edit DATA_DIR at the
+                            top of the script.
+
+head_to_head_Seu.R          Head-to-head comparison of Seurat vs tinydenseR
+                            cell type composition on COVID PBMC data.
+                            Requires a pre-processed Seurat v5 object
+                            (see comments in script for creation instructions).
+
+landmark_integration.R      Landmark-level vs cell-level Harmony integration
+                            comparison on Luecken et al. Immune_ALL_human
+                            benchmark dataset (33,506 cells, 10 batches).
+                            Downloads from: https://figshare.com/ndownloader/files/25717328
+
+
+## Utility scripts (sourced by other scripts, not run standalone)
+
+perm_utils.R                Exact stratified permutation test functions and
+                            plotting utilities.  Sourced by sim_flow_DA.R,
+                            sim_flow_DE.R, and sim_scRNAseq_trajectory_tdr.R.
+
+peak_mem_profvis.R          Extracts peak memory and elapsed time from profvis
+                            profile objects.  Sourced by
+                            benchmark_methods_comparison.R.

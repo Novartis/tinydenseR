@@ -25,38 +25,55 @@ library(BiocSingular)
 library(DelayedArray)
 library(DelayedMatrixStats)
 library(HDF5Array)
-library(biomaRt)
 library(tidyverse)
 library(profvis)
 library(ggpubr)
 options(future.globals.maxSize = 1e10)
 
-wd <- 
-  "path/to/your/working/directory" # change to your working directory
-rd <-
-  file.path(wd,
-            "res")
+# NOTE: timing/memory results are hardware-dependent and
+# will vary based on the specific machine used for benchmarking.
 
-setwd(dir = wd)
+# set wd to local dir
+script.path <-
+  grep(pattern = "^--file=", 
+       x = commandArgs(), 
+       value = TRUE,
+       fixed = FALSE) |>
+  gsub(pattern = "^--file=",
+       replacement = "", 
+       fixed = FALSE) |>
+  (\(x)
+   if(length(x = x) == 0) rstudioapi::getSourceEditorContext()$path else x
+  )()
 
-# Load the peak_mem_profvis (see inst/reproducible_analysis_script/) function
-# for accurate memory and timing measurements
-source(file = file.path("path/to/your/file/location",
-                        "peak_mem_profvis.R"))
+script.path |>
+  dirname() |>
+  setwd()
+
+# ── USER CONFIGURATION (edit these paths) ──
+# Required data:
+#   1. pbmc_multimodal_2023.rds  — Azimuth PBMC reference
+#      (download from https://azimuth.hubmapconsortium.org/)
+#   2. obj.Rds                   — Merged Seurat v5 object with BPCells backend
+#      (follow instructions below to create from h5ad files)
+#   3. symphony_ref.RDS          — Pre-built symphony reference
+#      (created by running buildReference() on the Seurat object)
+DATA_DIR <- file.path(getwd(), "derived_data")
+
+# create sub-folder for results
+rd <- file.path(dirname(script.path), "results", "benchmark_methods_comparison")
+
+if(!dir.exists(paths = rd)) dir.create(path = rd, recursive = TRUE)
+if(!dir.exists(paths = DATA_DIR)) dir.create(path = DATA_DIR, recursive = TRUE)
+
+# Load the peak_mem_profvis function for accurate memory and timing measurements
+source(file.path(dirname(script.path), "peak_mem_profvis.R"))
 
 # Follow instructions to create Seurat object from h5ad files here
 # https://github.com/satijalab/seurat/blob/e35abd442520808a20025e589f861620ddc315af/vignettes/seurat5_bpcells_interaction_vignette.Rmd
 # and just to line 59 here: 
 # https://github.com/satijalab/seurat/blob/30f82df52159ac5f0feb80b149698abbd876b779/vignettes/COVID_SCTMapping.Rmd
 # and save the object to the disk
-processed_obj_path <- 
-  file.path("path/to/your/file/location",
-            "object.Rds")
-
-saveRDS(object = object,
-        file = processed_obj_path)
-
-rm(object)
 
 # Set up for reproducibility
 set.seed(42)
@@ -74,16 +91,10 @@ load_data <- function() {
   cat("Loading and preparing COVID dataset...\n")
   
   # Load reference data
-  reference <- 
-    file.path("path/to/your/file/location",
-              "pbmc_multimodal_2023.rds") |>
-    readRDS()
+  reference <- readRDS(file = file.path(DATA_DIR, "pbmc_multimodal_2023.rds"))
   
   # Check if processed object already exists
-  processed_obj_path <- 
-    file.path("path/to/your/file/location",
-              "object.Rds") |>
-    readRDS()
+  processed_obj_path <- file.path(DATA_DIR, "obj.Rds")
   
   cat("Loading pre-processed merged object...\n")
   merged.object <- readRDS(file = processed_obj_path)
@@ -406,22 +417,21 @@ benchmark_tinydenseR <- function(query_obj, reference_obj, run_id, n_cells) {
         
         # Get landmarks with parameters scaled for dataset size
         lm_obj <- tinydenseR::get.landmarks(
-          .tdr.obj = lm_obj, 
+          x = lm_obj, 
           .nHVG = 2000,
           .verbose = TRUE
         )
         
         # Get landmark graph with appropriate resolution
         lm_obj <- tinydenseR::get.graph(
-          .tdr.obj = lm_obj,
+          x = lm_obj,
           .verbose = TRUE
         )
         
         # Map to reference
         lm_obj <- tinydenseR::get.map(
-          .tdr.obj = lm_obj,
+          x = lm_obj,
           .ref.obj = reference_obj,
-          .integrate.vars = "LibraryId",
           .celltype.col.name = "celltype.l2",
           .verbose = TRUE
         )
@@ -549,7 +559,7 @@ run_benchmarks <- function() {
   merged_obj <- data_objects$merged
   
   tdr.reference <-
-    readRDS(file = "/da/onc/cBIT/milanpe1/dev/projects/cyto/manuscript/Seurat.data/symphony_ref.RDS")
+    readRDS(file = file.path(DATA_DIR, "symphony_ref.RDS"))
   
   # Initialize results
   all_results <- data.frame()
@@ -773,7 +783,8 @@ cat("\nBenchmarking pipeline completed successfully!\n")
 benchmark_results_complete <-
   readRDS(file = file.path(rd, "benchmark_results_complete.rds"))
 
-benchmark_results_complete |>
+(p <-
+    benchmark_results_complete |>
   dplyr::mutate(method = ifelse(test = method == "Seurat",
                                 yes = "Seurat_BPCells",
                                 no = method)) |> 
@@ -809,9 +820,16 @@ benchmark_results_complete |>
                                                   units = "in"),
                              rows = ggplot2::unit(x = 1.5,
                                                   units = "in"))
-  )()
+  )()); ggplot2::ggsave(
+    plot = p,
+    filename = file.path(rd, "benchmark_time.png"),
+    width = 4.5,
+    height = 2.5,
+    bg = "white"
+  ); rm(p)
 
-benchmark_results_complete |>
+(p <-
+    benchmark_results_complete |>
   dplyr::mutate(method = ifelse(test = method == "Seurat",
                                 yes = "Seurat_BPCells",
                                 no = method)) |> 
@@ -848,3 +866,11 @@ benchmark_results_complete |>
                              rows = ggplot2::unit(x = 1.5,
                                                   units = "in"))
   )()
+); ggplot2::ggsave(
+  plot = p,
+  filename = file.path(rd, "benchmark_memory.png"),
+  width = 4.5,
+  height = 2.5,
+  bg = "white"); rm(p)
+
+sessionInfo()

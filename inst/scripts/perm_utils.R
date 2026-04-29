@@ -1,3 +1,21 @@
+#####
+# Copyright 2025 Novartis Biomedical Research Inc.
+#
+# Licensed under the MIT License (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# https://www.mit.edu/~amini/LICENSE.md
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#####
+
+# Requires: dplyr, ggplot2, patchwork, tinydenseR
+
 # Function: Count discoveries for a given design
 count_discoveries <-
   function(lm_obj, 
@@ -5,14 +23,21 @@ count_discoveries <-
            coef_name,
            alpha = 0.10) {
     
-    stats_obj <-
+    lm_obj <-
       tinydenseR::get.lm(
-        .tdr.obj = lm_obj, 
+        x = lm_obj, 
         .design = design_mat, 
+        .force.recalc = TRUE,
         .verbose = FALSE)
     
     q_vals <- 
-      stats_obj$fit$pca.weighted.q[, coef_name]
+      if(inherits(x = lm_obj,
+      what = "SingleCellExperiment")) {
+        tinydenseR::GetTDR(x = lm_obj)@results$lm[["default"]]$fit$pca.weighted.q[, coef_name]
+      } else {
+        lm_obj@results$lm[["default"]]$fit$pca.weighted.q[, coef_name]
+      }
+      
     
     dplyr::tibble(
       m_tests = length(x = q_vals),
@@ -162,7 +187,7 @@ run_stratified_permutation_test <-
                   setequal(x = chosen, 
                            y = orig_idx)
                   
-                })),]
+                })), , drop = FALSE]
     
     # Evaluate each permutation
     # Iterate row-wise (each row provides one combination)
@@ -329,6 +354,292 @@ plot_n_sig <-
       })()
     
   }
+# Function: Compute pePC t-test p-value for a given design
+count_discoveries_pePC <-
+  function(lm_obj,
+           design_mat,
+           coef_name,
+           red_design_mat,
+           term_of_interest,
+           alpha = 0.10) {
+    
+    # Full model
+    lm_obj <-
+      tinydenseR::get.lm(
+        x = lm_obj,
+        .design = design_mat,
+        .force.recalc = TRUE,
+        .verbose = FALSE)
+    
+    q_vals <-
+      if(inherits(x = lm_obj,
+      what = "SingleCellExperiment")) {
+        tinydenseR::GetTDR(x = lm_obj)@results$lm[["default"]]$fit$pca.weighted.q[, coef_name]
+      } else {
+        lm_obj@results$lm[["default"]]$fit$pca.weighted.q[, coef_name]
+      }
+      
+    
+    # Reduced model (intercept-only or otherwise)
+    lm_obj <-
+      tinydenseR::get.lm(
+        x = lm_obj,
+        .design = red_design_mat,
+        .model.name = "noCondition",
+        .force.recalc = TRUE,
+        .verbose = FALSE)
+    
+    # Compute pePC embedding
+    lm_obj <-
+      tinydenseR::get.embedding(
+        x = lm_obj,
+        .full.model = "default",
+        .red.model = "noCondition",
+        .term.of.interest = term_of_interest,
+        .verbose = FALSE)
+    
+    # t-test on pePC1 vs the grouping variable
+    pePC1 <-
+      lm_obj$sample.embed$pepc[[term_of_interest]]$coord[, 1]
+    
+    cond_labels <-
+      if(inherits(x = lm_obj,
+      what = "SingleCellExperiment")) {
+        tinydenseR::GetTDR(x = lm_obj)@metadata[[term_of_interest]]
+      } else {
+        lm_obj@metadata[[term_of_interest]]
+      }
+      
+    
+    pePC_p <-
+      tryCatch(
+        t.test(formula = pePC1 ~ cond_labels)$p.value,
+        error = function(e) NA_real_)
+    
+    dplyr::tibble(
+      m_tests   = length(x = q_vals),
+      n_sig     = sum(q_vals <= alpha, na.rm = TRUE),
+      min_q     = min(q_vals, na.rm = TRUE),
+      pePC1_p   = pePC_p
+    )
+  }
+
+# Function: Run exact stratified permutation test with pePC embedding
+run_stratified_permutation_test_pePC <-
+  function(lm_obj,
+           meta_df,
+           formula = ~ Treatment + Batch,
+           coef_name,
+           term_of_interest,
+           alpha = 0.10) {
+    
+    # Observed design and stats
+    obs_design <-
+      model.matrix(object = formula,
+                   data = meta_df)
+    
+    colnames(x = obs_design) <-
+      gsub(pattern = "^Treatment|^Batch",
+           replacement =  "",
+           x =  colnames(x = obs_design),
+           fixed = FALSE)
+    
+    # Reduced model design (intercept-only)
+    red_design <-
+      model.matrix(object = ~ 1,
+                   data = meta_df)
+    
+    obs <-
+      count_discoveries_pePC(
+        lm_obj = lm_obj,
+        design_mat = obs_design,
+        coef_name = coef_name,
+        red_design_mat = red_design,
+        term_of_interest = term_of_interest,
+        alpha = alpha)
+    
+    obs$type <-
+      "observed"
+    
+    obs$run <-
+      "0"
+    
+    obs$mcc <-
+      1.0
+    
+    # Prepare labels
+    obs_labels <-
+      factor(x = meta_df$Treatment) |>
+      droplevels()
+    
+    comp_labels <-
+      make_complement_labels(labels = obs_labels)
+    
+    lev <-
+      levels(x = obs_labels)
+    
+    obs01 <-
+      encode01(obs_labels)
+    
+    # Generate all stratified permutations
+    batch_levels <-
+      unique(x = meta_df$Batch)
+    
+    batch_combos <-
+      list()
+    
+    batch_indices <-
+      list()
+    
+    for(bl in batch_levels) {
+      
+      idx <-
+        which(x = meta_df$Batch == bl)
+      
+      batch_indices[[bl]] <-
+        idx
+      
+      n_depl <-
+        sum(meta_df$Treatment[idx] == coef_name)
+      
+      batch_combos[[bl]] <-
+        length(x = idx) |>
+        combn(m = n_depl,
+              simplify = FALSE)
+    }
+    
+    all_combos <-
+      lapply(X = batch_combos,
+             FUN = seq_along) |>
+      expand.grid(stringsAsFactors = FALSE)
+    
+    names(x = all_combos) <-
+      paste0("batch_",
+             seq_along(along.with = batch_levels))
+    
+    orig_idx <-
+      which(x = meta_df$Treatment == coef_name)
+    
+    all_combos <-
+      all_combos[
+        !(apply(X = all_combos,
+                MARGIN = 1,
+                FUN = function(row) {
+                  
+                  chosen <-
+                    Map(f = function(i, combos, idx) idx[combos[[i]]],
+                        row,
+                        batch_combos,
+                        batch_indices) |>
+                    unlist()
+                  
+                  setequal(x = chosen,
+                           y = orig_idx)
+                  
+                })), , drop = FALSE]
+    
+    perm_results_list <-
+      nrow(x = all_combos) |>
+      seq_len() |>
+      lapply(FUN = function(i) {
+        
+        combo_idx <-
+          as.list(x = all_combos[i, , drop = FALSE])
+        
+        chosen <-
+          Map(function(i, combos, idx) idx[combos[[i]]],
+              combo_idx,
+              batch_combos,
+              batch_indices) |>
+          unlist()
+        
+        perm_meta <-
+          meta_df
+        
+        perm_meta$Treatment <-
+          rep(x = lev[1],
+              times = nrow(meta_df)) |>
+          factor(levels = lev)
+        
+        perm_meta$Treatment[chosen] <-
+          lev[2]
+        
+        perm_type <-
+          if(identical(x = perm_meta$Treatment,
+                       y = comp_labels)){
+            "complement"
+          } else {
+            "permuted"
+          }
+        
+        perm01 <-
+          encode01(perm_meta$Treatment, lev = levels(obs_labels))
+        
+        perm_mcc <-
+          mcc_binary(obs01, perm01)
+        
+        perm_design <-
+          model.matrix(object = formula,
+                       data = perm_meta)
+        
+        colnames(x = perm_design) <-
+          gsub(pattern = "^Treatment|^Batch",
+               replacement = "",
+               x = colnames(x = perm_design),
+               fixed = FALSE)
+        
+        # Must also update metadata on the object so that
+        # get.embedding can find the term of interest labels
+        perm_lm_obj <- lm_obj
+        if(inherits(
+          x = perm_lm_obj,
+          what = "SingleCellExperiment")) {
+          
+          tmp.tdr <-
+            tinydenseR::GetTDR(x = perm_lm_obj)
+          
+          tmp.tdr@metadata[[term_of_interest]] <-
+            as.character(x = perm_meta$Treatment)
+          
+          perm_lm_obj <-
+            tinydenseR::SetTDR(x = perm_lm_obj, tdr = tmp.tdr)
+
+          rm(tmp.tdr)
+          
+        } else {
+            perm_lm_obj@metadata[[term_of_interest]] <-
+              as.character(x = perm_meta$Treatment)
+        }
+        
+        res <-
+          count_discoveries_pePC(
+            lm_obj = perm_lm_obj,
+            design_mat = perm_design,
+            coef_name = coef_name,
+            red_design_mat = red_design,
+            term_of_interest = term_of_interest,
+            alpha = alpha)
+        
+        res$type <-
+          perm_type
+        
+        res$run <-
+          unlist(x = combo_idx) |>
+          paste(collapse = "-")
+        
+        res$mcc <-
+          perm_mcc
+        
+        res
+      })
+    
+    perm_results <-
+      dplyr::bind_rows(perm_results_list)
+    
+    dplyr::bind_rows(obs,
+                     perm_results)
+  }
+
 
 # Function: Plot permutation test results - min_q
 plot_min_q <-
@@ -413,3 +724,4 @@ plot_min_q <-
     
     
   }
+

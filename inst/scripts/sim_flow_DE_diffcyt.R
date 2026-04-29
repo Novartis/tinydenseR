@@ -17,129 +17,61 @@
 library(diffcyt)
 library(flowCore)
 library(SummarizedExperiment)
+library(tinydenseR)
 library(tidyverse)
 library(ggpubr)
 library(rstatix)
 
-wd <- "path/to/your/working/directory/"
-rd <- file.path(wd, "res")
+# set wd to local dir
+script.path <-
+  grep(pattern = "^--file=", 
+       x = commandArgs(), 
+       value = TRUE,
+       fixed = FALSE) |>
+  gsub(pattern = "^--file=",
+       replacement = "", 
+       fixed = FALSE) |>
+  (\(x)
+   if(length(x = x) == 0) rstudioapi::getSourceEditorContext()$path else x
+  )()
 
-setwd(dir = wd)
+script.path |>
+  dirname() |>
+  setwd()
+
+# create sub-folder for results
+rd <- file.path(dirname(script.path), "results", "sim_flow_DE_diffcyt")
+
+if(!dir.exists(paths = rd)) dir.create(path = rd, recursive = TRUE)
 
 set.seed(42)
 
-# Parameters
-groups <- c("Baseline", "Activation")
-batches <- c("Batch1", "Batch2")
-sd_shifts <- c(0.5, 1, 2)  # SD differences in Marker2 for Baseline vs Activation
-samples_per_group <- 6
-mean_cells <- 50000
-sd_cells <- 500  # Noise in total cell count
+# Simulate DE data using tinydenseR API (same seed / RNG sequence as original)
+sim_data <- tinydenseR::simulate_DE_data()
+final_data_DE <- sim_data$cell_meta
 
-# Initialize storage
-data_list_DE <- list()
-
-# Simulate data (same as original)
-for (sd_shift in sd_shifts) {
-  for (group in groups) {
-    for (sample_id in 1:samples_per_group) {
-      batch <- 
-        if(sample_id %% 2 == 0) {
-          "Batch2"
-        } else {
-          "Batch1"
-        }
-      total_cells <- round(rnorm(1, mean = mean_cells, sd = sd_cells))
-      total_cells <- max(total_cells, 1000)  # Ensure a minimum number of cells
-      
-      # Fixed proportion of cell type of interest
-      proportion <- 0.05
-      num_interest <- round(total_cells * proportion)
-      num_other <- total_cells - num_interest
-      cell_types <- c(rep("target", num_interest), rep("other", num_other))
-      cell_types <- sample(cell_types)
-      
-      # Simulate expression data
-      marker1 <- numeric(total_cells)
-      marker2 <- rlnorm(total_cells, meanlog = 0, sdlog = 1.5)
-      marker3 <- rlnorm(total_cells, meanlog = 0, sdlog = 2.5)
-      marker4 <- numeric(total_cells)  
-      marker5 <- numeric(total_cells)  
-      
-      # Assign Marker1, Marker4 Marker5 based on cell type
-      marker1[cell_types == "other"] <- rlnorm(sum(cell_types == "other"), meanlog = 0, sdlog = 2)
-      marker1[cell_types == "target"] <- rlnorm(sum(cell_types == "target"), meanlog = 0 + 5, sdlog = 2)  # Shift by 5 SD
-      marker4[cell_types == "other"] <- rlnorm(sum(cell_types == "other"), meanlog = 0, sdlog = 1.2)
-      marker4[cell_types == "target"] <- rlnorm(sum(cell_types == "target"), meanlog = 0 + 3, sdlog = 1.2)  # Shift by 3 SD
-      marker5[cell_types == "other"] <- rlnorm(sum(cell_types == "other"), meanlog = 0, sdlog = 1.8)
-      marker5[cell_types == "target"] <- rlnorm(sum(cell_types == "target"), meanlog = 0 + 7, sdlog = 1.8)  # Shift by 7 SD
-      
-      # Marker2: differential expression between groups in target cells only
-      marker2[cell_types == "other"] <- rlnorm(sum(cell_types == "other"), meanlog = 0, sdlog = 1.5)
-      if (group == "Baseline") {
-        marker2[cell_types == "target"] <- rlnorm(sum(cell_types == "target"), meanlog = 0, sdlog = 1.5)
-      } else {
-        marker2[cell_types == "target"] <- rlnorm(sum(cell_types == "target"), meanlog = 0 + sd_shift, sdlog = 1.5)
-      }
-      
-      # Add batch effect
-      if (batch == "Batch2") {
-        marker1 <- marker1 * rlnorm(total_cells, meanlog = 0.1, sdlog = 0.5)
-        marker2 <- marker2 * rlnorm(total_cells, meanlog = 0.2, sdlog = 0.3)
-        marker3 <- marker3 * rlnorm(total_cells, meanlog = 0.3, sdlog = 0.4)
-        marker4 <- marker4 * rlnorm(total_cells, meanlog = 0.4, sdlog = 0.3)
-        marker5 <- marker5 * rlnorm(total_cells, meanlog = 0.5, sdlog = 0.5)
-      }
-      
-      sample_name <- paste0(group, "_S", sample_id, "_Shift", sd_shift, "SD")
-      df <- data.frame(
-        Sample = sample_name,
-        Treatment = group,
-        Batch = batch,
-        SD_Shift = paste0(sd_shift, "SD"),
-        CellType = cell_types,
-        Marker1 = marker1,
-        Marker2 = marker2,
-        Marker3 = marker3,
-        Marker4 = marker4,
-        Marker5 = marker5
-      )
-      data_list_DE[[length(data_list_DE) + 1]] <- df
-    }
-  }
-}
-
-# Combine all simulated data
-final_data_DE <- do.call(rbind, data_list_DE) |>
-  dplyr::mutate(Treatment = factor(x = Treatment,
-                                   levels = c("Baseline", "Activation")))
+sd_shifts <- c(0.5, 1, 2)
 
 # Function to convert simulated data to diffcyt format
+# Reads pre-written FCS files from simulate_DE_data() output.
+# NOTE: FCS files already contain log-transformed expression;
+#       do NOT apply log() again.
 prepare_diffcyt_data <-
-  function(data, sd_shift_filter) {
+  function(sample_meta, sd_shift_filter) {
     
-    # Filter data for specific SD shift
-    data_filtered <- data |>
+    # Filter sample metadata for specific SD shift
+    meta_filtered <- sample_meta |>
       dplyr::filter(SD_Shift == sd_shift_filter)
     
-    # Create flowSet from simulated data
-    sample_ids <- unique(data_filtered$Sample)
+    sample_ids <- meta_filtered$Sample
     
-    # Create list of flowFrames
+    # Read FCS files (already log-transformed by simulate_DE_data)
     flowframes_list <- list()
     
     for (i in seq_along(sample_ids)) {
-      sample_data <- data_filtered |>
-        dplyr::filter(Sample == sample_ids[i]) |>
-        dplyr::select(Marker1, Marker2, Marker3, Marker4, Marker5) |>
-        as.matrix()
-      
-      # Apply log transformation (equivalent to original log() transformation)
-      sample_data <- log(sample_data)
-      
-      # Create flowFrame
-      colnames(sample_data) <- paste0("Marker", 1:5)
-      ff <- flowCore::flowFrame(exprs = sample_data)
+      ff <- flowCore::read.FCS(meta_filtered$fcs_path[i],
+                               transformation = FALSE,
+                               truncate_max_range = FALSE)
       flowframes_list[[i]] <- ff
     }
     
@@ -147,10 +79,8 @@ prepare_diffcyt_data <-
     fs <- flowCore::flowSet(flowframes_list)
     
     # Create experiment_info
-    experiment_info <- data_filtered |>
+    experiment_info <- meta_filtered |>
       dplyr::select(Sample, Treatment, Batch) |>
-      dplyr::distinct() |>
-      dplyr::arrange(match(Sample, sample_ids)) |>
       as.data.frame()
     
     rownames(experiment_info) <- experiment_info$Sample
@@ -320,7 +250,7 @@ for (sd_shift in sd_shifts) {
   cat(rep("=", 50), "\n")
   
   # Prepare data
-  diffcyt_data <- prepare_diffcyt_data(final_data_DE, sd_shift_name)
+  diffcyt_data <- prepare_diffcyt_data(sim_data$sample_meta, sd_shift_name)
   
   # Run diffcyt analysis
   diffcyt_results <- run_diffcyt_analysis(diffcyt_data, sd_shift_name)
@@ -442,3 +372,5 @@ cat("ANALYSIS COMPLETE\n")
 cat("diffcyt successfully identified differential abundance and differential states\n")
 cat("Results and plots saved to:", rd, "\n")
 cat(rep("=", 60), "\n")
+
+sessionInfo()
