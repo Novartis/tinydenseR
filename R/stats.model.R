@@ -773,9 +773,13 @@ get.lm.TDRObj <-
 #' @noRd
 .tdr_pseudobulk_aggregate_rna <- function(.source, .tdr.obj,
                                            .samples, .cell.idx.list,
-                                           .robust = FALSE) {
-  stats::setNames(object = .samples, nm = .samples) |>
-    lapply(FUN = function(smpl) {
+                                           .robust = FALSE,
+                                           .verbose = FALSE) {
+  .agg_start <- Sys.time()
+  stats::setNames(object = seq_along(along.with = .samples),
+                  nm = .samples) |>
+    lapply(FUN = function(i) {
+      smpl <- .samples[i]
       exprs.mat <-
         .get_sample_matrix(.source, .tdr.obj, smpl) |>
         methods::as(Class = "dgCMatrix")
@@ -789,7 +793,7 @@ get.lm.TDRObj <-
           (sum(Matrix::rowSums(x = wcl) > 0))
       }
 
-      if (isTRUE(x = .robust)) {
+      result <- if (isTRUE(x = .robust)) {
         tryCatch(
           expr = .agg_fn(),
           error = function(e) {
@@ -802,6 +806,13 @@ get.lm.TDRObj <-
       } else {
         .agg_fn()
       }
+
+      if (isTRUE(x = .verbose)) {
+        .show_progress(current = i, total = length(x = .samples),
+                       item_label = smpl, start_time = .agg_start)
+      }
+
+      result
     }) |>
     do.call(what = cbind)
 }
@@ -821,11 +832,15 @@ get.lm.TDRObj <-
 #' @noRd
 .tdr_pseudobulk_aggregate_cyto <- function(.source, .tdr.obj,
                                             .samples, .cell.idx.list,
-                                            .robust = FALSE) {
+                                            .robust = FALSE,
+                                            .verbose = FALSE) {
   cols <- colnames(x = .tdr.obj@assay$expr)
+  .agg_start <- Sys.time()
 
-  stats::setNames(object = .samples, nm = .samples) |>
-    lapply(FUN = function(smpl) {
+  stats::setNames(object = seq_along(along.with = .samples),
+                  nm = .samples) |>
+    lapply(FUN = function(i) {
+      smpl <- .samples[i]
       exprs.mat <- .get_sample_matrix(.source, .tdr.obj, smpl)
 
       .agg_fn <- function() {
@@ -836,7 +851,7 @@ get.lm.TDRObj <-
         Matrix::rowSums(x = wsum) / sum(wcl)
       }
 
-      if (isTRUE(x = .robust)) {
+      result <- if (isTRUE(x = .robust)) {
         tryCatch(
           expr = .agg_fn(),
           error = function(e) {
@@ -849,6 +864,13 @@ get.lm.TDRObj <-
       } else {
         .agg_fn()
       }
+
+      if (isTRUE(x = .verbose)) {
+        .show_progress(current = i, total = length(x = .samples),
+                       item_label = smpl, start_time = .agg_start)
+      }
+
+      result
     }) |>
     do.call(what = rbind)
 }
@@ -1213,11 +1235,14 @@ get.pbDE.TDRObj <-
           ))
         }
 
+        if (isTRUE(x = .verbose)) message("\naggregating pseudobulks")
+
         counts <- .tdr_pseudobulk_aggregate_rna(
           .source, .tdr.obj,
           .samples = names(x = .tdr.obj@cells)[!smpl.outlier],
           .cell.idx.list = .lm.idx,
-          .robust = FALSE
+          .robust = FALSE,
+          .verbose = .verbose
         )
 
         dge <- edgeR::DGEList(counts = counts)
@@ -1301,11 +1326,14 @@ get.pbDE.TDRObj <-
       } else {
         # --- Cytometry pseudobulk aggregation ---
 
+        if (isTRUE(x = .verbose)) message("\naggregating pseudobulks")
+
         counts <- .tdr_pseudobulk_aggregate_cyto(
           .source, .tdr.obj,
           .samples = names(x = .tdr.obj@cells),
           .cell.idx.list = .lm.idx,
-          .robust = FALSE
+          .robust = FALSE,
+          .verbose = .verbose
         )
 
         tmp.design <-
@@ -1483,19 +1511,25 @@ get.pbDE.TDRObj <-
           ))
         }
 
+        if (isTRUE(x = .verbose)) message("\naggregating pseudobulks \u2014 group 1")
+
         counts1 <- .tdr_pseudobulk_aggregate_rna(
           .source, .tdr.obj,
           .samples = names(x = .tdr.obj@cells)[!smpl.outlier.1],
           .cell.idx.list = .lm1.idx,
-          .robust = TRUE
+          .robust = TRUE,
+          .verbose = .verbose
         )
         colnames(counts1) <- paste0("counts1.", colnames(x = counts1))
+
+        if (isTRUE(x = .verbose)) message("aggregating pseudobulks \u2014 group 2")
 
         counts2 <- .tdr_pseudobulk_aggregate_rna(
           .source, .tdr.obj,
           .samples = names(x = .tdr.obj@cells)[!smpl.outlier.2],
           .cell.idx.list = .lm2.idx,
-          .robust = TRUE
+          .robust = TRUE,
+          .verbose = .verbose
         )
         colnames(counts2) <- paste0("counts2.", colnames(x = counts2))
 
@@ -1550,19 +1584,25 @@ get.pbDE.TDRObj <-
       } else {
         # --- Cytometry marker aggregation ---
 
+        if (isTRUE(x = .verbose)) message("\naggregating pseudobulks \u2014 group 1")
+
         counts1 <- .tdr_pseudobulk_aggregate_cyto(
           .source, .tdr.obj,
           .samples = names(x = .tdr.obj@cells),
           .cell.idx.list = .lm1.idx,
-          .robust = TRUE
+          .robust = TRUE,
+          .verbose = .verbose
         )
         rownames(counts1) <- paste0("counts1.", rownames(x = counts1))
+
+        if (isTRUE(x = .verbose)) message("aggregating pseudobulks \u2014 group 2")
 
         counts2 <- .tdr_pseudobulk_aggregate_cyto(
           .source, .tdr.obj,
           .samples = names(x = .tdr.obj@cells),
           .cell.idx.list = .lm2.idx,
-          .robust = TRUE
+          .robust = TRUE,
+          .verbose = .verbose
         )
         rownames(counts2) <- paste0("counts2.", rownames(x = counts2))
 
