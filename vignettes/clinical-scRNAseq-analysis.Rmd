@@ -188,7 +188,6 @@ neighborhood graph, computes sample-level density profiles, and maps cell type
 annotations — all in a single call.
 
 ```{r run-tdr}
-set.seed(seed = 123) # for reproducibility
 lm.cells <-
   tinydenseR::RunTDR(
     x = ondisk.mat,
@@ -197,7 +196,8 @@ lm.cells <-
     .assay.type = "RNA",
     .celltype.vec = "cell_type",
     .label.confidence = 0.5,
-    .verbose = FALSE
+    .verbose = FALSE,
+    .seed = 123 # for reproducibility
   )
 ```
 

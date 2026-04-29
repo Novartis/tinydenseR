@@ -167,14 +167,14 @@ generate the landmark-by-sample matrix in a single call. Unsupervised
 sample embedding is also returned automatically.
 
 ```{r run-tdr}
-set.seed(seed = 123)
 sim_trajectory <-
   tinydenseR::RunTDR(
     x = sim_trajectory,
     .sample.var = "Sample",
     .assay.type = "RNA",
     .nHVG = 500,
-    .verbose = FALSE
+    .verbose = FALSE,
+    .seed = 123 # for reproducibility
   )
 ```
 
