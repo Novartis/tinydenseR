@@ -657,6 +657,7 @@ plotBeeswarm.TDRObj <-
         data.frame(x = as.factor(x = 1),
                    pop = colnames(x = .tdr.obj@density$composition[[.split.by]]$cell.perc),
                    cell.perc = Matrix::colMeans(x = .tdr.obj@density$composition[[.split.by]]$cell.perc)) |>
+        dplyr::filter(pop != "..low.confidence..") |>
         dplyr::mutate(pop = factor(x = pop,
                                    levels = if(isTRUE(x = .order.ids)){
                                      
@@ -1632,6 +1633,7 @@ plotTradStats.TDRObj <-
       data.frame(x = as.factor(x = 1),
                  pop = colnames(x = .tdr.obj@density$composition[[.split.by]]$cell.perc),
                  cell.perc = Matrix::colMeans(x = .tdr.obj@density$composition[[.split.by]]$cell.perc)) |>
+      dplyr::filter(pop != "..low.confidence..") |>
       dplyr::mutate(pop = factor(x = pop,
                                  levels = if(isTRUE(x = .order.ids)){
                                    
@@ -1716,6 +1718,7 @@ plotTradStats.TDRObj <-
     
     dat.df <-
       dat.df |>
+      dplyr::filter(pop != "..low.confidence..") |>
       dplyr::mutate(pop = factor(x = pop,
                                  levels = if(isTRUE(x = .order.ids)){
                                    
@@ -1997,6 +2000,11 @@ plotTradPerc.TDRObj <-
         ])
       
     }
+    
+    dat.df <-
+      dat.df |>
+      dplyr::filter(name != "..low.confidence..") |>
+      droplevels()
     
     p <-
       ggplot2::ggplot(data = dat.df,
