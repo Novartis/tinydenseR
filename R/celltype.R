@@ -67,9 +67,9 @@
 #' @param .verbose Logical; if \code{TRUE}, print progress messages when
 #'   refreshing downstream slots (default \code{TRUE}).
 #' @param .name Character name for storing the solution (default \code{NULL},
-#'   which auto-generates \code{"cluster_map"} for Mode A or
-#'   \code{"per_cell"} for Mode B).  Cannot be \code{"ids"}, which is
-#'   reserved for the active solution.
+#'   which auto-generates \code{"manual.<timestamp>"} for Mode A or
+#'   \code{"labels.<timestamp>"} for Mode B).  Cannot be \code{"ids"},
+#'   which is reserved for the active solution.
 #' @examples
 #' \dontrun{
 #' # After clustering with get.graph()
@@ -101,7 +101,9 @@
 #' @return The \code{.tdr.obj} with the following updated fields:
 #'   \describe{
 #'     \item{\code{$landmark.annot$celltyping$ids}}{Factor vector of cell type labels 
-#'       for each landmark}
+#'       for each landmark (active solution)}
+#'     \item{\code{$landmark.annot$celltyping[[.name]]}}{Copy of \code{$ids}, stored
+#'       as a named solution for multi-solution workflows}
 #'   }
 #'   If \code{get.map()} has already been run, the following slots are also
 #'   refreshed (no re-mapping required):

@@ -39,7 +39,7 @@ traditional model.}
 
 \item{.row.space.scaler}{Numeric scaling for row height (default 0.2 inches per population).}
 
-\item{.col.space.scaler}{Numeric scaling for column width (default 0.5 inches per coefficient).}
+\item{.col.space.scaler}{Numeric scaling for column width (default 0.07).}
 
 \item{.label.substr.rm}{Character substring to remove from labels (default "").}
 

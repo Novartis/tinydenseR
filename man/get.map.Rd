@@ -91,9 +91,9 @@ When \code{.cache.on.disk = TRUE}, the four cell-level slots above are stored as
 attributed path strings (with \code{schema_v} and \code{bytes} attributes) in
 \code{@cellmap} rather than in-memory objects.  The cache root is stored in
 \code{@config$.cache.root}.  Use \code{tdr_cache_cleanup()} to remove cached files.
-If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with list containing \code{$ids}
-(factor of cell type assignments for landmarks), \code{$median.exprs} (matrix of mean expression
-per cell type), and \code{$pheatmap} (heatmap object).
+If \code{.ref.obj} provided, also updates \code{@landmark.annot$celltyping$ids}
+(factor of cell type assignments for landmarks) and stores a named copy under
+\code{@landmark.annot$celltyping[[.celltype.col.name]]}.
 }
 \description{
 Projects all cells onto the landmark graph to compute fuzzy graph edge weights between cells and landmarks.

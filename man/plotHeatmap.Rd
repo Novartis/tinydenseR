@@ -24,9 +24,9 @@ A \code{gtable}/\code{grob} object (from \code{pheatmap}) rendered to the graphi
 The heatmap includes hierarchical clustering of both features and populations.
 }
 \description{
-Displays a heatmap of mean marker/gene expression across clusters or cell types. Shows the expression
+Displays a heatmap of median marker/gene expression across clusters or cell types. Shows the expression
 patterns that define each population, helping to validate cluster annotations and identify marker genes.
-The heatmap is automatically generated during \code{get.graph()} and stored for quick display.
+The heatmap is computed on-the-fly from the current active annotations and expression data.
 }
 \details{
 The heatmap content depends on assay type:
@@ -38,8 +38,11 @@ The heatmap content depends on assay type:
 Rows (features) are ordered by hierarchical clustering to group co-expressed markers/genes.
 Columns (populations) also clustered to reveal relationships between cell types.
 
-The heatmap is generated once during \code{get.graph()} and cached in
-\code{.tdr.obj$graph[[.id.from]]$pheatmap}. This function simply displays the cached version.
+The heatmap is computed on-the-fly each time this function is called, using
+\code{@landmark.annot[[.id.from]]$ids} and the expression matrix via
+\code{.compute_annot_pheatmap()}.  This ensures the plot always reflects the
+current active annotations (e.g.\ after \code{set_active_clustering()} or
+\code{set_active_celltyping()}).
 }
 \examples{
 \dontrun{
@@ -59,5 +62,5 @@ plotHeatmap(lm.cells, .id.from = "celltyping")
 
 }
 \seealso{
-\code{\link{get.graph}}, \code{\link{celltyping}}
+\code{\link{get.graph}}, \code{\link{celltyping}}, \code{\link{set_active_clustering}}
 }

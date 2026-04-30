@@ -44,12 +44,11 @@ than this are merged into most connected neighbors.}
 \code{"ids"}, which is reserved for the active solution.}
 }
 \value{
-Updated \code{.tdr.obj} with \code{$graph$clustering} containing:
+Updated \code{.tdr.obj} with \code{@landmark.annot$clustering} updated:
 \itemize{
-\item \code{ids}: Factor of cluster assignments for each landmark
-\item \code{median.exprs}: Matrix of mean expression per cluster. For RNA: top features
-from PCA rotation (6 genes per PC: 3 highest, 3 lowest loadings). For cytometry: all markers.
-\item \code{pheatmap}: Heatmap object showing cluster profiles
+\item \code{$ids}: Factor of cluster assignments for each landmark (active solution)
+\item \code{$[[.column.name]]}: Same factor, stored as a named solution for
+multi-solution workflows
 }
 }
 \description{
@@ -58,9 +57,6 @@ the SNN graph or UMAP fuzzy graph. Clusters are used for visualization and as a 
 grouping for statistical testing. This is a wrapper around \code{leiden.cluster}.
 }
 \details{
-For RNA data, the heatmap displays top contributors to each principal component (6 genes
-per PC: 3 most positive, 3 most negative loadings). For cytometry, all markers are shown.
-
 The fuzzy graph method ("fgraph") uses probabilistic UMAP edges (pruned with tolerance 1/20
 to remove weak connections) and may produce more visually coherent clusters in UMAP space.
 The SNN method uses Jaccard similarity of k-NN overlaps and often gives more stable results

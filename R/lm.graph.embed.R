@@ -688,9 +688,9 @@ get.graph.TDRObj <-
 #'   attributed path strings (with \code{schema_v} and \code{bytes} attributes) in
 #'   \code{@cellmap} rather than in-memory objects.  The cache root is stored in
 #'   \code{@config$.cache.root}.  Use \code{tdr_cache_cleanup()} to remove cached files.
-#'   If \code{.ref.obj} provided, also updates \code{$graph$celltyping} with list containing \code{$ids} 
-#'   (factor of cell type assignments for landmarks), \code{$median.exprs} (matrix of mean expression 
-#'   per cell type), and \code{$pheatmap} (heatmap object).
+#'   If \code{.ref.obj} provided, also updates \code{@landmark.annot$celltyping$ids}
+#'   (factor of cell type assignments for landmarks) and stores a named copy under
+#'   \code{@landmark.annot$celltyping[[.celltype.col.name]]}.
 #'   
 #' @details
 #' \strong{Workflow Overview:}
@@ -1393,18 +1393,14 @@ get.map.TDRObj <-
 #'   \code{paste0("leiden.res.", .cl.resolution.parameter)}).  Cannot be
 #'   \code{"ids"}, which is reserved for the active solution.
 #'   
-#' @return Updated \code{.tdr.obj} with \code{$graph$clustering} containing:
+#' @return Updated \code{.tdr.obj} with \code{@landmark.annot$clustering} updated:
 #'   \itemize{
-#'     \item \code{ids}: Factor of cluster assignments for each landmark
-#'     \item \code{median.exprs}: Matrix of mean expression per cluster. For RNA: top features 
-#'       from PCA rotation (6 genes per PC: 3 highest, 3 lowest loadings). For cytometry: all markers.
-#'     \item \code{pheatmap}: Heatmap object showing cluster profiles
+#'     \item \code{$ids}: Factor of cluster assignments for each landmark (active solution)
+#'     \item \code{$[[.column.name]]}: Same factor, stored as a named solution for
+#'       multi-solution workflows
 #'   }
 #'   
 #' @details
-#' For RNA data, the heatmap displays top contributors to each principal component (6 genes 
-#' per PC: 3 most positive, 3 most negative loadings). For cytometry, all markers are shown.
-#' 
 #' The fuzzy graph method ("fgraph") uses probabilistic UMAP edges (pruned with tolerance 1/20 
 #' to remove weak connections) and may produce more visually coherent clusters in UMAP space. 
 #' The SNN method uses Jaccard similarity of k-NN overlaps and often gives more stable results 
