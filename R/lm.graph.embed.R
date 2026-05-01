@@ -647,6 +647,12 @@ get.graph.TDRObj <-
 #'   in \code{@cellmap} as attributed path strings.  Downstream accessors
 #'   (e.g.\ in \code{get.pbDE}, \code{goi.summary}) read them back lazily on a
 #'   per-sample basis.  Set to \code{FALSE} to keep everything in memory.
+#' @param .cache.path Character scalar or \code{NULL} (default).  When non-\code{NULL},
+#'   overrides the default \code{tempdir()}-based cache root so that cached
+#'   \code{@cellmap} files are written to this user-specified directory instead.
+#'   This is useful on HPC systems where session suspension or temporary-directory
+#'   cleanup would otherwise invalidate the \code{@cellmap} slot.  The directory
+#'   is created if it does not exist.  Ignored when \code{.cache.on.disk = FALSE}.
 #'
 #'   Cache files are stored under the system temporary directory
 #'   (\code{tempdir()}) and are automatically removed when the R session
@@ -654,6 +660,12 @@ get.graph.TDRObj <-
 #'   \strong{ephemeral} and never persists across R sessions.  There are
 #'   no implications for reproducibility since the cache only stores
 #'   intermediate results that are recomputed deterministically.
+#'
+#'   Override the cache root by setting \code{.cache.path} to a
+#'   user-controlled directory (e.g.\ a project-level path on shared
+#'   storage).  This is useful on HPC systems where session suspension
+#'   or cleanup can delete the system \code{tempdir()}, rendering the
+#'   \code{@cellmap} slot unusable.
 #'   
 #' @return Updated \code{.tdr.obj} with \code{@density} containing:
 #'   \itemize{
@@ -718,7 +730,9 @@ get.graph.TDRObj <-
 #' - Expression is mapped to reference via Symphony
 #' - Cell types assigned by kNN voting (k = 10) in reference embedding
 #' - Landmark cell types updated and used for visualization/statistics
-#' - Replaces any existing manual cell type annotations
+#' - Overwrites the active celltyping solution (\code{$ids}). Previously stored
+#'   named solutions (from \code{celltyping()} or \code{import_cell_annotations()})
+#'   are preserved and can be restored via \code{set_active_celltyping()}
 #' 
 #' \strong{Fuzzy Graph Densities:}
 #' 
@@ -760,6 +774,7 @@ get.map.TDRObj <-
            .seed = 123,
            .label.confidence = 0.5,
            .cache.on.disk = TRUE,
+           .cache.path = NULL,
            ...){
     .tdr.obj <- x
 
@@ -814,7 +829,7 @@ get.map.TDRObj <-
         
       }
       
-      warning("Using Symphony reference object for cell typing. Removing previous celltyping from .tdr.obj.")
+      warning("Using Symphony reference object for cell typing. Overwriting active celltyping solution ($ids). Previous named solutions are preserved.")
       
       if(isTRUE(x = .verbose)){
         message("building Annoy index for Symphony reference object")
@@ -834,7 +849,11 @@ get.map.TDRObj <-
       .tdr.obj@integration$symphony.obj$celltype.col.name <-
         .celltype.col.name
       
-      .tdr.obj@landmark.annot$celltyping <- NULL
+      # Preserve existing named solutions; only $ids will be overwritten post-loop
+      if (is.null(.tdr.obj@landmark.annot$celltyping)) {
+        .tdr.obj@landmark.annot$celltyping <- list()
+      }
+      .tdr.obj@landmark.annot$celltyping$ids <- NULL
       
     }
     
@@ -846,8 +865,18 @@ get.map.TDRObj <-
 
     .cache.meta <- NULL
     if (isTRUE(x = .cache.on.disk)) {
+      .cache_root <- if (!is.null(.cache.path)) {
+        if (!is.character(.cache.path) || length(.cache.path) != 1L ||
+            is.na(.cache.path) || !nzchar(.cache.path)) {
+          stop(".cache.path must be a single non-empty character string.")
+        }
+        dir.create(.cache.path, recursive = TRUE, showWarnings = FALSE)
+        normalizePath(.cache.path, mustWork = TRUE)
+      } else {
+        .tdr_cache_root()
+      }
       .run_key <- .tdr_make_run_key()
-      .run_cache_dir <- file.path(.tdr_cache_root(), .run_key)
+      .run_cache_dir <- file.path(.cache_root, .run_key)
       dir.create(.run_cache_dir, recursive = TRUE, showWarnings = FALSE)
       .tdr_cache_sweep_orphans(.run_cache_dir)
       .tdr_cache_register_cleanup(.run_cache_dir)
@@ -1198,10 +1227,6 @@ get.map.TDRObj <-
       })
     
     if(!is.null(x = .tdr.obj@integration$symphony.obj)){
-      
-      .tdr.obj@landmark.annot$celltyping <-
-        vector(mode = "list",
-               length = 0)
       
       .tdr.obj@landmark.annot$celltyping$ids <-
         seq_along(along.with = res) |>
