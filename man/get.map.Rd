@@ -16,6 +16,7 @@ get.map(x, ...)
   .seed = 123,
   .label.confidence = 0.5,
   .cache.on.disk = TRUE,
+  .cache.path = NULL,
   ...
 )
 }
@@ -48,14 +49,27 @@ slots (\code{clustering$ids}, \code{celltyping$ids}, \code{nearest.lm},
 \code{fuzzy.graphs}) are serialized to disk as uncompressed RDS files and stored
 in \code{@cellmap} as attributed path strings.  Downstream accessors
 (e.g.\ in \code{get.pbDE}, \code{goi.summary}) read them back lazily on a
-per-sample basis.  Set to \code{FALSE} to keep everything in memory.
+per-sample basis.  Set to \code{FALSE} to keep everything in memory.}
+
+\item{.cache.path}{Character scalar or \code{NULL} (default).  When non-\code{NULL},
+overrides the default \code{tempdir()}-based cache root so that cached
+\code{@cellmap} files are written to this user-specified directory instead.
+This is useful on HPC systems where session suspension or temporary-directory
+cleanup would otherwise invalidate the \code{@cellmap} slot.  The directory
+is created if it does not exist.  Ignored when \code{.cache.on.disk = FALSE}.
 
 Cache files are stored under the system temporary directory
 (\code{tempdir()}) and are automatically removed when the R session
 ends via a registered finalizer.  This means the cache is
 \strong{ephemeral} and never persists across R sessions.  There are
 no implications for reproducibility since the cache only stores
-intermediate results that are recomputed deterministically.}
+intermediate results that are recomputed deterministically.
+
+Override the cache root by setting \code{.cache.path} to a
+user-controlled directory (e.g.\ a project-level path on shared
+storage).  This is useful on HPC systems where session suspension
+or cleanup can delete the system \code{tempdir()}, rendering the
+\code{@cellmap} slot unusable.}
 }
 \value{
 Updated \code{.tdr.obj} with \code{@density} containing:
@@ -130,7 +144,9 @@ When \code{.ref.obj} is provided:
 \item Expression is mapped to reference via Symphony
 \item Cell types assigned by kNN voting (k = 10) in reference embedding
 \item Landmark cell types updated and used for visualization/statistics
-\item Replaces any existing manual cell type annotations
+\item Overwrites the active celltyping solution (\code{$ids}). Previously stored
+named solutions (from \code{celltyping()} or \code{import_cell_annotations()})
+are preserved and can be restored via \code{set_active_celltyping()}
 }
 
 \strong{Fuzzy Graph Densities:}
