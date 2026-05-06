@@ -6,6 +6,14 @@ within-cluster state changes. Modeling samples as replicates, tinydenseR
 enhances analytic efficiency and reproducibility while preserving the
 richness of single cell data.
 
+## See also
+
+Useful links:
+
+- <https://opensource.nibr.com/tinydenseR/>
+
+- Report bugs at <https://github.com/Novartis/tinydenseR/issues>
+
 ## Author
 
 **Maintainer**: Pedro Milanez-Almeida <pedro.milanez@novartis.com>
