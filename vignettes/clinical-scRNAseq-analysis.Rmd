@@ -1,5 +1,5 @@
 ---
-title: "COVID-19 PBMC Analysis with tinydenseR: Identifying Dysregulated Cell States"
+title: "scRNA-seq: COVID-19 PBMCs"
 author: "Pedro Milanez-Almeida"
 date: "`r Sys.Date()`"
 output: 
@@ -8,7 +8,7 @@ output:
     toc_depth: 3
     toc_float: true
 vignette: >
-  %\VignetteIndexEntry{COVID-19 PBMC Analysis with tinydenseR}
+  %\VignetteIndexEntry{scRNA-seq: COVID-19 PBMCs}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -21,7 +21,7 @@ knitr::opts_chunk$set(
   warning = FALSE,
   dpi = 300,
   out.width = "100%",
-  eval = TRUE
+  eval = FALSE
 )
 ```
 
@@ -217,6 +217,10 @@ tinydenseR::plotUMAP(
     ncol = 2))
 ```
 
+```{r umap-celltype-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/scrnaseq-umap-celltype-1.png")
+```
+
 We can also project individual gene expression (e.g., canonical markers) onto
 the UMAP to validate cell identities:
 
@@ -243,6 +247,10 @@ p3 <-
 p1 | p2 | p3
 ```
 
+```{r umap-markers-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/scrnaseq-umap-markers-1.png")
+```
+
 ### Sample PCA
 
 The sample PCA provides a low-dimensional view of inter-sample variation based
@@ -255,6 +263,10 @@ tinydenseR::plotSampleEmbedding(
   .embedding = "pca",
   .color.by = "log10.n.cells"
 )
+```
+
+```{r sample-pca-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/scrnaseq-sample-pca-1.png")
 ```
 
 ## Step 3: Differential Density Analysis with `get.lm()`
@@ -362,6 +374,10 @@ tinydenseR::plotUMAP(
   ggplot2::theme(plot.subtitle = ggplot2::element_blank())
 ```
 
+```{r da-umap-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/scrnaseq-da-umap-1.png")
+```
+
 ### Sample Embeddings by Contrast
 
 We compute a supervised sample embedding (partial-effect PC, pePC) for the
@@ -392,6 +408,10 @@ tinydenseR::plotSampleEmbedding(
                                                         angle = 30),
                     axis.title.x = ggplot2::element_blank())
 
+```
+
+```{r sample-embed-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/scrnaseq-sample-embed-1.png")
 ```
 
 ## Step 4: Decomposing the Density Contrast with `get.plsD()`
@@ -431,6 +451,10 @@ tinydenseR::plotPlsD(
 )
 ```
 
+```{r plsD1-scores-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/scrnaseq-plsD1-scores-1.png")
+```
+
 The left panel shows landmark scores: landmarks in the monocyte region carry
 the strongest positive plsD1 scores, indicating that this component is driven
 by monocyte-state variation. The right panel confirms tight coupling between
@@ -449,6 +473,10 @@ tinydenseR::plotPlsDHeatmap(
   .order.by = "plsD.dim",
   .feature.font.size = I(x = 5)
 )
+```
+
+```{r plsD1-heatmap-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/scrnaseq-plsD1-heatmap-1.png")
 ```
 
 ```{r plsD1-gsea, fig.width=10, fig.height=4}
@@ -527,6 +555,10 @@ fgseaRes.plsD1[order(-log10(x = padj)*sign(NES)),]
   c(nrow = 1) |>
     do.call(what = gridExtra::grid.arrange))
 ```
+
+```{r plsD1-gsea-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/scrnaseq-plsD1-gsea-1.png")
+```
 #### Interpretation
 
 Positive plsD1 loadings are enriched for **neutrophil degranulation**, with
@@ -553,6 +585,10 @@ tinydenseR::plotPlsD(
 )
 ```
 
+```{r plsD2-scores-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/scrnaseq-plsD2-scores-1.png")
+```
+
 ```{r plsD2-heatmap, fig.width=8, fig.height=6}
 tinydenseR::plotPlsDHeatmap(
   x = lm.cells,
@@ -561,6 +597,10 @@ tinydenseR::plotPlsDHeatmap(
   .order.by = "plsD.dim",
   .feature.font.size = I(x = 5)
 )
+```
+
+```{r plsD2-heatmap-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/scrnaseq-plsD2-heatmap-1.png")
 ```
 
 ```{r plsD2-gsea, fig.width=10, fig.height=4}
@@ -637,6 +677,10 @@ fgseaRes.plsD2[order(-log10(x = padj)*sign(NES)),]
 
 rank(x = lm.cells$results$pls$CRIT_earlyVSMILD_early$loadings[,"plsD2"])[c("NKG7", "PRF1", "CST7", "GZMB", "CCL5", "GZMH", "GZMA")]
 
+```
+
+```{r plsD2-gsea-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/scrnaseq-plsD2-gsea-1.png")
 ```
 
 #### Interpretation

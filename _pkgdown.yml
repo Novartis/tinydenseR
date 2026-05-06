@@ -1,0 +1,145 @@
+url: https://opensource.nibr.com/tinydenseR/
+
+destination: "./docs"
+
+template:
+  bootstrap: 5
+
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github]
+  components:
+    github:
+      icon: fa-github
+      href: https://github.com/Novartis/tinydenseR
+
+articles:
+- title: Articles
+  navbar: ~
+  contents:
+  - package-architecture
+  - clinical-scRNAseq-analysis
+  - clinical-cytometry-analysis
+  - multi-backend-workflows
+
+reference:
+- title: Core Pipeline
+  desc: Entry points for running tinydenseR and managing TDRObj objects
+  contents:
+  - tinydenseR-package
+  - RunTDR
+  - GetTDR
+  - SetTDR
+  - TDRObj-class
+  - TDRObj
+  - setup.tdr.obj
+  - is.TDRObj
+
+- title: Differential Density Analysis
+  desc: Linear modeling of landmark-level density across conditions
+  contents:
+  - get.lm
+  - get.dea
+  - get.density
+
+- title: Pseudobulk Differential Expression
+  desc: Manifold-informed pseudobulk DE in design and marker modes
+  contents:
+  - get.pbDE
+  - get.markerDE
+  - get.marker
+
+- title: plsD Decomposition
+  desc: Graph-diffused partial least squares decomposition
+  contents:
+  - get.plsD
+
+- title: Sample Embedding
+  desc: PCA, diffusion-map, and partial-effect PC embeddings
+  contents:
+  - get.embedding
+
+- title: Cell Typing and Clustering
+  desc: Cell type annotation, clustering, and resolution management
+  contents:
+  - celltyping
+  - set_active_celltyping
+  - list_celltyping_solutions
+  - import_cell_annotations
+  - recluster
+  - set_active_clustering
+  - leiden.cluster
+  - lm.cluster
+
+- title: Accessors and Utilities
+  desc: Extract data from containers and helper functions
+  contents:
+  - get.cells
+  - get.cells.SCE
+  - get.cells.Seurat
+  - get.cells.Seurat5
+  - get.cells.list.mat
+  - get.cellmap
+  - get.features
+  - get.graph
+  - get.landmarks
+  - get.map
+  - get.meta
+  - get.meta.HDF5AnnData
+  - get.meta.SCE
+  - get.meta.Seurat
+  - get.meta.Seurat5
+  - get.adj.matrix
+  - get.subset
+  - goi.summary
+  - is.hpc
+  - fast.jaccard.r
+  - elbow.sec.deriv
+
+- title: Visualization
+  desc: Plotting functions for landmarks, samples, and results
+  contents:
+  - plotUMAP
+  - plotPCA
+  - plotDensity
+  - plotDEA
+  - plotBeeswarm
+  - plotHeatmap
+  - plotMarkerDE
+  - plotPbDE
+  - plotPlsD
+  - plotPlsDHeatmap
+  - plotSampleEmbedding
+  - plotSamplePCA
+  - plotTradPerc
+  - plotTradStats
+  - plot2Markers
+  - scatterPlot
+
+- title: Data and Simulation
+  desc: Bundled datasets and simulation functions
+  contents:
+  - sim_trajectory_tdr
+  - simulate_DA_data
+  - simulate_DE_data
+  - fetch_trajectory_data
+  - Color.Palette
+
+- title: Conversion
+  desc: Convert TDRObj to other Bioconductor containers
+  contents:
+  - as.SummarizedExperiment
+  - as.SummarizedExperiment.TDRObj
+
+- title: Cache Management
+  desc: On-disk cache for large per-sample mapping data
+  contents:
+  - tdr_cache_info
+  - tdr_cache_validate
+  - tdr_cache_cleanup
+
+- title: Internal
+  desc: Internal helper functions (not part of the public API)
+  contents:
+  - starts_with(".")

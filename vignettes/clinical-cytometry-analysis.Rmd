@@ -1,5 +1,5 @@
 ---
-title: "Clinical Cytometry Analysis with tinydenseR: Predicting Response to Anti-PD-1 Immunotherapy"
+title: "Cytometry: Anti-PD-1 Response"
 author: "Pedro Milanez-Almeida"
 date: "`r Sys.Date()`"
 output: 
@@ -8,7 +8,7 @@ output:
     toc_depth: 3
     toc_float: true
 vignette: >
-  %\VignetteIndexEntry{Clinical Cytometry Analysis with tinydenseR}
+  %\VignetteIndexEntry{Cytometry: Anti-PD-1 Response}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -21,7 +21,7 @@ knitr::opts_chunk$set(
   warning = FALSE,
   dpi = 300,
   out.width = "100%",
-  eval = TRUE
+  eval = FALSE
 )
 ```
 
@@ -268,6 +268,10 @@ tinydenseR::plotUMAP(
     plot.subtitle = ggplot2::element_blank())
 ```
 
+```{r umap-batch-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/cytometry-umap-batch-1.png")
+```
+
 ### Sample PCA
 
 The sample PCA provides a low-dimensional view of inter-sample variation
@@ -285,6 +289,10 @@ tinydenseR::plotSampleEmbedding(
   ggplot2::labs(title = "Sample PCA") +
   ggplot2::theme(
     plot.title = ggplot2::element_text(hjust = 0.5))
+```
+
+```{r sample-pca-group-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/cytometry-sample-pca-group-1.png")
 ```
 
 When we inspect both the biological variable of interest (`group_id`, above)
@@ -308,6 +316,10 @@ tinydenseR::plotSampleEmbedding(
   ggplot2::labs(title = "Sample PCA") +
   ggplot2::theme(
     plot.title = ggplot2::element_text(hjust = 0.5))
+```
+
+```{r sample-pca-batch-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/cytometry-sample-pca-batch-1.png")
 ```
 
 ## Step 3: Differential Density Analysis with `get.lm()`
@@ -413,6 +425,10 @@ tinydenseR::plotSampleEmbedding(
     legend.position = "right")
 ```
 
+```{r pepc-plot-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/cytometry-pepc-plot-1.png")
+```
+
 ### Visualize Differential Density
 
 We overlay the `"R"` coefficient (density log2-fold-change) onto the landmark
@@ -430,6 +446,10 @@ tinydenseR::plotUMAP(
   .midpoint = 0) +
   ggplot2::theme(
     plot.subtitle = ggplot2::element_blank())
+```
+
+```{r density-umap-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/cytometry-density-umap-1.png")
 ```
 
 We can also restrict the visualization to statistically significant landmarks
@@ -456,6 +476,10 @@ tinydenseR::plotUMAP(
   .panel.size = 1.5,
   .legend.position = "bottom") +
   ggplot2::theme(plot.subtitle = ggplot2::element_blank())
+```
+
+```{r significance-umap-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/cytometry-significance-umap-1.png")
 ```
 
 Landmarks with significantly higher or lower density in responders span
@@ -512,6 +536,10 @@ tinydenseR::plotPlsD(
     legend.position = "right")
 ```
 
+```{r plsd1-umap-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/cytometry-plsd1-umap-1.png")
+```
+
 ### plsD1: Marker Loadings
 
 The plsD1 heatmap displays the marker loadings for the first density-contrast-aligned
@@ -530,6 +558,10 @@ tinydenseR::plotPlsDHeatmap(
   .panel.width = 2,
   .feature.font.size = I(x = 8)
 )
+```
+
+```{r plsd1-heatmap-static, echo=FALSE, eval=TRUE, out.width="100%"}
+knitr::include_graphics("figures/cytometry-plsd1-heatmap-1.png")
 ```
 
 #### Interpretation

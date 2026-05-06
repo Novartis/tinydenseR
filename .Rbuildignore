@@ -13,3 +13,6 @@
 ^R/spectral\.dea\.R$
 ^inst/dev$
 ^\.quarantine$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
