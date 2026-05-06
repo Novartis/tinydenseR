@@ -41,7 +41,8 @@
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="articles/package-architecture.html">tinydenseR Package Architecture</a></li>
+<li><a class="dropdown-item" href="articles/quick-start.html">Quick Start with tinydenseR</a></li>
+    <li><a class="dropdown-item" href="articles/package-architecture.html">tinydenseR Package Architecture</a></li>
     <li><a class="dropdown-item" href="articles/clinical-scRNAseq-analysis.html">scRNA-seq: COVID-19 PBMCs</a></li>
     <li><a class="dropdown-item" href="articles/clinical-cytometry-analysis.html">Cytometry: Anti-PD-1 Response</a></li>
     <li><a class="dropdown-item" href="articles/multi-backend-workflows.html">Multi-Backend Workflows with tinydenseR</a></li>
@@ -119,24 +120,10 @@
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
 <div class="section level3">
-<h3 id="system-requirements">System Requirements<a class="anchor" aria-label="anchor" href="#system-requirements"></a>
-</h3>
-<ul>
-<li>R version 4.1 or higher</li>
-</ul>
-<p>You can install <code>tinydenseR</code> from GitHub using devtools:</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Install devtools if you haven't already</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="st"><a href="https://devtools.r-lib.org/" class="external-link">"devtools"</a></span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"devtools"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Install `tinydenseR`</span></span>
-<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"Novartis/tinydenseR"</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level3">
 <h3 id="dependencies">Dependencies<a class="anchor" aria-label="anchor" href="#dependencies"></a>
 </h3>
-<p><code>tinydenseR</code> requires R (&gt;= 4.1) and several Bioconductor and CRAN packages. Most dependencies will be installed automatically, but you may need to install Bioconductor and its dependencies first:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<p><code>tinydenseR</code> requires R (&gt;= 4.1) and a few Bioconductor and CRAN packages. Most dependencies will be installed automatically, but you may need to install Bioconductor and its dependencies first:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"BiocManager"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"BiocManager"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
@@ -182,6 +169,13 @@
 <span><span class="op">}</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">temp_file</span><span class="op">)</span></span></code></pre></div>
+<p>You can install <code>tinydenseR</code> from GitHub using devtools:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Install devtools if you haven't already</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="st"><a href="https://devtools.r-lib.org/" class="external-link">"devtools"</a></span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"devtools"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Install `tinydenseR`</span></span>
+<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"Novartis/tinydenseR"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="example-data">Example Data<a class="anchor" aria-label="anchor" href="#example-data"></a>
@@ -204,15 +198,12 @@
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://patchwork.data-imaginist.com" class="external-link">patchwork</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/teunbrand/ggh4x" class="external-link">ggh4x</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span>seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Load bundled simulation data</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">sim_trajectory_tdr</span>, package <span class="op">=</span> <span class="st">"tinydenseR"</span><span class="op">)</span></span>
-<span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="va">sim_trajectory_tdr</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/rm.html" class="external-link">rm</a></span><span class="op">(</span><span class="va">sim_trajectory_tdr</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">sim_trajectory.meta</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">meta</span></span>
-<span><span class="va">sim_trajectory</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">sce</span></span></code></pre></div>
+<span><span class="va">sim_trajectory</span> <span class="op">&lt;-</span> <span class="va">sim_trajectory_tdr</span><span class="op">$</span><span class="va">sce</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/rm.html" class="external-link">rm</a></span><span class="op">(</span><span class="va">sim_trajectory_tdr</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="build-landmarks-with-runtdr">Build Landmarks with <code>RunTDR()</code>
@@ -511,8 +502,6 @@
 <div class="dev-status">
 <h2 data-toc-skip>Dev status</h2>
 <ul class="list-unstyled">
-<li><a href="https://github.com/Novartis/tinydenseR/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/Novartis/tinydenseR/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
-<li><a href="https://app.codecov.io/gh/Novartis/tinydenseR" class="external-link"><img src="https://codecov.io/gh/Novartis/tinydenseR/branch/main/graph/badge.svg" alt="Codecov test coverage"></a></li>
 <li><a href="LICENSE.html"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a></li>
 <li><a href="https://lifecycle.r-lib.org/articles/stages.html" class="external-link"><img src="https://img.shields.io/badge/lifecycle-maturing-blue.svg" alt="Lifecycle: maturing"></a></li>
 <li><a href="https://github.com/Novartis/tinydenseR/releases" class="external-link"><img src="https://img.shields.io/github/v/release/Novartis/tinydenseR?include_prereleases" alt="GitHub release"></a></li>

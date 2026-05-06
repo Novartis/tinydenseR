@@ -18,3 +18,8 @@ Useful links:
 
 **Maintainer**: Pedro Milanez-Almeida <pedro.milanez@novartis.com>
 ([ORCID](https://orcid.org/0000-0001-8285-957X))
+
+Authors:
+
+- Pedro Milanez-Almeida <pedro.milanez@novartis.com>
+  ([ORCID](https://orcid.org/0000-0001-8285-957X))

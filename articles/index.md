@@ -2,6 +2,8 @@
 
 ### Articles
 
+- [Quick Start with
+  tinydenseR](https://opensource.nibr.com/tinydenseR/articles/quick-start.md):
 - [tinydenseR Package
   Architecture](https://opensource.nibr.com/tinydenseR/articles/package-architecture.md):
 - [scRNA-seq: COVID-19
