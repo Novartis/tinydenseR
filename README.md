@@ -3,9 +3,6 @@
 
 <!-- badges: start -->
 
-[![R-CMD-check](https://github.com/Novartis/tinydenseR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Novartis/tinydenseR/actions/workflows/R-CMD-check.yaml)
-[![Codecov test
-coverage](https://codecov.io/gh/Novartis/tinydenseR/branch/main/graph/badge.svg)](https://app.codecov.io/gh/Novartis/tinydenseR)
 [![License:
 MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 [![Lifecycle:

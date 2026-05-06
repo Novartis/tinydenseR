@@ -18,6 +18,7 @@ articles:
 - title: Articles
   navbar: ~
   contents:
+  - quick-start
   - package-architecture
   - clinical-scRNAseq-analysis
   - clinical-cytometry-analysis
