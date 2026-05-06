@@ -70,7 +70,7 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rcmdcheck, BPCells=?ignore
+          extra-packages: any::rcmdcheck, BPCells=?ignore, destiny=?ignore
           needs: check
           # Uncomment to bust cache if needed:
           # cache-version: 1

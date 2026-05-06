@@ -1922,8 +1922,10 @@ get.marker <- function(
         # Check if destiny is available
         if(!requireNamespace("destiny", quietly = TRUE)){
           warning("Package 'destiny' is required for trajectory embedding. ",
-                  "Install with BiocManager::install('destiny'). ",
+                  "Install with install.packages('https://cran.r-project.org/src/contrib/Archive/smoother/smoother_1.1.tar.gz', repos = NULL, type = 'source') ",
+                  "and BiocManager::install('destiny'). ",
                   "Skipping trajectory computation.",
+
                   call. = FALSE)
           return(.tdr.obj)
         }
