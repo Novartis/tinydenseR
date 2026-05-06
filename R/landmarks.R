@@ -14,6 +14,114 @@
 # limitations under the License.
 #####
 
+# Internal helper: build Symphony reference from Harmony object, handling
+# API changes in harmony where Z_orig / Z_corr might not be exposed
+# as direct fields (use getter methods instead).
+# Falls back to manual construction when symphony::buildReferenceFromHarmonyObj
+# cannot access the required fields.
+#' @noRd
+.build_symphony_ref <- function(harmony_obj, metadata, vargenes_means_sds,
+                                pca_loadings, verbose = TRUE, seed = 111) {
+  # Try the standard symphony pathway first (works with older harmony)
+  ref <- tryCatch(
+    expr = symphony::buildReferenceFromHarmonyObj(
+      harmony_obj = harmony_obj,
+      metadata = metadata,
+      vargenes_means_sds = vargenes_means_sds,
+      pca_loadings = pca_loadings,
+      verbose = verbose,
+      do_umap = FALSE,
+      save_uwot_path = NULL,
+      seed = seed
+    ),
+    error = function(e) {
+      if (!grepl("Z_orig", conditionMessage(e))) stop(e)
+      NULL
+    }
+  )
+  if (!is.null(x = ref)) return(ref)
+
+  # Newer harmony API: use getter methods
+  if (verbose) message("Using harmony getter API (Z_orig field unavailable)")
+
+  Z_orig <- tryCatch(t(x = harmony_obj$getZorig()), error = function(e) NULL)
+  Z_corr <- tryCatch(t(x = harmony_obj$getZcorr()), error = function(e) {
+    # Some versions expose Z_corr directly even when Z_orig is hidden
+    tryCatch(harmony_obj$Z_corr, error = function(e2) NULL)
+  })
+  R <- tryCatch(harmony_obj$R, error = function(e) {
+    tryCatch(t(x = harmony_obj$getR()), error = function(e2) NULL)
+  })
+
+  if (is.null(x = Z_orig) || is.null(x = Z_corr) || is.null(x = R)) {
+    stop("Cannot extract embeddings from harmony object. ",
+         "Installed harmony/symphony versions may be incompatible.",
+         call. = FALSE)
+  }
+
+  # Ensure dims × cells orientation (harmony native: d × N)
+  if (ncol(x = Z_orig) != nrow(x = metadata)) {
+    Z_orig <- t(x = Z_orig)
+  }
+  if (ncol(x = Z_corr) != nrow(x = metadata)) {
+    Z_corr <- t(x = Z_corr)
+  }
+  if (ncol(x = R) != nrow(x = metadata)) {
+    R <- t(x = R)
+  }
+
+  betas <- tryCatch(
+    harmony::moe_ridge_get_betas(harmony_obj),
+    error = function(e) NULL
+  )
+
+  # Build reference list matching symphony structure
+  set.seed(seed = seed)
+  colnames(x = Z_orig) <- rownames(x = metadata)
+  rownames(x = Z_orig) <- paste0("PC_", seq_len(length.out = nrow(x = Z_corr)))
+  colnames(x = Z_corr) <- rownames(x = metadata)
+  rownames(x = Z_corr) <- paste0("harmony_", seq_len(length.out = nrow(x = Z_corr)))
+
+  # Cosine-normalized soft cluster centroids
+  centroids <- tryCatch(
+    t(x = symphony::cosine_normalize_cpp(R %*% t(x = Z_corr), 1)),
+    error = function(e) NULL
+  )
+
+  # Reference compression terms (Nr and C)
+  cache <- tryCatch(
+    symphony::compute_ref_cache(R, Z_corr),
+    error = function(e) NULL
+  )
+
+  # Centroids in PC space
+  centroids_pc <- NULL
+  if (!is.null(x = cache)) {
+    cluster_sizes <- cache[[1]] |> as.matrix()
+    centroid_sums <- t(x = Z_corr %*% t(x = R)) |> as.data.frame()
+    centroids_pc <- sweep(x = centroid_sums, MARGIN = 1,
+                          STATS = cluster_sizes, FUN = "/")
+    colnames(x = centroids_pc) <- paste0("harmony_", seq_len(length.out = nrow(x = Z_corr)))
+    rownames(x = centroids_pc) <- paste0("centroid_", seq_len(length.out = nrow(x = R)))
+  }
+
+  res <- list(
+    meta_data = metadata,
+    vargenes = vargenes_means_sds,
+    loadings = pca_loadings,
+    R = R,
+    Z_orig = Z_orig,
+    Z_corr = Z_corr,
+    betas = betas,
+    centroids = centroids,
+    cache = cache,
+    centroids_pc = centroids_pc
+  )
+
+  if (verbose) message("Finished building symphony reference (compat path).")
+  res
+}
+
 # Internal helper for progress display (not exported)
 # Combines single-line overwriting progress bar with stage headers
 .show_progress <- function(current, total, stage_label = NULL, item_label = NULL, 
@@ -883,7 +991,7 @@ get.landmarks.TDRObj <-
                             verbose = .verbose)
       
       .tdr.obj@integration$harmony.obj <-
-        symphony::buildReferenceFromHarmonyObj(
+        .build_symphony_ref(
           harmony_obj = tmp.harmony,
           metadata = .tdr.obj@metadata[.tdr.obj@config$key,],
           vargenes_means_sds =
@@ -894,9 +1002,6 @@ get.landmarks.TDRObj <-
             ),
           pca_loadings = pca_res1$v,
           verbose = .verbose,
-          do_umap = FALSE,
-          save_uwot_path = NULL,
-          #umap_min_dist = 0.1,
           seed = .seed)  
       
       if(isTRUE(x = .verbose)){
@@ -1245,7 +1350,7 @@ get.landmarks.TDRObj <-
                             verbose = .verbose)
       
       .tdr.obj@integration$harmony.obj <-
-        symphony::buildReferenceFromHarmonyObj(
+        .build_symphony_ref(
           harmony_obj = tmp.harmony,
           metadata = .tdr.obj@metadata[.tdr.obj@config$key,],
           vargenes_means_sds =
@@ -1256,9 +1361,6 @@ get.landmarks.TDRObj <-
             ),
           pca_loadings = pca_res2$rotation,
           verbose = .verbose,
-          do_umap = FALSE,
-          save_uwot_path = NULL,
-          #umap_min_dist = 0.1,
           seed = .seed)  
       
       if(isTRUE(x = .verbose)){

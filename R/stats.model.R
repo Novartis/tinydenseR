@@ -1254,7 +1254,11 @@ get.pbDE.TDRObj <-
         keep <- edgeR::filterByExpr(y = dge, design = tmp.design)
         dge <- dge[keep, , keep.lib.sizes = FALSE]
         dge <- edgeR::calcNormFactors(object = dge, method = "TMM")
-        v <- limma::voom(counts = dge, design = tmp.design, plot = FALSE)
+        v <- if (isTRUE(x = .verbose)) {
+          limma::voom(counts = dge, design = tmp.design, plot = FALSE)
+        } else {
+          suppressMessages(limma::voom(counts = dge, design = tmp.design, plot = FALSE))
+        }
 
         if (!is.null(x = .block)) {
           if (length(x = .block) != 1) stop("Block must be a vector of length 1")
@@ -1285,7 +1289,11 @@ get.pbDE.TDRObj <-
           .de <- limma::contrasts.fit(fit = .de, contrasts = tmp.contrasts)
         }
 
-        .de <- limma::eBayes(fit = .de, robust = TRUE)
+        .de <- if (isTRUE(x = .verbose)) {
+          limma::eBayes(fit = .de, robust = TRUE)
+        } else {
+          suppressMessages(limma::eBayes(fit = .de, robust = TRUE))
+        }
         .de$adj.p <- apply(X = .de$p.value, MARGIN = 2,
                            FUN = stats::p.adjust, method = "fdr")
 
@@ -1369,7 +1377,11 @@ get.pbDE.TDRObj <-
           .de <- limma::contrasts.fit(fit = .de, contrasts = tmp.contrasts)
         }
 
-        .de <- limma::eBayes(fit = .de, robust = TRUE)
+        .de <- if (isTRUE(x = .verbose)) {
+          limma::eBayes(fit = .de, robust = TRUE)
+        } else {
+          suppressMessages(limma::eBayes(fit = .de, robust = TRUE))
+        }
         .de$adj.p <- apply(X = .de$p.value, MARGIN = 2,
                            FUN = stats::p.adjust, method = "fdr")
       }

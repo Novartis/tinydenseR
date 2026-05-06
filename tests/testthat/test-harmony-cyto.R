@@ -7,6 +7,31 @@
 library(testthat)
 library(tinydenseR)
 
+# Skip entire file if harmony/symphony combination cannot build a reference
+# (e.g., newer harmony removed direct Z_orig/Z_corr fields and symphony has
+# not yet been updated to use getter methods, or symphony internals like
+# compute_ref_cache are unavailable)
+skip_if_not_installed("harmony")
+skip_if_not_installed("symphony")
+
+.harmony_symphony_ok <- local({
+  tryCatch({
+    set.seed(1)
+    h <- harmony::RunHarmony(
+      matrix(rnorm(200), ncol = 5),
+      data.frame(batch = rep(c("A", "B"), each = 20)),
+      "batch", return_obj = TRUE, verbose = FALSE
+    )
+    # Check if we can extract embeddings via either old or new API
+    z <- tryCatch(h$Z_orig, error = function(e) {
+      tryCatch(t(h$getZorig()), error = function(e2) NULL)
+    })
+    !is.null(z)
+  }, error = function(e) FALSE)
+})
+skip_if_not(.harmony_symphony_ok,
+            "harmony/symphony version incompatibility (cannot extract embeddings)")
+
 # ============================================================================
 # Harmony batch correction for cytometry data
 # ============================================================================

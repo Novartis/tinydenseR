@@ -4053,6 +4053,13 @@ plotPlsD.TDRObj <-
        x[sample(x = nrow(x = x)), ]
       )()
 
+    # Determine axis column names from the embedding
+    .embed_cols <- if (.embed == "umap") {
+      c("umap.1", "umap.2")
+    } else {
+      colnames(x = .tdr.obj@landmark.embed$pca$coord)[1:2]
+    }
+
     # Get Y (centered)
     Y.vec <- plsD.res$Y
 
@@ -4066,8 +4073,8 @@ plotPlsD.TDRObj <-
     # Panel 1: Embedding colored by PLS scores (diverging scale, centered at 0)
     p.embed <-
       ggplot2::ggplot(data = embed.df,
-                      mapping = ggplot2::aes(x = if(.embed == "umap") umap.1 else PC1,
-                                             y = if(.embed == "umap") umap.2 else PC2,
+                      mapping = ggplot2::aes(x = !!rlang::sym(x = .embed_cols[1]),
+                                             y = !!rlang::sym(x = .embed_cols[2]),
                                              color = score)) +
       ggplot2::guides(color = ggplot2::guide_colorbar(title.position = "top",
                                                       title.hjust = 0.5)) +
@@ -4082,8 +4089,8 @@ plotPlsD.TDRObj <-
       ) +
       ggplot2::labs(
         title = comp.name,
-        x = if(.embed == "umap") "umap.1" else "PC1",
-        y = if(.embed == "umap") "umap.2" else "PC2"
+        x = .embed_cols[1],
+        y = .embed_cols[2]
       ) +
       ggplot2::theme_bw() +
       ggplot2::theme(

@@ -567,18 +567,26 @@ get.graph.TDRObj <-
           
         } else {
           
-          .tdr.obj@landmark.embed$le$elbow <-
-            elbow.sec.deriv(x = .tdr.obj@landmark.embed$le$values[.tdr.obj@landmark.embed$le$nontriv],
-                            smooth = TRUE,
-                            df = NULL,
-                            sort.order = "asc")$index
+          .eig_vals <- .tdr.obj@landmark.embed$le$values[.tdr.obj@landmark.embed$le$nontriv]
           
-          # Use elbow dimensions, bounded by target and available eigenvectors
-          k <- 
-            min(.tdr.obj@landmark.embed$le$elbow, 
-                target_k, 
-                length(x = .tdr.obj@landmark.embed$le$nontriv)) |>
-            max(2L)
+          if (diff(x = range(.eig_vals)) < .Machine$double.eps * max(abs(x = .eig_vals)) * 100) {
+            # Flat eigenspectrum (platform-dependent numerics) — no elbow detectable;
+            # fall back to using all available non-trivial dimensions
+            k <- min(length(x = .tdr.obj@landmark.embed$le$nontriv), target_k) |> max(2L)
+          } else {
+            .tdr.obj@landmark.embed$le$elbow <-
+              elbow.sec.deriv(x = .eig_vals,
+                              smooth = TRUE,
+                              df = NULL,
+                              sort.order = "asc")$index
+            
+            # Use elbow dimensions, bounded by target and available eigenvectors
+            k <- 
+              min(.tdr.obj@landmark.embed$le$elbow, 
+                  target_k, 
+                  length(x = .tdr.obj@landmark.embed$le$nontriv)) |>
+              max(2L)
+          }
           
         }
         
