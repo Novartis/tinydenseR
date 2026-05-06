@@ -34,12 +34,9 @@
       save_uwot_path = NULL,
       seed = seed
     ),
-    error = function(e) {
-      if (!grepl("Z_orig", conditionMessage(e))) stop(e)
-      NULL
-    }
+    error = function(e) NULL
   )
-  if (!is.null(x = ref)) return(ref)
+  if (!is.null(x = ref) && !is.null(x = ref$centroids)) return(ref)
 
   # Newer harmony API: use getter methods
   if (verbose) message("Using harmony getter API (Z_orig field unavailable)")
@@ -83,15 +80,27 @@
   rownames(x = Z_corr) <- paste0("harmony_", seq_len(length.out = nrow(x = Z_corr)))
 
   # Cosine-normalized soft cluster centroids
+  # R: K × N, Z_corr: d × N → centroid_mat = R %*% t(Z_corr) → K × d
+  centroid_mat <- as.matrix(x = R) %*% t(x = as.matrix(x = Z_corr))
   centroids <- tryCatch(
-    t(x = symphony::cosine_normalize_cpp(R %*% t(x = Z_corr), 1)),
-    error = function(e) NULL
+    t(x = symphony:::cosine_normalize_cpp(centroid_mat, 1)),
+    error = function(e) {
+      # Pure-R cosine normalization fallback
+      row_norms <- sqrt(rowSums(centroid_mat^2))
+      row_norms[row_norms == 0] <- 1
+      t(centroid_mat / row_norms)
+    }
   )
 
   # Reference compression terms (Nr and C)
   cache <- tryCatch(
-    symphony::compute_ref_cache(R, Z_corr),
-    error = function(e) NULL
+    symphony:::compute_ref_cache(R, Z_corr),
+    error = function(e) {
+      # Pure-R fallback: Nr = rowSums(R), C = Z_corr %*% t(R)
+      Nr <- rowSums(x = as.matrix(x = R))
+      C <- as.matrix(x = Z_corr) %*% t(x = as.matrix(x = R))
+      list(Nr, C)
+    }
   )
 
   # Centroids in PC space
@@ -117,6 +126,12 @@
     cache = cache,
     centroids_pc = centroids_pc
   )
+
+  if (is.null(x = res$centroids)) {
+    stop("Failed to compute centroids for symphony reference. ",
+         "Installed harmony/symphony versions may be incompatible.",
+         call. = FALSE)
+  }
 
   if (verbose) message("Finished building symphony reference (compat path).")
   res

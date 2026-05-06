@@ -10,7 +10,6 @@ URL: https://opensource.nibr.com/tinydenseR/
 BugReports: https://github.com/Novartis/tinydenseR/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
 Collate: 
     'TDRObj-class.R'
     'accessor.R'
@@ -100,3 +99,4 @@ Imports:
     uwot,
     utils,
     withr
+Config/roxygen2/version: 8.0.0

@@ -21,5 +21,10 @@ Useful links:
 \author{
 \strong{Maintainer}: Pedro Milanez-Almeida \email{pedro.milanez@novartis.com} (\href{https://orcid.org/0000-0001-8285-957X}{ORCID})
 
+Authors:
+\itemize{
+  \item Pedro Milanez-Almeida \email{pedro.milanez@novartis.com} (\href{https://orcid.org/0000-0001-8285-957X}{ORCID})
+}
+
 }
 \keyword{internal}

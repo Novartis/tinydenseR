@@ -63,23 +63,9 @@ bioRxiv](https://doi.org/10.1101/2025.11.26.690752)!
 
 ## Installation
 
-### System Requirements
-
-- R version 4.1 or higher
-
-You can install `tinydenseR` from GitHub using devtools:
-
-``` r
-# Install devtools if you haven't already
-if (!require("devtools")) install.packages("devtools")
-
-# Install `tinydenseR`
-devtools::install_github("Novartis/tinydenseR")
-```
-
 ### Dependencies
 
-`tinydenseR` requires R (\>= 4.1) and several Bioconductor and CRAN
+`tinydenseR` requires R (\>= 4.1) and a few Bioconductor and CRAN
 packages. Most dependencies will be installed automatically, but you may
 need to install Bioconductor and its dependencies first:
 
@@ -131,6 +117,16 @@ if (length(bioc_pkgs) > 0) {
 unlink(temp_file)
 ```
 
+You can install `tinydenseR` from GitHub using devtools:
+
+``` r
+# Install devtools if you haven't already
+if (!require("devtools")) install.packages("devtools")
+
+# Install `tinydenseR`
+devtools::install_github("Novartis/tinydenseR")
+```
+
 ### Example Data
 
 The example below uses a bundled synthetic scRNA-seq trajectory dataset
@@ -155,15 +151,12 @@ library(ggplot2)
 library(patchwork)
 library(ggh4x)
 
-set.seed(seed = 42)
 
 # Load bundled simulation data
 data(sim_trajectory_tdr, package = "tinydenseR")
-sim <- sim_trajectory_tdr
-rm(sim_trajectory_tdr)
 
-sim_trajectory.meta <- sim$meta
-sim_trajectory <- sim$sce
+sim_trajectory <- sim_trajectory_tdr$sce
+rm(sim_trajectory_tdr)
 ```
 
 ### Build Landmarks with `RunTDR()`

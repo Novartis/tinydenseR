@@ -1251,9 +1251,17 @@ get.pbDE.TDRObj <-
           .design[!smpl.outlier, ] |>
           (\(x) x[, Matrix::colSums(x = x == 0) != nrow(x = x), drop = FALSE])()
 
-        keep <- edgeR::filterByExpr(y = dge, design = tmp.design)
+        keep <- if (isTRUE(x = .verbose)) {
+          edgeR::filterByExpr(y = dge, design = tmp.design)
+        } else {
+          suppressMessages(edgeR::filterByExpr(y = dge, design = tmp.design))
+        }
         dge <- dge[keep, , keep.lib.sizes = FALSE]
-        dge <- edgeR::calcNormFactors(object = dge, method = "TMM")
+        dge <- if (isTRUE(x = .verbose)) {
+          edgeR::normLibSizes(object = dge, method = "TMM")
+        } else {
+          suppressMessages(edgeR::normLibSizes(object = dge, method = "TMM"))
+        }
         v <- if (isTRUE(x = .verbose)) {
           limma::voom(counts = dge, design = tmp.design, plot = FALSE)
         } else {
@@ -1568,13 +1576,29 @@ get.pbDE.TDRObj <-
           ))() |>
           (\(x) x[, Matrix::colSums(x = x) > 1])()
 
-        keep <- edgeR::filterByExpr(y = dge, design = tmp.design)
+        keep <- if (isTRUE(x = .verbose)) {
+          edgeR::filterByExpr(y = dge, design = tmp.design)
+        } else {
+          suppressMessages(edgeR::filterByExpr(y = dge, design = tmp.design))
+        }
         dge <- dge[keep, , keep.lib.sizes = FALSE]
-        dge <- edgeR::calcNormFactors(object = dge, method = "TMM")
-        v <- limma::voom(counts = dge, design = tmp.design, plot = FALSE)
+        dge <- if (isTRUE(x = .verbose)) {
+          edgeR::normLibSizes(object = dge, method = "TMM")
+        } else {
+          suppressMessages(edgeR::normLibSizes(object = dge, method = "TMM"))
+        }
+        v <- if (isTRUE(x = .verbose)) {
+          limma::voom(counts = dge, design = tmp.design, plot = FALSE)
+        } else {
+          suppressMessages(limma::voom(counts = dge, design = tmp.design, plot = FALSE))
+        }
 
         .de <- limma::lmFit(object = v, design = tmp.design)
-        .de <- limma::eBayes(fit = .de, robust = TRUE)
+        .de <- if (isTRUE(x = .verbose)) {
+          limma::eBayes(fit = .de, robust = TRUE)
+        } else {
+          suppressMessages(limma::eBayes(fit = .de, robust = TRUE))
+        }
         .de$adj.p <- apply(X = .de$p.value, MARGIN = 2,
                            FUN = stats::p.adjust, method = "fdr")
 
