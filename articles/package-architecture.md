@@ -1,0 +1,250 @@
+# tinydenseR Package Architecture
+
+## Overview
+
+`tinydenseR` is a landmark-based framework for differential abundance
+and differential expression analysis of single-cell data. It is designed
+for scRNA-seq, flow, mass, and spectral cytometry data.
+
+The core idea is to select a representative set of **landmark cells**,
+build a graph over them, map all cells to their nearest landmarks, and
+then model per-landmark density or expression across **samples as
+biological replicates**. This preserves statistical rigor while
+maintaining the richness of single-cell resolution.
+
+## TDRObj: The Core Data Structure
+
+All analysis results are stored in a single S4 class, `TDRObj`. It
+contains 12 slots that organize the data and results at each stage of
+the pipeline:
+
+| Slot | Contents |
+|:---|:---|
+| `cells` | Named list of per-sample cell indices (or file paths for the files backend) |
+| `metadata` | `data.frame` of sample-level metadata |
+| `config` | Run parameters: key, sampling, assay.type, markers, n.threads, backend |
+| `integration` | Trained projection models and batch variables (harmony.var, harmony.obj, symphony.obj, umap.model) |
+| `assay` | Landmark expression layers (L × features matrices): raw, expr, scaled |
+| `landmark.embed` | Landmark-space coordinate matrices (pca, le, umap), each with a `$coord` entry |
+| `landmark.annot` | Per-landmark categorical annotations: clustering and celltyping, each with an `$ids` factor |
+| `graphs` | Landmark-landmark connectivity: adj.matrix, snn, fgraph |
+| `density` | Fuzzy density analytics (L × N matrices): raw, norm, log.norm, size.factors, composition |
+| `sample.embed` | Sample-level embeddings (N × k matrices): pca, traj, pepc |
+| `cellmap` | Per-cell, per-sample data: clustering and celltyping, each with an `$ids` factor, nearest.lm, fuzzy.graphs. Each entry is in-memory or an on-disk path string |
+| `results` | All statistical outputs: lm, pb, marker, spec, nmf, pls, clustering, celltyping, features |
+
+The `$` accessor is overloaded so you can use `tdr$results` instead of
+`tdr@results`:
+
+``` r
+
+tdr$metadata              # sample-level metadata
+tdr$landmark.embed$pca    # PCA coordinates of landmarks
+tdr$results$lm            # linear model results
+tdr$config$assay.type     # "RNA" or "cyto"
+```
+
+## Analysis Pipeline Stages
+
+The standard analysis pipeline proceeds through a series of stages, each
+populating specific slots in the `TDRObj`:
+
+    setup.tdr.obj() / RunTDR()
+        |
+        v
+    get.landmarks()  --> landmark.embed (pca, le)
+        |                 assay (raw, expr, scaled)
+        v
+    get.graph()      --> graphs (adj.matrix, snn)
+        |                 landmark.embed (umap)
+        |                 landmark.annot (clustering)
+        v
+    get.map()        --> density (raw, norm, log.norm, composition)
+        |                 cellmap (nearest.lm, fuzzy.graphs)
+        v
+    get.lm()         --> results$lm (fit, trad)
+        |                 sample.embed (pca)
+        v
+    get.pbDE()            --> results$pb
+    get.pbDE(.mode="marker") --> results$marker
+    get.plsD()           --> results$pls
+
+A typical workflow looks like:
+
+``` r
+
+library(tinydenseR)
+
+# Option 1: step-by-step
+tdr <- setup.tdr.obj(...)
+tdr <- get.landmarks(tdr)
+tdr <- get.graph(tdr)
+tdr <- get.map(tdr)
+tdr <- get.lm(tdr, .design = design)
+
+# Option 2: RunTDR() runs landmarks + graph + map + embedding in one call
+result <- RunTDR(seurat_obj, .sample.var = "sample_id", .assay.type = "RNA")
+result <- get.lm(result, .design = design)
+```
+
+## S3 Dispatch System
+
+`tinydenseR` uses S3 dispatch to support multiple container types
+(Seurat, SingleCellExperiment) through a single API. H5AD inputs (either
+as a file path or via `anndataR`) are converted to a bare `TDRObj`
+during
+[`RunTDR()`](https://opensource.nibr.com/tinydenseR/reference/RunTDR.md)
+and do not carry container dispatch methods. The dispatch wrappers in
+`dispatch.R` follow one of three patterns:
+
+### Tier 1: Compute-Only
+
+Functions that only need the `TDRObj` for computation. The wrapper
+extracts the `TDRObj`, runs the `.TDRObj` method, and stores it back.
+
+``` r
+
+# Example: get.lm.Seurat
+get.lm.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- get.lm.TDRObj(tdr, ...)
+  SetTDR(x, tdr)
+}
+```
+
+Functions in this tier:
+[`get.graph()`](https://opensource.nibr.com/tinydenseR/reference/get.graph.md),
+[`get.lm()`](https://opensource.nibr.com/tinydenseR/reference/get.lm.md),
+[`get.embedding()`](https://opensource.nibr.com/tinydenseR/reference/get.embedding.md),
+[`get.plsD()`](https://opensource.nibr.com/tinydenseR/reference/get.plsD.md),
+[`get.features()`](https://opensource.nibr.com/tinydenseR/reference/get.features.md),
+[`lm.cluster()`](https://opensource.nibr.com/tinydenseR/reference/lm.cluster.md),
+[`celltyping()`](https://opensource.nibr.com/tinydenseR/reference/celltyping.md).
+
+### Tier 2: Needs Source Data
+
+Functions that need access to the original data container (e.g., to read
+expression matrices via `.get_sample_matrix()`). The source object is
+passed via the `.source` argument.
+
+``` r
+
+# Example: get.landmarks.Seurat
+get.landmarks.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  tdr <- get.landmarks.TDRObj(tdr, .source = x, ...)
+  SetTDR(x, tdr)
+}
+```
+
+Functions in this tier:
+[`get.landmarks()`](https://opensource.nibr.com/tinydenseR/reference/get.landmarks.md),
+[`get.map()`](https://opensource.nibr.com/tinydenseR/reference/get.map.md),
+[`get.pbDE()`](https://opensource.nibr.com/tinydenseR/reference/get.pbDE.md).
+
+Note:
+[`get.markerDE()`](https://opensource.nibr.com/tinydenseR/reference/get.markerDE.md)
+is soft-deprecated. Use `get.pbDE(.mode = "marker")` instead. The
+[`get.pbDE()`](https://opensource.nibr.com/tinydenseR/reference/get.pbDE.md)
+function supports two modes:
+
+- `.mode = "design"` (default) — pseudobulk differential expression
+- `.mode = "marker"` — marker gene/protein identification between groups
+
+### Special Case: `goi.summary()`
+
+[`goi.summary()`](https://opensource.nibr.com/tinydenseR/reference/goi.summary.md)
+is a read-only Tier 2 function: it needs `.source` for expression
+access, but it returns a summary data frame rather than updating the
+container.
+
+``` r
+
+# Example: goi.summary.Seurat
+goi.summary.Seurat <- function(x, ...) {
+  tdr <- GetTDR(x)
+  goi.summary.TDRObj(tdr, .source = x, ...)
+}
+```
+
+### Tier 3: Read-Only Plots
+
+Plot functions only need to read the `TDRObj`; they return a plot object
+rather than updating the container.
+
+``` r
+
+# Example: plotPCA.Seurat
+plotPCA.Seurat <- function(x, ...) plotPCA.TDRObj(GetTDR(x), ...)
+```
+
+All `plot*()` functions follow this pattern:
+[`plotPCA()`](https://opensource.nibr.com/tinydenseR/reference/plotPCA.md),
+[`plotUMAP()`](https://opensource.nibr.com/tinydenseR/reference/plotUMAP.md),
+[`plotBeeswarm()`](https://opensource.nibr.com/tinydenseR/reference/plotBeeswarm.md),
+[`plot2Markers()`](https://opensource.nibr.com/tinydenseR/reference/plot2Markers.md),
+[`plotSamplePCA()`](https://opensource.nibr.com/tinydenseR/reference/plotSamplePCA.md),
+[`plotSampleEmbedding()`](https://opensource.nibr.com/tinydenseR/reference/plotSampleEmbedding.md),
+[`plotTradStats()`](https://opensource.nibr.com/tinydenseR/reference/plotTradStats.md),
+[`plotTradPerc()`](https://opensource.nibr.com/tinydenseR/reference/plotTradPerc.md),
+[`plotDensity()`](https://opensource.nibr.com/tinydenseR/reference/plotDensity.md),
+[`plotPbDE()`](https://opensource.nibr.com/tinydenseR/reference/plotPbDE.md),
+[`plotDEA()`](https://opensource.nibr.com/tinydenseR/reference/plotDEA.md),
+[`plotMarkerDE()`](https://opensource.nibr.com/tinydenseR/reference/plotMarkerDE.md),
+[`plotHeatmap()`](https://opensource.nibr.com/tinydenseR/reference/plotHeatmap.md),
+[`plotPlsD()`](https://opensource.nibr.com/tinydenseR/reference/plotPlsD.md),
+[`plotPlsDHeatmap()`](https://opensource.nibr.com/tinydenseR/reference/plotPlsDHeatmap.md).
+
+## Backend Data Flow
+
+When `tinydenseR` needs to access per-sample expression matrices during
+the pipeline, it calls the internal function `.get_sample_matrix()`.
+This function dispatches on `config$backend` to retrieve data from the
+appropriate source:
+
+| Backend value | Source | How data is retrieved |
+|:---|:---|:---|
+| `"files"` | RDS files on disk | `readRDS(tdr@cells[[sample_idx]])` |
+| `"seurat"` | Live Seurat object | `SeuratObject::LayerData(.source, assay, layer)[, col_idx]` |
+| `"sce"` | Live SingleCellExperiment | `SummarizedExperiment::assay(.source, assay)[, col_idx]` |
+| `"matrix"` | In-memory or on-disk matrix | Direct column indexing on the stored matrix reference |
+| `"cyto"` | flowCore flowSet or flowWorkspace cytoset | `flowCore::exprs(cs[[sample_name]])` |
+
+The `"matrix"` backend is used by `dgCMatrix`, `DelayedMatrix`,
+`IterableMatrix`, and H5AD inputs (both `RunTDR.character` and
+`RunTDR.HDF5AnnData`). In these cases, a reference to the matrix is
+stored in a locked environment within `config$source.env` so that
+`.get_sample_matrix()` can slice into it without copying the entire
+matrix.
+
+For the `"seurat"` and `"sce"` backends, the live container object is
+passed as `.source` to Tier 2 functions, which then forward it to
+`.get_sample_matrix()`.
+
+## Caching System
+
+`tinydenseR` includes an on-disk caching system for per-cell mapping
+results (nearest landmark assignments, fuzzy graph memberships). This
+avoids recomputing expensive cell-to-landmark mappings when re-running
+downstream analyses.
+
+The cache is managed through three user-facing functions:
+
+``` r
+
+# Show cache location and size
+tdr_cache_info(tdr)
+
+# Validate cache integrity
+tdr_cache_validate(tdr)
+
+# Remove orphaned cache files
+tdr_cache_cleanup(tdr)
+```
+
+Internal helpers
+([`.tdr_cache_read()`](https://opensource.nibr.com/tinydenseR/reference/dot-tdr_cache_read.md),
+[`.tdr_cache_write()`](https://opensource.nibr.com/tinydenseR/reference/dot-tdr_cache_write.md),
+[`.tdr_cache_sweep_orphans()`](https://opensource.nibr.com/tinydenseR/reference/dot-tdr_cache_sweep_orphans.md))
+handle the low-level read/write operations and are not intended to be
+called directly by users.
