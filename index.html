@@ -122,60 +122,12 @@
 <div class="section level3">
 <h3 id="dependencies">Dependencies<a class="anchor" aria-label="anchor" href="#dependencies"></a>
 </h3>
-<p><code>tinydenseR</code> requires R (&gt;= 4.1) and a few Bioconductor and CRAN packages. Most dependencies will be installed automatically, but you may need to install Bioconductor and its dependencies first:</p>
+<p><code>tinydenseR</code> requires R (&gt;= 4.1) and Bioconductor and CRAN packages. Most dependencies will be installed automatically, but you may need to install some of them manually, like <code>BPCells</code>:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"BiocManager"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"BiocManager"</span><span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="co"># Download DESCRIPTION from GitHub</span></span>
-<span><span class="va">data_url</span> <span class="op">&lt;-</span></span>
-<span>  <span class="st">"https://raw.githubusercontent.com/Novartis/tinydenseR/main/DESCRIPTION"</span></span>
-<span><span class="va">temp_file</span> <span class="op">&lt;-</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="fu">utils</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/utils/download.file.html" class="external-link">download.file</a></span><span class="op">(</span></span>
-<span>  url <span class="op">=</span> <span class="va">data_url</span>, </span>
-<span>  destfile <span class="op">=</span> <span class="va">temp_file</span>, </span>
-<span>  mode <span class="op">=</span> <span class="st">"wb"</span>,</span>
-<span>  quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Parse Imports</span></span>
-<span><span class="va">desc</span> <span class="op">&lt;-</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/dcf.html" class="external-link">read.dcf</a></span><span class="op">(</span>file <span class="op">=</span> <span class="va">temp_file</span><span class="op">)</span></span>
-<span><span class="va">imports</span> <span class="op">&lt;-</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/strsplit.html" class="external-link">strsplit</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">desc</span><span class="op">[</span>, <span class="st">"Imports"</span><span class="op">]</span>,</span>
-<span>           split <span class="op">=</span> <span class="st">"\\s*,\\s*"</span><span class="op">)</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="va">imports</span> <span class="op">&lt;-</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span>pattern <span class="op">=</span> <span class="st">"\\s*\\(.*?\\)"</span>, </span>
-<span>       replacement <span class="op">=</span> <span class="st">""</span>, </span>
-<span>       x <span class="op">=</span> <span class="va">imports</span><span class="op">)</span>  <span class="co"># remove version constraints</span></span>
-<span></span>
-<span><span class="co"># Install only missing Bioconductor packages</span></span>
-<span><span class="va">avail.bioc.pkgs</span> <span class="op">&lt;-</span></span>
-<span>  <span class="fu">BiocManager</span><span class="fu">::</span><span class="fu">repositories</span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="op">(</span>\<span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/utils/available.packages.html" class="external-link">available.packages</a></span><span class="op">(</span>repos <span class="op">=</span> <span class="va">x</span><span class="op">)</span></span>
-<span>  <span class="op">)</span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="op">)</span> </span>
-<span></span>
-<span><span class="va">bioc_pkgs</span> <span class="op">&lt;-</span></span>
-<span>  <span class="va">imports</span><span class="op">[</span><span class="va">imports</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span></span>
-<span>            <span class="va">avail.bioc.pkgs</span><span class="op">[</span><span class="op">!</span><span class="va">avail.bioc.pkgs</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> </span>
-<span>                              <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/utils/installed.packages.html" class="external-link">installed.packages</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>                                 <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">]</span><span class="op">]</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">bioc_pkgs</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu">BiocManager</span><span class="fu">::</span><span class="fu">install</span><span class="op">(</span>pkgs <span class="op">=</span> <span class="va">bioc_pkgs</span>,</span>
-<span>                       update <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">temp_file</span><span class="op">)</span></span></code></pre></div>
-<p>You can install <code>tinydenseR</code> from GitHub using devtools:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Install devtools if you haven't already</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="st"><a href="https://devtools.r-lib.org/" class="external-link">"devtools"</a></span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"devtools"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Install `tinydenseR`</span></span>
-<span><span class="fu">devtools</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"Novartis/tinydenseR"</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="co">#install_github()` was deprecated in devtools 2.5.0</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="st"><a href="https://pak.r-lib.org/" class="external-link">"pak"</a></span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"pak"</span><span class="op">)</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pkg_install.html" class="external-link">pkg_install</a></span><span class="op">(</span>pkg <span class="op">=</span> <span class="st">"Novartis/tinydenseR"</span><span class="op">)</span></span>
+<span><span class="co"># pak::pkg_install(pkg = "bnprks/BPCells/r")</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="example-data">Example Data<a class="anchor" aria-label="anchor" href="#example-data"></a>
@@ -190,7 +142,7 @@
 <div class="section level3">
 <h3 id="load-libraries-and-data">Load Libraries and Data<a class="anchor" aria-label="anchor" href="#load-libraries-and-data"></a>
 </h3>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://opensource.nibr.com/tinydenseR/">tinydenseR</a></span><span class="op">)</span></span>
 <span><span class="co">#&gt; Loading required package: Matrix</span></span>
 <span><span class="co">#&gt; Loading required package: patchwork</span></span>
@@ -210,7 +162,7 @@
 <a class="anchor" aria-label="anchor" href="#build-landmarks-with-runtdr"></a>
 </h3>
 <p><code><a href="reference/RunTDR.html">RunTDR()</a></code> selects landmark cells, builds a nearest-neighbor graph, clusters landmarks, maps all cells to their nearest landmarks to generate the landmark-by-sample matrix in a single call. Unsupervised sample embedding is also returned automatically.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sim_trajectory</span> <span class="op">&lt;-</span></span>
 <span>  <span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="reference/RunTDR.html">RunTDR</a></span><span class="op">(</span></span>
 <span>    x <span class="op">=</span> <span class="va">sim_trajectory</span>,</span>
@@ -230,7 +182,7 @@
 <a class="anchor" aria-label="anchor" href="#differential-density-analysis-with-getlm"></a>
 </h3>
 <p>We set up a design matrix and test which landmarks show differential density between conditions.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">.design</span> <span class="op">&lt;-</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/stats/model.matrix.html" class="external-link">model.matrix</a></span><span class="op">(</span><span class="op">~</span> <span class="va">Condition</span>,</span>
 <span>               data <span class="op">=</span> <span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="reference/GetTDR.html">GetTDR</a></span><span class="op">(</span><span class="va">sim_trajectory</span><span class="op">)</span><span class="op">@</span><span class="va">metadata</span><span class="op">)</span></span>
@@ -253,7 +205,7 @@
 <h3 id="sample-embedding">Sample Embedding<a class="anchor" aria-label="anchor" href="#sample-embedding"></a>
 </h3>
 <p>We fit a reduced (intercept-only) model and compute partial-effect PCs to produce a quantitative per-sample score along the Condition axis.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Reduced model (no Condition term)</span></span>
 <span><span class="va">noCondition.design</span> <span class="op">&lt;-</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/stats/model.matrix.html" class="external-link">model.matrix</a></span><span class="op">(</span><span class="op">~</span> <span class="fl">1</span>,</span>
@@ -282,7 +234,7 @@
 <span>    .term.of.interest <span class="op">=</span> <span class="st">"Condition"</span>,</span>
 <span>    .verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Unsupervised sample PCA</span></span>
 <span><span class="va">smpl.pca</span> <span class="op">&lt;-</span></span>
 <span>  <span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="reference/plotSampleEmbedding.html">plotSampleEmbedding</a></span><span class="op">(</span></span>
@@ -323,7 +275,7 @@
 <h3 id="density-contrast-and-plsd">Density Contrast and plsD<a class="anchor" aria-label="anchor" href="#density-contrast-and-plsd"></a>
 </h3>
 <p>We decompose the density contrast into interpretable gene-expression programs using <code><a href="reference/get.plsD.html">get.plsD()</a></code>, and visualize the result as a patchwork of the density fold-change and plsD1 scores on the landmark PCA.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sim_trajectory</span> <span class="op">&lt;-</span></span>
 <span>  <span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="reference/get.plsD.html">get.plsD</a></span><span class="op">(</span></span>
 <span>    x <span class="op">=</span> <span class="va">sim_trajectory</span>,</span>
@@ -331,7 +283,7 @@
 <span>    .model.name <span class="op">=</span> <span class="st">"default"</span>,</span>
 <span>    .verbose <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Density fold-change on landmark PCA</span></span>
 <span><span class="va">dens.p</span> <span class="op">&lt;-</span></span>
 <span>  <span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="reference/plotPCA.html">plotPCA</a></span><span class="op">(</span></span>
@@ -380,7 +332,7 @@
 <h3 id="plsd-heatmap">plsD Heatmap<a class="anchor" aria-label="anchor" href="#plsd-heatmap"></a>
 </h3>
 <p>The plsD heatmap shows landmark expression profiles ordered by plsD1 scores, with gene loadings on the right. Rows display centered expression of the top 25 features associated with each direction of plsD1.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="reference/plotPlsDHeatmap.html">plotPlsDHeatmap</a></span><span class="op">(</span></span>
 <span>  x <span class="op">=</span> <span class="va">sim_trajectory</span>,</span>
 <span>  .coef.col <span class="op">=</span> <span class="st">"ConditionB"</span>,</span>
@@ -451,7 +403,7 @@
 <h2 id="citation">Citation<a class="anchor" aria-label="anchor" href="#citation"></a>
 </h2>
 <p>If you use <code>tinydenseR</code> in your research, please cite:</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode R"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>Milanez<span class="sc">-</span>Almeida, P. et <span class="fu">al.</span> (<span class="dv">2025</span>). Sample<span class="sc">-</span>level modeling of single<span class="sc">-</span>cell data at scale with tinydenseR. bioRxviv https<span class="sc">:</span><span class="er">//</span>doi.org<span class="sc">/</span><span class="fl">10.1101</span><span class="sc">/</span><span class="dv">2025</span>.<span class="dv">11</span>.<span class="dv">26</span>.<span class="fl">690752.</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode R"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>Milanez<span class="sc">-</span>Almeida, P. et <span class="fu">al.</span> (<span class="dv">2025</span>). Sample<span class="sc">-</span>level modeling of single<span class="sc">-</span>cell data at scale with tinydenseR. bioRxviv https<span class="sc">:</span><span class="er">//</span>doi.org<span class="sc">/</span><span class="fl">10.1101</span><span class="sc">/</span><span class="dv">2025</span>.<span class="dv">11</span>.<span class="dv">26</span>.<span class="fl">690752.</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>
