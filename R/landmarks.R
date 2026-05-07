@@ -393,12 +393,36 @@ setup.tdr.obj <-
           }
           
           if(!is.null(x = .markers)){
-            if(!all(.markers %in% colnames(x = .cell))){
-              stop(paste0("\n",
-                          .markers,
-                          " could not be found in the data. Arg .markers must be one or more of the following: ",
-                          paste0(colnames(x = .cell),
-                                 collapse = ", ")))
+            .missing <- .markers[!.markers %in% colnames(x = .cell)]
+            if(length(x = .missing) > 0L){
+              .suggestions <- vapply(
+                X = .missing,
+                FUN = function(m){
+                  hits <- agrep(pattern = m, x = colnames(x = .cell),
+                                max.distance = 0.2, value = TRUE,
+                                ignore.case = TRUE)
+                  if(length(x = hits) == 0L) "" else paste0(hits, collapse = ", ")
+                },
+                FUN.VALUE = character(1L)
+              )
+              .msg <- vapply(
+                X = seq_along(along.with = .missing),
+                FUN = function(i){
+                  line <- paste0("\"", .missing[i], "\" not found")
+                  if(nzchar(x = .suggestions[i])){
+                    line <- paste0(line, ". Did you mean: ", .suggestions[i], "?")
+                  }
+                  line
+                },
+                FUN.VALUE = character(1L)
+              )
+              stop(paste0(
+                "\nThe following markers were not found in file \"",
+                names(x = .cells)[cell_elem], "\":\n",
+                paste0("- ", .msg, collapse = "\n"),
+                "\n\nAvailable columns: ",
+                paste0(colnames(x = .cell), collapse = ", ")
+              ), call. = FALSE)
             }
           }
           

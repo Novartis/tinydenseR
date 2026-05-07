@@ -62,66 +62,15 @@ bioRxiv](https://doi.org/10.1101/2025.11.26.690752)!
 
 ### Dependencies
 
-`tinydenseR` requires R (\>= 4.1) and a few Bioconductor and CRAN
-packages. Most dependencies will be installed automatically, but you may
-need to install Bioconductor and its dependencies first:
+`tinydenseR` requires R (\>= 4.1) and Bioconductor and CRAN packages.
+Most dependencies will be installed automatically, but you may need to
+install some of them manually, like `BPCells`:
 
 ``` r
-if (!requireNamespace("BiocManager", quietly = TRUE)) {
-  install.packages("BiocManager")
-}
-
-# Download DESCRIPTION from GitHub
-data_url <-
-  "https://raw.githubusercontent.com/Novartis/tinydenseR/main/DESCRIPTION"
-temp_file <-
-  tempfile()
-utils::download.file(
-  url = data_url, 
-  destfile = temp_file, 
-  mode = "wb",
-  quiet = TRUE)
-
-# Parse Imports
-desc <-
-  read.dcf(file = temp_file)
-imports <-
-  strsplit(x = desc[, "Imports"],
-           split = "\\s*,\\s*")[[1]]
-imports <-
-  gsub(pattern = "\\s*\\(.*?\\)", 
-       replacement = "", 
-       x = imports)  # remove version constraints
-
-# Install only missing Bioconductor packages
-avail.bioc.pkgs <-
-  BiocManager::repositories() |>
-  (\(x)
-  available.packages(repos = x)
-  )() |>
-  rownames() 
-
-bioc_pkgs <-
-  imports[imports %in%
-            avail.bioc.pkgs[!avail.bioc.pkgs %in% 
-                              (installed.packages() |>
-                                 rownames())]]
-if (length(bioc_pkgs) > 0) {
-  BiocManager::install(pkgs = bioc_pkgs,
-                       update = FALSE)
-}
-
-unlink(temp_file)
-```
-
-You can install `tinydenseR` from GitHub using devtools:
-
-``` r
-# Install devtools if you haven't already
-if (!require("devtools")) install.packages("devtools")
-
-# Install `tinydenseR`
-devtools::install_github("Novartis/tinydenseR")
+#install_github()` was deprecated in devtools 2.5.0
+if (!require("pak")) install.packages("pak")
+pak::pkg_install(pkg = "Novartis/tinydenseR")
+# pak::pkg_install(pkg = "bnprks/BPCells/r")
 ```
 
 ### Example Data
