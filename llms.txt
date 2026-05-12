@@ -1,5 +1,12 @@
 # tinydenseR [![](artwork/tinydenseR_hex_piano_behind.png)](https://opensource.nibr.com/tinydenseR/artwork/tinydenseR_hex_piano_behind.png)
 
+## Tutorials
+
+- [Quick
+  Start](https://opensource.nibr.com/tinydenseR/articles/quick-start.html)
+- [scRNAseq](https://opensource.nibr.com/tinydenseR/articles/clinical-scRNAseq-analysis.html)
+- [cytometry](https://opensource.nibr.com/tinydenseR/articles/clinical-cytometry-analysis.html)
+
 ## Table of Contents
 
 - [Overview](#overview)

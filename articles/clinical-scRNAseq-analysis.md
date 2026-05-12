@@ -67,7 +67,7 @@ preprocessing steps; adjust file paths to match your local setup.
 ``` r
 
 # Path to the downloaded h5ad file
-file_path <- "~/sandbox/COVID19_COMBAT/derived_data/COMBAT.h5ad"
+file_path <- "~/Downloads/687c09ff-731a-4e3d-ac07-4c29c33a6338.h5ad"
 
 # Access h5ad keeping data on disk
 h5ad <- 
@@ -118,7 +118,8 @@ feature_metadata <- feature_metadata[keep.unique.genes, ] |> droplevels()
 
 # Write BPCells on-disk matrix
 ondisk_path <- 
-  "~/sandbox/COVID19_COMBAT/derived_data/COMBAT_COVID_ondisk/"
+  dirname(path = file_path) |>
+  file.path("COMBAT_COVID_ondisk")
 
 ondisk.data <-
   BPCells::open_matrix_anndata_hdf5(
@@ -547,7 +548,9 @@ fgseaRes.plsD1[order(-log10(x = padj)*sign(NES)),]
     do.call(what = gridExtra::grid.arrange))
 ```
 
-![](figures/scrnaseq-plsD1-gsea-1.png) \#### Interpretation
+![](figures/scrnaseq-plsD1-gsea-1.png)
+
+#### Interpretation
 
 Positive plsD1 loadings are enriched for **neutrophil degranulation**,
 with key contributing genes including S100A12, CLU, VCAN, and CTSD.

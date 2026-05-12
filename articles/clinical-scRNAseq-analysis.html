@@ -68,7 +68,7 @@
                         <h4 data-toc-skip class="author">Pedro
 Milanez-Almeida</h4>
             
-            <h4 data-toc-skip class="date">2026-05-07</h4>
+            <h4 data-toc-skip class="date">2026-05-12</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/Novartis/tinydenseR/blob/main/vignettes/clinical-scRNAseq-analysis.Rmd" class="external-link"><code>vignettes/clinical-scRNAseq-analysis.Rmd</code></a></small>
       <div class="d-none name"><code>clinical-scRNAseq-analysis.Rmd</code></div>
@@ -153,7 +153,7 @@ This section shows the key preprocessing steps; adjust file paths to
 match your local setup.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Path to the downloaded h5ad file</span></span>
-<span><span class="va">file_path</span> <span class="op">&lt;-</span> <span class="st">"~/sandbox/COVID19_COMBAT/derived_data/COMBAT.h5ad"</span></span>
+<span><span class="va">file_path</span> <span class="op">&lt;-</span> <span class="st">"~/Downloads/687c09ff-731a-4e3d-ac07-4c29c33a6338.h5ad"</span></span>
 <span></span>
 <span><span class="co"># Access h5ad keeping data on disk</span></span>
 <span><span class="va">h5ad</span> <span class="op">&lt;-</span> </span>
@@ -200,7 +200,8 @@ subset it to QC-passing cells with unique gene symbols.</p>
 <span></span>
 <span><span class="co"># Write BPCells on-disk matrix</span></span>
 <span><span class="va">ondisk_path</span> <span class="op">&lt;-</span> </span>
-<span>  <span class="st">"~/sandbox/COVID19_COMBAT/derived_data/COMBAT_COVID_ondisk/"</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">dirname</a></span><span class="op">(</span>path <span class="op">=</span> <span class="va">file_path</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="st">"COMBAT_COVID_ondisk"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">ondisk.data</span> <span class="op">&lt;-</span></span>
 <span>  <span class="fu">BPCells</span><span class="fu">::</span><span class="fu">open_matrix_anndata_hdf5</span><span class="op">(</span></span>
@@ -589,8 +590,10 @@ indicate downregulation.</p>
 <span>  <span class="op">}</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nrow <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span>what <span class="op">=</span> <span class="fu">gridExtra</span><span class="fu">::</span><span class="va"><a href="https://rdrr.io/pkg/gridExtra/man/arrangeGrob.html" class="external-link">grid.arrange</a></span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><img src="figures/scrnaseq-plsD1-gsea-1.png" class="r-plt" alt="" width="100%">
-#### Interpretation</p>
+<p><img src="figures/scrnaseq-plsD1-gsea-1.png" class="r-plt" alt="" width="100%"></p>
+<div class="section level4">
+<h4 id="interpretation">Interpretation<a class="anchor" aria-label="anchor" href="#interpretation"></a>
+</h4>
 <p>Positive plsD1 loadings are enriched for <strong>neutrophil
 degranulation</strong>, with key contributing genes including S100A12,
 CLU, VCAN, and CTSD. Negative loadings are enriched for
@@ -601,6 +604,7 @@ from interferon-responsive classical monocytes in early mild disease
 toward a more inflammatory, dysregulated myeloid program in early
 critical disease, in line with previous reports of myeloid dysregulation
 in severe COVID-19.</p>
+</div>
 </div>
 <div class="section level3">
 <h3 id="plsd2-progenitor-like-vs--pdcnk-programs">plsD2: Progenitor-like vs. pDC/NK Programs<a class="anchor" aria-label="anchor" href="#plsd2-progenitor-like-vs--pdcnk-programs"></a>
@@ -701,7 +705,7 @@ and NK cell regions.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/rank.html" class="external-link">rank</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">lm.cells</span><span class="op">$</span><span class="va">results</span><span class="op">$</span><span class="va">pls</span><span class="op">$</span><span class="va">CRIT_earlyVSMILD_early</span><span class="op">$</span><span class="va">loadings</span><span class="op">[</span>,<span class="st">"plsD2"</span><span class="op">]</span><span class="op">)</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"NKG7"</span>, <span class="st">"PRF1"</span>, <span class="st">"CST7"</span>, <span class="st">"GZMB"</span>, <span class="st">"CCL5"</span>, <span class="st">"GZMH"</span>, <span class="st">"GZMA"</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
 <p><img src="figures/scrnaseq-plsD2-gsea-1.png" class="r-plt" alt="" width="100%"></p>
 <div class="section level4">
-<h4 id="interpretation">Interpretation<a class="anchor" aria-label="anchor" href="#interpretation"></a>
+<h4 id="interpretation-1">Interpretation<a class="anchor" aria-label="anchor" href="#interpretation-1"></a>
 </h4>
 <p>Analysis of plsD2 loadings reveals the progenitor-like
 cell-associated genes CD34, CYTL1 and PRSS57 to be highly expressed in
