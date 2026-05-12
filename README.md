@@ -11,6 +11,13 @@ maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://lif
 release](https://img.shields.io/github/v/release/Novartis/tinydenseR?include_prereleases)](https://github.com/Novartis/tinydenseR/releases)
 <!-- badges: end -->
 
+## Tutorials
+
+- [Quick
+  Start](https://opensource.nibr.com/tinydenseR/articles/quick-start.html)
+- [scRNAseq](https://opensource.nibr.com/tinydenseR/articles/clinical-scRNAseq-analysis.html)
+- [cytometry](https://opensource.nibr.com/tinydenseR/articles/clinical-cytometry-analysis.html)
+
 ## Table of Contents
 
 - [Overview](#overview)
