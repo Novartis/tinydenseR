@@ -24,7 +24,7 @@ citEntry(
   ),
   year = "2025",
   note = "R package version 0.0.3.0001",
-  url = "https://www.biorxiv.org/content/10.1101/2025.11.26.690752v1",
+  url = "https://www.biorxiv.org/content/10.1101/2025.11.26.690752",
   doi = "https://doi.org/10.1101/2025.11.26.690752",
   textVersion = paste(
     "Milanez-Almeida, P. et al. (2025).",

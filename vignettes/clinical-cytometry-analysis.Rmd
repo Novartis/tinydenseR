@@ -21,7 +21,8 @@ knitr::opts_chunk$set(
   warning = FALSE,
   dpi = 300,
   out.width = "100%",
-  eval = FALSE
+  eval = FALSE,
+  fig.path = "figures/cytometry-"
 )
 ```
 
@@ -495,9 +496,6 @@ marker features drive those changes. `get.plsD()` bridges this gap by
 decomposing the density contrast into PLS components whose loadings reveal
 the markers underlying the signal. In the context of cytometry data, these
 loadings correspond to protein markers rather than gene expression features.
-We set `.residualize = TRUE` to remove residual batch-associated variation
-from the decomposition, ensuring that plsD components reflect response-related
-signal rather than technical artifacts.
 
 ```{r run-plsd}
 lm.cells <-
@@ -505,8 +503,7 @@ lm.cells <-
     x = lm.cells, 
     .coef.col = "R",
     .model.name = "default",
-    .verbose = TRUE,
-    .residualize = TRUE
+    .verbose = TRUE
   )
 ```
 

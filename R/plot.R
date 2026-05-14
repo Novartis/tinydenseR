@@ -458,15 +458,8 @@ plotUMAP.TDRObj <-
                                               tooltip = topFeatTab)) +
          ggplot2::theme_bw() +
          ggplot2::theme(legend.position = .legend.position,
-                        plot.title = ggplot2::element_text(hjust = 0.5),
-                        plot.subtitle = ggplot2::element_text(hjust = 0.5)) +
+                        plot.title = ggplot2::element_text(hjust = 0.5)) +
          ggplot2::labs(title = .plot.title,
-                       subtitle = if(.hover.stats != "none"){
-                         paste0(.hover.stats,
-                                " stats (hover)")
-                       } else {
-                         ""
-                       },
                        color = .color.label)
       )()
     
