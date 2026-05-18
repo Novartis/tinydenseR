@@ -417,7 +417,7 @@ tinydenseR::plotSampleEmbedding(
   .embedding = "pePC",
   .sup.embed.slot = "group_id",
   .color.by = "group_id",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(2,1)],
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,2)],
   .panel.size = 1.5,
   .point.size = 3) +
   ggplot2::labs(title = "pePC") +
