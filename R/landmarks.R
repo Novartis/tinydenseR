@@ -68,7 +68,7 @@
   }
 
   betas <- tryCatch(
-    harmony::moe_ridge_get_betas(harmony_obj),
+    harmony_obj$W,
     error = function(e) NULL
   )
 
@@ -83,7 +83,7 @@
   # R: K × N, Z_corr: d × N → centroid_mat = R %*% t(Z_corr) → K × d
   centroid_mat <- as.matrix(x = R) %*% t(x = as.matrix(x = Z_corr))
   centroids <- tryCatch(
-    t(x = symphony:::cosine_normalize_cpp(centroid_mat, 1)),
+    t(x = cosine_normalize_cpp(centroid_mat, 1)),
     error = function(e) {
       # Pure-R cosine normalization fallback
       row_norms <- sqrt(rowSums(centroid_mat^2))
@@ -94,7 +94,7 @@
 
   # Reference compression terms (Nr and C)
   cache <- tryCatch(
-    symphony:::compute_ref_cache(R, Z_corr),
+    compute_ref_cache(R, Z_corr),
     error = function(e) {
       # Pure-R fallback: Nr = rowSums(R), C = Z_corr %*% t(R)
       Nr <- rowSums(x = as.matrix(x = R))

@@ -1218,21 +1218,35 @@ get.map.TDRObj <-
                          start_time = .map_start)
         }
         
-        # Return lightweight result (large objects are on disk if caching enabled)
-        list(
-          fdens.col      = smpl.fdens,
-          n.cells        = smpl.n.cells,
-          cl.count       = smpl.cl.count,
-          ct.count       = smpl.ct.count,
-          cell.clustering  = res2$cell.clustering,
-          cell.celltyping  = res2$cell.celltyping,
-          lm.celltyping    = res2$lm.celltyping,
-          fgraph           = res2$fgraph,
-          nn.idx           = res2$nn$euclidean$idx,
-          cache.records    = smpl.cache.records
-        )
+        # Return result; exclude large objects when they are already cached to disk
+        if (isTRUE(x = .cache.on.disk)) {
+          list(
+            fdens.col       = smpl.fdens,
+            n.cells         = smpl.n.cells,
+            cl.count        = smpl.cl.count,
+            ct.count        = smpl.ct.count,
+            lm.celltyping   = res2$lm.celltyping,
+            cache.records   = smpl.cache.records
+          )
+        } else {
+          list(
+            fdens.col        = smpl.fdens,
+            n.cells          = smpl.n.cells,
+            cl.count         = smpl.cl.count,
+            ct.count         = smpl.ct.count,
+            cell.clustering  = res2$cell.clustering,
+            cell.celltyping  = res2$cell.celltyping,
+            lm.celltyping    = res2$lm.celltyping,
+            fgraph           = res2$fgraph,
+            nn.idx           = res2$nn$euclidean$idx,
+            cache.records    = smpl.cache.records
+          )
+        }
         
       })
+    
+    # Release temporaries accumulated during the loop
+    gc()
     
     if(!is.null(x = .tdr.obj@integration$symphony.obj)){
       
@@ -1812,3 +1826,12 @@ irlba_spectral_tsvd <-
   getFromNamespace(x = "irlba_spectral_tsvd",
                    ns = "uwot")
 
+#' @keywords internal
+cosine_normalize_cpp <-
+  getFromNamespace(x = "cosine_normalize_cpp",
+                   ns = "symphony")
+
+#' @keywords internal
+compute_ref_cache <-
+  getFromNamespace(x = "compute_ref_cache",
+                   ns = "symphony")
