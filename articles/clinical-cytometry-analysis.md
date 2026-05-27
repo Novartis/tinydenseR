@@ -358,6 +358,64 @@ lm.cells <-
   )
 ```
 
+### Visualize Differential Density
+
+We overlay the `"R"` coefficient (density log2-fold-change) onto the
+landmark UMAP. This reveals which regions of the immune cell landscape
+show increased or decreased density in responders relative to
+non-responders.
+
+``` r
+
+tinydenseR::plotUMAP(
+  x = lm.cells,
+  .feature = lm.cells$results$lm$default$fit$coefficients[,"R"],
+  .plot.title = "Responders vs. Non-responders",
+  .color.label = "density\nlog2(+0.5)FC",
+  .panel.size = 1.5,
+  .point.size = 0.1,
+  .midpoint = 0) +
+  ggplot2::theme(
+    plot.subtitle = ggplot2::element_blank())
+```
+
+![](figures/cytometry-density-umap-1.png)
+
+We can also restrict the visualization to statistically significant
+landmarks (q \< 0.1), categorizing them by the direction of the density
+change:
+
+``` r
+
+tinydenseR::plotUMAP(
+  x = lm.cells,
+  .feature =
+    ifelse(
+      test = lm.cells$results$lm$default$fit$coefficients[,"R"] < 0,
+      yes = "lower density",
+      no = "higher density") |>
+    ifelse(
+      test = lm.cells$results$lm$default$fit$pca.weighted.q[,"R"] < 0.1,
+      no = "not sig.") |>
+    factor(levels = c("lower density",
+                      "higher density",
+                      "not sig.")),
+  .plot.title = "group_id",
+  .color.label = "q < 0.1",
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,2,6)],
+  .point.size = 0.1,
+  .panel.size = 1.5,
+  .legend.position = "bottom") +
+  ggplot2::theme(plot.subtitle = ggplot2::element_blank())
+```
+
+![](figures/cytometry-significance-umap-1.png)
+
+Landmarks with significantly higher or lower density in responders span
+specific regions of the immune landscape. The spatial pattern on the
+UMAP indicates which immune cell populations are differentially
+represented between responders and non-responders at baseline.
+
 ### Reduced Model for Sample Embedding
 
 To embed samples along the `group_id` axis specifically, we fit a
@@ -414,7 +472,7 @@ tinydenseR::plotSampleEmbedding(
   .embedding = "pePC",
   .sup.embed.slot = "group_id",
   .color.by = "group_id",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(2,1)],
+  .cat.feature.color = tinydenseR::Color.Palette[1,c(1,2)],
   .panel.size = 1.5,
   .point.size = 3) +
   ggplot2::labs(title = "pePC") +
@@ -425,64 +483,6 @@ tinydenseR::plotSampleEmbedding(
 
 ![](figures/cytometry-pepc-plot-1.png)
 
-### Visualize Differential Density
-
-We overlay the `"R"` coefficient (density log2-fold-change) onto the
-landmark UMAP. This reveals which regions of the immune cell landscape
-show increased or decreased density in responders relative to
-non-responders.
-
-``` r
-
-tinydenseR::plotUMAP(
-  x = lm.cells,
-  .feature = lm.cells$results$lm$default$fit$coefficients[,"R"],
-  .plot.title = "Responders vs. Non-responders",
-  .color.label = "density\nlog2(+0.5)FC",
-  .panel.size = 1.5,
-  .point.size = 0.1,
-  .midpoint = 0) +
-  ggplot2::theme(
-    plot.subtitle = ggplot2::element_blank())
-```
-
-![](figures/cytometry-density-umap-1.png)
-
-We can also restrict the visualization to statistically significant
-landmarks (q \< 0.1), categorizing them by the direction of the density
-change:
-
-``` r
-
-tinydenseR::plotUMAP(
-  x = lm.cells,
-  .feature =
-    ifelse(
-      test = lm.cells$results$lm$default$fit$coefficients[,"R"] < 0,
-      yes = "lower density",
-      no = "higher density") |>
-    ifelse(
-      test = lm.cells$results$lm$default$fit$pca.weighted.q[,"R"] < 0.1,
-      no = "not sig.") |>
-    factor(levels = c("lower density",
-                      "higher density",
-                      "not sig.")),
-  .plot.title = "group_id",
-  .color.label = "q < 0.1",
-  .cat.feature.color = tinydenseR::Color.Palette[1,c(2,1,6)],
-  .point.size = 0.1,
-  .panel.size = 1.5,
-  .legend.position = "bottom") +
-  ggplot2::theme(plot.subtitle = ggplot2::element_blank())
-```
-
-![](figures/cytometry-significance-umap-1.png)
-
-Landmarks with significantly higher or lower density in responders span
-specific regions of the immune landscape. The spatial pattern on the
-UMAP indicates which immune cell populations are differentially
-represented between responders and non-responders at baseline.
-
 ## Step 4: Decomposing the Density Contrast with `get.plsD()`
 
 Differential density analysis tells us *where* on the landmark landscape
@@ -492,10 +492,7 @@ marker features drive those changes.
 bridges this gap by decomposing the density contrast into PLS components
 whose loadings reveal the markers underlying the signal. In the context
 of cytometry data, these loadings correspond to protein markers rather
-than gene expression features. We set `.residualize = TRUE` to remove
-residual batch-associated variation from the decomposition, ensuring
-that plsD components reflect response-related signal rather than
-technical artifacts.
+than gene expression features.
 
 ``` r
 
@@ -504,8 +501,7 @@ lm.cells <-
     x = lm.cells, 
     .coef.col = "R",
     .model.name = "default",
-    .verbose = TRUE,
-    .residualize = TRUE
+    .verbose = TRUE
   )
 ```
 

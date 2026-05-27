@@ -248,3 +248,33 @@ Internal helpers
 [`.tdr_cache_sweep_orphans()`](https://opensource.nibr.com/tinydenseR/reference/dot-tdr_cache_sweep_orphans.md))
 handle the low-level read/write operations and are not intended to be
 called directly by users.
+
+## Memory Management on HPC
+
+When running `tinydenseR` on Linux HPC systems, the glibc memory
+allocator may retain freed memory in the process address space rather
+than returning it to the OS. This can cause the reported RSS (Resident
+Set Size) to remain high even after R has freed its objects, potentially
+triggering OOM kills by the job scheduler.
+
+[`get.map()`](https://opensource.nibr.com/tinydenseR/reference/get.map.md)
+already minimises peak memory by excluding large per-sample objects from
+its internal accumulator when on-disk caching is enabled (the default).
+For additional defence-in-depth, add the following to your `~/.Renviron`
+or SLURM/PBS job script **before** launching R:
+
+``` bash
+MALLOC_MMAP_THRESHOLD_=4096
+MALLOC_TRIM_THRESHOLD_=0
+MALLOC_TOP_PAD_=0
+MALLOC_MMAP_MAX_=1000000
+```
+
+These variables instruct glibc to use `mmap()` for allocations larger
+than 4 KB. Unlike `brk()`-based allocations, `mmap()` pages are returned
+to the OS immediately on
+[`free()`](https://patchwork.data-imaginist.com/reference/free.html),
+keeping the process RSS close to actual R memory usage.
+
+No additional R code or packages are required — this is a user-side
+configuration that applies to any R session on Linux.

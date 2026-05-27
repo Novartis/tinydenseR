@@ -1,4 +1,4 @@
-# tinydenseR [![](artwork/tinydenseR_hex_piano_behind.png)](https://opensource.nibr.com/tinydenseR/artwork/tinydenseR_hex_piano_behind.png)
+# tinydenseR
 
 ## Tutorials
 

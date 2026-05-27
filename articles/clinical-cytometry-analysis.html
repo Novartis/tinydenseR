@@ -12,8 +12,8 @@
 <link rel="icon" sizes="any" href="../favicon.ico">
 <link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Cytometry: Anti-PD-1 Response">
 </head>
@@ -68,7 +68,7 @@
                         <h4 data-toc-skip class="author">Pedro
 Milanez-Almeida</h4>
             
-            <h4 data-toc-skip class="date">2026-05-12</h4>
+            <h4 data-toc-skip class="date">2026-05-27</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/Novartis/tinydenseR/blob/main/vignettes/clinical-cytometry-analysis.Rmd" class="external-link"><code>vignettes/clinical-cytometry-analysis.Rmd</code></a></small>
       <div class="d-none name"><code>clinical-cytometry-analysis.Rmd</code></div>
@@ -419,6 +419,55 @@ non-responders (the reference level) at each landmark.</p>
 <span>  <span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
+<h3 id="visualize-differential-density">Visualize Differential Density<a class="anchor" aria-label="anchor" href="#visualize-differential-density"></a>
+</h3>
+<p>We overlay the <code>"R"</code> coefficient (density
+log2-fold-change) onto the landmark UMAP. This reveals which regions of
+the immune cell landscape show increased or decreased density in
+responders relative to non-responders.</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="../reference/plotUMAP.html">plotUMAP</a></span><span class="op">(</span></span>
+<span>  x <span class="op">=</span> <span class="va">lm.cells</span>,</span>
+<span>  .feature <span class="op">=</span> <span class="va">lm.cells</span><span class="op">$</span><span class="va">results</span><span class="op">$</span><span class="va">lm</span><span class="op">$</span><span class="va">default</span><span class="op">$</span><span class="va">fit</span><span class="op">$</span><span class="va">coefficients</span><span class="op">[</span>,<span class="st">"R"</span><span class="op">]</span>,</span>
+<span>  .plot.title <span class="op">=</span> <span class="st">"Responders vs. Non-responders"</span>,</span>
+<span>  .color.label <span class="op">=</span> <span class="st">"density\nlog2(+0.5)FC"</span>,</span>
+<span>  .panel.size <span class="op">=</span> <span class="fl">1.5</span>,</span>
+<span>  .point.size <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  .midpoint <span class="op">=</span> <span class="fl">0</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span></span>
+<span>    plot.subtitle <span class="op">=</span> <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="figures/cytometry-density-umap-1.png" class="r-plt" alt="" width="100%"></p>
+<p>We can also restrict the visualization to statistically significant
+landmarks (q &lt; 0.1), categorizing them by the direction of the
+density change:</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="../reference/plotUMAP.html">plotUMAP</a></span><span class="op">(</span></span>
+<span>  x <span class="op">=</span> <span class="va">lm.cells</span>,</span>
+<span>  .feature <span class="op">=</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span></span>
+<span>      test <span class="op">=</span> <span class="va">lm.cells</span><span class="op">$</span><span class="va">results</span><span class="op">$</span><span class="va">lm</span><span class="op">$</span><span class="va">default</span><span class="op">$</span><span class="va">fit</span><span class="op">$</span><span class="va">coefficients</span><span class="op">[</span>,<span class="st">"R"</span><span class="op">]</span> <span class="op">&lt;</span> <span class="fl">0</span>,</span>
+<span>      yes <span class="op">=</span> <span class="st">"lower density"</span>,</span>
+<span>      no <span class="op">=</span> <span class="st">"higher density"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span></span>
+<span>      test <span class="op">=</span> <span class="va">lm.cells</span><span class="op">$</span><span class="va">results</span><span class="op">$</span><span class="va">lm</span><span class="op">$</span><span class="va">default</span><span class="op">$</span><span class="va">fit</span><span class="op">$</span><span class="va">pca.weighted.q</span><span class="op">[</span>,<span class="st">"R"</span><span class="op">]</span> <span class="op">&lt;</span> <span class="fl">0.1</span>,</span>
+<span>      no <span class="op">=</span> <span class="st">"not sig."</span><span class="op">)</span> <span class="op">|&gt;</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span>levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"lower density"</span>,</span>
+<span>                      <span class="st">"higher density"</span>,</span>
+<span>                      <span class="st">"not sig."</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  .plot.title <span class="op">=</span> <span class="st">"group_id"</span>,</span>
+<span>  .color.label <span class="op">=</span> <span class="st">"q &lt; 0.1"</span>,</span>
+<span>  .cat.feature.color <span class="op">=</span> <span class="fu">tinydenseR</span><span class="fu">::</span><span class="va"><a href="../reference/Color.Palette.html">Color.Palette</a></span><span class="op">[</span><span class="fl">1</span>,<span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>,<span class="fl">2</span>,<span class="fl">6</span><span class="op">)</span><span class="op">]</span>,</span>
+<span>  .point.size <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  .panel.size <span class="op">=</span> <span class="fl">1.5</span>,</span>
+<span>  .legend.position <span class="op">=</span> <span class="st">"bottom"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>plot.subtitle <span class="op">=</span> <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p><img src="figures/cytometry-significance-umap-1.png" class="r-plt" alt="" width="100%"></p>
+<p>Landmarks with significantly higher or lower density in responders
+span specific regions of the immune landscape. The spatial pattern on
+the UMAP indicates which immune cell populations are differentially
+represented between responders and non-responders at baseline.</p>
+</div>
+<div class="section level3">
 <h3 id="reduced-model-for-sample-embedding">Reduced Model for Sample Embedding<a class="anchor" aria-label="anchor" href="#reduced-model-for-sample-embedding"></a>
 </h3>
 <p>To embed samples along the <code>group_id</code> axis specifically,
@@ -427,7 +476,7 @@ comparing the full and reduced models, <code>tinydenseR</code> can
 separate the density variation due to response status from that due to
 batch — producing a sample embedding that reflects only the biologically
 meaningful axis.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">nogroup_id.design</span> <span class="op">&lt;-</span> </span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/stats/model.matrix.html" class="external-link">model.matrix</a></span><span class="op">(</span>object <span class="op">=</span> <span class="op">~</span> <span class="va">batch_id</span>,</span>
 <span>               data <span class="op">=</span> <span class="va">lm.cells</span><span class="op">$</span><span class="va">metadata</span><span class="op">)</span></span>
@@ -448,7 +497,7 @@ meaningful axis.</p>
 resulting pePC captures sample variation attributable to
 <code>group_id</code> after removing the effect of
 <code>batch_id</code>.</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lm.cells</span> <span class="op">&lt;-</span></span>
 <span>  <span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="../reference/get.embedding.html">get.embedding</a></span><span class="op">(</span></span>
 <span>    x <span class="op">=</span> <span class="va">lm.cells</span>,</span>
@@ -464,13 +513,13 @@ resulting pePC captures sample variation attributable to
 <p>The pePC provides a quantitative summary of how each sample deviates
 along the response axis, with the fraction of total density variance it
 explains reported on the axis labels.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="../reference/plotSampleEmbedding.html">plotSampleEmbedding</a></span><span class="op">(</span></span>
 <span>  x <span class="op">=</span> <span class="va">lm.cells</span>,</span>
 <span>  .embedding <span class="op">=</span> <span class="st">"pePC"</span>,</span>
 <span>  .sup.embed.slot <span class="op">=</span> <span class="st">"group_id"</span>,</span>
 <span>  .color.by <span class="op">=</span> <span class="st">"group_id"</span>,</span>
-<span>  .cat.feature.color <span class="op">=</span> <span class="fu">tinydenseR</span><span class="fu">::</span><span class="va"><a href="../reference/Color.Palette.html">Color.Palette</a></span><span class="op">[</span><span class="fl">1</span>,<span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>,<span class="fl">1</span><span class="op">)</span><span class="op">]</span>,</span>
+<span>  .cat.feature.color <span class="op">=</span> <span class="fu">tinydenseR</span><span class="fu">::</span><span class="va"><a href="../reference/Color.Palette.html">Color.Palette</a></span><span class="op">[</span><span class="fl">1</span>,<span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>,<span class="fl">2</span><span class="op">)</span><span class="op">]</span>,</span>
 <span>  .panel.size <span class="op">=</span> <span class="fl">1.5</span>,</span>
 <span>  .point.size <span class="op">=</span> <span class="fl">3</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>title <span class="op">=</span> <span class="st">"pePC"</span><span class="op">)</span> <span class="op">+</span></span>
@@ -478,55 +527,6 @@ explains reported on the axis labels.</p>
 <span>    plot.title <span class="op">=</span> <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_text</a></span><span class="op">(</span>hjust <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>,</span>
 <span>    legend.position <span class="op">=</span> <span class="st">"right"</span><span class="op">)</span></span></code></pre></div>
 <p><img src="figures/cytometry-pepc-plot-1.png" class="r-plt" alt="" width="100%"></p>
-</div>
-<div class="section level3">
-<h3 id="visualize-differential-density">Visualize Differential Density<a class="anchor" aria-label="anchor" href="#visualize-differential-density"></a>
-</h3>
-<p>We overlay the <code>"R"</code> coefficient (density
-log2-fold-change) onto the landmark UMAP. This reveals which regions of
-the immune cell landscape show increased or decreased density in
-responders relative to non-responders.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="../reference/plotUMAP.html">plotUMAP</a></span><span class="op">(</span></span>
-<span>  x <span class="op">=</span> <span class="va">lm.cells</span>,</span>
-<span>  .feature <span class="op">=</span> <span class="va">lm.cells</span><span class="op">$</span><span class="va">results</span><span class="op">$</span><span class="va">lm</span><span class="op">$</span><span class="va">default</span><span class="op">$</span><span class="va">fit</span><span class="op">$</span><span class="va">coefficients</span><span class="op">[</span>,<span class="st">"R"</span><span class="op">]</span>,</span>
-<span>  .plot.title <span class="op">=</span> <span class="st">"Responders vs. Non-responders"</span>,</span>
-<span>  .color.label <span class="op">=</span> <span class="st">"density\nlog2(+0.5)FC"</span>,</span>
-<span>  .panel.size <span class="op">=</span> <span class="fl">1.5</span>,</span>
-<span>  .point.size <span class="op">=</span> <span class="fl">0.1</span>,</span>
-<span>  .midpoint <span class="op">=</span> <span class="fl">0</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span></span>
-<span>    plot.subtitle <span class="op">=</span> <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><img src="figures/cytometry-density-umap-1.png" class="r-plt" alt="" width="100%"></p>
-<p>We can also restrict the visualization to statistically significant
-landmarks (q &lt; 0.1), categorizing them by the direction of the
-density change:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="../reference/plotUMAP.html">plotUMAP</a></span><span class="op">(</span></span>
-<span>  x <span class="op">=</span> <span class="va">lm.cells</span>,</span>
-<span>  .feature <span class="op">=</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span></span>
-<span>      test <span class="op">=</span> <span class="va">lm.cells</span><span class="op">$</span><span class="va">results</span><span class="op">$</span><span class="va">lm</span><span class="op">$</span><span class="va">default</span><span class="op">$</span><span class="va">fit</span><span class="op">$</span><span class="va">coefficients</span><span class="op">[</span>,<span class="st">"R"</span><span class="op">]</span> <span class="op">&lt;</span> <span class="fl">0</span>,</span>
-<span>      yes <span class="op">=</span> <span class="st">"lower density"</span>,</span>
-<span>      no <span class="op">=</span> <span class="st">"higher density"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span></span>
-<span>      test <span class="op">=</span> <span class="va">lm.cells</span><span class="op">$</span><span class="va">results</span><span class="op">$</span><span class="va">lm</span><span class="op">$</span><span class="va">default</span><span class="op">$</span><span class="va">fit</span><span class="op">$</span><span class="va">pca.weighted.q</span><span class="op">[</span>,<span class="st">"R"</span><span class="op">]</span> <span class="op">&lt;</span> <span class="fl">0.1</span>,</span>
-<span>      no <span class="op">=</span> <span class="st">"not sig."</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span>levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"lower density"</span>,</span>
-<span>                      <span class="st">"higher density"</span>,</span>
-<span>                      <span class="st">"not sig."</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  .plot.title <span class="op">=</span> <span class="st">"group_id"</span>,</span>
-<span>  .color.label <span class="op">=</span> <span class="st">"q &lt; 0.1"</span>,</span>
-<span>  .cat.feature.color <span class="op">=</span> <span class="fu">tinydenseR</span><span class="fu">::</span><span class="va"><a href="../reference/Color.Palette.html">Color.Palette</a></span><span class="op">[</span><span class="fl">1</span>,<span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>,<span class="fl">1</span>,<span class="fl">6</span><span class="op">)</span><span class="op">]</span>,</span>
-<span>  .point.size <span class="op">=</span> <span class="fl">0.1</span>,</span>
-<span>  .panel.size <span class="op">=</span> <span class="fl">1.5</span>,</span>
-<span>  .legend.position <span class="op">=</span> <span class="st">"bottom"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>plot.subtitle <span class="op">=</span> <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html" class="external-link">element_blank</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><img src="figures/cytometry-significance-umap-1.png" class="r-plt" alt="" width="100%"></p>
-<p>Landmarks with significantly higher or lower density in responders
-span specific regions of the immune landscape. The spatial pattern on
-the UMAP indicates which immune cell populations are differentially
-represented between responders and non-responders at baseline.</p>
 </div>
 </div>
 <div class="section level2">
@@ -539,18 +539,14 @@ landscape changes occur between responders and non-responders, but not
 <code><a href="../reference/get.plsD.html">get.plsD()</a></code> bridges this gap by decomposing the density
 contrast into PLS components whose loadings reveal the markers
 underlying the signal. In the context of cytometry data, these loadings
-correspond to protein markers rather than gene expression features. We
-set <code>.residualize = TRUE</code> to remove residual batch-associated
-variation from the decomposition, ensuring that plsD components reflect
-response-related signal rather than technical artifacts.</p>
+correspond to protein markers rather than gene expression features.</p>
 <div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">lm.cells</span> <span class="op">&lt;-</span></span>
 <span>  <span class="fu">tinydenseR</span><span class="fu">::</span><span class="fu"><a href="../reference/get.plsD.html">get.plsD</a></span><span class="op">(</span></span>
 <span>    x <span class="op">=</span> <span class="va">lm.cells</span>, </span>
 <span>    .coef.col <span class="op">=</span> <span class="st">"R"</span>,</span>
 <span>    .model.name <span class="op">=</span> <span class="st">"default"</span>,</span>
-<span>    .verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>    .residualize <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span>    .verbose <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="plsd1-landmark-scores-on-umap">plsD1: Landmark Scores on UMAP<a class="anchor" aria-label="anchor" href="#plsd1-landmark-scores-on-umap"></a>

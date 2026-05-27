@@ -19,6 +19,6 @@ https://doi.org/10.1101/2025.11.26.690752
       author = {Pedro Milanez-Almeida and Daniela Schildknecht and Markus Linder and Saskia M. Brachmann and Andreas Weiss and Flavia Adler and Sofia {Cardoni Lenticchia} and Morgane Meistertzheim and Sophia Wild and Rachel Cuttat and Pushpa Jayaraman and Lang Ho Lee and Tanya Mulvey and Nadia Hassounah and Gina Crafts and David S. Quinn and Elena J. Orlando},
       year = {2025},
       note = {R package version 0.0.3.0001},
-      url = {https://www.biorxiv.org/content/10.1101/2025.11.26.690752v1},
+      url = {https://www.biorxiv.org/content/10.1101/2025.11.26.690752},
       doi = {https://doi.org/10.1101/2025.11.26.690752},
     }

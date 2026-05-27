@@ -12,8 +12,8 @@
 <link rel="icon" sizes="any" href="../favicon.ico">
 <link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="tinydenseR Package Architecture">
 </head>
@@ -68,7 +68,7 @@
                         <h4 data-toc-skip class="author">Pedro
 Milanez-Almeida</h4>
             
-            <h4 data-toc-skip class="date">2026-05-12</h4>
+            <h4 data-toc-skip class="date">2026-05-27</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/Novartis/tinydenseR/blob/main/vignettes/package-architecture.Rmd" class="external-link"><code>vignettes/package-architecture.Rmd</code></a></small>
       <div class="d-none name"><code>package-architecture.Rmd</code></div>
@@ -383,6 +383,31 @@ mappings when re-running downstream analyses.</p>
 <code><a href="../reference/dot-tdr_cache_write.html">.tdr_cache_write()</a></code>,
 <code><a href="../reference/dot-tdr_cache_sweep_orphans.html">.tdr_cache_sweep_orphans()</a></code>) handle the low-level read/write
 operations and are not intended to be called directly by users.</p>
+</div>
+<div class="section level2">
+<h2 id="memory-management-on-hpc">Memory Management on HPC<a class="anchor" aria-label="anchor" href="#memory-management-on-hpc"></a>
+</h2>
+<p>When running <code>tinydenseR</code> on Linux HPC systems, the glibc
+memory allocator may retain freed memory in the process address space
+rather than returning it to the OS. This can cause the reported RSS
+(Resident Set Size) to remain high even after R has freed its objects,
+potentially triggering OOM kills by the job scheduler.</p>
+<p><code><a href="../reference/get.map.html">get.map()</a></code> already minimises peak memory by excluding
+large per-sample objects from its internal accumulator when on-disk
+caching is enabled (the default). For additional defence-in-depth, add
+the following to your <code>~/.Renviron</code> or SLURM/PBS job script
+<strong>before</strong> launching R:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="va">MALLOC_MMAP_THRESHOLD_</span><span class="op">=</span>4096</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="va">MALLOC_TRIM_THRESHOLD_</span><span class="op">=</span>0</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="va">MALLOC_TOP_PAD_</span><span class="op">=</span>0</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="va">MALLOC_MMAP_MAX_</span><span class="op">=</span>1000000</span></code></pre></div>
+<p>These variables instruct glibc to use <code>mmap()</code> for
+allocations larger than 4 KB. Unlike <code>brk()</code>-based
+allocations, <code>mmap()</code> pages are returned to the OS
+immediately on <code><a href="https://patchwork.data-imaginist.com/reference/free.html" class="external-link">free()</a></code>, keeping the process RSS close to
+actual R memory usage.</p>
+<p>No additional R code or packages are required — this is a user-side
+configuration that applies to any R session on Linux.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

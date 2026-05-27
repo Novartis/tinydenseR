@@ -63,7 +63,6 @@ Condition A using `limma`-style syntax.
 ``` r
 
 .design <-
-
   model.matrix(~ 0 + Condition,
                data = tinydenseR::GetTDR(sim_trajectory)@metadata)
 
