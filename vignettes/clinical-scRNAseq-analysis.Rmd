@@ -114,15 +114,18 @@ keep.QC.cells <-
   (metadata$QC_ngenes >= 500)
 
 # Keep only HV, MILD, SEV, and CRIT patients with >= 200 cells
-smpl.to.keep <-
+keep.pt.group <-
   metadata$scRNASeq_sample_ID[
     metadata$Source %in% c("HV", "COVID_MILD", "COVID_SEV", "COVID_CRIT")
   ] |> 
   table() |>
   (\(x) names(x[x >= 200]))()
 
+smpl.to.keep <-
+  keep.QC.cells & (metadata$scRNASeq_sample_ID %in% keep.pt.group)
+
 metadata <-
-  metadata[keep.QC.cells & (metadata$scRNASeq_sample_ID %in% smpl.to.keep), ]
+  metadata[smpl.to.keep,]
 ```
 
 ### Prepare the On-Disk Count Matrix
@@ -157,7 +160,7 @@ ondisk.mat <-
   BPCells::open_matrix_dir(dir = ondisk_path)
 
 ondisk.mat <-
-  ondisk.mat[keep.unique.genes, keep.QC.cells & (metadata$scRNASeq_sample_ID %in% smpl.to.keep)]
+  ondisk.mat[keep.unique.genes, smpl.to.keep]
 
 rownames(x = ondisk.mat) <- feature_metadata$feature_name
 ```
@@ -332,7 +335,6 @@ matrix defines the biologically interesting comparisons.
     # Critical vs mild within early timepoint
     CRIT_earlyVSMILD_early =
       CRIT_early - MILD_early,
-    
     levels = .design
   )
 ```
@@ -371,7 +373,7 @@ tinydenseR::plotUMAP(
     .feature = lm.cells$results$lm$contrast.Source_TSO.binary$fit$coefficients[, "CRIT_earlyVSMILD_early"],
     .plot.title = "early: CRIT vs MILD",
     .cat.feature.color = unname(obj = Color.Palette[1, c(1, 6, 2)]),
-    .color.label = "q < 0.1"
+        .color.label = "density\nlog2FC"
   ) +
   ggplot2::theme(plot.subtitle = ggplot2::element_blank())
 ```
