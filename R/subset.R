@@ -64,6 +64,7 @@
 #' @param .prop.landmarks Numeric between 0 and 1 specifying proportion of
 #'   cells to use as landmarks when the child pipeline runs
 #'   \code{get.landmarks()}.  Default 0.1 (10 percent).
+#' @param .tot.landmarks Integer. Maximum total number of landmarks. Default 5000.
 #' @param .min.cells.per.sample Integer.  Samples with fewer qualifying cells
 #'   than this threshold are excluded from the child (default 10).
 #' @param .verbose Logical: print progress? Default \code{TRUE}.
@@ -122,6 +123,7 @@ get.subset.TDRObj <-
     .id.from = "clustering",
     .label.confidence = NULL,
     .prop.landmarks = 0.1,
+    .tot.landmarks = 5000,
     .min.cells.per.sample = 10,
     .verbose = TRUE,
     ...
@@ -296,7 +298,7 @@ get.subset.TDRObj <-
 
     # Sampling configuration needed by get.landmarks
     n.cells.vec <- new.n.cells[names(new.cells)]
-    target.lm.n <- pmin(sum(n.cells.vec) * .prop.landmarks, 5e3)
+    target.lm.n <- pmin(sum(n.cells.vec) * .prop.landmarks, .tot.landmarks)
     n.perSample <- pmin(
       ceiling(n.cells.vec * .prop.landmarks),
       ceiling(target.lm.n / length(new.cells))

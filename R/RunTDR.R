@@ -142,6 +142,7 @@ RunTDR.default <- function(x,
 #' @param .verbose Logical. Print progress messages.
 #' @param .seed Integer. Random seed.
 #' @param .prop.landmarks Numeric in (0, 1]. Proportion of cells as landmarks.
+#' @param .tot.landmarks Integer. Maximum total number of landmarks. Default 5000.
 #' @param .n.threads Integer. Number of threads.
 #' @param ... Additional arguments passed to pipeline functions.
 #'
@@ -161,6 +162,7 @@ RunTDR.Seurat <- function(x,
                           .verbose = TRUE,
                           .seed = 123,
                           .prop.landmarks = 0.1,
+                          .tot.landmarks = 5000,
                           .n.threads = if (is.hpc()) {
                             max(RhpcBLASctl::blas_get_num_procs(),
                                 RhpcBLASctl::omp_get_num_procs(),
@@ -243,6 +245,7 @@ RunTDR.Seurat <- function(x,
     .harmony.var = .harmony.var,
     .celltype.vec = ct_vec,
     .prop.landmarks = .prop.landmarks,
+    .tot.landmarks = .tot.landmarks,
     .seed = .seed,
     .n.threads = .n.threads,
     .verbose = .verbose
@@ -308,6 +311,7 @@ RunTDR.Seurat <- function(x,
                                    .harmony.var,
                                    .celltype.vec,
                                    .prop.landmarks,
+                                   .tot.landmarks,
                                    .seed,
                                    .n.threads,
                                    .verbose) {
@@ -385,10 +389,10 @@ RunTDR.Seurat <- function(x,
     }
   }
 
-  # Calculate target number of landmarks: prop of total cells, capped at 5000
+  # Calculate target number of landmarks: prop of total cells, capped at .tot.landmarks
   .tdr.obj@config$sampling$target.lm.n <-
     pmin(sum(.tdr.obj@config$sampling$n.cells) * .prop.landmarks,
-         5e3)
+         .tot.landmarks)
 
   # Allocate landmarks per sample: proportional to sample size, but capped
   .tdr.obj@config$sampling$n.perSample <-
@@ -473,6 +477,7 @@ RunTDR.Seurat <- function(x,
 #' @param .verbose Logical. Print progress messages.
 #' @param .seed Integer. Random seed.
 #' @param .prop.landmarks Numeric in (0, 1]. Proportion of cells as landmarks.
+#' @param .tot.landmarks Integer. Maximum total number of landmarks. Default 5000.
 #' @param .n.threads Integer. Number of threads.
 #' @param ... Additional arguments passed to pipeline functions.
 #'
@@ -492,6 +497,7 @@ RunTDR.SingleCellExperiment <- function(x,
                                         .verbose = TRUE,
                                         .seed = 123,
                                         .prop.landmarks = 0.1,
+                                        .tot.landmarks = 5000,
                                         .n.threads = if (is.hpc()) {
                                           max(RhpcBLASctl::blas_get_num_procs(),
                                               RhpcBLASctl::omp_get_num_procs(),
@@ -570,6 +576,7 @@ RunTDR.SingleCellExperiment <- function(x,
       .verbose        = .verbose,
       .seed           = .seed,
       .prop.landmarks = .prop.landmarks,
+      .tot.landmarks  = .tot.landmarks,
       .n.threads      = .n.threads,
       ...
     )
@@ -635,6 +642,7 @@ RunTDR.SingleCellExperiment <- function(x,
       .harmony.var = .harmony.var,
       .celltype.vec = ct_vec,
       .prop.landmarks = .prop.landmarks,
+      .tot.landmarks = .tot.landmarks,
       .seed = .seed,
       .n.threads = .n.threads,
       .verbose = .verbose
@@ -702,6 +710,7 @@ RunTDR.SingleCellExperiment <- function(x,
                                 .harmony.var,
                                 .celltype.vec,
                                 .prop.landmarks,
+                                .tot.landmarks,
                                 .seed,
                                 .n.threads,
                                 .verbose) {
@@ -779,10 +788,10 @@ RunTDR.SingleCellExperiment <- function(x,
     }
   }
 
-  # Calculate target number of landmarks: prop of total cells, capped at 5000
+  # Calculate target number of landmarks: prop of total cells, capped at .tot.landmarks
   .tdr.obj@config$sampling$target.lm.n <-
     pmin(sum(.tdr.obj@config$sampling$n.cells) * .prop.landmarks,
-         5e3)
+         .tot.landmarks)
 
   # Allocate landmarks per sample: proportional to sample size, but capped
   .tdr.obj@config$sampling$n.perSample <-
@@ -1064,6 +1073,7 @@ RunTDR.SingleCellExperiment <- function(x,
 #' @param .verbose Logical. Print progress messages.
 #' @param .seed Integer. Random seed.
 #' @param .prop.landmarks Numeric in (0, 1]. Proportion of cells as landmarks.
+#' @param .tot.landmarks Integer. Maximum total number of landmarks. Default 5000.
 #' @param .n.threads Integer. Number of threads.
 #' @param ... Additional arguments passed to pipeline functions.
 #'
@@ -1082,6 +1092,7 @@ RunTDR.HDF5AnnData <- function(x,
                         .verbose = TRUE,
                         .seed = 123,
                         .prop.landmarks = 0.1,
+                        .tot.landmarks = 5000,
                         .n.threads = if (is.hpc()) {
                           max(RhpcBLASctl::blas_get_num_procs(),
                               RhpcBLASctl::omp_get_num_procs(),
@@ -1208,6 +1219,7 @@ RunTDR.HDF5AnnData <- function(x,
     .verbose        = .verbose,
     .seed           = .seed,
     .prop.landmarks = .prop.landmarks,
+    .tot.landmarks  = .tot.landmarks,
     .n.threads      = .n.threads,
     ...
   )
@@ -1252,6 +1264,7 @@ RunTDR.HDF5AnnData <- function(x,
 #' @param .verbose Logical. Print progress messages.
 #' @param .seed Integer. Random seed.
 #' @param .prop.landmarks Numeric in (0, 1]. Proportion of cells as landmarks.
+#' @param .tot.landmarks Integer. Maximum total number of landmarks. Default 5000.
 #' @param .n.threads Integer. Number of threads.
 #' @param ... Additional arguments passed to pipeline functions.
 #'
@@ -1270,6 +1283,7 @@ RunTDR.character <- function(x,
                              .verbose = TRUE,
                              .seed = 123,
                              .prop.landmarks = 0.1,
+                             .tot.landmarks = 5000,
                              .n.threads = if (is.hpc()) {
                                max(RhpcBLASctl::blas_get_num_procs(),
                                    RhpcBLASctl::omp_get_num_procs(),
@@ -1388,6 +1402,7 @@ RunTDR.character <- function(x,
     .verbose        = .verbose,
     .seed           = .seed,
     .prop.landmarks = .prop.landmarks,
+    .tot.landmarks  = .tot.landmarks,
     .n.threads      = .n.threads,
     ...
   )
@@ -1418,6 +1433,7 @@ RunTDR.character <- function(x,
 #' @param .verbose Logical.
 #' @param .seed Integer.
 #' @param .prop.landmarks Numeric in (0, 1].
+#' @param .tot.landmarks Integer. Maximum total number of landmarks. Default 5000.
 #' @param .n.threads Integer.
 #' @param ... Additional arguments passed to pipeline functions.
 #'
@@ -1434,6 +1450,7 @@ RunTDR.cytoset <- function(x,
                            .verbose = TRUE,
                            .seed = 123,
                            .prop.landmarks = 0.1,
+                           .tot.landmarks = 5000,
                            .n.threads = if (is.hpc()) {
                              max(RhpcBLASctl::blas_get_num_procs(),
                                  RhpcBLASctl::omp_get_num_procs(),
@@ -1449,7 +1466,7 @@ RunTDR.cytoset <- function(x,
     .celltype.vec = .celltype.vec,
     .min.cells.per.sample = .min.cells.per.sample,
     .verbose = .verbose, .seed = .seed,
-    .prop.landmarks = .prop.landmarks, .n.threads = .n.threads, ...
+    .prop.landmarks = .prop.landmarks, .tot.landmarks = .tot.landmarks, .n.threads = .n.threads, ...
   )
 }
 
@@ -1474,6 +1491,7 @@ RunTDR.cytoset <- function(x,
 #' @param .verbose Logical.
 #' @param .seed Integer.
 #' @param .prop.landmarks Numeric in (0, 1].
+#' @param .tot.landmarks Integer. Maximum total number of landmarks. Default 5000.
 #' @param .n.threads Integer.
 #' @param ... Additional arguments passed to pipeline functions.
 #'
@@ -1490,6 +1508,7 @@ RunTDR.flowSet <- function(x,
                            .verbose = TRUE,
                            .seed = 123,
                            .prop.landmarks = 0.1,
+                           .tot.landmarks = 5000,
                            .n.threads = if (is.hpc()) {
                              max(RhpcBLASctl::blas_get_num_procs(),
                                  RhpcBLASctl::omp_get_num_procs(),
@@ -1505,7 +1524,7 @@ RunTDR.flowSet <- function(x,
     .celltype.vec = .celltype.vec,
     .min.cells.per.sample = .min.cells.per.sample,
     .verbose = .verbose, .seed = .seed,
-    .prop.landmarks = .prop.landmarks, .n.threads = .n.threads, ...
+    .prop.landmarks = .prop.landmarks, .tot.landmarks = .tot.landmarks, .n.threads = .n.threads, ...
   )
 }
 
@@ -1528,6 +1547,7 @@ RunTDR.flowSet <- function(x,
                                 .verbose = TRUE,
                                 .seed = 123,
                                 .prop.landmarks = 0.1,
+                                .tot.landmarks = 5000,
                                 .n.threads = if (is.hpc()) {
                                   max(RhpcBLASctl::blas_get_num_procs(),
                                       RhpcBLASctl::omp_get_num_procs(),
@@ -1635,6 +1655,7 @@ RunTDR.flowSet <- function(x,
     .harmony.var = .harmony.var,
     .celltype.vec = ct_vec,
     .prop.landmarks = .prop.landmarks,
+    .tot.landmarks = .tot.landmarks,
     .seed = .seed,
     .n.threads = .n.threads,
     .verbose = .verbose
@@ -1692,6 +1713,7 @@ RunTDR.flowSet <- function(x,
                                     .harmony.var,
                                     .celltype.vec,
                                     .prop.landmarks,
+                                    .tot.landmarks,
                                     .seed,
                                     .n.threads,
                                     .verbose) {
@@ -1760,7 +1782,7 @@ RunTDR.flowSet <- function(x,
   # Calculate target number of landmarks: prop of total cells, capped at 5000
   .tdr.obj@config$sampling$target.lm.n <-
     pmin(sum(.tdr.obj@config$sampling$n.cells) * .prop.landmarks,
-         5e3)
+         .tot.landmarks)
 
   # Allocate landmarks per sample: proportional to sample size, but capped
   .tdr.obj@config$sampling$n.perSample <-
@@ -1836,6 +1858,7 @@ RunTDR.flowSet <- function(x,
 #' @param .verbose Logical. Print progress messages.
 #' @param .seed Integer. Random seed.
 #' @param .prop.landmarks Numeric in (0, 1]. Proportion of cells as landmarks.
+#' @param .tot.landmarks Integer. Maximum total number of landmarks. Default 5000.
 #' @param .n.threads Integer. Number of threads.
 #' @param ... Additional arguments passed to pipeline functions.
 #'
@@ -1982,7 +2005,7 @@ RunTDR.dgCMatrix <- function(x, .cell.meta, ...) {
 #' @param ... Additional arguments passed to \code{.run_tdr_matrix}
 #'   (e.g. \code{.sample.var}, \code{.assay.type}, \code{.harmony.var},
 #'   \code{.markers}, \code{.celltype.vec}, \code{.min.cells.per.sample},
-#'   \code{.verbose}, \code{.seed}, \code{.prop.landmarks},
+#'   \code{.verbose}, \code{.seed}, \code{.prop.landmarks}, \code{.tot.landmarks},
 #'   \code{.n.threads}).
 #'
 #' @return A \code{\linkS4class{TDRObj}}.
@@ -2045,6 +2068,7 @@ RunTDR.IterableMatrix <- function(x, .cell.meta, ...) {
                             .verbose = TRUE,
                             .seed = 123,
                             .prop.landmarks = 0.1,
+                            .tot.landmarks = 5000,
                             .n.threads = if (is.hpc()) {
                               max(RhpcBLASctl::blas_get_num_procs(),
                                   RhpcBLASctl::omp_get_num_procs(),
@@ -2208,6 +2232,7 @@ RunTDR.IterableMatrix <- function(x, .cell.meta, ...) {
     .harmony.var = .harmony.var,
     .celltype.vec = ct_vec,
     .prop.landmarks = .prop.landmarks,
+    .tot.landmarks = .tot.landmarks,
     .seed = .seed,
     .n.threads = .n.threads,
     .verbose = .verbose
@@ -2267,6 +2292,7 @@ RunTDR.IterableMatrix <- function(x, .cell.meta, ...) {
                                    .harmony.var,
                                    .celltype.vec,
                                    .prop.landmarks,
+                                   .tot.landmarks,
                                    .seed,
                                    .n.threads,
                                    .verbose) {
@@ -2347,7 +2373,7 @@ RunTDR.IterableMatrix <- function(x, .cell.meta, ...) {
   # Calculate target number of landmarks: prop of total cells, capped at 5000
   .tdr.obj@config$sampling$target.lm.n <-
     pmin(sum(.tdr.obj@config$sampling$n.cells) * .prop.landmarks,
-         5e3)
+         .tot.landmarks)
 
   # Allocate landmarks per sample: proportional to sample size, but capped
   .tdr.obj@config$sampling$n.perSample <-

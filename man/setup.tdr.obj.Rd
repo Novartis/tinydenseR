@@ -15,6 +15,7 @@ setup.tdr.obj(
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -44,7 +45,7 @@ Harmony batch correction. Supported for both \code{"RNA"} and \code{"cyto"} assa
 types. For cytometry, Harmony operates on the SVD embedding of the (centered, scaled)
 marker matrix. If NULL, no batch correction is performed.}
 
-\item{.assay.type}{Character string: "cyto" for cytometry (default) or "RNA" for
+\item{.assay.type}{Character string: \code{"cyto"} for cytometry (default) or \code{"RNA"} for
 scRNA-seq. Determines normalization strategy and feature selection approach.}
 
 \item{.celltype.vec}{Optional named character vector mapping cell IDs to cell type labels.}
@@ -54,7 +55,10 @@ scRNA-seq. Determines normalization strategy and feature selection approach.}
 \item{.seed}{Integer for random seed to ensure reproducibility. Default 123.}
 
 \item{.prop.landmarks}{Numeric between 0 and 1 specifying proportion of cells to
-sample as landmarks. Default 0.1 (10\%). Total landmarks capped at about 5000 regardless.}
+sample as landmarks. Default 0.1 (10\%). Total landmarks capped at about \code{".tot.landmarks"} regardless.}
+
+\item{.tot.landmarks}{Integer specifying the maximum number of landmarks to sample.
+Default 5000.}
 
 \item{.n.threads}{Integer for parallel processing. Default automatically detects
 maximum available threads (using BLAS settings on HPC, or \code{detectCores()} locally).}
@@ -95,14 +99,14 @@ This is the required first step before landmark identification.
 This function:
 \enumerate{
 \item Validates input data structure and compatibility
-\item Calculates the number of landmarks to sample per sample (max 5000 total)
+\item Calculates the number of landmarks to sample per sample (default max 5000 total)
 \item Creates a "key" vector mapping landmarks to samples
 \item Initializes empty slots for downstream analyses (PCA, graph, mapping)
 \item Performs quality checks (warns if sample sizes vary >10-fold)
 }
 
 The landmark sampling strategy aims for proportional representation across samples
-while capping total landmarks at 5000 for computational efficiency. Large samples are
+while capping total landmarks at \code{.tot.landmarks} (default 5000) for computational efficiency. Large samples are
 capped to prevent domination and ensure adequate representation.
 }
 \examples{

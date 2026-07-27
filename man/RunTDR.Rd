@@ -38,6 +38,7 @@ RunTDR(x, ...)
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -61,6 +62,7 @@ RunTDR(x, ...)
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -84,6 +86,7 @@ RunTDR(x, ...)
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -107,6 +110,7 @@ RunTDR(x, ...)
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -128,6 +132,7 @@ RunTDR(x, ...)
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -149,6 +154,7 @@ RunTDR(x, ...)
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -171,7 +177,7 @@ RunTDR(x, ...)
 \item{...}{Additional arguments passed to \code{.run_tdr_matrix}
 (e.g. \code{.sample.var}, \code{.assay.type}, \code{.harmony.var},
 \code{.markers}, \code{.celltype.vec}, \code{.min.cells.per.sample},
-\code{.verbose}, \code{.seed}, \code{.prop.landmarks},
+\code{.verbose}, \code{.seed}, \code{.prop.landmarks}, \code{.tot.landmarks},
 \code{.n.threads}).}
 
 \item{.celltype.vec}{Character(1). Column name in \code{.cell.meta}
@@ -202,6 +208,8 @@ in sample-level metadata, or \code{NULL}.}
 included.}
 
 \item{.prop.landmarks}{Numeric in (0, 1]. Proportion of cells as landmarks.}
+
+\item{.tot.landmarks}{Integer. Maximum total number of landmarks. Default 5000.}
 
 \item{.n.threads}{Integer. Number of threads.}
 

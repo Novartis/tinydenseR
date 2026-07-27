@@ -15,6 +15,7 @@ get.subset(x, ...)
   .id.from = "clustering",
   .label.confidence = NULL,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .min.cells.per.sample = 10,
   .verbose = TRUE,
   ...
@@ -51,6 +52,8 @@ Defaults to the parent's stored threshold
 \item{.prop.landmarks}{Numeric between 0 and 1 specifying proportion of
 cells to use as landmarks when the child pipeline runs
 \code{get.landmarks()}.  Default 0.1 (10 percent).}
+
+\item{.tot.landmarks}{Integer. Maximum total number of landmarks. Default 5000.}
 
 \item{.min.cells.per.sample}{Integer.  Samples with fewer qualifying cells
 than this threshold are excluded from the child (default 10).}
