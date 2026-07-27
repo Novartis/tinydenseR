@@ -9,6 +9,10 @@ RStudio.
 Requirements: R >= 4.1, tinydenseR (this package), plus script-specific
 packages listed at the top of each file.
 
+For the COMBAT COVID-19 PBMC analysis vignette (including the full
+tinydenseR workflow on public scRNA-seq data), see:
+https://opensource.nibr.com/tinydenseR/articles/clinical-scRNAseq-analysis.html
+
 
 ## Self-contained simulation scripts (no external data needed)
 
@@ -26,13 +30,34 @@ sim_flow_DA_diffcyt.R       Same simulated DA data analysed with diffcyt
 sim_flow_DE_diffcyt.R       Same simulated DE data analysed with diffcyt
                             (FlowSOM + limma). Comparator method.
 
+sim_flow_DA_cydar.R         Same simulated DA data analysed with cydar
+                            (hypersphere counting + edgeR + spatial FDR).
+                            Comparator method.
+
+sim_flow_DA_daseq.R         Same simulated DA data analysed with DA-seq
+                            (multi-scale k-NN scoring + permutation thresholds).
+                            Comparator method. Uses 5,000 cells/sample due to
+                            memory constraints at the original scale.
+
 sim_scRNAseq_trajectory_tdr.R
                             Simulated scRNA-seq trajectory analysis with
                             tinydenseR.  Uses package-shipped data
                             (sim_trajectory_tdr). Includes permutation testing.
 
+fdr_robustness_simulation.R Factorial simulation evaluating FDR calibration and
+                            power across 72 scenarios: 4 sample sizes x 3 balance
+                            ratios x 3 batch magnitudes x signal/null, with 50
+                            replicates per scenario (3,600 total pipeline runs).
+                            Parallelised via mclapply. No external data needed.
+
 
 ## Scripts requiring external data (user must supply input files)
+
+sensitivity_analysis.R      Hyperparameter sensitivity analysis on the COMBAT
+                            COVID-19 PBMC dataset. One-at-a-time sweep of
+                            5 parameters (.tot.landmarks, .prop.landmarks, .k,
+                            .nHVG, .nPC). Requires the COMBAT h5ad file
+                            (pass path via --h5ad argument).
 
 benchmark_methods_comparison.R
                             Benchmark tinydenseR, Seurat, and miloR on the
