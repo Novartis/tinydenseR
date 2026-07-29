@@ -8,6 +8,8 @@ Description: tinydenseR is a landmark-based platform for single cell data analys
 License: MIT + file LICENSE
 URL: https://opensource.nibr.com/tinydenseR/
 BugReports: https://github.com/Novartis/tinydenseR/issues
+Remotes:
+    immunogenomics/symphony
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Collate: 
