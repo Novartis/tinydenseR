@@ -65,6 +65,7 @@ This is the required first step before landmark identification.</p>
 <span>  .verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  .seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>  .prop.landmarks <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  .tot.landmarks <span class="op">=</span> <span class="fl">5000</span>,</span>
 <span>  .n.threads <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="is.hpc.html">is.hpc</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>     <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">blas_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>    <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_max_threads</a></span><span class="op">(</span><span class="op">)</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -107,7 +108,7 @@ marker matrix. If NULL, no batch correction is performed.</p></dd>
 
 
 <dt id="arg--assay-type">.assay.type<a class="anchor" aria-label="anchor" href="#arg--assay-type"></a></dt>
-<dd><p>Character string: "cyto" for cytometry (default) or "RNA" for
+<dd><p>Character string: <code>"cyto"</code> for cytometry (default) or <code>"RNA"</code> for
 scRNA-seq. Determines normalization strategy and feature selection approach.</p></dd>
 
 
@@ -125,7 +126,12 @@ scRNA-seq. Determines normalization strategy and feature selection approach.</p>
 
 <dt id="arg--prop-landmarks">.prop.landmarks<a class="anchor" aria-label="anchor" href="#arg--prop-landmarks"></a></dt>
 <dd><p>Numeric between 0 and 1 specifying proportion of cells to
-sample as landmarks. Default 0.1 (10%). Total landmarks capped at about 5000 regardless.</p></dd>
+sample as landmarks. Default 0.1 (10%). Total landmarks capped at about <code>".tot.landmarks"</code> regardless.</p></dd>
+
+
+<dt id="arg--tot-landmarks">.tot.landmarks<a class="anchor" aria-label="anchor" href="#arg--tot-landmarks"></a></dt>
+<dd><p>Integer specifying the maximum number of landmarks to sample.
+Default 5000.</p></dd>
 
 
 <dt id="arg--n-threads">.n.threads<a class="anchor" aria-label="anchor" href="#arg--n-threads"></a></dt>
@@ -182,12 +188,12 @@ maximum available threads (using BLAS settings on HPC, or <code>detectCores()</c
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>This function:</p><ol><li><p>Validates input data structure and compatibility</p></li>
-<li><p>Calculates the number of landmarks to sample per sample (max 5000 total)</p></li>
+<li><p>Calculates the number of landmarks to sample per sample (default max 5000 total)</p></li>
 <li><p>Creates a "key" vector mapping landmarks to samples</p></li>
 <li><p>Initializes empty slots for downstream analyses (PCA, graph, mapping)</p></li>
 <li><p>Performs quality checks (warns if sample sizes vary &gt;10-fold)</p></li>
 </ol><p>The landmark sampling strategy aims for proportional representation across samples
-while capping total landmarks at 5000 for computational efficiency. Large samples are
+while capping total landmarks at <code>.tot.landmarks</code> (default 5000) for computational efficiency. Large samples are
 capped to prevent domination and ensure adequate representation.</p>
     </div>
 
@@ -235,7 +241,7 @@ capped to prevent domination and ensure adequate representation.</p>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

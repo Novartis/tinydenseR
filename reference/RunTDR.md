@@ -33,6 +33,7 @@ RunTDR(
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -57,6 +58,7 @@ RunTDR(
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -81,6 +83,7 @@ RunTDR(
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -105,6 +108,7 @@ RunTDR(
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -127,6 +131,7 @@ RunTDR(
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -149,6 +154,7 @@ RunTDR(
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -180,7 +186,7 @@ RunTDR(x, .cell.meta, ...)
   Additional arguments passed to `.run_tdr_matrix` (e.g. `.sample.var`,
   `.assay.type`, `.harmony.var`, `.markers`, `.celltype.vec`,
   `.min.cells.per.sample`, `.verbose`, `.seed`, `.prop.landmarks`,
-  `.n.threads`).
+  `.tot.landmarks`, `.n.threads`).
 
 - .celltype.vec:
 
@@ -233,6 +239,10 @@ RunTDR(x, .cell.meta, ...)
 - .prop.landmarks:
 
   Numeric in (0, 1\]. Proportion of cells as landmarks.
+
+- .tot.landmarks:
+
+  Integer. Maximum total number of landmarks. Default 5000.
 
 - .n.threads:
 

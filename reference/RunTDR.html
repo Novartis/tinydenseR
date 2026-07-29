@@ -75,6 +75,7 @@ landmark selection, graph construction, optional cell typing, and mapping.</p>
 <span>  .verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  .seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>  .prop.landmarks <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  .tot.landmarks <span class="op">=</span> <span class="fl">5000</span>,</span>
 <span>  .n.threads <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="is.hpc.html">is.hpc</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>     <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">blas_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>    <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_max_threads</a></span><span class="op">(</span><span class="op">)</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -99,6 +100,7 @@ landmark selection, graph construction, optional cell typing, and mapping.</p>
 <span>  .verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  .seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>  .prop.landmarks <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  .tot.landmarks <span class="op">=</span> <span class="fl">5000</span>,</span>
 <span>  .n.threads <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="is.hpc.html">is.hpc</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>     <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">blas_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>    <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_max_threads</a></span><span class="op">(</span><span class="op">)</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -123,6 +125,7 @@ landmark selection, graph construction, optional cell typing, and mapping.</p>
 <span>  .verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  .seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>  .prop.landmarks <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  .tot.landmarks <span class="op">=</span> <span class="fl">5000</span>,</span>
 <span>  .n.threads <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="is.hpc.html">is.hpc</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>     <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">blas_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>    <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_max_threads</a></span><span class="op">(</span><span class="op">)</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -147,6 +150,7 @@ landmark selection, graph construction, optional cell typing, and mapping.</p>
 <span>  .verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  .seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>  .prop.landmarks <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  .tot.landmarks <span class="op">=</span> <span class="fl">5000</span>,</span>
 <span>  .n.threads <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="is.hpc.html">is.hpc</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>     <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">blas_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>    <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_max_threads</a></span><span class="op">(</span><span class="op">)</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -169,6 +173,7 @@ landmark selection, graph construction, optional cell typing, and mapping.</p>
 <span>  .verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  .seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>  .prop.landmarks <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  .tot.landmarks <span class="op">=</span> <span class="fl">5000</span>,</span>
 <span>  .n.threads <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="is.hpc.html">is.hpc</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>     <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">blas_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>    <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_max_threads</a></span><span class="op">(</span><span class="op">)</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -191,6 +196,7 @@ landmark selection, graph construction, optional cell typing, and mapping.</p>
 <span>  .verbose <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  .seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>  .prop.landmarks <span class="op">=</span> <span class="fl">0.1</span>,</span>
+<span>  .tot.landmarks <span class="op">=</span> <span class="fl">5000</span>,</span>
 <span>  .n.threads <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="is.hpc.html">is.hpc</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>     <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">blas_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>    <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_num_procs</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu">RhpcBLASctl</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/RhpcBLASctl/man/RhpcBLASctl-package.html" class="external-link">omp_get_max_threads</a></span><span class="op">(</span><span class="op">)</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -223,7 +229,7 @@ landmark selection, graph construction, optional cell typing, and mapping.</p>
 <dd><p>Additional arguments passed to <code>.run_tdr_matrix</code>
 (e.g. <code>.sample.var</code>, <code>.assay.type</code>, <code>.harmony.var</code>,
 <code>.markers</code>, <code>.celltype.vec</code>, <code>.min.cells.per.sample</code>,
-<code>.verbose</code>, <code>.seed</code>, <code>.prop.landmarks</code>,
+<code>.verbose</code>, <code>.seed</code>, <code>.prop.landmarks</code>, <code>.tot.landmarks</code>,
 <code>.n.threads</code>).</p></dd>
 
 
@@ -278,6 +284,10 @@ included.</p></dd>
 
 <dt id="arg--prop-landmarks">.prop.landmarks<a class="anchor" aria-label="anchor" href="#arg--prop-landmarks"></a></dt>
 <dd><p>Numeric in (0, 1]. Proportion of cells as landmarks.</p></dd>
+
+
+<dt id="arg--tot-landmarks">.tot.landmarks<a class="anchor" aria-label="anchor" href="#arg--tot-landmarks"></a></dt>
+<dd><p>Integer. Maximum total number of landmarks. Default 5000.</p></dd>
 
 
 <dt id="arg--n-threads">.n.threads<a class="anchor" aria-label="anchor" href="#arg--n-threads"></a></dt>
@@ -392,7 +402,7 @@ to the proven <code>IterableMatrix</code> pipeline via
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer></div>

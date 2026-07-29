@@ -22,6 +22,7 @@ get.subset(
   .id.from = "clustering",
   .label.confidence = NULL,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .min.cells.per.sample = 10,
   .verbose = TRUE,
   ...
@@ -76,6 +77,10 @@ get.subset(
   landmarks when the child pipeline runs
   [`get.landmarks()`](https://opensource.nibr.com/tinydenseR/reference/get.landmarks.md).
   Default 0.1 (10 percent).
+
+- .tot.landmarks:
+
+  Integer. Maximum total number of landmarks. Default 5000.
 
 - .min.cells.per.sample:
 

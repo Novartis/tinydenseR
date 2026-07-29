@@ -20,6 +20,7 @@ setup.tdr.obj(
   .verbose = TRUE,
   .seed = 123,
   .prop.landmarks = 0.1,
+  .tot.landmarks = 5000,
   .n.threads = if (is.hpc()) {
      max(RhpcBLASctl::blas_get_num_procs(),
     RhpcBLASctl::omp_get_num_procs(), RhpcBLASctl::omp_get_max_threads(), na.rm = TRUE)
@@ -63,7 +64,7 @@ setup.lm.obj(...)
 
 - .assay.type:
 
-  Character string: "cyto" for cytometry (default) or "RNA" for
+  Character string: `"cyto"` for cytometry (default) or `"RNA"` for
   scRNA-seq. Determines normalization strategy and feature selection
   approach.
 
@@ -82,8 +83,13 @@ setup.lm.obj(...)
 - .prop.landmarks:
 
   Numeric between 0 and 1 specifying proportion of cells to sample as
-  landmarks. Default 0.1 (10%). Total landmarks capped at about 5000
-  regardless.
+  landmarks. Default 0.1 (10%). Total landmarks capped at about
+  `".tot.landmarks"` regardless.
+
+- .tot.landmarks:
+
+  Integer specifying the maximum number of landmarks to sample. Default
+  5000.
 
 - .n.threads:
 
@@ -154,8 +160,8 @@ This function:
 
 1.  Validates input data structure and compatibility
 
-2.  Calculates the number of landmarks to sample per sample (max 5000
-    total)
+2.  Calculates the number of landmarks to sample per sample (default max
+    5000 total)
 
 3.  Creates a "key" vector mapping landmarks to samples
 
@@ -165,9 +171,9 @@ This function:
 5.  Performs quality checks (warns if sample sizes vary \>10-fold)
 
 The landmark sampling strategy aims for proportional representation
-across samples while capping total landmarks at 5000 for computational
-efficiency. Large samples are capped to prevent domination and ensure
-adequate representation.
+across samples while capping total landmarks at `.tot.landmarks`
+(default 5000) for computational efficiency. Large samples are capped to
+prevent domination and ensure adequate representation.
 
 ## Examples
 
