@@ -19,18 +19,19 @@ permissions: read-all
 jobs:
   R-CMD-check:
     runs-on: ${{ matrix.config.os }}
-    timeout-minutes: 45
+    # Cold installs of the Bioconductor + GitHub dependency set are slow, and
+    # Windows/macOS have no binaries for much of it.
+    timeout-minutes: 90
 
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
 
     strategy:
       fail-fast: false
       matrix:
-        config:
-          - {os: macos-latest,   r: 'release'}
-          - {os: windows-latest, r: 'release'}
-          - {os: ubuntu-latest,  r: 'release'}
-          
+        # Push/PR runs check Linux only; the scheduled and manual runs take the
+        # full three-OS matrix. Parenthesised group makes the ternary bind right.
+        config: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '[{"os":"ubuntu-latest","r":"release"},{"os":"macos-latest","r":"release"},{"os":"windows-latest","r":"release"}]' || '[{"os":"ubuntu-latest","r":"release"}]') }}
+
     continue-on-error: ${{ matrix.config.allow-failure || false }}
 
     env:
@@ -48,18 +49,18 @@ jobs:
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
 
-      # Install system tools required by --compact-vignettes=gs+qpdf
-      - name: Install Ghostscript & qpdf (Linux)
+      # System tools for --compact-vignettes=gs+qpdf, plus HDF5 for BPCells
+      - name: Install Ghostscript, qpdf & HDF5 (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ghostscript qpdf
+          sudo apt-get install -y ghostscript qpdf libhdf5-dev
 
-      - name: Install Ghostscript & qpdf (macOS)
+      - name: Install Ghostscript, qpdf & HDF5 (macOS)
         if: runner.os == 'macOS'
         run: |
           brew update
-          brew install ghostscript qpdf
+          brew install ghostscript qpdf hdf5
 
       - name: Install Ghostscript & qpdf (Windows)
         if: runner.os == 'Windows'
@@ -68,7 +69,11 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::rcmdcheck, BPCells=?ignore, destiny=?ignore
+          # BPCells is resolvable via the Remotes field but costly to compile,
+          # so it is only built on the scheduled/manual full runs.
+          # destiny is skipped everywhere: unavailable upstream, and its only
+          # use site in get.trad() already degrades gracefully.
+          extra-packages: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'any::rcmdcheck, destiny=?ignore' || 'any::rcmdcheck, destiny=?ignore, BPCells=?ignore' }}
           needs: check
           # Uncomment to bust cache if needed:
           # cache-version: 1

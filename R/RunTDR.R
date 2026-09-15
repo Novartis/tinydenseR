@@ -539,7 +539,7 @@ RunTDR.SingleCellExperiment <- function(x,
 
     if (!requireNamespace("BPCells", quietly = TRUE)) {
       stop("Package 'BPCells' is required for DelayedMatrix SCE support. ",
-           "Install it with: BiocManager::install('BPCells')", call. = FALSE)
+           "Install it with: pak::pak('bnprks/BPCells/r')", call. = FALSE)
     }
 
     if (isTRUE(.verbose)) {
@@ -1114,7 +1114,7 @@ RunTDR.HDF5AnnData <- function(x,
 
   if (!requireNamespace("BPCells", quietly = TRUE)) {
     stop("Package 'BPCells' is required for HDF5AnnData support. ",
-         "Install it with: BiocManager::install('BPCells')", call. = FALSE)
+         "Install it with: pak::pak('bnprks/BPCells/r')", call. = FALSE)
   }
 
   # --- Get backing file path ---
@@ -1315,7 +1315,7 @@ RunTDR.character <- function(x,
   }
   if (!requireNamespace("BPCells", quietly = TRUE)) {
     stop("Package 'BPCells' is required for h5ad file path support. ",
-         "Install it with: BiocManager::install('BPCells')", call. = FALSE)
+         "Install it with: pak::pak('bnprks/BPCells/r')", call. = FALSE)
   }
 
   h5ad_path <- normalizePath(x, mustWork = TRUE)
@@ -1908,7 +1908,7 @@ RunTDR.dgCMatrix <- function(x, .cell.meta, ...) {
 
   if (!requireNamespace("BPCells", quietly = TRUE)) {
     stop("Package 'BPCells' is required for DelayedMatrix \u2192 BPCells conversion. ",
-         "Install it with: BiocManager::install('BPCells')", call. = FALSE)
+         "Install it with: pak::pak('bnprks/BPCells/r')", call. = FALSE)
   }
 
   # --- Check if the DelayedMatrix is already BPCells-backed ---

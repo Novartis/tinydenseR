@@ -10,6 +10,11 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
+  schedule:
+    # Weekly run keeps the dependency cache alive: GitHub evicts caches after
+    # 7 days without a read, and pushes here are often weeks apart.
+    # NOTE: GitHub suspends cron triggers after 60 days of repo inactivity.
+    - cron: '0 6 * * 1'
 
 name: test-coverage
 
@@ -19,7 +24,9 @@ permissions:
 jobs:
   test-coverage:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # A cold dependency install alone has taken 23 min; covr instrumentation
+    # makes the test run several times slower than plain testthat.
+    timeout-minutes: 90
     
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
@@ -44,6 +51,8 @@ jobs:
       - name: Install R dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
+          # BPCells stays excluded here so the reported coverage % is comparable
+          # across runs; the BPCells paths are exercised by R-CMD-check instead.
           extra-packages: any::covr, any::xml2, BPCells=?ignore
           needs: coverage
           cache-version: 1
@@ -63,7 +72,8 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
         with:
-          fail_ci_if_error: true
+          # A Codecov outage should not be reported as a package failure.
+          fail_ci_if_error: false
           files: ./cobertura.xml
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true

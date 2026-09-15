@@ -9,7 +9,8 @@ License: MIT + file LICENSE
 URL: https://opensource.nibr.com/tinydenseR/
 BugReports: https://github.com/Novartis/tinydenseR/issues
 Remotes:
-    immunogenomics/symphony
+    immunogenomics/symphony,
+    bnprks/BPCells/r
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Collate: 
