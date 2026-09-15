@@ -129,12 +129,20 @@ leiden.cluster <-
     # Initialize with k-means to avoid starting Leiden from singletons
     # Up to 25 clusters or half the data size, whichever is smaller
     kres <-
-      stats::kmeans(x = .init.embed,
-                    centers = min(25,
-                                  (nrow(x = .init.embed) / 2) |>
-                                    ceiling()),
-                    nstart = 10,
-                    iter.max = 100)
+      withCallingHandlers(
+        expr = stats::kmeans(x = .init.embed,
+                             centers = min(25,
+                                           (nrow(x = .init.embed) / 2) |>
+                                             ceiling()),
+                             nstart = 10,
+                             iter.max = 100),
+        # ifault == 4 is repaired by the MacQueen retry below, so the warning
+        # only alarms users about something already handled.
+        warning = function(w){
+          if(grepl(pattern = "Quick-TRANSfer", x = conditionMessage(c = w))){
+            invokeRestart(r = "muffleWarning")
+          }
+        })
     
     # Handle k-means convergence failure (ifault=4: no convergence in iter.max)
     # Switch to MacQueen algorithm which is more robust but slower

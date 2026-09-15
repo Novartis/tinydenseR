@@ -360,7 +360,7 @@ lm.cells <-
 
 ### Visualize Differential Density
 
-We can now overlay the q-values and fold-change directions onto the landmark
+We can now overlay the log2 fold-change values onto the landmark
 UMAP. Density shifts span multiple immune compartments — including monocyte/DC,
 T/NK, and B/plasmablast-rich regions of the manifold — indicating broad cell-state
 remodeling in early critical relative to mild COVID-19.
