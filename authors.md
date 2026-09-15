@@ -8,7 +8,7 @@
 ## Citation
 
 Source:
-[`inst/CITATION`](https://github.com/Novartis/tinydenseR/blob/main/inst/CITATION)
+[`inst/CITATION`](https://github.com/Novartis/tinydenseR/blob/v0.1.0.0000/inst/CITATION)
 
 Milanez-Almeida, P. et al. (2025). Sample-level modeling of single-cell
 data at scale with tinydenseR. bioRxiv
@@ -18,7 +18,7 @@ https://doi.org/10.1101/2025.11.26.690752
       title = {Sample-level modeling of single-cell data at scale with tinydenseR},
       author = {Pedro Milanez-Almeida and Daniela Schildknecht and Markus Linder and Saskia M. Brachmann and Andreas Weiss and Flavia Adler and Sofia {Cardoni Lenticchia} and Morgane Meistertzheim and Sophia Wild and Rachel Cuttat and Pushpa Jayaraman and Lang Ho Lee and Tanya Mulvey and Nadia Hassounah and Gina Crafts and David S. Quinn and Elena J. Orlando},
       year = {2025},
-      note = {R package version 0.0.3.0001},
+      note = {R package version 0.1.0.0000},
       url = {https://www.biorxiv.org/content/10.1101/2025.11.26.690752},
       doi = {https://doi.org/10.1101/2025.11.26.690752},
     }
