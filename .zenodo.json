@@ -1,0 +1,45 @@
+{
+  "title": "tinydenseR: Linking Cell-To-Cell Variation to Sample-to-Sample Variation",
+  "description": "tinydenseR is a landmark-based platform for single cell data analysis that identifies differential cell states and features, including subtle within-cluster state changes. Modeling samples as replicates, tinydenseR enhances analytic efficiency and reproducibility while preserving the richness of single cell data.",
+  "upload_type": "software",
+  "license": "MIT",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Milanez-Almeida, Pedro",
+      "affiliation": "Novartis Biomedical Research",
+      "orcid": "0000-0001-8285-957X"
+    },
+    { "name": "Schildknecht, Daniela" },
+    { "name": "Linder, Markus" },
+    { "name": "Brachmann, Saskia M." },
+    { "name": "Weiss, Andreas" },
+    { "name": "Adler, Flavia" },
+    { "name": "Cardoni Lenticchia, Sofia" },
+    { "name": "Meistertzheim, Morgane" },
+    { "name": "Wild, Sophia" },
+    { "name": "Cuttat, Rachel" },
+    { "name": "Jayaraman, Pushpa" },
+    { "name": "Lee, Lang Ho" },
+    { "name": "Mulvey, Tanya" },
+    { "name": "Hassounah, Nadia" },
+    { "name": "Crafts, Gina" },
+    { "name": "Quinn, David S." },
+    { "name": "Orlando, Elena J." }
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.1101/2025.11.26.690752",
+      "relation": "isSupplementTo",
+      "scheme": "doi"
+    }
+  ],
+  "keywords": [
+    "single-cell",
+    "cytometry",
+    "scRNA-seq",
+    "differential abundance",
+    "clinical trials",
+    "R"
+  ]
+}

@@ -23,7 +23,7 @@ citEntry(
     person("Elena J.", "Orlando")
   ),
   year = "2025",
-  note = "R package version 0.0.3.0001",
+  note = "R package version 0.1.0.0000",
   url = "https://www.biorxiv.org/content/10.1101/2025.11.26.690752",
   doi = "https://doi.org/10.1101/2025.11.26.690752",
   textVersion = paste(
